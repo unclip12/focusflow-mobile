@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'app_lifecycle.dart';
 import 'core/navigation/app_router.dart';
 import 'core/providers/theme_provider.dart';
 import 'core/theme/app_theme.dart';
@@ -17,6 +18,9 @@ class FocusFlowApp extends ConsumerWidget {
       darkTheme: AppTheme.dark,
       themeMode: themeMode,
       routerConfig: appRouter,
+      builder: (context, child) => AppLifecycleObserver(
+        child: child!,
+      ),
     );
   }
 }
