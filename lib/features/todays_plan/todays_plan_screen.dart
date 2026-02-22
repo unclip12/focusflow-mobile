@@ -72,8 +72,7 @@ class TodaysPlanScreen extends ConsumerWidget {
                     children: [
                       Text('Tasks', style: Theme.of(context).textTheme.titleMedium),
                       if (tasks.isNotEmpty)
-                        Text('${tasks.length} total',
-                            style: Theme.of(context).textTheme.bodyMedium),
+                        Text('${tasks.length} total', style: Theme.of(context).textTheme.bodyMedium),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -111,7 +110,7 @@ class TodaysPlanScreen extends ConsumerWidget {
                       alignment: Alignment.centerRight,
                       padding: const EdgeInsets.only(right: 20),
                       decoration: BoxDecoration(
-                        color: AppColors.error.withOpacity(0.15),
+                        color: AppColors.error.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: const Icon(Icons.delete_rounded, color: AppColors.error),
@@ -154,7 +153,6 @@ class TodaysPlanScreen extends ConsumerWidget {
 class _TaskCard extends ConsumerWidget {
   final Task task;
   const _TaskCard({required this.task});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -176,9 +174,7 @@ class _TaskCard extends ConsumerWidget {
                 ),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: task.isDone
-                  ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
-                  : null,
+              child: task.isDone ? const Icon(Icons.check_rounded, size: 16, color: Colors.white) : null,
             ),
           ),
           const SizedBox(width: 14),
@@ -190,21 +186,15 @@ class _TaskCard extends ConsumerWidget {
                   task.title,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     decoration: task.isDone ? TextDecoration.lineThrough : null,
-                    color: task.isDone
-                        ? (isDark ? Colors.white38 : Colors.black38)
-                        : null,
+                    color: task.isDone ? (isDark ? Colors.white38 : Colors.black38) : null,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Row(children: [
-                  Text(task.category,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12)),
+                  Text(task.category, style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12)),
                   const SizedBox(width: 8),
-                  Container(
-                    width: 6, height: 6,
-                    decoration: BoxDecoration(
-                        color: priColors[task.priority], shape: BoxShape.circle),
-                  ),
+                  Container(width: 6, height: 6,
+                    decoration: BoxDecoration(color: priColors[task.priority], shape: BoxShape.circle)),
                 ]),
               ],
             ),
@@ -218,8 +208,7 @@ class _TaskCard extends ConsumerWidget {
 class _AddTaskSheet extends StatefulWidget {
   final void Function(String, String, int) onAdd;
   const _AddTaskSheet({required this.onAdd});
-  @override
-  State<_AddTaskSheet> createState() => _AddTaskSheetState();
+  @override State<_AddTaskSheet> createState() => _AddTaskSheetState();
 }
 
 class _AddTaskSheetState extends State<_AddTaskSheet> {
@@ -270,7 +259,7 @@ class _AddTaskSheetState extends State<_AddTaskSheet> {
                     label: Text(['Low', 'Medium', 'High'][p]),
                     selected: _priority == p,
                     onSelected: (_) => setState(() => _priority = p),
-                    selectedColor: [AppColors.info, AppColors.warning, AppColors.error][p].withOpacity(0.25),
+                    selectedColor: [AppColors.info, AppColors.warning, AppColors.error][p].withValues(alpha: 0.25),
                   )),
             ]),
             const SizedBox(height: 24),
@@ -301,7 +290,6 @@ class _AddTaskSheetState extends State<_AddTaskSheet> {
 class _RingPainter extends CustomPainter {
   final double progress;
   _RingPainter(this.progress);
-
   @override
   void paint(Canvas canvas, Size size) {
     final c = Offset(size.width / 2, size.height / 2);
@@ -320,7 +308,6 @@ class _RingPainter extends CustomPainter {
       );
     }
   }
-
   @override
   bool shouldRepaint(_RingPainter old) => old.progress != progress;
 }

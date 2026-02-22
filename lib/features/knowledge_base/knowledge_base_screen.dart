@@ -20,8 +20,8 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered  = ref.watch(filteredKBProvider);
-    final selCat    = ref.watch(kbCategoryProvider);
+    final filtered   = ref.watch(filteredKBProvider);
+    final selCat     = ref.watch(kbCategoryProvider);
     final entryCount = ref.watch(kbProvider).length;
 
     return Scaffold(
@@ -41,11 +41,9 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: AppColors.accentGlow,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text('$entryCount entries',
-                            style: const TextStyle(fontSize: 12, color: AppColors.accent, fontWeight: FontWeight.w600)),
+                          color: AppColors.accentGlow, borderRadius: BorderRadius.circular(10)),
+                        child: Text('$entryCount entries', style: const TextStyle(
+                            fontSize: 12, color: AppColors.accent, fontWeight: FontWeight.w600)),
                       ),
                     ],
                   ),
@@ -98,8 +96,7 @@ class _KnowledgeBaseScreenState extends ConsumerState<KnowledgeBaseScreen> {
                       const SizedBox(height: 12),
                       Text('No entries yet', style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 4),
-                      Text('Tap + to add your first note',
-                          style: Theme.of(context).textTheme.bodyMedium),
+                      Text('Tap + to add your first note', style: Theme.of(context).textTheme.bodyMedium),
                     ],
                   ),
                 ),
@@ -208,7 +205,7 @@ class _KBCard extends ConsumerWidget {
             children: [
               Center(child: Container(width: 40, height: 5,
                 decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.35),
+                  color: const Color(0x59808080),
                   borderRadius: BorderRadius.circular(3)))),
               const SizedBox(height: 20),
               Container(
@@ -312,8 +309,7 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
             if (_tags.isNotEmpty) Wrap(
               spacing: 8,
               children: _tags.map((t) => Chip(
-                label: Text(t),
-                onDeleted: () => setState(() => _tags.remove(t)),
+                label: Text(t), onDeleted: () => setState(() => _tags.remove(t)),
               )).toList(),
             ),
             const SizedBox(height: 24),

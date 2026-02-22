@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/theme_provider.dart';
@@ -20,16 +19,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _loading = false;
 
   @override
-  void initState() {
-    super.initState();
-    _loadPrefs();
-  }
+  void initState() { super.initState(); _loadPrefs(); }
 
   @override
   void dispose() { _apiKeyCtrl.dispose(); super.dispose(); }
 
   Future<void> _loadPrefs() async {
-    final svc = ref.read(backupServiceProvider);
+    final svc  = ref.read(backupServiceProvider);
     final key  = await svc.getApiKey();
     final auto = await svc.isAutoSyncEnabled();
     setState(() { _apiKeyCtrl.text = key; _autoSync = auto; });
@@ -37,9 +33,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final themeMode  = ref.watch(themeModeProvider);
-    final snapshots  = ref.watch(backupSnapshotsProvider);
-    final isDark     = Theme.of(context).brightness == Brightness.dark;
+    final themeMode = ref.watch(themeModeProvider);
+    final snapshots = ref.watch(backupSnapshotsProvider);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -54,7 +49,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   Text('Settings', style: Theme.of(context).textTheme.displayMedium),
                   const SizedBox(height: 24),
 
-                  // ── Theme ──────────────────────────────────────────────────
+                  // ─ Appearance
                   _SectionHeader(title: 'Appearance'),
                   GlassCard(
                     padding: const EdgeInsets.all(16),
@@ -74,34 +69,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                     duration: 200.ms,
                                     padding: const EdgeInsets.symmetric(vertical: 12),
                                     decoration: BoxDecoration(
-                                      color: themeMode == mode
-                                          ? AppColors.accent
-                                          : AppColors.accentGlow,
+                                      color: themeMode == mode ? AppColors.accent : AppColors.accentGlow,
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
-                                        color: themeMode == mode
-                                            ? AppColors.accent
-                                            : Colors.transparent,
+                                        color: themeMode == mode ? AppColors.accent : Colors.transparent),
+                                    ),
+                                    child: Column(children: [
+                                      Icon(
+                                        [Icons.dark_mode_rounded, Icons.light_mode_rounded, Icons.contrast_rounded][mode.index],
+                                        color: themeMode == mode ? Colors.white : AppColors.accent,
+                                        size: 22,
                                       ),
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        Icon(
-                                          [Icons.dark_mode_rounded, Icons.light_mode_rounded, Icons.contrast_rounded][mode.index],
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        ['Dark', 'Light', 'Auto'][mode.index],
+                                        style: TextStyle(
+                                          fontSize: 11, fontWeight: FontWeight.w600,
                                           color: themeMode == mode ? Colors.white : AppColors.accent,
-                                          size: 22,
                                         ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          ['Dark', 'Light', 'Auto'][mode.index],
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: themeMode == mode ? Colors.white : AppColors.accent,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                      ),
+                                    ]),
                                   ),
                                 ),
                               ),
@@ -113,7 +100,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                   const SizedBox(height: 24),
 
-                  // ── AI ─────────────────────────────────────────────────────
+                  // ─ AI
                   _SectionHeader(title: 'AI Mentor (Gemini)'),
                   GlassCard(
                     padding: const EdgeInsets.all(16),
@@ -134,7 +121,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  icon: Icon(_apiKeyObscure ? Icons.visibility_rounded : Icons.visibility_off_rounded),
+                                  icon: Icon(_apiKeyObscure
+                                      ? Icons.visibility_rounded
+                                      : Icons.visibility_off_rounded),
                                   onPressed: () => setState(() => _apiKeyObscure = !_apiKeyObscure),
                                 ),
                                 IconButton(
@@ -157,111 +146,102 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                   const SizedBox(height: 24),
 
-                  // ── Backup & Sync ──────────────────────────────────────────
+                  // ─ Backup
                   _SectionHeader(title: 'Backup & Sync'),
                   GlassCard(
                     padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        Row(children: [
-                          const Icon(Icons.cloud_sync_rounded, color: AppColors.accent),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Auto Backup', style: Theme.of(context).textTheme.titleMedium),
-                                Text('Saves on app close',
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12)),
-                              ],
+                    child: Column(children: [
+                      Row(children: [
+                        const Icon(Icons.cloud_sync_rounded, color: AppColors.accent),
+                        const SizedBox(width: 12),
+                        Expanded(child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Auto Backup', style: Theme.of(context).textTheme.titleMedium),
+                            Text('Saves on app close',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12)),
+                          ],
+                        )),
+                        Switch(
+                          value: _autoSync,
+                          activeColor: AppColors.accent,
+                          onChanged: (v) async {
+                            setState(() => _autoSync = v);
+                            await ref.read(backupServiceProvider).setAutoSync(v);
+                          },
+                        ),
+                      ]),
+                      const Divider(height: 24),
+                      Row(children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _loading ? null : _createManualBackup,
+                            icon: _loading
+                                ? const SizedBox(width: 16, height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2))
+                                : const Icon(Icons.backup_rounded),
+                            label: const Text('Backup Now'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.accent,
+                              side: const BorderSide(color: AppColors.accent),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                           ),
-                          Switch(
-                            value: _autoSync,
-                            activeColor: AppColors.accent,
-                            onChanged: (v) async {
-                              setState(() => _autoSync = v);
-                              await ref.read(backupServiceProvider).setAutoSync(v);
-                            },
-                          ),
-                        ]),
-                        const Divider(height: 24),
-                        Row(children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _loading ? null : _createManualBackup,
-                              icon: _loading
-                                  ? const SizedBox(width: 16, height: 16,
-                                      child: CircularProgressIndicator(strokeWidth: 2))
-                                  : const Icon(Icons.backup_rounded),
-                              label: const Text('Backup Now'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.accent,
-                                side: const BorderSide(color: AppColors.accent),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _importBackup,
+                            icon: const Icon(Icons.upload_file_rounded),
+                            label: const Text('Import'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.accentLight,
+                              side: const BorderSide(color: AppColors.accentLight),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _importBackup,
-                              icon: const Icon(Icons.upload_file_rounded),
-                              label: const Text('Import'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.accentLight,
-                                side: const BorderSide(color: AppColors.accentLight),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                            ),
-                          ),
-                        ]),
-                      ],
-                    ),
+                        ),
+                      ]),
+                    ]),
                   ).animate().fadeIn(delay: 150.ms),
 
-                  const SizedBox(height: 20),
-
-                  // ── Snapshot list ─────────────────────────────────────────
-                  if (snapshots.isNotEmpty) ...
-                    [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Snapshots (${snapshots.length}/30)',
-                              style: Theme.of(context).textTheme.titleMedium),
-                          Text('Swipe to delete',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11)),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      ...snapshots.asMap().entries.map((e) =>
-                          _SnapshotTile(
-                            snapshot: e.value,
-                            onRestore: () => _restoreSnapshot(e.value),
-                            onExport: () => ref.read(backupServiceProvider).exportToFile(e.value),
-                            onDelete: () => ref.read(backupSnapshotsProvider.notifier).delete(e.value.id),
-                          ).animate(delay: (e.key * 30).ms).fadeIn().slideX(begin: 0.06),
-                      ),
-                    ],
+                  if (snapshots.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Snapshots (${snapshots.length}/30)',
+                            style: Theme.of(context).textTheme.titleMedium),
+                        Text('Swipe to delete',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ...snapshots.asMap().entries.map((e) =>
+                      _SnapshotTile(
+                        snapshot: e.value,
+                        onRestore: () => _restoreSnapshot(e.value),
+                        onExport: () => ref.read(backupServiceProvider).exportToFile(e.value),
+                        onDelete: () => ref.read(backupSnapshotsProvider.notifier).delete(e.value.id),
+                      ).animate(delay: (e.key * 30).ms).fadeIn().slideX(begin: 0.06),
+                    ),
+                  ],
 
                   const SizedBox(height: 24),
 
-                  // ── About ─────────────────────────────────────────────────
+                  // ─ About
                   _SectionHeader(title: 'About'),
                   GlassCard(
                     padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        _AboutRow(icon: Icons.info_rounded, label: 'Version', value: '1.0.0'),
-                        const Divider(height: 20),
-                        _AboutRow(icon: Icons.code_rounded, label: 'Built with', value: 'Flutter + Riverpod'),
-                        const Divider(height: 20),
-                        _AboutRow(icon: Icons.storage_rounded, label: 'Storage', value: 'Offline • Hive'),
-                      ],
-                    ),
+                    child: Column(children: [
+                      _AboutRow(icon: Icons.info_rounded,    label: 'Version',    value: '1.0.0'),
+                      const Divider(height: 20),
+                      _AboutRow(icon: Icons.code_rounded,    label: 'Built with', value: 'Flutter + Riverpod'),
+                      const Divider(height: 20),
+                      _AboutRow(icon: Icons.storage_rounded, label: 'Storage',    value: 'Offline • Hive'),
+                    ]),
                   ).animate().fadeIn(delay: 200.ms),
 
                   const SizedBox(height: 120),
@@ -279,10 +259,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final snap = ref.read(backupServiceProvider).createSnapshot(isAuto: false);
       ref.read(backupSnapshotsProvider.notifier).add(snap);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✅ Backup created!')));
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ Backup created!')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -305,10 +283,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
     if (confirmed != true || !mounted) return;
     await ref.read(backupServiceProvider).restoreSnapshot(snap);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Data restored! Restart the app.')));
-    }
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('✅ Data restored! Restart the app.')));
   }
 
   Future<void> _importBackup() async {
@@ -326,11 +302,8 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 10),
-        child: Text(title,
-            style: Theme.of(context)
-                .textTheme
-                .labelLarge
-                ?.copyWith(color: AppColors.accent, letterSpacing: 0.5)),
+        child: Text(title, style: Theme.of(context).textTheme.labelLarge
+            ?.copyWith(color: AppColors.accent, letterSpacing: 0.5)),
       );
 }
 
@@ -357,53 +330,47 @@ class _SnapshotTile extends StatelessWidget {
     required this.onExport,
     required this.onDelete,
   });
-
   @override
-  Widget build(BuildContext context) {
-    return Dismissible(
-      key: Key(snapshot.id),
-      direction: DismissDirection.endToStart,
-      onDismissed: (_) => onDelete(),
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        decoration: BoxDecoration(
-          color: AppColors.error.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(14),
+  Widget build(BuildContext context) => Dismissible(
+    key: Key(snapshot.id),
+    direction: DismissDirection.endToStart,
+    onDismissed: (_) => onDelete(),
+    background: Container(
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.only(right: 20),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: const Icon(Icons.delete_rounded, color: AppColors.error),
+    ),
+    child: GlassCard(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(children: [
+        Icon(
+          snapshot.isAuto ? Icons.cloud_done_rounded : Icons.save_rounded,
+          color: snapshot.isAuto ? AppColors.info : AppColors.accent,
+          size: 20,
         ),
-        child: const Icon(Icons.delete_rounded, color: AppColors.error),
-      ),
-      child: GlassCard(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(children: [
-          Icon(
-            snapshot.isAuto ? Icons.cloud_done_rounded : Icons.save_rounded,
-            color: snapshot.isAuto ? AppColors.info : AppColors.accent,
-            size: 20,
-          ),
-          const SizedBox(width: 12),
-          Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(snapshot.label, style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontSize: 14)),
-              Text(
-                snapshot.createdAt.toString().substring(0, 16),
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
-              ),
-            ],
-          )),
-          IconButton(
-            icon: const Icon(Icons.share_rounded, size: 18, color: AppColors.accentLight),
-            onPressed: onExport,
-            tooltip: 'Export',
-          ),
-          TextButton(
-            onPressed: onRestore,
-            style: TextButton.styleFrom(foregroundColor: AppColors.accent),
-            child: const Text('Restore', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-          ),
-        ]),
-      ),
-    );
-  }
+        const SizedBox(width: 12),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(snapshot.label, style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontSize: 14)),
+            Text(snapshot.createdAt.toString().substring(0, 16),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11)),
+          ],
+        )),
+        IconButton(
+          icon: const Icon(Icons.share_rounded, size: 18, color: AppColors.accentLight),
+          onPressed: onExport, tooltip: 'Export',
+        ),
+        TextButton(
+          onPressed: onRestore,
+          style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+          child: const Text('Restore', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        ),
+      ]),
+    ),
+  );
 }

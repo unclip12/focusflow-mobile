@@ -66,7 +66,8 @@ class FALoggerScreen extends ConsumerWidget {
               ),
             ),
           ),
-          if (sessions.isNotEmpty) ...[            SliverToBoxAdapter(
+          if (sessions.isNotEmpty) ...[
+            SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 28, 20, 12),
                 child: Text('Recent Sessions', style: Theme.of(context).textTheme.titleMedium),
@@ -89,7 +90,7 @@ class FALoggerScreen extends ConsumerWidget {
                         alignment: Alignment.centerRight,
                         padding: const EdgeInsets.only(right: 20),
                         decoration: BoxDecoration(
-                          color: AppColors.error.withOpacity(0.15),
+                          color: AppColors.error.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: const Icon(Icons.delete_rounded, color: AppColors.error),
@@ -104,8 +105,7 @@ class FALoggerScreen extends ConsumerWidget {
                           Expanded(child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(s.subject,
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 14)),
+                              Text(s.subject, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 14)),
                               Text('${s.pages} pages  •  ${s.durationMin} min',
                                   style: Theme.of(context).textTheme.bodyMedium),
                               if (s.notes != null)
@@ -185,7 +185,7 @@ class _SubjectCard extends StatelessWidget {
         ]),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text('$pages pg', style: TextStyle(fontSize: 13, color: color, fontWeight: FontWeight.w700)),
-          Icon(Icons.add_circle_rounded, color: color.withOpacity(0.7), size: 20),
+          Icon(Icons.add_circle_rounded, color: color.withValues(alpha: 0.7), size: 20),
         ]),
       ],
     ),
@@ -238,7 +238,7 @@ class _LogSheetState extends State<_LogSheet> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(
-                  color: widget.color.withOpacity(0.15),
+                  color: widget.color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10)),
                 child: Text('$_pages', style: TextStyle(
                     fontSize: 18, fontWeight: FontWeight.w700, color: widget.color)),
@@ -255,7 +255,7 @@ class _LogSheetState extends State<_LogSheet> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(
-                  color: widget.color.withOpacity(0.15),
+                  color: widget.color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10)),
                 child: Text('${_duration}m', style: TextStyle(
                     fontSize: 18, fontWeight: FontWeight.w700, color: widget.color)),
