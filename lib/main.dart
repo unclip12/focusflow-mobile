@@ -1,26 +1,30 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'app.dart';
+import 'providers/app_provider.dart';
+import 'providers/settings_provider.dart';
+import 'providers/knowledge_base_provider.dart';
+import 'providers/plan_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Hive.initFlutter();
-
-  // Open all Hive boxes used across the app
-  await Future.wait([
-    Hive.openBox('todays_plan'),
-    Hive.openBox('knowledge_base'),
-    Hive.openBox('fa_logger'),
-    Hive.openBox('focus_timer'),
-    Hive.openBox('time_logger'),
-    Hive.openBox('fmge'),
-    Hive.openBox('revision'),
-    Hive.openBox('analytics'),
-    Hive.openBox('backups'),
-    Hive.openBox('settings'),
+  // Lock to portrait orientation
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
   ]);
 
-  runApp(const ProviderScope(child: FocusFlowApp()));
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => SettingsProvider()..init()),
+        ChangeNotifierProvider(create: (_) => AppProvider()..init()),
+        ChangeNotifierProvider(create: (_) => KnowledgeBaseProvider()..init()),
+        ChangeNotifierProvider(create: (_) => PlanProvider()..init()),
+      ],
+      child: const FocusFlowApp(),
+    ),
+  );
 }

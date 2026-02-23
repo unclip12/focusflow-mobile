@@ -1,26 +1,29 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'app_lifecycle.dart';
-import 'core/navigation/app_router.dart';
-import 'core/providers/theme_provider.dart';
-import 'core/theme/app_theme.dart';
+import 'package:provider/provider.dart';
+import 'providers/settings_provider.dart';
+import 'utils/app_theme.dart';
+import 'app_router.dart';
 
-class FocusFlowApp extends ConsumerWidget {
+class FocusFlowApp extends StatelessWidget {
   const FocusFlowApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final themeMode = ref.watch(themeModeProvider);
-    return MaterialApp.router(
-      title: 'FocusFlow',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: themeMode,
-      routerConfig: appRouter,
-      builder: (context, child) => AppLifecycleObserver(
-        child: child!,
-      ),
+  Widget build(BuildContext context) {
+    return Consumer<SettingsProvider>(
+      builder: (context, settings, _) {
+        final theme = AppTheme.buildTheme(
+          themeName: settings.themeName,
+          accentColor: settings.accentColor,
+          isDark: settings.isDarkMode,
+          fontSize: settings.fontSize,
+        );
+        return MaterialApp.router(
+          title: 'FocusFlow',
+          theme: theme,
+          routerConfig: appRouter,
+          debugShowCheckedModeBanner: false,
+        );
+      },
     );
   }
 }
