@@ -1,6 +1,5 @@
 name: focusflow_mobile
-description: FocusFlow — Offline medical study companion for Flutter.
-
+description: FocusFlow - Offline Medical Study Planner
 publish_to: 'none'
 version: 1.0.0+1
 

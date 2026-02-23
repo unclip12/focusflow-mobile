@@ -4,13 +4,15 @@ import 'package:provider/provider.dart';
 import 'app.dart';
 import 'providers/app_provider.dart';
 import 'providers/settings_provider.dart';
-import 'providers/knowledge_base_provider.dart';
-import 'providers/plan_provider.dart';
+import 'services/database_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Lock to portrait orientation
+  // Initialise SQLite — creates all tables on first run
+  await DatabaseService.instance.database;
+
+  // Portrait-only layout
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -19,10 +21,8 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => SettingsProvider()..init()),
-        ChangeNotifierProvider(create: (_) => AppProvider()..init()),
-        ChangeNotifierProvider(create: (_) => KnowledgeBaseProvider()..init()),
-        ChangeNotifierProvider(create: (_) => PlanProvider()..init()),
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProvider(create: (_) => AppProvider()),
       ],
       child: const FocusFlowApp(),
     ),
