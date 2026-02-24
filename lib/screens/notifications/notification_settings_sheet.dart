@@ -220,7 +220,7 @@ class _NotificationSettingsSheetState
                 const Spacer(),
                 Switch.adaptive(
                   value:            _quietEnabled,
-                  activeThumbColor: cs.primary,
+                  activeColor: cs.primary,
                   onChanged: (v) {
                     setState(() => _quietEnabled = v);
                     _saveQuietHours();
@@ -313,7 +313,7 @@ class _ToggleTile extends StatelessWidget {
           ),
           Switch.adaptive(
             value:            value,
-            activeThumbColor: cs.primary,
+            activeColor: cs.primary,
             onChanged:        onChanged,
           ),
         ],
