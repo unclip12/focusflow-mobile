@@ -1,0 +1,366 @@
+// =============================================================
+// TodayPlanScreen — shows today's blocks in timeline
+// Date header with prev/next day arrows, block list, generate plan
+// =============================================================
+
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:focusflow_mobile/providers/app_provider.dart';
+import 'package:focusflow_mobile/models/day_plan.dart';
+import 'package:focusflow_mobile/utils/constants.dart';
+import 'package:focusflow_mobile/utils/date_utils.dart';
+import 'package:focusflow_mobile/services/haptics_service.dart';
+import 'package:focusflow_mobile/widgets/app_scaffold.dart';
+import 'block_card.dart';
+
+class TodayPlanScreen extends StatefulWidget {
+  const TodayPlanScreen({super.key});
+
+  @override
+  State<TodayPlanScreen> createState() => _TodayPlanScreenState();
+}
+
+class _TodayPlanScreenState extends State<TodayPlanScreen> {
+  late DateTime _selectedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = AppDateUtils.getAdjustedDate();
+  }
+
+  String get _dateKey => AppDateUtils.formatDate(_selectedDate);
+  bool get _isToday => AppDateUtils.isSameDay(_selectedDate, AppDateUtils.getAdjustedDate());
+
+  void _prevDay() => setState(() {
+        _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+      });
+
+  void _nextDay() => setState(() {
+        _selectedDate = _selectedDate.add(const Duration(days: 1));
+      });
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppProvider>();
+    final DayPlan? plan = app.getDayPlan(_dateKey);
+    final blocks = List<Block>.from(plan?.blocks ?? []);
+    // Sort blocks by startTime
+    blocks.sort((a, b) => a.plannedStartTime.compareTo(b.plannedStartTime));
+
+    // Calculate streak for scaffold
+    final now = DateTime.now();
+    int streak = 0;
+    for (int i = 0; i < 365; i++) {
+      final d = now.subtract(Duration(days: i));
+      final ds = DateFormat('yyyy-MM-dd').format(d);
+      final hasLogs =
+          app.timeLogs.any((l) => l.date == ds && l.durationMinutes > 0);
+      if (hasLogs) {
+        streak++;
+      } else {
+        if (i == 0) continue;
+        break;
+      }
+    }
+
+    return AppScaffold(
+      screenName: "Today's Plan",
+      streakCount: streak,
+      body: Column(
+        children: [
+          // ── Date navigation ─────────────────────────────────────
+          _DateHeader(
+            date: _selectedDate,
+            isToday: _isToday,
+            onPrev: _prevDay,
+            onNext: _nextDay,
+            onToday: () => setState(() {
+              _selectedDate = AppDateUtils.getAdjustedDate();
+            }),
+          ),
+
+          // ── Plan summary bar ────────────────────────────────────
+          if (plan != null)
+            _PlanSummaryBar(plan: plan, blocks: blocks),
+
+          // ── Block list or empty ─────────────────────────────────
+          Expanded(
+            child: blocks.isEmpty
+                ? _EmptyState(
+                    hasNoPlan: plan == null,
+                    onGenerate: () => _generatePlan(context),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    itemCount: blocks.length,
+                    itemBuilder: (context, i) {
+                      final b = blocks[i];
+                      return BlockCard(
+                        block: b,
+                        dayPlan: plan!,
+                        onStart: () => _startBlock(app, plan, b),
+                        onSkip: () => _skipBlock(app, plan, b),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _generatePlan(BuildContext context) {
+    // Placeholder — in a later batch this will call AI plan generation
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Plan generation coming in a future batch'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _startBlock(AppProvider app, DayPlan plan, Block block) {
+    HapticsService.medium();
+    final now = DateTime.now().toIso8601String();
+    final blocks = List<Block>.from(plan.blocks ?? []);
+
+    // Pause any active block
+    for (int i = 0; i < blocks.length; i++) {
+      if (blocks[i].status == BlockStatus.inProgress &&
+          blocks[i].id != block.id) {
+        blocks[i] = blocks[i].copyWith(status: BlockStatus.paused);
+      }
+    }
+
+    // Start this block
+    final idx = blocks.indexWhere((b) => b.id == block.id);
+    if (idx >= 0) {
+      blocks[idx] = blocks[idx].copyWith(
+        status: BlockStatus.inProgress,
+        actualStartTime: blocks[idx].actualStartTime ?? now,
+      );
+    }
+
+    app.upsertDayPlan(plan.copyWith(blocks: blocks));
+  }
+
+  void _skipBlock(AppProvider app, DayPlan plan, Block block) {
+    HapticsService.medium();
+    final blocks = List<Block>.from(plan.blocks ?? []);
+    final idx = blocks.indexWhere((b) => b.id == block.id);
+    if (idx >= 0) {
+      blocks[idx] = blocks[idx].copyWith(status: BlockStatus.skipped);
+    }
+    app.upsertDayPlan(plan.copyWith(blocks: blocks));
+  }
+}
+
+// ── Date header ─────────────────────────────────────────────────
+class _DateHeader extends StatelessWidget {
+  final DateTime date;
+  final bool isToday;
+  final VoidCallback onPrev;
+  final VoidCallback onNext;
+  final VoidCallback onToday;
+
+  const _DateHeader({
+    required this.date,
+    required this.isToday,
+    required this.onPrev,
+    required this.onNext,
+    required this.onToday,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left_rounded),
+            onPressed: onPrev,
+            color: cs.onSurface.withValues(alpha: 0.6),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: isToday ? null : onToday,
+              child: Column(
+                children: [
+                  Text(
+                    isToday
+                        ? 'Today'
+                        : DateFormat('EEEE').format(date),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: isToday ? cs.primary : cs.onSurface,
+                    ),
+                  ),
+                  Text(
+                    DateFormat('d MMMM yyyy').format(date),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontSize: 12,
+                      color: cs.onSurface.withValues(alpha: 0.45),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right_rounded),
+            onPressed: onNext,
+            color: cs.onSurface.withValues(alpha: 0.6),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Plan summary bar ────────────────────────────────────────────
+class _PlanSummaryBar extends StatelessWidget {
+  final DayPlan plan;
+  final List<Block> blocks;
+
+  const _PlanSummaryBar({required this.plan, required this.blocks});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    final done = blocks.where((b) => b.status == BlockStatus.done).length;
+    final total = blocks.length;
+    final studyMins = plan.totalStudyMinutesPlanned;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: cs.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _SummaryChip(
+            icon: Icons.view_agenda_rounded,
+            label: '$done/$total blocks',
+            color: cs.primary,
+          ),
+          _SummaryChip(
+            icon: Icons.schedule_rounded,
+            label: '${(studyMins / 60).toStringAsFixed(1)}h planned',
+            color: const Color(0xFF10B981),
+          ),
+          if (plan.faPagesCount > 0)
+            _SummaryChip(
+              icon: Icons.menu_book_rounded,
+              label: '${plan.faPagesCount} pages',
+              color: const Color(0xFF8B5CF6),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _SummaryChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Empty state ─────────────────────────────────────────────────
+class _EmptyState extends StatelessWidget {
+  final bool hasNoPlan;
+  final VoidCallback onGenerate;
+
+  const _EmptyState({required this.hasNoPlan, required this.onGenerate});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              hasNoPlan
+                  ? Icons.calendar_today_rounded
+                  : Icons.check_circle_outline_rounded,
+              size: 48,
+              color: cs.primary.withValues(alpha: 0.3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              hasNoPlan ? 'No plan for this day' : 'No blocks yet',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: cs.onSurface.withValues(alpha: 0.5),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              hasNoPlan
+                  ? 'Generate a plan to get started'
+                  : 'Add blocks to your plan',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: cs.onSurface.withValues(alpha: 0.35),
+              ),
+            ),
+            if (hasNoPlan) ...[
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: onGenerate,
+                icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                label: const Text('Generate Plan'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}

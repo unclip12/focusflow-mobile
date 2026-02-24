@@ -92,8 +92,7 @@ class AppDateUtils {
 
   /// Returns a list of DateTime objects for every day in the given month.
   static List<DateTime> daysInMonth(int year, int month) {
-    final first = DateTime(year, month, 1);
-    final last  = DateTime(year, month + 1, 0); // last day trick
+    final last = DateTime(year, month + 1, 0); // last day trick
     return List.generate(
       last.day,
       (i) => DateTime(year, month, i + 1),
