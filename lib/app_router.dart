@@ -26,6 +26,7 @@ import 'package:focusflow_mobile/screens/profile/profile_screen.dart';
 import 'package:focusflow_mobile/screens/analytics/analytics_screen.dart';
 import 'package:focusflow_mobile/screens/daily_tracker/daily_tracker_screen.dart';
 import 'package:focusflow_mobile/screens/mentor/mentor_screen.dart';
+import 'package:focusflow_mobile/screens/session/session_screen.dart';
 
 // ── Route names (used by GoRouter named navigation) ─────────────
 class Routes {
@@ -51,6 +52,7 @@ class Routes {
   static const profile       = 'profile';
   static const analytics     = 'analytics';
   static const mentor        = 'mentor';
+  static const session       = 'session';
 }
 
 // ── Router configuration ────────────────────────────────────────
@@ -208,6 +210,16 @@ final GoRouter appRouter = GoRouter(
       path: '/mentor',
       name: Routes.mentor,
       builder: (context, state) => const MentorScreen(),
+    ),
+
+    // ── Session Focus Timer ───────────────────────────────────
+    GoRoute(
+      path: '/session',
+      name: Routes.session,
+      builder: (context, state) {
+        final args = state.extra as SessionArgs;
+        return SessionScreen(args: args);
+      },
     ),
   ],
 );

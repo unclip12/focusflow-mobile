@@ -113,6 +113,7 @@ class AppProvider extends ChangeNotifier {
   List<HistoryRecord> history = [];
   List<AppNotification> notifications = [];
   List<Habit> habits = [];
+  List<RevisionItem> revisionItems = [];
 
   MentorMemory? mentorMemory;
   AISettings? aiSettings;
@@ -159,6 +160,10 @@ class AppProvider extends ChangeNotifier {
 
     history = (await _db.getAllHistory())
         .map((j) => HistoryRecord.fromJson(j))
+        .toList();
+
+    revisionItems = (await _db.getAllRevisionItems())
+        .map((j) => RevisionItem.fromJson(j))
         .toList();
 
     // Singletons
@@ -470,6 +475,23 @@ class AppProvider extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════════
+  // REVISION ITEMS
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> upsertRevisionItem(RevisionItem item) async {
+    await _db.upsertRevisionItem(item.toJson());
+    final idx = revisionItems.indexWhere((e) => e.id == item.id);
+    if (idx >= 0) { revisionItems[idx] = item; } else { revisionItems.add(item); }
+    notifyListeners();
+  }
+
+  Future<void> deleteRevisionItem(String id) async {
+    await _db.deleteRevisionItem(id);
+    revisionItems.removeWhere((e) => e.id == id);
+    notifyListeners();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // NOTIFICATIONS
   // ═══════════════════════════════════════════════════════════════
 
@@ -635,6 +657,7 @@ class AppProvider extends ChangeNotifier {
     history.clear();
     notifications.clear();
     habits.clear();
+    revisionItems.clear();
     mentorMemory = null;
     aiSettings = null;
     userProfile = null;

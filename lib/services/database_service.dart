@@ -49,6 +49,7 @@ class DatabaseService {
   static const tSettings = 'settings';
   static const tHistory = 'history';
   static const tRevisionSettings = 'revision_settings';
+  static const tRevisionItems = 'revision_items';
 
   Future<void> _onCreate(Database db, int version) async {
     // Knowledge Base — pageNumber is the primary key
@@ -190,6 +191,15 @@ class DatabaseService {
       CREATE TABLE $tRevisionSettings (
         id TEXT PRIMARY KEY DEFAULT 'singleton',
         data TEXT NOT NULL
+      )
+    ''');
+
+    // Revision Items — scheduled revision entries
+    await db.execute('''
+      CREATE TABLE $tRevisionItems (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        pageNumber TEXT
       )
     ''');
   }
@@ -521,6 +531,21 @@ class DatabaseService {
   Future<int> deleteAllHistory() => deleteAll(tHistory);
 
   // ═══════════════════════════════════════════════════════════════
+  // REVISION ITEMS
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> upsertRevisionItem(Map<String, dynamic> json) => upsert(
+        tRevisionItems, 'id', json['id'] ?? '', json,
+        indexColumns: {'pageNumber': json['pageNumber']},
+      );
+
+  Future<List<Map<String, dynamic>>> getAllRevisionItems() =>
+      getAll(tRevisionItems);
+
+  Future<int> deleteRevisionItem(String id) =>
+      deleteById(tRevisionItems, 'id', id);
+
+  // ═══════════════════════════════════════════════════════════════
   // BULK OPERATIONS (for backup restore)
   // ═══════════════════════════════════════════════════════════════
 
@@ -532,7 +557,7 @@ class DatabaseService {
         tKnowledgeBase, tDayPlans, tStudyPlan, tFmgeEntries,
         tTimeLogs, tDailyTracker, tStudyEntries, tStudyMaterials,
         tMentorMessages, tMentorMemory, tAiSettings, tUserProfile,
-        tSettings, tHistory, tRevisionSettings,
+        tSettings, tHistory, tRevisionSettings, tRevisionItems,
       ]) {
         await txn.delete(table);
       }
