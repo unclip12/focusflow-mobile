@@ -217,8 +217,11 @@ final GoRouter appRouter = GoRouter(
       path: '/session',
       name: Routes.session,
       builder: (context, state) {
-        final args = state.extra as SessionArgs;
-        return SessionScreen(args: args);
+        final extra = state.extra as Map<String, dynamic>;
+        return SessionScreen(
+          block: extra['block'],
+          plan: extra['plan'],
+        );
       },
     ),
   ],

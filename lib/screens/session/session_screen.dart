@@ -13,22 +13,10 @@ import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/screens/session/session_complete_sheet.dart';
 
-/// Data bundle passed to the session screen via GoRouter extra.
-class SessionArgs {
-  final Block block;
-  final int blockIndex;
-  final String dayPlanDate; // YYYY-MM-DD
-
-  const SessionArgs({
-    required this.block,
-    required this.blockIndex,
-    required this.dayPlanDate,
-  });
-}
-
 class SessionScreen extends StatefulWidget {
-  final SessionArgs args;
-  const SessionScreen({super.key, required this.args});
+  final Block block;
+  final DayPlan plan;
+  const SessionScreen({super.key, required this.block, required this.plan});
 
   @override
   State<SessionScreen> createState() => _SessionScreenState();
@@ -45,6 +33,16 @@ class _SessionScreenState extends State<SessionScreen> {
   Timer? _quoteTimer;
   late String _currentQuote;
   final _rng = Random();
+
+  Block get _block => widget.block;
+  DayPlan get _plan => widget.plan;
+
+  int get _blockIndex {
+    final blocks = _plan.blocks ?? [];
+    return blocks.indexWhere((b) => b.id == _block.id);
+  }
+
+  String get _dayPlanDate => _plan.date;
 
   @override
   void initState() {
@@ -83,9 +81,9 @@ class _SessionScreenState extends State<SessionScreen> {
 
     showSessionCompleteSheet(
       context,
-      block: widget.args.block,
-      blockIndex: widget.args.blockIndex,
-      dayPlanDate: widget.args.dayPlanDate,
+      block: _block,
+      blockIndex: _blockIndex,
+      dayPlanDate: _dayPlanDate,
       startedAt: _startedAt,
       endedAt: DateTime.now(),
       elapsedSeconds: _elapsedSeconds,
@@ -107,7 +105,7 @@ class _SessionScreenState extends State<SessionScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final block = widget.args.block;
+    final block = _block;
 
     return Scaffold(
       backgroundColor: cs.surface,

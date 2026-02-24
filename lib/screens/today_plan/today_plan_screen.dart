@@ -16,6 +16,7 @@ import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/widgets/app_scaffold.dart';
 import 'block_card.dart';
 import 'add_task_sheet.dart';
+import 'package:focusflow_mobile/screens/session/session_screen.dart';
 
 class TodayPlanScreen extends StatefulWidget {
   const TodayPlanScreen({super.key});
@@ -220,7 +221,17 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
       );
     }
 
-    app.upsertDayPlan(plan.copyWith(blocks: blocks));
+    final updatedPlan = plan.copyWith(blocks: blocks);
+    app.upsertDayPlan(updatedPlan);
+
+    // Navigate to the session screen
+    if (mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SessionScreen(block: block, plan: updatedPlan),
+        ),
+      );
+    }
   }
 
   void _skipBlock(AppProvider app, DayPlan plan, Block block) {
