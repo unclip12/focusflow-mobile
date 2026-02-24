@@ -15,6 +15,7 @@ import 'package:focusflow_mobile/utils/date_utils.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/widgets/app_scaffold.dart';
 import 'block_card.dart';
+import 'add_task_sheet.dart';
 
 class TodayPlanScreen extends StatefulWidget {
   const TodayPlanScreen({super.key});
@@ -87,6 +88,17 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
     return AppScaffold(
       screenName: "Today's Plan",
       streakCount: streak,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => AddTaskSheet(dateKey: _dateKey),
+          );
+        },
+        child: const Icon(Icons.add_rounded),
+      ),
       body: Stack(
         children: [
           Column(

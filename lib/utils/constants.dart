@@ -19,21 +19,23 @@ class MenuItemId {
   static const String data          = 'DATA';
   static const String chat          = 'CHAT';
   static const String aiMemory      = 'AI_MEMORY';
+  static const String analytics     = 'ANALYTICS';
   static const String settings      = 'SETTINGS';
 }
 
 const List<String> kDefaultMenuOrder = [
   MenuItemId.dashboard,
-  MenuItemId.studyTracker,
   MenuItemId.todaysPlan,
+  MenuItemId.faLogger,
+  MenuItemId.revision,
+  MenuItemId.knowledgeBase,
   MenuItemId.focusTimer,
+  MenuItemId.studyTracker,
   MenuItemId.calendar,
   MenuItemId.timeLogger,
   MenuItemId.fmge,
   MenuItemId.dailyTracker,
-  MenuItemId.faLogger,
-  MenuItemId.revision,
-  MenuItemId.knowledgeBase,
+  MenuItemId.analytics,
   MenuItemId.data,
   MenuItemId.chat,
   MenuItemId.aiMemory,
@@ -55,6 +57,7 @@ const Map<String, String> kMenuItemLabels = {
   MenuItemId.data:          'Info Files',
   MenuItemId.chat:          'AI Mentor',
   MenuItemId.aiMemory:      'My AI Memory',
+  MenuItemId.analytics:     'Analytics',
   MenuItemId.settings:      'Settings',
 };
 
