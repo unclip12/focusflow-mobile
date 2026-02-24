@@ -1,32 +1,21 @@
 // =============================================================
-// MentorScreen — AI Mentor chat UI
-// AppScaffold + chat messages list + suggestion bar + input bar.
-// resizeToAvoidBottomInset: true (keyboard push-up).
-// Send → AppProvider.addMentorMessage(user) → mock mentor reply
-// after 800ms delay.
+// MentorScreen — JSON paste receiver for KB import
+// Accepts pasted JSON from FA extraction prompts, detects valid
+// KB JSON format, and imports pages into the Knowledge Base.
+// Non-JSON messages get a static helper response.
 // =============================================================
 
-import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/mentor_message.dart';
+import 'package:focusflow_mobile/models/knowledge_base.dart';
 import 'package:focusflow_mobile/widgets/app_scaffold.dart';
 import 'package:focusflow_mobile/screens/mentor/mentor_message_bubble.dart';
 import 'package:focusflow_mobile/screens/mentor/mentor_suggestions_bar.dart';
-
-// ── Canned mentor replies (rotated) ──────────────────────────────
-const _kMentorReplies = [
-  "Great question! Based on your recent study logs, I'd recommend focusing on Anatomy — you haven't reviewed it in 5 days.",
-  "You're doing amazing! Your streak is strong 🔥. Keep the momentum going with a quick revision session today.",
-  "Looking at your analytics, your weakest area is Pharmacology. Want me to create a focused study plan for it?",
-  "Here's a tip: try the Pomodoro technique — 25 min study, 5 min break. It works wonders for retention!",
-  "Your block completion rate has been improving! You've gone from 65% to 82% this week. Excellent progress!",
-  "I notice you study best in the morning. Consider scheduling your hardest subjects before noon.",
-  "Don't forget — 3 KB pages are due for revision today. Spaced repetition is key to long-term memory!",
-];
 
 class MentorScreen extends StatefulWidget {
   const MentorScreen({super.key});
@@ -36,12 +25,10 @@ class MentorScreen extends StatefulWidget {
 }
 
 class _MentorScreenState extends State<MentorScreen> {
-  final _controller  = TextEditingController();
-  final _scrollCtrl  = ScrollController();
-  final _uuid        = const Uuid();
-  final _focusNode   = FocusNode();
-  int   _replyIndex  = 0;
-  bool  _isTyping    = false;
+  final _controller = TextEditingController();
+  final _scrollCtrl = ScrollController();
+  final _uuid       = const Uuid();
+  final _focusNode  = FocusNode();
 
   @override
   void dispose() {
@@ -64,15 +51,175 @@ class _MentorScreenState extends State<MentorScreen> {
     });
   }
 
+  // ── Try to parse text as KB JSON ───────────────────────────────
+  /// Returns parsed list if valid KB JSON, null otherwise.
+  List<Map<String, dynamic>>? _tryParseAsKBJson(String text) {
+    try {
+      final decoded = jsonDecode(text);
+      if (decoded is! List || decoded.isEmpty) return null;
+
+      final first = decoded[0];
+      if (first is! Map<String, dynamic>) return null;
+
+      // Must have pageNumber, title, and topics keys
+      if (!first.containsKey('pageNumber') ||
+          !first.containsKey('title') ||
+          !first.containsKey('topics')) {
+        return null;
+      }
+
+      return decoded.cast<Map<String, dynamic>>();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ── Show KB import bottom sheet ────────────────────────────────
+  void _showImportSheet(List<Map<String, dynamic>> pages) {
+    final pageNumbers = pages
+        .map((p) => p['pageNumber']?.toString() ?? '?')
+        .toList();
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final cs = theme.colorScheme;
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Import to Knowledge Base',
+                style: theme.textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Found ${pages.length} page(s): ${pageNumbers.join(', ')}',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: cs.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _importPages(pages);
+                      },
+                      child: const Text('Add to Knowledge Base'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ── Import parsed pages into KB ────────────────────────────────
+  Future<void> _importPages(List<Map<String, dynamic>> pages) async {
+    final app = context.read<AppProvider>();
+
+    for (final item in pages) {
+      // Build topics as TrackableItem list from JSON
+      List<TrackableItem> topicsList = [];
+      if (item['topics'] != null) {
+        if (item['topics'] is List) {
+          topicsList = (item['topics'] as List).map((t) {
+            if (t is Map<String, dynamic>) {
+              return TrackableItem.fromJson(t);
+            }
+            // If topic is a plain string, wrap it
+            return TrackableItem(
+              id: const Uuid().v4(),
+              name: t.toString(),
+              revisionCount: 0,
+              currentRevisionIndex: 0,
+              logs: [],
+            );
+          }).toList();
+        }
+      }
+
+      // Build keyPoints list
+      List<String>? keyPointsList;
+      if (item['keyPoints'] != null) {
+        if (item['keyPoints'] is List) {
+          keyPointsList = (item['keyPoints'] as List)
+              .map((k) => k.toString())
+              .toList();
+        }
+      }
+
+      final entry = KnowledgeBaseEntry(
+        pageNumber: item['pageNumber']?.toString() ?? '',
+        title: item['title']?.toString() ?? '',
+        system: item['system']?.toString() ?? 'General',
+        subject: item['subject']?.toString() ?? 'General',
+        revisionCount: 0,
+        currentRevisionIndex: 0,
+        ankiTotal: 0,
+        ankiCovered: 0,
+        videoLinks: [],
+        tags: [],
+        notes: '',
+        keyPoints: keyPointsList,
+        logs: [],
+        topics: topicsList,
+      );
+
+      await app.upsertKBEntry(entry);
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ ${pages.length} page(s) added to Knowledge Base'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   // ── Send message ───────────────────────────────────────────────
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
+
+    // Step A: Try to parse as KB JSON
+    final parsed = _tryParseAsKBJson(text);
+
+    if (parsed != null) {
+      // Step B: Show import bottom sheet (do NOT save as chat message)
+      _controller.clear();
+      _showImportSheet(parsed);
+      return;
+    }
+
+    // Step D: Not KB JSON — show as normal message with static response
+    final app = context.read<AppProvider>();
     _controller.clear();
 
-    final app = context.read<AppProvider>();
-
-    // 1. Add user message
+    // Add user message
     final userMsg = MentorMessage(
       id:        _uuid.v4(),
       role:      'user',
@@ -82,25 +229,17 @@ class _MentorScreenState extends State<MentorScreen> {
     await app.addMentorMessage(userMsg);
     _scrollToBottom();
 
-    // 2. Show typing indicator
-    setState(() => _isTyping = true);
-
-    // 3. Mock mentor reply after delay
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    final reply = _kMentorReplies[_replyIndex % _kMentorReplies.length];
-    _replyIndex++;
-
+    // Static mentor response
     final mentorMsg = MentorMessage(
       id:        _uuid.v4(),
       role:      'model',
-      text:      reply,
+      text:      "I'm your study assistant. Paste your structured FA JSON output "
+                 "here and I'll import it directly into your Knowledge Base.",
       timestamp: DateTime.now().toIso8601String(),
     );
     await app.addMentorMessage(mentorMsg);
 
     if (mounted) {
-      setState(() => _isTyping = false);
       _scrollToBottom();
     }
   }
@@ -116,9 +255,7 @@ class _MentorScreenState extends State<MentorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final app   = context.watch<AppProvider>();
-    final theme = Theme.of(context);
-    final cs    = theme.colorScheme;
+    final app      = context.watch<AppProvider>();
     final messages = app.mentorMessages;
 
     // Auto-scroll when messages change
@@ -131,7 +268,11 @@ class _MentorScreenState extends State<MentorScreen> {
         if (messages.isNotEmpty)
           IconButton(
             icon: Icon(Icons.delete_outline_rounded,
-                size: 20, color: cs.onSurface.withValues(alpha: 0.5)),
+                size: 20,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.5)),
             onPressed: () => _confirmClear(context, app),
             tooltip: 'Clear chat',
           ),
@@ -145,11 +286,8 @@ class _MentorScreenState extends State<MentorScreen> {
                 : ListView.builder(
                     controller: _scrollCtrl,
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                    itemCount: messages.length + (_isTyping ? 1 : 0),
+                    itemCount: messages.length,
                     itemBuilder: (_, i) {
-                      if (i == messages.length && _isTyping) {
-                        return _TypingIndicator();
-                      }
                       return MentorMessageBubble(message: messages[i]);
                     },
                   ),
@@ -172,7 +310,6 @@ class _MentorScreenState extends State<MentorScreen> {
             controller: _controller,
             focusNode:  _focusNode,
             onSend:     _send,
-            isTyping:   _isTyping,
           ),
         ],
       ),
@@ -211,13 +348,11 @@ class _InputBar extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode             focusNode;
   final VoidCallback          onSend;
-  final bool                  isTyping;
 
   const _InputBar({
     required this.controller,
     required this.focusNode,
     required this.onSend,
-    required this.isTyping,
   });
 
   @override
@@ -253,7 +388,7 @@ class _InputBar extends StatelessWidget {
                 minLines:    1,
                 style: theme.textTheme.bodyMedium,
                 decoration: InputDecoration(
-                  hintText:  'Ask your mentor…',
+                  hintText:  'Paste JSON here or ask a question…',
                   hintStyle: theme.textTheme.bodyMedium?.copyWith(
                     color: cs.onSurface.withValues(alpha: 0.35),
                   ),
@@ -276,7 +411,7 @@ class _InputBar extends StatelessWidget {
                 width:  42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: hasText && !isTyping
+                  color: hasText
                       ? cs.primary
                       : cs.onSurface.withValues(alpha: 0.08),
                   shape: BoxShape.circle,
@@ -285,11 +420,11 @@ class _InputBar extends StatelessWidget {
                   icon: Icon(
                     Icons.arrow_upward_rounded,
                     size:  20,
-                    color: hasText && !isTyping
+                    color: hasText
                         ? cs.onPrimary
                         : cs.onSurface.withValues(alpha: 0.3),
                   ),
-                  onPressed: hasText && !isTyping ? onSend : null,
+                  onPressed: hasText ? onSend : null,
                   padding:   EdgeInsets.zero,
                 ),
               );
@@ -325,18 +460,20 @@ class _EmptyChat extends StatelessWidget {
                 shape:  BoxShape.circle,
               ),
               child: const Center(
-                child: Text('🤖', style: TextStyle(fontSize: 36)),
+                child: Text('📋', style: TextStyle(fontSize: 36)),
               ),
             ),
             const SizedBox(height: 16),
             Text(
-              'FocusFlow AI Mentor',
+              'Paste FA JSON Output Here',
               style: theme.textTheme.titleMedium
                   ?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 6),
             Text(
-              'Ask me about your study plan, weak areas,\nor anything about FMGE prep!',
+              'Copy the structured output from Gemini/ChatGPT\n'
+              'after using your FA extraction prompt,\n'
+              'then paste it here.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall?.copyWith(
                 color:  cs.onSurface.withValues(alpha: 0.45),
@@ -344,112 +481,6 @@ class _EmptyChat extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════
-// TYPING INDICATOR
-// ══════════════════════════════════════════════════════════════════
-
-class _TypingIndicator extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // Avatar
-          Container(
-            width:  32,
-            height: 32,
-            decoration: BoxDecoration(
-              color:  cs.primary.withValues(alpha: 0.12),
-              shape:  BoxShape.circle,
-            ),
-            child: const Center(
-              child: Text('🤖', style: TextStyle(fontSize: 16)),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Dots
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color:        cs.surface,
-              borderRadius: const BorderRadius.only(
-                topLeft:     Radius.circular(16),
-                topRight:    Radius.circular(16),
-                bottomRight: Radius.circular(16),
-                bottomLeft:  Radius.circular(4),
-              ),
-              border: Border.all(
-                  color: cs.onSurface.withValues(alpha: 0.08)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: List.generate(3, (i) => Padding(
-                padding: EdgeInsets.only(right: i < 2 ? 4 : 0),
-                child: _AnimatedDot(delay: i * 200),
-              )),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AnimatedDot extends StatefulWidget {
-  final int delay;
-  const _AnimatedDot({required this.delay});
-
-  @override
-  State<_AnimatedDot> createState() => _AnimatedDotState();
-}
-
-class _AnimatedDotState extends State<_AnimatedDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double>  _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync:    this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _anim = Tween(begin: 0.3, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
-    Future.delayed(Duration(milliseconds: widget.delay), () {
-      if (mounted) _ctrl.repeat(reverse: true);
-    });
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return FadeTransition(
-      opacity: _anim,
-      child: Container(
-        width:  7,
-        height: 7,
-        decoration: BoxDecoration(
-          color:  cs.onSurface.withValues(alpha: 0.3),
-          shape:  BoxShape.circle,
         ),
       ),
     );

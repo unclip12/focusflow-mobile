@@ -42,7 +42,7 @@ class FMGEEntryDetailScreen extends StatelessWidget {
       );
     }
 
-    const String mode = 'balanced';
+    const String mode = 'strict';
     final totalSteps = SrsService.totalSteps(mode);
     final masteredCount = entry.currentRevisionIndex.clamp(0, totalSteps);
     final masteryRatio = totalSteps > 0 ? masteredCount / totalSteps : 0.0;
@@ -324,7 +324,7 @@ class FMGEEntryDetailScreen extends StatelessWidget {
       BuildContext context, FMGEEntry entry, int score) async {
     final app = context.read<AppProvider>();
     final now = DateTime.now();
-    const String mode = 'balanced';
+    const String mode = 'strict';
 
     // Only advance revision index if score >= 4
     final newIndex =

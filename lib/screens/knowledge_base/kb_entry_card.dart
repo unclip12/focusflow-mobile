@@ -21,7 +21,7 @@ class KBEntryCard extends StatelessWidget {
     final cs = theme.colorScheme;
 
     // ── Mastery computation ──────────────────────────────────────
-    const String mode = 'balanced';
+    const String mode = 'strict';
     final int totalSteps = SrsService.totalSteps(mode);
     final int masteredCount = entry.currentRevisionIndex.clamp(0, totalSteps);
     final double masteryRatio =

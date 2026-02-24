@@ -21,7 +21,7 @@ class FMGEEntryCard extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    const String mode = 'balanced';
+    const String mode = 'strict';
     final isMastered = SrsService.isMastered(
         revisionIndex: entry.currentRevisionIndex, mode: mode);
     final isOverdue =

@@ -248,21 +248,25 @@ enum TimeLogSource {
 enum RevisionMode {
   fast,
   balanced,
-  deep;
+  deep,
+  strict;
 
   String get value {
     switch (this) {
       case RevisionMode.fast:     return 'fast';
       case RevisionMode.balanced: return 'balanced';
       case RevisionMode.deep:     return 'deep';
+      case RevisionMode.strict:   return 'strict';
     }
   }
 
   static RevisionMode fromString(String s) {
     switch (s) {
-      case 'fast': return RevisionMode.fast;
-      case 'deep': return RevisionMode.deep;
-      default:     return RevisionMode.balanced;
+      case 'fast':     return RevisionMode.fast;
+      case 'balanced': return RevisionMode.balanced;
+      case 'deep':     return RevisionMode.deep;
+      case 'strict':   return RevisionMode.strict;
+      default:         return RevisionMode.strict;
     }
   }
 }
@@ -271,10 +275,12 @@ enum RevisionMode {
 // fast:     1d 3d 7d 15d 30d
 // balanced: 4h 1d 2d 5d 10d 20d 40d
 // deep:     4h 1d 3d 7d 14d 30d 60d
+// strict:   8h 1d 3d 7d 14d 21d 30d 45d 60d 90d 120d 180d
 const Map<String, List<int>> kRevisionSchedules = {
   'fast':     [24, 72, 168, 360, 720],
   'balanced': [4, 24, 48, 120, 240, 480, 960],
   'deep':     [4, 24, 72, 168, 336, 720, 1440],
+  'strict':   [8, 24, 72, 168, 336, 504, 720, 1080, 1440, 2160, 2880, 4320],
 };
 
 // ── Block Durations (minutes) ─────────────────────────────────

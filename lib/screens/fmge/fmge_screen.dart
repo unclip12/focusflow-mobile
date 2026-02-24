@@ -42,7 +42,7 @@ class _FMGEScreenState extends State<FMGEScreen>
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    const String mode = 'balanced';
+    const String mode = 'strict';
 
     final all = app.fmgeEntries;
     final due = all

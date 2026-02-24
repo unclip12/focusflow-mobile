@@ -39,7 +39,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
   }
 
   List<KnowledgeBaseEntry> _applyFilters(List<KnowledgeBaseEntry> entries) {
-    const String mode = 'balanced';
+    const String mode = 'strict';
     var filtered = entries.toList();
 
     // ── Text search ──────────────────────────────────────────────
