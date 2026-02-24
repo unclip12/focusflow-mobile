@@ -196,7 +196,19 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     final newBlocks = <Block>[];
     final timeFormat = DateFormat('HH:mm');
 
-    if (batches.isEmpty && _startTime != null && _endTime != null) {
+    if (_startTime == null || _endTime == null) {
+      newBlocks.add(Block(
+        id: _uuid.v4(),
+        index: existingBlocks.length,
+        date: widget.dateKey,
+        plannedStartTime: '00:00',
+        plannedEndTime: '00:00',
+        type: _blockType,
+        title: title,
+        plannedDurationMinutes: 0,
+        status: BlockStatus.notStarted,
+      ));
+    } else if (batches.isEmpty) {
       // Single block, no batches
       newBlocks.add(Block(
         id: _uuid.v4(),
@@ -527,7 +539,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     fields.add(SizedBox(
       width: double.infinity,
       child: FilledButton.icon(
-        onPressed: (_startTime != null && _endTime != null) ? _save : null,
+        onPressed: _save,
         icon: const Icon(Icons.check_rounded, size: 18),
         label: const Text('Save Task'),
         style: FilledButton.styleFrom(

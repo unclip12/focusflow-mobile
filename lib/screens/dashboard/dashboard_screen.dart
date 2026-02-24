@@ -7,6 +7,7 @@
 // =============================================================
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -27,16 +28,46 @@ class DashboardScreen extends StatelessWidget {
     // ── Selective rebuilds: only watch the fields we need ─────────
     final loaded = context.select<AppProvider, bool>((p) => p.loaded);
 
+    Widget content;
     if (!loaded) {
-      return AppScaffold(
+      content = AppScaffold(
         screenName: 'Dashboard',
         body: _ShimmerLoading(),
       );
+    } else {
+      content = const AppScaffold(
+        screenName: 'Dashboard',
+        body: _DashboardBody(),
+      );
     }
 
-    return const AppScaffold(
-      screenName: 'Dashboard',
-      body: _DashboardBody(),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldExit = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Exit FocusFlow?'),
+            content: const Text('Are you sure you want to exit?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Exit'),
+              ),
+            ],
+          ),
+        );
+        if (shouldExit == true && context.mounted) {
+          // ignore: use_build_context_synchronously
+          SystemNavigator.pop();
+        }
+      },
+      child: content,
     );
   }
 }

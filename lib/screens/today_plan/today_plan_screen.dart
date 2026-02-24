@@ -64,7 +64,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
-    final DayPlan? plan = app.getDayPlan(_dateKey);
+    final DayPlan? plan = app.getDayPlan(DateFormat('yyyy-MM-dd').format(_selectedDate));
     final blocks = List<Block>.from(plan?.blocks ?? []);
     // Sort blocks by startTime
     blocks.sort((a, b) => a.plannedStartTime.compareTo(b.plannedStartTime));
