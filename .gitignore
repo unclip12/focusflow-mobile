@@ -1,0 +1,14 @@
+# Dart/Flutter
+.dart_tool/
+build/
+*.iml
+.idea/
+
+# Android build outputs only (keep android/ tracked)
+android/.gradle/
+android/local.properties
+android/captures/
+
+# iOS build outputs only (keep ios/ tracked)
+ios/Pods/
+ios/.symlinks/

@@ -22,10 +22,6 @@ jobs:
           channel: 'stable'
           cache: true
 
-      # Generate android/ + ios/ folders without overwriting existing Dart files
-      - name: Generate native platform folders
-        run: flutter create . --project-name focusflow_mobile --org com.focusflow
-
       - name: flutter pub get
         run: flutter pub get
 
