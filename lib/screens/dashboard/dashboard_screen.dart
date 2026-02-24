@@ -3,13 +3,16 @@
 // Uses AppScaffold, shows welcome, TodayGlance, Activity chart,
 // Due Now list (KB + FMGE entries where nextRevisionAt ≤ now)
 // Pull-to-refresh, shimmer loading, proper empty states.
+// Performance: RepaintBoundary, const children, context.select.
 // =============================================================
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import 'package:focusflow_mobile/providers/app_provider.dart';
+import 'package:focusflow_mobile/app_router.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart' as du;
 import 'package:focusflow_mobile/widgets/app_scaffold.dart';
@@ -21,17 +24,35 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final app = context.watch<AppProvider>();
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    // ── Selective rebuilds: only watch the fields we need ─────────
+    final loaded = context.select<AppProvider, bool>((p) => p.loaded);
 
-    // ── Show shimmer while loading ────────────────────────────────
-    if (!app.loaded) {
+    if (!loaded) {
       return AppScaffold(
         screenName: 'Dashboard',
         body: _ShimmerLoading(),
       );
     }
+
+    return const AppScaffold(
+      screenName: 'Dashboard',
+      body: _DashboardBody(),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// DASHBOARD BODY — separated to allow fine-grained selects
+// ══════════════════════════════════════════════════════════════════
+
+class _DashboardBody extends StatelessWidget {
+  const _DashboardBody();
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppProvider>();
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
     final todayStr = du.AppDateUtils.todayKey();
     final displayName = app.userProfile?.displayName ?? 'Student';
@@ -111,39 +132,59 @@ class DashboardScreen extends StatelessWidget {
             const SizedBox(height: 20),
 
             // ── Today's Glance ──────────────────────────────────────
-            TodayGlanceCard(
-              blocksDone: blocksDone,
-              blocksTotal: blocksTotal,
-              studyHoursToday: studyHoursToday,
+            RepaintBoundary(
+              child: blocksTotal > 0
+                  ? TodayGlanceCard(
+                      blocksDone: blocksDone,
+                      blocksTotal: blocksTotal,
+                      studyHoursToday: studyHoursToday,
+                    )
+                  : _SectionEmptyState(
+                      icon: Icons.checklist_outlined,
+                      message: "No tasks for today — add one!",
+                      buttonLabel: "Today's Plan",
+                      routeName: Routes.todaysPlan,
+                    ),
             ),
             const SizedBox(height: 16),
 
             // ── Quick Stats Row ─────────────────────────────────────
-            Row(
-              children: [
-                Expanded(
-                  child: StatsCard(
-                    icon: Icons.menu_book_rounded,
-                    label: 'KB Pages',
-                    value: '${app.knowledgeBase.length}',
-                    accentColor: const Color(0xFF8B5CF6),
+            RepaintBoundary(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: StatsCard(
+                      icon: Icons.menu_book_rounded,
+                      label: 'KB Pages',
+                      value: '${app.knowledgeBase.length}',
+                      accentColor: const Color(0xFF8B5CF6),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatsCard(
-                    icon: Icons.replay_rounded,
-                    label: 'Due Now',
-                    value: '${dueKB.length + dueFMGE.length}',
-                    accentColor: const Color(0xFFF43F5E),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: StatsCard(
+                      icon: Icons.replay_rounded,
+                      label: 'Due Now',
+                      value: '${dueKB.length + dueFMGE.length}',
+                      accentColor: const Color(0xFFF43F5E),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(height: 16),
 
-            // ── Activity Graph ──────────────────────────────────────
-            ActivityGraph(minutesByDate: minutesByDate),
+            // ── Activity Graph / Study Streak ───────────────────────
+            RepaintBoundary(
+              child: minutesByDate.isNotEmpty
+                  ? ActivityGraph(minutesByDate: minutesByDate)
+                  : _SectionEmptyState(
+                      icon: Icons.local_fire_department_outlined,
+                      message: "No study sessions yet — start your streak!",
+                      buttonLabel: 'Focus Timer',
+                      routeName: Routes.focusTimer,
+                    ),
+            ),
             const SizedBox(height: 20),
 
             // ── Due Now list ────────────────────────────────────────
@@ -152,28 +193,97 @@ class DashboardScreen extends StatelessWidget {
                   style: theme.textTheme.titleMedium
                       ?.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
-              ...dueKB.take(5).map((e) => _DueTile(
-                    icon: Icons.menu_book_rounded,
-                    title: 'Page ${e.pageNumber}',
-                    subtitle: e.title,
-                    color: const Color(0xFF6366F1),
+              ...dueKB.take(5).map((e) => RepaintBoundary(
+                    child: _DueTile(
+                      icon: Icons.menu_book_rounded,
+                      title: 'Page ${e.pageNumber}',
+                      subtitle: e.title,
+                      color: const Color(0xFF6366F1),
+                    ),
                   )),
-              ...dueFMGE.take(5).map((e) => _DueTile(
-                    icon: Icons.medical_services_rounded,
-                    title: e.subject,
-                    subtitle: 'Slides ${e.slideStart}–${e.slideEnd}',
-                    color: const Color(0xFF10B981),
+              ...dueFMGE.take(5).map((e) => RepaintBoundary(
+                    child: _DueTile(
+                      icon: Icons.medical_services_rounded,
+                      title: e.subject,
+                      subtitle: 'Slides ${e.slideStart}–${e.slideEnd}',
+                      color: const Color(0xFF10B981),
+                    ),
                   )),
               const SizedBox(height: 8),
             ],
 
-            // ── Empty state — no due, no blocks ─────────────────────
-            if (dueKB.isEmpty && dueFMGE.isEmpty && blocks.isEmpty)
-              _DashboardEmptyState(),
+            // ── Empty state — no due revisions ──────────────────────
+            if (dueKB.isEmpty && dueFMGE.isEmpty)
+              _SectionEmptyState(
+                icon: Icons.auto_awesome_outlined,
+                message: "No revisions due — you're all caught up!",
+                buttonLabel: 'Knowledge Base',
+                routeName: Routes.knowledgeBase,
+              ),
 
             const SizedBox(height: 24),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PER-SECTION EMPTY STATE
+// ══════════════════════════════════════════════════════════════════
+
+class _SectionEmptyState extends StatelessWidget {
+  final IconData icon;
+  final String message;
+  final String buttonLabel;
+  final String routeName;
+
+  const _SectionEmptyState({
+    required this.icon,
+    required this.message,
+    required this.buttonLabel,
+    required this.routeName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
+      decoration: BoxDecoration(
+        color: cs.primary.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: cs.primary.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon,
+                size: 28, color: cs.primary.withValues(alpha: 0.5)),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: cs.onSurface.withValues(alpha: 0.5),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextButton(
+            onPressed: () => context.goNamed(routeName),
+            child: Text(buttonLabel),
+          ),
+        ],
       ),
     );
   }
@@ -254,52 +364,6 @@ class _ShimmerLoadingState extends State<_ShimmerLoading>
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(radius),
-      ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════
-// DASHBOARD EMPTY STATE
-// ══════════════════════════════════════════════════════════════════
-
-class _DashboardEmptyState extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-      decoration: BoxDecoration(
-        color: cs.primary.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.primary.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: cs.primary.withValues(alpha: 0.08),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.auto_awesome_rounded,
-                size: 32, color: cs.primary.withValues(alpha: 0.5)),
-          ),
-          const SizedBox(height: 14),
-          Text('Nothing due right now',
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              )),
-          const SizedBox(height: 4),
-          Text(
-            'Start your first study session!',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: cs.onSurface.withValues(alpha: 0.4),
-            ),
-          ),
-        ],
       ),
     );
   }

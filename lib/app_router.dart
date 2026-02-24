@@ -3,7 +3,6 @@
 // All placeholder screens replaced with real implementations.
 // =============================================================
 
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 // ── Screen imports ──────────────────────────────────────────────
@@ -19,6 +18,9 @@ import 'package:focusflow_mobile/screens/fmge/fmge_entry_detail_screen.dart';
 import 'package:focusflow_mobile/screens/revision_hub/revision_hub_screen.dart';
 import 'package:focusflow_mobile/screens/settings/settings_screen.dart';
 import 'package:focusflow_mobile/screens/calendar/calendar_screen.dart';
+import 'package:focusflow_mobile/screens/fa_logger/fa_logger_screen.dart';
+import 'package:focusflow_mobile/screens/info_files/info_files_screen.dart';
+import 'package:focusflow_mobile/screens/backup/backup_screen.dart';
 import 'package:focusflow_mobile/screens/notifications/notifications_screen.dart';
 import 'package:focusflow_mobile/screens/profile/profile_screen.dart';
 import 'package:focusflow_mobile/screens/analytics/analytics_screen.dart';
@@ -125,7 +127,7 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/fa-logger',
       name: Routes.faLogger,
-      builder: (context, state) => const _Placeholder('FA Logger'),
+      builder: (context, state) => const FALoggerScreen(),
     ),
 
     // ── Revision Hub ──────────────────────────────────────────
@@ -156,7 +158,7 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/data',
       name: Routes.data,
-      builder: (context, state) => const _Placeholder('Info Files'),
+      builder: (context, state) => const InfoFilesScreen(),
     ),
 
     // ── AI Mentor Chat ────────────────────────────────────────
@@ -170,7 +172,7 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/ai-memory',
       name: Routes.aiMemory,
-      builder: (context, state) => const _Placeholder('My AI Memory'),
+      builder: (context, state) => const BackupScreen(),
     ),
 
     // ── Settings ──────────────────────────────────────────────
@@ -210,28 +212,3 @@ final GoRouter appRouter = GoRouter(
   ],
 );
 
-// ── Placeholder screen (for screens not yet implemented) ────────
-class _Placeholder extends StatelessWidget {
-  final String title;
-  const _Placeholder(this.title);
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.construction_rounded,
-                size: 48, color: theme.colorScheme.primary),
-            const SizedBox(height: 16),
-            Text(title, style: theme.textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Text('Coming soon', style: theme.textTheme.bodyMedium),
-          ],
-        ),
-      ),
-    );
-  }
-}
