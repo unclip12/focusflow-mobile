@@ -109,9 +109,15 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
                 isToday: _isToday,
                 onPrev: _prevDay,
                 onNext: _nextDay,
-                onToday: () => setState(() {
-                  _selectedDate = AppDateUtils.getAdjustedDate();
-                }),
+                onDateTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _selectedDate,
+                    firstDate: DateTime(2024),
+                    lastDate: DateTime(2027),
+                  );
+                  if (picked != null) setState(() => _selectedDate = picked);
+                },
               ),
 
               // ── Plan summary bar ────────────────────────────────────
@@ -119,11 +125,10 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
                 _PlanSummaryBar(plan: plan, blocks: blocks),
 
               // ── Block list or empty ─────────────────────────────────
-              Expanded(
+                   Expanded(
                 child: blocks.isEmpty
                     ? _EmptyState(
                         hasNoPlan: plan == null,
-                        onGenerate: () => _generatePlan(context),
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -189,16 +194,6 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
               },
             ),
         ],
-      ),
-    );
-  }
-
-  void _generatePlan(BuildContext context) {
-    // Placeholder — in a later batch this will call AI plan generation
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Plan generation coming in a future batch'),
-        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -391,14 +386,14 @@ class _DateHeader extends StatelessWidget {
   final bool isToday;
   final VoidCallback onPrev;
   final VoidCallback onNext;
-  final VoidCallback onToday;
+  final VoidCallback onDateTap;
 
   const _DateHeader({
     required this.date,
     required this.isToday,
     required this.onPrev,
     required this.onNext,
-    required this.onToday,
+    required this.onDateTap,
   });
 
   @override
@@ -417,7 +412,7 @@ class _DateHeader extends StatelessWidget {
           ),
           Expanded(
             child: GestureDetector(
-              onTap: isToday ? null : onToday,
+              onTap: onDateTap,
               child: Column(
                 children: [
                   Text(
@@ -533,9 +528,8 @@ class _SummaryChip extends StatelessWidget {
 // ── Empty state ─────────────────────────────────────────────────
 class _EmptyState extends StatelessWidget {
   final bool hasNoPlan;
-  final VoidCallback onGenerate;
 
-  const _EmptyState({required this.hasNoPlan, required this.onGenerate});
+  const _EmptyState({required this.hasNoPlan});
 
   @override
   Widget build(BuildContext context) {
@@ -571,21 +565,6 @@ class _EmptyState extends StatelessWidget {
                 color: cs.onSurface.withValues(alpha: 0.35),
               ),
             ),
-            if (hasNoPlan) ...[
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: onGenerate,
-                icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-                label: const Text('Generate Plan'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ],
           ],
         ),
       ),

@@ -185,7 +185,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   }
 
   // ── Save ────────────────────────────────────────────────────────
-  void _save() {
+  Future<void> _save() async {
     final app = context.read<AppProvider>();
     final batches = _focusBatches;
     final title = _taskTitle;
@@ -263,15 +263,17 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
           .fold<int>(0, (s, b) => s + b.plannedDurationMinutes),
     );
 
-    app.upsertDayPlan(plan);
+    await app.upsertDayPlan(plan);
 
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
+    if (mounted) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Task added with $focusBlockCount focus block${focusBlockCount == 1 ? '' : 's'}'),
         behavior: SnackBarBehavior.floating,
       ),
     );
+    }
   }
 
   String _formatTimeOfDay(TimeOfDay t) =>
