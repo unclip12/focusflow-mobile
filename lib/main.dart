@@ -18,11 +18,19 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
+  // Create providers first
+  final appProvider = AppProvider();
+  final settingsProvider = SettingsProvider();
+  
+  // Load all persisted data BEFORE rendering any UI
+  await appProvider.loadAll();
+  await settingsProvider.loadSettings();
+
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => SettingsProvider()),
-        ChangeNotifierProvider(create: (_) => AppProvider()),
+        ChangeNotifierProvider<SettingsProvider>.value(value: settingsProvider),
+        ChangeNotifierProvider<AppProvider>.value(value: appProvider),
       ],
       child: const FocusFlowApp(),
     ),
