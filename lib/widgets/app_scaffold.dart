@@ -45,6 +45,7 @@ class _AppScaffoldState extends State<AppScaffold> {
     final cs = theme.colorScheme;
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       floatingActionButton: widget.floatingActionButton,
       body: Stack(
         children: [
@@ -64,8 +65,31 @@ class _AppScaffoldState extends State<AppScaffold> {
                   ),
                 ),
               ),
-              // Body
-              Expanded(child: widget.body),
+              // Body — animated page transition
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  switchInCurve: Curves.easeInOut,
+                  switchOutCurve: Curves.easeInOut,
+                  transitionBuilder: (child, animation) {
+                    final slide = Tween<Offset>(
+                      begin: const Offset(0, 0.03),
+                      end: Offset.zero,
+                    ).animate(animation);
+                    return FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: slide,
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: KeyedSubtree(
+                    key: ValueKey(widget.screenName),
+                    child: widget.body,
+                  ),
+                ),
+              ),
             ],
           ),
 

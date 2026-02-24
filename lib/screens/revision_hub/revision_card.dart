@@ -69,9 +69,9 @@ class RevisionCard extends StatelessWidget {
               children: [
                 // Page number + topic
                 Text(
-                  entry.pageNumber != null
-                      ? 'Page ${entry.pageNumber} — ${entry.topic}'
-                      : entry.topic,
+                  entry.pageNumber.isNotEmpty
+                      ? 'Page ${entry.pageNumber} — ${entry.title}'
+                      : entry.title,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),

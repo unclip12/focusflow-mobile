@@ -2,6 +2,7 @@
 // FocusTimerScreen — circular countdown timer with wakelock
 // Shows active block name, session type, time remaining
 // Start/Pause/Stop with WakelockPlus integration
+// Animations: smooth arc via AnimatedBuilder, pulse when running.
 // =============================================================
 
 import 'dart:math' as math;
@@ -20,8 +21,11 @@ class FocusTimerScreen extends StatefulWidget {
 }
 
 class _FocusTimerScreenState extends State<FocusTimerScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _controller;
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnim;
+
   TimerState _state = TimerState.idle;
 
   // Session config
@@ -43,12 +47,26 @@ class _FocusTimerScreenState extends State<FocusTimerScreen>
       duration: Duration(seconds: _totalSeconds),
     );
     _controller.addStatusListener(_onAnimationStatus);
+
+    // Pulse animation for the ring when timer is running
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _pulseAnim = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.04), weight: 50),
+      TweenSequenceItem(tween: Tween(begin: 1.04, end: 1.0), weight: 50),
+    ]).animate(CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeInOut,
+    ));
   }
 
   @override
   void dispose() {
     _controller.removeStatusListener(_onAnimationStatus);
     _controller.dispose();
+    _pulseController.dispose();
     WakelockPlus.disable();
     super.dispose();
   }
@@ -63,6 +81,7 @@ class _FocusTimerScreenState extends State<FocusTimerScreen>
   void _onTimerComplete() {
     HapticsService.heavy();
     WakelockPlus.disable();
+    _pulseController.stop();
     setState(() => _state = TimerState.idle);
 
     final elapsed = _totalSeconds;
@@ -87,27 +106,30 @@ class _FocusTimerScreenState extends State<FocusTimerScreen>
     WakelockPlus.enable();
     _startedAt = DateTime.now();
     setState(() => _state = TimerState.running);
-    // forward from current value (0.0 if fresh, or wherever paused)
     _controller.forward();
+    _pulseController.repeat();
   }
 
   void _pause() {
     HapticsService.light();
     WakelockPlus.disable();
     setState(() => _state = TimerState.paused);
-    _controller.stop(); // preserves current value — resume from exact spot
+    _controller.stop();
+    _pulseController.stop();
   }
 
   void _resume() {
     HapticsService.light();
     WakelockPlus.enable();
     setState(() => _state = TimerState.running);
-    _controller.forward(); // continues from stopped value
+    _controller.forward();
+    _pulseController.repeat();
   }
 
   void _stop() {
     HapticsService.medium();
     WakelockPlus.disable();
+    _pulseController.stop();
 
     // Calculate elapsed time
     final elapsedFraction = _controller.value;
@@ -186,59 +208,88 @@ class _FocusTimerScreenState extends State<FocusTimerScreen>
 
           const Spacer(),
 
-          // ── Circular timer ──────────────────────────────────────
+          // ── Circular timer with pulse ─────────────────────────────
           AnimatedBuilder(
-            animation: _controller,
+            animation: Listenable.merge([_controller, _pulseController]),
             builder: (context, child) {
               final remaining =
                   ((_totalSeconds * (1.0 - _controller.value))).round();
               final mins = remaining ~/ 60;
               final secs = remaining % 60;
+              final pulseScale = _state == TimerState.running
+                  ? _pulseAnim.value
+                  : 1.0;
 
-              return SizedBox(
-                width: 260,
-                height: 260,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Track + progress arc
-                    CustomPaint(
-                      size: const Size(260, 260),
-                      painter: _CircularTimerPainter(
-                        progress: _controller.value,
-                        trackColor: cs.onSurface.withValues(alpha: 0.06),
-                        progressColor: _state == TimerState.paused
-                            ? const Color(0xFFF59E0B)
-                            : cs.primary,
-                        strokeWidth: 8,
+              return Transform.scale(
+                scale: pulseScale,
+                child: SizedBox(
+                  width: 260,
+                  height: 260,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Track + progress arc (smooth via AnimatedBuilder)
+                      CustomPaint(
+                        size: const Size(260, 260),
+                        painter: _CircularTimerPainter(
+                          progress: _controller.value,
+                          trackColor: cs.onSurface.withValues(alpha: 0.06),
+                          progressColor: _state == TimerState.paused
+                              ? const Color(0xFFF59E0B)
+                              : cs.primary,
+                          strokeWidth: 8,
+                        ),
                       ),
-                    ),
-                    // Time display
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}',
-                          style: theme.textTheme.displayLarge?.copyWith(
-                            fontWeight: FontWeight.w300,
-                            fontSize: 56,
-                            letterSpacing: 2,
+
+                      // Glow effect when running
+                      if (_state == TimerState.running)
+                        Container(
+                          width: 200,
+                          height: 200,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: cs.primary.withValues(
+                                    alpha: 0.08 * pulseScale),
+                                blurRadius: 40,
+                                spreadRadius: 8,
+                              ),
+                            ],
                           ),
                         ),
-                        Text(
-                          _state == TimerState.running
-                              ? 'Focus'
-                              : _state == TimerState.paused
-                                  ? 'Paused'
-                                  : 'Ready',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: cs.onSurface.withValues(alpha: 0.4),
-                            fontWeight: FontWeight.w500,
+
+                      // Time display
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}',
+                            style: theme.textTheme.displayLarge?.copyWith(
+                              fontWeight: FontWeight.w300,
+                              fontSize: 56,
+                              letterSpacing: 2,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
+                            child: Text(
+                              _state == TimerState.running
+                                  ? 'Focus'
+                                  : _state == TimerState.paused
+                                      ? 'Paused'
+                                      : 'Ready',
+                              key: ValueKey(_state),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: cs.onSurface.withValues(alpha: 0.4),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               );
             },

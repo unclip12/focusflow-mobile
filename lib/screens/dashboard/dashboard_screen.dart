@@ -2,6 +2,7 @@
 // DashboardScreen — main landing page
 // Uses AppScaffold, shows welcome, TodayGlance, Activity chart,
 // Due Now list (KB + FMGE entries where nextRevisionAt ≤ now)
+// Pull-to-refresh, shimmer loading, proper empty states.
 // =============================================================
 
 import 'package:flutter/material.dart';
@@ -23,6 +24,14 @@ class DashboardScreen extends StatelessWidget {
     final app = context.watch<AppProvider>();
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+
+    // ── Show shimmer while loading ────────────────────────────────
+    if (!app.loaded) {
+      return AppScaffold(
+        screenName: 'Dashboard',
+        body: _ShimmerLoading(),
+      );
+    }
 
     final todayStr = du.AppDateUtils.todayKey();
     final displayName = app.userProfile?.displayName ?? 'Student';
@@ -79,104 +88,217 @@ class DashboardScreen extends StatelessWidget {
     return AppScaffold(
       screenName: 'Dashboard',
       streakCount: streak,
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        children: [
-          // ── Welcome ─────────────────────────────────────────────
-          Text(
-            'Hey, $displayName 👋',
-            style: theme.textTheme.displayMedium?.copyWith(
-              fontWeight: FontWeight.w800,
+      body: RefreshIndicator(
+        color: cs.primary,
+        onRefresh: () => app.loadAll(),
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          children: [
+            // ── Welcome ─────────────────────────────────────────────
+            Text(
+              'Hey, $displayName 👋',
+              style: theme.textTheme.displayMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
             ),
+            const SizedBox(height: 4),
+            Text(
+              DateFormat('EEEE, d MMMM').format(now),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: cs.onSurface.withValues(alpha: 0.5),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // ── Today's Glance ──────────────────────────────────────
+            TodayGlanceCard(
+              blocksDone: blocksDone,
+              blocksTotal: blocksTotal,
+              studyHoursToday: studyHoursToday,
+            ),
+            const SizedBox(height: 16),
+
+            // ── Quick Stats Row ─────────────────────────────────────
+            Row(
+              children: [
+                Expanded(
+                  child: StatsCard(
+                    icon: Icons.menu_book_rounded,
+                    label: 'KB Pages',
+                    value: '${app.knowledgeBase.length}',
+                    accentColor: const Color(0xFF8B5CF6),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: StatsCard(
+                    icon: Icons.replay_rounded,
+                    label: 'Due Now',
+                    value: '${dueKB.length + dueFMGE.length}',
+                    accentColor: const Color(0xFFF43F5E),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // ── Activity Graph ──────────────────────────────────────
+            ActivityGraph(minutesByDate: minutesByDate),
+            const SizedBox(height: 20),
+
+            // ── Due Now list ────────────────────────────────────────
+            if (dueKB.isNotEmpty || dueFMGE.isNotEmpty) ...[
+              Text('📋 Due for Revision',
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              ...dueKB.take(5).map((e) => _DueTile(
+                    icon: Icons.menu_book_rounded,
+                    title: 'Page ${e.pageNumber}',
+                    subtitle: e.title,
+                    color: const Color(0xFF6366F1),
+                  )),
+              ...dueFMGE.take(5).map((e) => _DueTile(
+                    icon: Icons.medical_services_rounded,
+                    title: e.subject,
+                    subtitle: 'Slides ${e.slideStart}–${e.slideEnd}',
+                    color: const Color(0xFF10B981),
+                  )),
+              const SizedBox(height: 8),
+            ],
+
+            // ── Empty state — no due, no blocks ─────────────────────
+            if (dueKB.isEmpty && dueFMGE.isEmpty && blocks.isEmpty)
+              _DashboardEmptyState(),
+
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SHIMMER LOADING PLACEHOLDER
+// ══════════════════════════════════════════════════════════════════
+
+class _ShimmerLoading extends StatefulWidget {
+  @override
+  State<_ShimmerLoading> createState() => _ShimmerLoadingState();
+}
+
+class _ShimmerLoadingState extends State<_ShimmerLoading>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) {
+        final shimmer = cs.onSurface.withValues(
+            alpha: 0.04 + 0.04 * _ctrl.value);
+
+        return ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          physics: const NeverScrollableScrollPhysics(),
+          children: [
+            // Welcome placeholder
+            _shimmerBox(shimmer, 200, 28),
+            const SizedBox(height: 8),
+            _shimmerBox(shimmer, 140, 14),
+            const SizedBox(height: 24),
+            // Glance card placeholder
+            _shimmerBox(shimmer, double.infinity, 100, radius: 16),
+            const SizedBox(height: 16),
+            // Stats row placeholder
+            Row(
+              children: [
+                Expanded(child: _shimmerBox(shimmer, double.infinity, 72, radius: 12)),
+                const SizedBox(width: 12),
+                Expanded(child: _shimmerBox(shimmer, double.infinity, 72, radius: 12)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Activity graph placeholder
+            _shimmerBox(shimmer, double.infinity, 140, radius: 16),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _shimmerBox(Color color, double width, double height,
+      {double radius = 8}) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// DASHBOARD EMPTY STATE
+// ══════════════════════════════════════════════════════════════════
+
+class _DashboardEmptyState extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+      decoration: BoxDecoration(
+        color: cs.primary.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: cs.primary.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.auto_awesome_rounded,
+                size: 32, color: cs.primary.withValues(alpha: 0.5)),
           ),
+          const SizedBox(height: 14),
+          Text('Nothing due right now',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              )),
           const SizedBox(height: 4),
           Text(
-            DateFormat('EEEE, d MMMM').format(now),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: cs.onSurface.withValues(alpha: 0.5),
+            'Start your first study session!',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: cs.onSurface.withValues(alpha: 0.4),
             ),
           ),
-          const SizedBox(height: 20),
-
-          // ── Today's Glance ──────────────────────────────────────
-          TodayGlanceCard(
-            blocksDone: blocksDone,
-            blocksTotal: blocksTotal,
-            studyHoursToday: studyHoursToday,
-          ),
-          const SizedBox(height: 16),
-
-          // ── Quick Stats Row ─────────────────────────────────────
-          Row(
-            children: [
-              Expanded(
-                child: StatsCard(
-                  icon: Icons.menu_book_rounded,
-                  label: 'KB Pages',
-                  value: '${app.knowledgeBase.length}',
-                  accentColor: const Color(0xFF8B5CF6),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: StatsCard(
-                  icon: Icons.replay_rounded,
-                  label: 'Due Now',
-                  value: '${dueKB.length + dueFMGE.length}',
-                  accentColor: const Color(0xFFF43F5E),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // ── Activity Graph ──────────────────────────────────────
-          ActivityGraph(minutesByDate: minutesByDate),
-          const SizedBox(height: 20),
-
-          // ── Due Now list ────────────────────────────────────────
-          if (dueKB.isNotEmpty || dueFMGE.isNotEmpty) ...[
-            Text('📋 Due for Revision',
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            ...dueKB.take(5).map((e) => _DueTile(
-                  icon: Icons.menu_book_rounded,
-                  title: 'Page ${e.pageNumber}',
-                  subtitle: e.title,
-                  color: const Color(0xFF6366F1),
-                )),
-            ...dueFMGE.take(5).map((e) => _DueTile(
-                  icon: Icons.medical_services_rounded,
-                  title: e.subject,
-                  subtitle: 'Slides ${e.slideStart}–${e.slideEnd}',
-                  color: const Color(0xFF10B981),
-                )),
-            const SizedBox(height: 8),
-          ],
-
-          // ── Empty state ─────────────────────────────────────────
-          if (dueKB.isEmpty && dueFMGE.isEmpty && blocks.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 32),
-              child: Column(
-                children: [
-                  Icon(Icons.auto_awesome_rounded,
-                      size: 48, color: cs.primary.withValues(alpha: 0.3)),
-                  const SizedBox(height: 12),
-                  Text('Nothing due right now',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: cs.onSurface.withValues(alpha: 0.4),
-                      )),
-                  Text('Start your first study session!',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: cs.onSurface.withValues(alpha: 0.3),
-                      )),
-                ],
-              ),
-            ),
-
-          const SizedBox(height: 24),
         ],
       ),
     );

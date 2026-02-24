@@ -1,8 +1,10 @@
 // =============================================================
 // TodayPlanScreen — shows today's blocks in timeline
 // Date header with prev/next day arrows, block list, generate plan
+// Swipe-to-complete on block cards, completion celebration.
 // =============================================================
 
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -23,6 +25,7 @@ class TodayPlanScreen extends StatefulWidget {
 
 class _TodayPlanScreenState extends State<TodayPlanScreen> {
   late DateTime _selectedDate;
+  String? _completedBlockId; // triggers celebration
 
   @override
   void initState() {
@@ -40,6 +43,22 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
   void _nextDay() => setState(() {
         _selectedDate = _selectedDate.add(const Duration(days: 1));
       });
+
+  void _completeBlock(AppProvider app, DayPlan plan, Block block) {
+    HapticsService.heavy();
+    final blocks = List<Block>.from(plan.blocks ?? []);
+    final idx = blocks.indexWhere((b) => b.id == block.id);
+    if (idx >= 0) {
+      blocks[idx] = blocks[idx].copyWith(
+        status: BlockStatus.done,
+        actualEndTime: DateTime.now().toIso8601String(),
+      );
+    }
+    app.upsertDayPlan(plan.copyWith(blocks: blocks));
+
+    // Trigger celebration
+    setState(() => _completedBlockId = block.id);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,44 +87,95 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
     return AppScaffold(
       screenName: "Today's Plan",
       streakCount: streak,
-      body: Column(
+      body: Stack(
         children: [
-          // ── Date navigation ─────────────────────────────────────
-          _DateHeader(
-            date: _selectedDate,
-            isToday: _isToday,
-            onPrev: _prevDay,
-            onNext: _nextDay,
-            onToday: () => setState(() {
-              _selectedDate = AppDateUtils.getAdjustedDate();
-            }),
+          Column(
+            children: [
+              // ── Date navigation ─────────────────────────────────────
+              _DateHeader(
+                date: _selectedDate,
+                isToday: _isToday,
+                onPrev: _prevDay,
+                onNext: _nextDay,
+                onToday: () => setState(() {
+                  _selectedDate = AppDateUtils.getAdjustedDate();
+                }),
+              ),
+
+              // ── Plan summary bar ────────────────────────────────────
+              if (plan != null)
+                _PlanSummaryBar(plan: plan, blocks: blocks),
+
+              // ── Block list or empty ─────────────────────────────────
+              Expanded(
+                child: blocks.isEmpty
+                    ? _EmptyState(
+                        hasNoPlan: plan == null,
+                        onGenerate: () => _generatePlan(context),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                        itemCount: blocks.length,
+                        itemBuilder: (context, i) {
+                          final b = blocks[i];
+                          final canSwipe =
+                              b.status != BlockStatus.done &&
+                              b.status != BlockStatus.skipped;
+
+                          final card = BlockCard(
+                            block: b,
+                            dayPlan: plan!,
+                            onStart: () => _startBlock(app, plan, b),
+                            onSkip: () => _skipBlock(app, plan, b),
+                          );
+
+                          if (!canSwipe) return card;
+
+                          return Dismissible(
+                            key: ValueKey('dismiss-${b.id}'),
+                            direction: DismissDirection.endToStart,
+                            confirmDismiss: (_) async {
+                              _completeBlock(app, plan, b);
+                              return false; // don't actually remove
+                            },
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.only(right: 24),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check_circle_rounded,
+                                      color: Colors.white, size: 22),
+                                  SizedBox(width: 6),
+                                  Text('Complete',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                      )),
+                                ],
+                              ),
+                            ),
+                            child: card,
+                          );
+                        },
+                      ),
+              ),
+            ],
           ),
 
-          // ── Plan summary bar ────────────────────────────────────
-          if (plan != null)
-            _PlanSummaryBar(plan: plan, blocks: blocks),
-
-          // ── Block list or empty ─────────────────────────────────
-          Expanded(
-            child: blocks.isEmpty
-                ? _EmptyState(
-                    hasNoPlan: plan == null,
-                    onGenerate: () => _generatePlan(context),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    itemCount: blocks.length,
-                    itemBuilder: (context, i) {
-                      final b = blocks[i];
-                      return BlockCard(
-                        block: b,
-                        dayPlan: plan!,
-                        onStart: () => _startBlock(app, plan, b),
-                        onSkip: () => _skipBlock(app, plan, b),
-                      );
-                    },
-                  ),
-          ),
+          // ── Celebration overlay ──────────────────────────────────
+          if (_completedBlockId != null)
+            _CelebrationOverlay(
+              onComplete: () {
+                if (mounted) setState(() => _completedBlockId = null);
+              },
+            ),
         ],
       ),
     );
@@ -155,6 +225,152 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
     }
     app.upsertDayPlan(plan.copyWith(blocks: blocks));
   }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CELEBRATION OVERLAY — burst of confetti-like particles
+// ══════════════════════════════════════════════════════════════════
+
+class _CelebrationOverlay extends StatefulWidget {
+  final VoidCallback? onComplete;
+  const _CelebrationOverlay({this.onComplete});
+
+  @override
+  State<_CelebrationOverlay> createState() => _CelebrationOverlayState();
+}
+
+class _CelebrationOverlayState extends State<_CelebrationOverlay>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  final _rng = Random();
+  late List<_Particle> _particles;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _ctrl.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        widget.onComplete?.call();
+      }
+    });
+    _ctrl.forward();
+
+    _particles = List.generate(24, (_) => _Particle(
+      x: _rng.nextDouble(),
+      y: _rng.nextDouble() * 0.3,
+      vx: (_rng.nextDouble() - 0.5) * 0.6,
+      vy: -0.5 - _rng.nextDouble() * 0.5,
+      size: 4 + _rng.nextDouble() * 6,
+      color: [
+        const Color(0xFF6366F1),
+        const Color(0xFF10B981),
+        const Color(0xFFF59E0B),
+        const Color(0xFFEF4444),
+        const Color(0xFF8B5CF6),
+        const Color(0xFF3B82F6),
+      ][_rng.nextInt(6)],
+    ));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, _) {
+        final t = _ctrl.value;
+
+        return IgnorePointer(
+          child: Stack(
+            children: [
+              // Center badge
+              Center(
+                child: AnimatedOpacity(
+                  opacity: t < 0.7 ? 1.0 : 1.0 - ((t - 0.7) / 0.3),
+                  duration: Duration.zero,
+                  child: AnimatedScale(
+                    scale: t < 0.2 ? t / 0.2 : 1.0,
+                    duration: Duration.zero,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                            blurRadius: 20,
+                            spreadRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle_rounded,
+                              color: Colors.white, size: 24),
+                          SizedBox(width: 8),
+                          Text('Block Complete! 🎉',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              )),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Particles
+              ..._particles.map((p) {
+                final px = p.x + p.vx * t;
+                final py = p.y + p.vy * t + 0.5 * t * t; // gravity
+                final opacity = (1.0 - t).clamp(0.0, 1.0);
+
+                return Positioned(
+                  left: px * MediaQuery.of(context).size.width,
+                  top: py * MediaQuery.of(context).size.height + 200,
+                  child: Opacity(
+                    opacity: opacity,
+                    child: Container(
+                      width: p.size,
+                      height: p.size,
+                      decoration: BoxDecoration(
+                        color: p.color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _Particle {
+  final double x, y, vx, vy, size;
+  final Color color;
+  const _Particle({
+    required this.x, required this.y,
+    required this.vx, required this.vy,
+    required this.size, required this.color,
+  });
 }
 
 // ── Date header ─────────────────────────────────────────────────

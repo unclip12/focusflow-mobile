@@ -7,7 +7,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 
 import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/models/app_settings.dart';
@@ -73,7 +72,7 @@ class SettingsScreen extends StatelessWidget {
             title: 'Dark Mode',
             trailing: Switch.adaptive(
               value: sp.isDarkMode,
-              activeColor: cs.primary,
+              activeTrackColor: cs.primary,
               onChanged: (_) => sp.toggleDarkMode(),
             ),
           ),
@@ -163,7 +162,7 @@ class SettingsScreen extends StatelessWidget {
                 : 'Disabled',
             trailing: Switch.adaptive(
               value: sp.settings.quietHours.enabled,
-              activeColor: cs.primary,
+              activeTrackColor: cs.primary,
               onChanged: (_) {
                 sp.updateQuietHours(sp.settings.quietHours
                     .copyWith(enabled: !sp.settings.quietHours.enabled));

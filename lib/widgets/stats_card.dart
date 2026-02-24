@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
 /// Single stat tile with icon, label, and value.
-class StatsCard extends StatelessWidget {
+class StatsCard extends StatefulWidget {
   final IconData icon;
   final String label;
   final String value;
@@ -21,10 +21,19 @@ class StatsCard extends StatelessWidget {
   });
 
   @override
+  State<StatsCard> createState() => _StatsCardState();
+}
+
+class _StatsCardState extends State<StatsCard> {
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final accent = accentColor ?? cs.primary;
+    final accent = widget.accentColor ?? cs.primary;
+
+    // Try to parse a numeric value for animation
+    final numericValue = double.tryParse(widget.value.replaceAll(RegExp(r'[^0-9.]'), ''));
+    final isNumeric = numericValue != null;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -42,14 +51,28 @@ class StatsCard extends StatelessWidget {
               color: accent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, size: 20, color: accent),
+            child: Icon(widget.icon, size: 20, color: accent),
           ),
           const SizedBox(height: 12),
-          Text(value,
-              style: theme.textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w800)),
+          if (isNumeric)
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: numericValue),
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeOut,
+              builder: (context, val, _) {
+                return Text(
+                  '${val.round()}',
+                  style: theme.textTheme.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w800),
+                );
+              },
+            )
+          else
+            Text(widget.value,
+                style: theme.textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w800)),
           const SizedBox(height: 2),
-          Text(label,
+          Text(widget.label,
               style: theme.textTheme.bodyMedium
                   ?.copyWith(color: cs.onSurface.withValues(alpha: 0.55))),
         ],

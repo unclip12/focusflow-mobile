@@ -18,7 +18,6 @@ class RevisionHubScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
-    final now = DateTime.now();
 
     // Partition KB entries into due and upcoming
     final allEntries = app.knowledgeBase;
@@ -115,7 +114,6 @@ class _DueCountBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),

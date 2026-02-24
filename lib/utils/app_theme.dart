@@ -152,14 +152,24 @@ class AppTheme {
         ? ThemeData.dark().textTheme
         : ThemeData.light().textTheme;
 
+    const radius = 12.0;
+
     final textTheme = GoogleFonts.interTextTheme(baseText).copyWith(
-      displayLarge:  GoogleFonts.inter(fontSize: 32 * scale, fontWeight: FontWeight.w700, color: primaryText),
+      displayLarge:  GoogleFonts.inter(fontSize: 32 * scale, fontWeight: FontWeight.w800, color: primaryText),
       displayMedium: GoogleFonts.inter(fontSize: 28 * scale, fontWeight: FontWeight.w700, color: primaryText),
+      displaySmall:  GoogleFonts.inter(fontSize: 24 * scale, fontWeight: FontWeight.w700, color: primaryText),
+      headlineLarge: GoogleFonts.inter(fontSize: 22 * scale, fontWeight: FontWeight.w700, color: primaryText),
+      headlineMedium:GoogleFonts.inter(fontSize: 20 * scale, fontWeight: FontWeight.w600, color: primaryText),
+      headlineSmall: GoogleFonts.inter(fontSize: 18 * scale, fontWeight: FontWeight.w600, color: primaryText),
       titleLarge:    GoogleFonts.inter(fontSize: 20 * scale, fontWeight: FontWeight.w600, color: primaryText),
       titleMedium:   GoogleFonts.inter(fontSize: 16 * scale, fontWeight: FontWeight.w600, color: primaryText),
+      titleSmall:    GoogleFonts.inter(fontSize: 14 * scale, fontWeight: FontWeight.w600, color: primaryText),
       bodyLarge:     GoogleFonts.inter(fontSize: 16 * scale, fontWeight: FontWeight.w400, color: primaryText),
       bodyMedium:    GoogleFonts.inter(fontSize: 14 * scale, fontWeight: FontWeight.w400, color: secondaryText),
+      bodySmall:     GoogleFonts.inter(fontSize: 12 * scale, fontWeight: FontWeight.w400, color: secondaryText),
       labelLarge:    GoogleFonts.inter(fontSize: 14 * scale, fontWeight: FontWeight.w600, color: primaryText),
+      labelMedium:   GoogleFonts.inter(fontSize: 12 * scale, fontWeight: FontWeight.w500, color: primaryText),
+      labelSmall:    GoogleFonts.inter(fontSize: 11 * scale, fontWeight: FontWeight.w500, color: secondaryText),
     );
 
     return ThemeData(
@@ -191,7 +201,7 @@ class AppTheme {
         color: surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(radius),
           side: BorderSide(color: border, width: 0.5),
         ),
       ),
@@ -199,36 +209,90 @@ class AppTheme {
         backgroundColor: surface,
         labelStyle: GoogleFonts.inter(fontSize: 13 * scale, color: primaryText),
         side: BorderSide(color: border, width: 0.5),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: accent,
         foregroundColor: Colors.white,
         elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius + 4)),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: isDark ? surface.withValues(alpha: 0.6) : const Color(0xFFF8F8FC),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(radius),
           borderSide: BorderSide(color: border, width: 0.5),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(radius),
           borderSide: BorderSide(color: border, width: 0.5),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(radius),
           borderSide: BorderSide(color: accent, width: 1.5),
         ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
       dividerTheme: DividerThemeData(color: border, thickness: 0.5),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: surface,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(radius + 8)),
         ),
+        showDragHandle: false,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: surface,
+        elevation: 6,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius + 4)),
+        titleTextStyle: GoogleFonts.inter(
+          fontSize: 18 * scale, fontWeight: FontWeight.w700, color: primaryText,
+        ),
+        contentTextStyle: GoogleFonts.inter(
+          fontSize: 14 * scale, fontWeight: FontWeight.w400, color: secondaryText,
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: isDark ? const Color(0xFF374151) : const Color(0xFF1E293B),
+        contentTextStyle: GoogleFonts.inter(
+          fontSize: 14 * scale, fontWeight: FontWeight.w500, color: Colors.white,
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+        elevation: 4,
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: accent,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+          textStyle: GoogleFonts.inter(fontSize: 14 * scale, fontWeight: FontWeight.w700),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: accent,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+          side: BorderSide(color: accent.withValues(alpha: 0.5)),
+          textStyle: GoogleFonts.inter(fontSize: 14 * scale, fontWeight: FontWeight.w600),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: accent,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+          textStyle: GoogleFonts.inter(fontSize: 14 * scale, fontWeight: FontWeight.w600),
+        ),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.selected) ? accent : null),
+        trackColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.selected) ? accent.withValues(alpha: 0.35) : null),
       ),
     );
   }

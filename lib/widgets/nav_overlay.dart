@@ -50,6 +50,20 @@ const Map<String, IconData> _menuIcons = {
   MenuItemId.settings:      Icons.settings_rounded,
 };
 
+// ── Extra screens not in MenuItemId ─────────────────────────────
+class _ExtraNavItem {
+  final String label;
+  final IconData icon;
+  final String routeName;
+  const _ExtraNavItem({required this.label, required this.icon, required this.routeName});
+}
+
+const _extraNavItems = [
+  _ExtraNavItem(label: 'Notifications', icon: Icons.notifications_rounded, routeName: 'notifications'),
+  _ExtraNavItem(label: 'Profile', icon: Icons.person_rounded, routeName: 'profile'),
+  _ExtraNavItem(label: 'Analytics', icon: Icons.bar_chart_rounded, routeName: 'analytics'),
+];
+
 class NavOverlay extends StatefulWidget {
   final String currentScreenName;
   final VoidCallback onClose;
@@ -173,28 +187,50 @@ class _NavOverlayState extends State<NavOverlay>
 
                       // ── Menu items ────────────────────────────
                       Expanded(
-                        child: ListView.builder(
+                        child: ListView(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
-                          itemCount: visibleIds.length,
-                          itemBuilder: (context, index) {
-                            final id = visibleIds[index];
-                            final label =
-                                kMenuItemLabels[id] ?? id;
-                            final icon =
-                                _menuIcons[id] ?? Icons.circle_outlined;
-                            final routeName =
-                                _menuIdToRoute[id] ?? 'dashboard';
-                            final isActive =
-                                label == widget.currentScreenName;
+                          children: [
+                            // ── Main menu items ─────────────────
+                            ...visibleIds.map((id) {
+                              final label =
+                                  kMenuItemLabels[id] ?? id;
+                              final icon =
+                                  _menuIcons[id] ?? Icons.circle_outlined;
+                              final routeName =
+                                  _menuIdToRoute[id] ?? 'dashboard';
+                              final isActive =
+                                  label == widget.currentScreenName;
 
-                            return _NavTile(
-                              icon: icon,
-                              label: label,
-                              isActive: isActive,
-                              onTap: () => _navigateTo(routeName),
-                            );
-                          },
+                              return _NavTile(
+                                icon: icon,
+                                label: label,
+                                isActive: isActive,
+                                onTap: () => _navigateTo(routeName),
+                              );
+                            }),
+
+                            // ── Divider ─────────────────────────
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 6, horizontal: 12),
+                              child: Divider(
+                                  color: cs.onSurface
+                                      .withValues(alpha: 0.08)),
+                            ),
+
+                            // ── Extra items ─────────────────────
+                            ..._extraNavItems.map((item) {
+                              final isActive =
+                                  item.label == widget.currentScreenName;
+                              return _NavTile(
+                                icon: item.icon,
+                                label: item.label,
+                                isActive: isActive,
+                                onTap: () => _navigateTo(item.routeName),
+                              );
+                            }),
+                          ],
                         ),
                       ),
                     ],
