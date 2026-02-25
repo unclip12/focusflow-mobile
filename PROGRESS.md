@@ -1,8 +1,8 @@
 # FocusFlow Mobile — Development Progress
 
-> Last updated: 2026-02-25 (Session 4 — G5 Complete)
+> Last updated: 2026-02-25 (Session 4 — G6 Complete)
 > Session: Claude + Arsh — direct push + Antigravity workflow
-> **App is a personal study OS for Arsh only. Tracker screen live.**
+> **App is a personal study OS for Arsh only. Tracker screen live. FA 2025 fully seeded.**
 
 ---
 
@@ -138,21 +138,50 @@
 
 ---
 
+### Batch G6 — FA 2025 Pre-seed
+**Status**: ✅ Complete — CI GREEN ✅
+**Commits**: `e69f323`, `a7b5c87`
+
+**New files:**
+- `assets/data/fa_2025_seed.json` — 676 FA pages (31–706) with hierarchical topics
+- `scripts/generate_fa_seed.py` — Python parser that extracts pages from FA text file
+- `lib/services/seed_service.dart` — Seeds SQLite from bundled JSON on first launch
+
+**Modified files:**
+- `lib/main.dart` — `SeedService.seedIfNeeded()` called before `AppProvider.loadAll()`
+- `pubspec.yaml` — `assets/data/` declaration added
+
+**What happens on first launch:**
+1. `SeedService` checks: "Have I seeded yet?"
+2. No → loads `fa_2025_seed.json` → writes all 676 pages to SQLite
+3. Sets flag: `fa_2025_seeded_v1 = true`
+4. `AppProvider.loadAll()` reads FA pages from SQLite
+5. App renders with all 676 pages ready to track
+
+**Pages 33–49 pre-marked as "read"** (Arsh's current progress)
+
+**JSON structure:**
+```json
+{
+  "pageNum": 78,
+  "subject": "Biochemistry",
+  "system": "General Principles",
+  "status": "unread",
+  "topics": [
+    {"t": "Disorders of fructose metabolism"},
+    {"t": "Disorders of galactose metabolism"}
+  ]
+}
+```
+
+---
+
 ## 🔄 In Progress / Up Next
 
 ---
 
-### Batch G6 — FA 2025 Pre-seed
-**Status**: 📋 Next — Direct Claude push
-- Generate `assets/data/fa_2025_seed.json` — all ~672 FA pages from 35th Ed
-- Pages 33–49 pre-marked as `read`
-- `lib/services/seed_service.dart` — detects first launch, seeds all pages
-- Register asset in `pubspec.yaml`
-
----
-
 ### Batch G7 — Bulk FA Page Range Marker
-**Status**: 📋 Planned — Gemini Flash
+**Status**: 📋 Next — Gemini Flash
 - "Mark as Read" → dialog: From Page [__] To Page [__]
 - Auto-schedules SRS revision for each marked page
 - Celebration animation fires when 10+ pages marked in a day
@@ -230,10 +259,9 @@
 | Analytics screen is placeholder | Medium | Batch H |
 | No Claude Import window yet | High | G12 |
 | No auto backup | High | G13 |
-| No FA pre-seeded content | High | G6 ← Next |
 | No prayer time settings | Medium | G10 |
 | No exam date settings | Medium | G10 |
-| No bulk page marker | High | G7 |
+| No bulk page marker | High | G7 ← Next |
 | Dashboard needs full rebuild | High | G8 |
 
 ---
@@ -251,7 +279,8 @@
 | Feb 25, 2026 PM | G3 ✅ — routes + constants + nav cleaned, 5 CI errors fixed |
 | Feb 25, 2026 PM | G3b ✅ — 10 orphaned screen directories deleted |
 | Feb 25, 2026 PM | G4 ✅ — ShellRoute + bottom nav + More sheet + fullScreenMode — CI GREEN |
-| Feb 25, 2026 PM | **G5 ✅** — Unified Tracker screen (FA/Sketchy/Pathoma/UWorld) + 4 models + DB v2 — CI GREEN |
+| Feb 25, 2026 PM | G5 ✅ — Unified Tracker screen (FA/Sketchy/Pathoma/UWorld) + 4 models + DB v2 — CI GREEN |
+| Feb 25, 2026 PM | **G6 ✅** — FA 2025 seed JSON (676 pages) + SeedService + wired into main.dart — CI GREEN |
 
 ---
 
