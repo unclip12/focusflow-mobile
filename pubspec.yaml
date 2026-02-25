@@ -37,3 +37,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  
+  # FA 2025 seed JSON asset
+  assets:
+    - assets/data/
