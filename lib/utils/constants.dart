@@ -1,24 +1,16 @@
 // =============================================================
 // FocusFlow Constants
-// Mirrors enums + constants from the web app's types.ts
+// G3: Dead screen menu items removed. 8 live screens only.
 // =============================================================
 
-// ── Menu Item IDs (15 screens) ────────────────────────────────
+// ── Menu Item IDs (8 live screens) ─────────────────────────────
 class MenuItemId {
   static const String dashboard     = 'DASHBOARD';
-  static const String studyTracker  = 'STUDY_TRACKER';
   static const String todaysPlan    = 'TODAYS_PLAN';
-  static const String focusTimer    = 'FOCUS_TIMER';
-  static const String calendar      = 'CALENDAR';
   static const String timeLogger    = 'TIME_LOGGER';
-  static const String fmge          = 'FMGE';
-  static const String dailyTracker  = 'DAILY_TRACKER';
   static const String faLogger      = 'FA_LOGGER';
   static const String revision      = 'REVISION';
   static const String knowledgeBase = 'KNOWLEDGE_BASE';
-  static const String data          = 'DATA';
-  static const String chat          = 'CHAT';
-  static const String aiMemory      = 'AI_MEMORY';
   static const String analytics     = 'ANALYTICS';
   static const String settings      = 'SETTINGS';
 }
@@ -29,34 +21,18 @@ const List<String> kDefaultMenuOrder = [
   MenuItemId.faLogger,
   MenuItemId.revision,
   MenuItemId.knowledgeBase,
-  MenuItemId.focusTimer,
-  MenuItemId.studyTracker,
-  MenuItemId.calendar,
   MenuItemId.timeLogger,
-  MenuItemId.fmge,
-  MenuItemId.dailyTracker,
   MenuItemId.analytics,
-  MenuItemId.data,
-  MenuItemId.chat,
-  MenuItemId.aiMemory,
   MenuItemId.settings,
 ];
 
 const Map<String, String> kMenuItemLabels = {
   MenuItemId.dashboard:     'Dashboard',
-  MenuItemId.studyTracker:  'Study Tracker',
   MenuItemId.todaysPlan:    "Today's Plan",
-  MenuItemId.focusTimer:    'Focus Timer',
-  MenuItemId.calendar:      'Calendar',
   MenuItemId.timeLogger:    'Time Logger',
-  MenuItemId.fmge:          'FMGE Prep',
-  MenuItemId.dailyTracker:  'Daily Tracker',
   MenuItemId.faLogger:      'FA Logger',
   MenuItemId.revision:      'Revision Hub',
   MenuItemId.knowledgeBase: 'Knowledge Base',
-  MenuItemId.data:          'Info Files',
-  MenuItemId.chat:          'AI Mentor',
-  MenuItemId.aiMemory:      'My AI Memory',
   MenuItemId.analytics:     'Analytics',
   MenuItemId.settings:      'Settings',
 };
@@ -103,7 +79,7 @@ const List<String> kBodySystems = [
   'Psychiatry',
 ];
 
-// ── Block Types ───────────────────────────────────────────────
+// ── Block Types ─────────────────────────────────────────────
 enum BlockType {
   video,
   revisionFa,
@@ -142,7 +118,7 @@ enum BlockType {
   }
 }
 
-// ── Block Status ──────────────────────────────────────────────
+// ── Block Status ────────────────────────────────────────────
 enum BlockStatus {
   notStarted,
   inProgress,
@@ -171,7 +147,7 @@ enum BlockStatus {
   }
 }
 
-// ── Time Log Categories ───────────────────────────────────────
+// ── Time Log Categories ────────────────────────────────────────
 enum TimeLogCategory {
   study,
   revision,
@@ -224,7 +200,7 @@ enum TimeLogCategory {
   }
 }
 
-// ── Time Log Source ───────────────────────────────────────────
+// ── Time Log Source ──────────────────────────────────────────
 enum TimeLogSource {
   manual,
   focusTimer,
@@ -247,7 +223,7 @@ enum TimeLogSource {
   }
 }
 
-// ── Revision Mode ─────────────────────────────────────────────
+// ── Revision Mode ───────────────────────────────────────────
 enum RevisionMode {
   fast,
   balanced,
@@ -274,11 +250,7 @@ enum RevisionMode {
   }
 }
 
-// ── SRS Schedules (hours) — mirrors srsService.ts ─────────────
-// fast:     1d 3d 7d 15d 30d
-// balanced: 4h 1d 2d 5d 10d 20d 40d
-// deep:     4h 1d 3d 7d 14d 30d 60d
-// strict:   8h 1d 3d 7d 14d 21d 30d 45d 60d 90d 120d 180d
+// ── SRS Schedules (hours) ─────────────────────────────────────
 const Map<String, List<int>> kRevisionSchedules = {
   'fast':     [24, 72, 168, 360, 720],
   'balanced': [4, 24, 48, 120, 240, 480, 960],
@@ -288,9 +260,6 @@ const Map<String, List<int>> kRevisionSchedules = {
 
 // ── Block Durations (minutes) ─────────────────────────────────
 const List<int> kBlockDurations = [30, 40, 45, 50];
-
-// ── AI Tone Options ───────────────────────────────────────────
-const List<String> kAiTones = ['strict', 'encouraging', 'balanced'];
 
 // ── Font Size Options ─────────────────────────────────────────
 const List<String> kFontSizes = ['small', 'medium', 'large'];

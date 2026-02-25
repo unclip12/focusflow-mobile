@@ -1,7 +1,6 @@
 // =============================================================
 // NavOverlay — spring-animated navigation menu
-// Anchored top-left, slides in with SpringSimulation
-// Filters by menuConfiguration.visible from SettingsProvider
+// G3: Dead screen entries removed. 8 live screens only.
 // =============================================================
 
 import 'package:flutter/material.dart';
@@ -12,57 +11,29 @@ import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 
-// ── MenuItemId → GoRouter route name mapping ────────────────────
+// ── MenuItemId → GoRouter route name mapping ──────────────────────
 const Map<String, String> _menuIdToRoute = {
   MenuItemId.dashboard:     'dashboard',
-  MenuItemId.studyTracker:  'study-tracker',
   MenuItemId.todaysPlan:    'todays-plan',
-  MenuItemId.focusTimer:    'focus-timer',
-  MenuItemId.calendar:      'calendar',
   MenuItemId.timeLogger:    'time-logger',
-  MenuItemId.fmge:          'fmge',
-  MenuItemId.dailyTracker:  'daily-tracker',
   MenuItemId.faLogger:      'fa-logger',
   MenuItemId.revision:      'revision',
   MenuItemId.knowledgeBase: 'knowledge-base',
-  MenuItemId.data:          'data',
-  MenuItemId.chat:          'chat',
-  MenuItemId.aiMemory:      'ai-memory',
+  MenuItemId.analytics:     'analytics',
   MenuItemId.settings:      'settings',
 };
 
 // ── MenuItemId → Icon mapping ───────────────────────────────────
 const Map<String, IconData> _menuIcons = {
   MenuItemId.dashboard:     Icons.dashboard_rounded,
-  MenuItemId.studyTracker:  Icons.auto_stories_rounded,
   MenuItemId.todaysPlan:    Icons.today_rounded,
-  MenuItemId.focusTimer:    Icons.timer_rounded,
-  MenuItemId.calendar:      Icons.calendar_month_rounded,
   MenuItemId.timeLogger:    Icons.schedule_rounded,
-  MenuItemId.fmge:          Icons.medical_services_rounded,
-  MenuItemId.dailyTracker:  Icons.checklist_rounded,
   MenuItemId.faLogger:      Icons.menu_book_rounded,
   MenuItemId.revision:      Icons.replay_rounded,
   MenuItemId.knowledgeBase: Icons.hub_rounded,
-  MenuItemId.data:          Icons.folder_rounded,
-  MenuItemId.chat:          Icons.smart_toy_rounded,
-  MenuItemId.aiMemory:      Icons.psychology_rounded,
+  MenuItemId.analytics:     Icons.bar_chart_rounded,
   MenuItemId.settings:      Icons.settings_rounded,
 };
-
-// ── Extra screens not in MenuItemId ─────────────────────────────
-class _ExtraNavItem {
-  final String label;
-  final IconData icon;
-  final String routeName;
-  const _ExtraNavItem({required this.label, required this.icon, required this.routeName});
-}
-
-const _extraNavItems = [
-  _ExtraNavItem(label: 'Notifications', icon: Icons.notifications_rounded, routeName: 'notifications'),
-  _ExtraNavItem(label: 'Profile', icon: Icons.person_rounded, routeName: 'profile'),
-  _ExtraNavItem(label: 'Analytics', icon: Icons.bar_chart_rounded, routeName: 'analytics'),
-];
 
 class NavOverlay extends StatefulWidget {
   final String currentScreenName;
@@ -87,7 +58,6 @@ class _NavOverlayState extends State<NavOverlay>
     super.initState();
     _controller = AnimationController.unbounded(vsync: this);
 
-    // Drive with SpringSimulation for bouncy feel
     final spring = SpringDescription(
       mass: 1.0,
       stiffness: 300,
@@ -122,7 +92,6 @@ class _NavOverlayState extends State<NavOverlay>
             (c) => c.id == id,
             orElse: () => null,
           );
-      // Visible by default if no config exists for this item
       if (config == null || config.visible) {
         visibleIds.add(id);
       }
@@ -135,7 +104,7 @@ class _NavOverlayState extends State<NavOverlay>
 
         return Stack(
           children: [
-            // ── Scrim ───────────────────────────────────────────
+            // ── Scrim ───────────────────────────────────────────────
             Positioned.fill(
               child: GestureDetector(
                 onTap: widget.onClose,
@@ -145,7 +114,7 @@ class _NavOverlayState extends State<NavOverlay>
               ),
             ),
 
-            // ── Menu panel (slides from left) ───────────────────
+            // ── Menu panel (slides from left) ─────────────────────────
             Positioned(
               top: 0,
               left: (t - 1.0) * 280,
@@ -158,7 +127,7 @@ class _NavOverlayState extends State<NavOverlay>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ── Header ─────────────────────────────────
+                      // ── Header ──────────────────────────────────────
                       Padding(
                         padding: const EdgeInsets.fromLTRB(20, 16, 16, 8),
                         child: Row(
@@ -185,13 +154,12 @@ class _NavOverlayState extends State<NavOverlay>
 
                       Divider(color: cs.onSurface.withValues(alpha: 0.08)),
 
-                      // ── Menu items ────────────────────────────
+                      // ── Menu items ────────────────────────────────────
                       Expanded(
                         child: ListView(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           children: [
-                            // ── Main menu items ─────────────────
                             ...visibleIds.map((id) {
                               final label =
                                   kMenuItemLabels[id] ?? id;
@@ -209,27 +177,6 @@ class _NavOverlayState extends State<NavOverlay>
                                 onTap: () => _navigateTo(routeName),
                               );
                             }),
-
-                            // ── Divider ─────────────────────────
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 6, horizontal: 12),
-                              child: Divider(
-                                  color: cs.onSurface
-                                      .withValues(alpha: 0.08)),
-                            ),
-
-                            // ── Extra items ─────────────────────
-                            ..._extraNavItems.map((item) {
-                              final isActive =
-                                  item.label == widget.currentScreenName;
-                              return _NavTile(
-                                icon: item.icon,
-                                label: item.label,
-                                isActive: isActive,
-                                onTap: () => _navigateTo(item.routeName),
-                              );
-                            }),
                           ],
                         ),
                       ),
@@ -245,7 +192,7 @@ class _NavOverlayState extends State<NavOverlay>
   }
 }
 
-// ── Individual nav tile ─────────────────────────────────────────
+// ── Individual nav tile ───────────────────────────────────────────
 class _NavTile extends StatelessWidget {
   final IconData icon;
   final String label;
