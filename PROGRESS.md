@@ -1,8 +1,8 @@
 # FocusFlow Mobile — Development Progress
 
-> Last updated: 2026-02-25 (Session 4 — G4 Complete)
-> Session: Claude + Arsh — direct push workflow
-> **App is a personal study OS for Arsh only. G4 bottom nav shell live.**
+> Last updated: 2026-02-25 (Session 4 — G5 Complete)
+> Session: Claude + Arsh — direct push + Antigravity workflow
+> **App is a personal study OS for Arsh only. Tracker screen live.**
 
 ---
 
@@ -39,7 +39,6 @@
 **Status**: ✅ Complete
 - 12-step SRS engine (strict/relaxed modes)
 - KnowledgeBaseEntry model + screens
-- AI Mentor JSON importer (replaced by Claude Import in G12)
 - Exam-aware task planner with smart focus batch calculator
 
 ---
@@ -90,44 +89,52 @@
 **Status**: ✅ Complete
 **Commits**: `c200807`, `f1ddad2`, `715a7b5`, `612efe2`
 - `app_router.dart`: 12 dead routes + 11 dead imports removed
-- `constants.dart`: MenuItemId trimmed from 16 → 8 live screens
+- `constants.dart`: MenuItemId trimmed from 16 → 9 live screens
 - `nav_overlay.dart`: dead map entries + `_extraNavItems` removed
-- 5 CI errors fixed (Routes.focusTimer ref + 4× initialValue)
+- 5 CI errors fixed
 - All 10 orphaned dead screen directories deleted (G3b)
-
-**Live screens after G3:**
-| Route | Screen |
-|---|---|
-| `/dashboard` | Dashboard |
-| `/todays-plan` | Today's Plan |
-| `/time-logger` | Time Logger |
-| `/fa-logger` | FA Logger (interim, replaced G5) |
-| `/revision` | Revision Hub |
-| `/knowledge-base` | Knowledge Base |
-| `/analytics` | Analytics |
-| `/settings` | Settings |
-| `/session` | Session (outside shell) |
 
 ---
 
 ### Batch G4 — Bottom Nav Shell
 **Status**: ✅ Complete — CI GREEN ✅
 **Commits**: `2c7dd4b`, `c8a1910`
+- `lib/widgets/main_shell.dart` — ShellRoute builder, 4 pinned tabs + More sheet
+- `lib/app_router.dart` — 8 screens in ShellRoute; `/session` outside
+- `lib/models/app_settings.dart` — `pinnedTabs` + `fullScreenMode` fields
+- `lib/providers/settings_provider.dart` — getters + setters
+- `lib/utils/constants.dart` — `kPinnableScreenLabels`, `kDefaultPinnedTabs`, `kFaSubjects`
+- `add_time_log_sheet.dart` — fixed 3 broken `\$` string interpolations
 
-**What was built:**
-- `lib/widgets/main_shell.dart` — NEW ShellRoute builder widget
-  - `fullScreenMode = true` → returns child only (AppScaffold hamburger works as before)
-  - `fullScreenMode = false` → wraps child in `Scaffold` with `NavigationBar`
-  - 4 pinned tabs + permanent `More` (5th tab)
-  - `More` → `showModalBottomSheet` 4-column icon grid of all non-pinned screens
-  - Current route always highlighted. `/knowledge-base/:id` normalises to `knowledge-base` tab
-- `lib/app_router.dart` — 8 screens wrapped in `ShellRoute`; `/session` stays outside
-- `lib/models/app_settings.dart` — `pinnedTabs` + `fullScreenMode` fields added
-- `lib/providers/settings_provider.dart` — `pinnedTabs`/`fullScreenMode` getters + setters
-- `lib/utils/constants.dart` — `kPinnableScreenLabels`, `kDefaultPinnedTabs`, `kFaSubjects` added
-- `add_time_log_sheet.dart` — fixed 3 broken `\$` string interpolations (functional bug)
+**Default pinned tabs:** Dashboard · Revision · Today's Plan · Tracker
 
-**Default pinned tabs:** Dashboard · Revision · Today's Plan · FA Tracker
+---
+
+### Batch G5 — Tracker Screen (Unified)
+**Status**: ✅ Complete — CI GREEN ✅
+**Commit**: `1a38f10`
+
+**New files:**
+- `lib/models/fa_page.dart` — FAPage model (unread → read → anki_done)
+- `lib/models/sketchy_item.dart` — SketchyItem (micro/pharma, status cycling)
+- `lib/models/pathoma_item.dart` — PathomaItem (chapters 1–19, status cycling)
+- `lib/models/uworld_session.dart` — UWorldSession (per-subject Q bank log)
+- `lib/screens/tracker/tracker_screen.dart` — 4-tab tracker
+
+**Modified files:**
+- `database_service.dart` — 4 new tables, DB version 1→2 with onUpgrade migration
+- `app_provider.dart` — data stores, loadAll, full CRUD for all 4 new domains
+- `constants.dart` — tracker menu item, `fa-logger` replaced by `tracker` in default pinned tabs
+- `app_router.dart` — `/tracker` route added
+- `main_shell.dart` — `track_changes_rounded` icon added
+
+**Tracker tabs:**
+| Tab | Content |
+|---|---|
+| FA 2025 | Pages grouped by subject, status chips, tap to cycle |
+| Sketchy | Micro + Pharma grouped by category, status cycling |
+| Pathoma | Chapters 1–19, status cycling |
+| UWorld | Per-subject Q bank totals + log session bottom sheet |
 
 ---
 
@@ -135,28 +142,12 @@
 
 ---
 
-### Batch G5 — Tracker Screen (Unified)
-**Status**: 📋 Next — Claude Opus 4.6 via Antigravity
-**What it does:**
-New screen `lib/screens/tracker/tracker_screen.dart` with scrollable top tab bar:
-- **FA 2025 tab**: Full page list grouped by subject, status badges, bulk range marker
-- **Sketchy tab**: Micro (organisms by type) + Pharma, per-item status, daily goal
-- **Pathoma tab**: Chapters list, per-chapter status
-- **UWorld tab**: Per-subject questions done/total/%, log session button
-
-**Models to create:**
-- `lib/models/fa_page.dart` — FAPage (pageNum, title, subject, system, status, srsFields)
-- `lib/models/sketchy_item.dart` — SketchyItem (name, type, status, srsFields)
-- `lib/models/pathoma_item.dart` — PathomaItem (chapter, subject, status)
-- `lib/models/uworld_session.dart` — UWorldSession (subject, done, correct, date)
-
----
-
 ### Batch G6 — FA 2025 Pre-seed
-**Status**: 📋 Planned — Direct Claude push
-- Claude generates `assets/data/fa_2025_seed.json` with all ~672 FA pages
+**Status**: 📋 Next — Direct Claude push
+- Generate `assets/data/fa_2025_seed.json` — all ~672 FA pages from 35th Ed
 - Pages 33–49 pre-marked as `read`
-- `lib/services/seed_service.dart` seeds on first launch
+- `lib/services/seed_service.dart` — detects first launch, seeds all pages
+- Register asset in `pubspec.yaml`
 
 ---
 
@@ -206,9 +197,9 @@ New screen `lib/screens/tracker/tracker_screen.dart` with scrollable top tab bar
 ### Batch G12 — Claude Import Window
 **Status**: 📋 Planned — Gemini Pro High
 - JSON paste area → parse → action preview → confirm → execute
-- `ClaudeImportService` handles: mark_fa_pages_read, mark_fa_anki_done,
-  add_today_task, add_study_block, log_uworld_session, set_daily_goals,
-  set_exam_dates, mark_sketchy_watched, mark_pathoma_watched
+- Actions: mark_fa_pages_read, mark_fa_anki_done, add_today_task,
+  log_uworld_session, set_daily_goals, set_exam_dates,
+  mark_sketchy_watched, mark_pathoma_watched
 
 ---
 
@@ -239,8 +230,7 @@ New screen `lib/screens/tracker/tracker_screen.dart` with scrollable top tab bar
 | Analytics screen is placeholder | Medium | Batch H |
 | No Claude Import window yet | High | G12 |
 | No auto backup | High | G13 |
-| No FA pre-seeded content | High | G6 |
-| No Tracker screen (unified) | High | G5 |
+| No FA pre-seeded content | High | G6 ← Next |
 | No prayer time settings | Medium | G10 |
 | No exam date settings | Medium | G10 |
 | No bulk page marker | High | G7 |
@@ -260,7 +250,8 @@ New screen `lib/screens/tracker/tracker_screen.dart` with scrollable top tab bar
 | Feb 25, 2026 PM | FA 2025 section map, design language, batch plan G3–I defined |
 | Feb 25, 2026 PM | G3 ✅ — routes + constants + nav cleaned, 5 CI errors fixed |
 | Feb 25, 2026 PM | G3b ✅ — 10 orphaned screen directories deleted |
-| Feb 25, 2026 PM | **G4 ✅** — ShellRoute + bottom nav + More sheet + fullScreenMode — CI GREEN |
+| Feb 25, 2026 PM | G4 ✅ — ShellRoute + bottom nav + More sheet + fullScreenMode — CI GREEN |
+| Feb 25, 2026 PM | **G5 ✅** — Unified Tracker screen (FA/Sketchy/Pathoma/UWorld) + 4 models + DB v2 — CI GREEN |
 
 ---
 
