@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/app_router.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
@@ -35,10 +36,7 @@ class DashboardScreen extends StatelessWidget {
         body: _ShimmerLoading(),
       );
     } else {
-      content = const AppScaffold(
-        screenName: 'Dashboard',
-        body: _DashboardBody(),
-      );
+      content = const _DashboardBody();
     }
 
     return PopScope(
@@ -92,7 +90,7 @@ class _DashboardBody extends StatelessWidget {
     // ── Today's plan data ────────────────────────────────────────
     final DayPlan? todayPlan = app.getDayPlan(todayStr);
     final blocks = todayPlan?.blocks ?? [];
-    final blocksDone = blocks.where((b) => b.status.value == 'COMPLETED').length;
+    final blocksDone = blocks.where((b) => b.status == BlockStatus.done).length;
     final blocksTotal = blocks.length;
 
     // ── Study hours today (from timeLogs) ────────────────────────
