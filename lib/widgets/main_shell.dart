@@ -34,9 +34,7 @@ class MainShell extends StatelessWidget {
   // Normalise /knowledge-base/:id → knowledge-base for tab highlight
   String _routeToTabId(String location) {
     final path = location.startsWith('/') ? location.substring(1) : location;
-    // Strip any sub-path (e.g. knowledge-base/someId)
-    final segment = path.split('/').first;
-    return segment;
+    return path.split('/').first;
   }
 
   void _navigateTo(BuildContext context, String routeId) {
@@ -61,7 +59,6 @@ class MainShell extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Handle bar
                 Center(
                   child: Container(
                     width: 40,
@@ -151,8 +148,6 @@ class MainShell extends StatelessWidget {
         int selectedIndex = pinnedTabs.indexOf(currentTabId);
         if (selectedIndex < 0) selectedIndex = 0;
 
-        // All nav items: pinned tabs + More
-        final totalItems = pinnedTabs.length + 1; // +1 for More
         final moreIndex = pinnedTabs.length;
 
         return Scaffold(
@@ -162,10 +157,8 @@ class MainShell extends StatelessWidget {
             onDestinationSelected: (index) {
               if (index == moreIndex) {
                 _showMoreSheet(context, pinnedTabs);
-              } else {
-                if (index < pinnedTabs.length) {
-                  _navigateTo(context, pinnedTabs[index]);
-                }
+              } else if (index < pinnedTabs.length) {
+                _navigateTo(context, pinnedTabs[index]);
               }
             },
             destinations: [
