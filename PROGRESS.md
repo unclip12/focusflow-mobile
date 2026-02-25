@@ -1,8 +1,8 @@
 # FocusFlow Mobile — Development Progress
 
-> Last updated: 2026-02-25 (Session 4 — G6 Complete)
+> Last updated: 2026-02-25 (Session 4 — G7 Complete)
 > Session: Claude + Arsh — direct push + Antigravity workflow
-> **App is a personal study OS for Arsh only. Tracker screen live. FA 2025 fully seeded.**
+> **App is a personal study OS for Arsh only. Tracker screen live. FA 2025 fully seeded. Bulk marker live.**
 
 ---
 
@@ -140,7 +140,7 @@
 
 ### Batch G6 — FA 2025 Pre-seed
 **Status**: ✅ Complete — CI GREEN ✅
-**Commits**: `e69f323`, `a7b5c87`
+**Commits**: `e69f323`, `a7b5c87`, `16781b4`
 
 **New files:**
 - `assets/data/fa_2025_seed.json` — 676 FA pages (31–706) with hierarchical topics
@@ -151,28 +151,22 @@
 - `lib/main.dart` — `SeedService.seedIfNeeded()` called before `AppProvider.loadAll()`
 - `pubspec.yaml` — `assets/data/` declaration added
 
-**What happens on first launch:**
-1. `SeedService` checks: "Have I seeded yet?"
-2. No → loads `fa_2025_seed.json` → writes all 676 pages to SQLite
-3. Sets flag: `fa_2025_seeded_v1 = true`
-4. `AppProvider.loadAll()` reads FA pages from SQLite
-5. App renders with all 676 pages ready to track
+**Pages 33–49 pre-marked as "read"** (Arsh's current progress at time of seeding)
 
-**Pages 33–49 pre-marked as "read"** (Arsh's current progress)
+---
 
-**JSON structure:**
-```json
-{
-  "pageNum": 78,
-  "subject": "Biochemistry",
-  "system": "General Principles",
-  "status": "unread",
-  "topics": [
-    {"t": "Disorders of fructose metabolism"},
-    {"t": "Disorders of galactose metabolism"}
-  ]
-}
-```
+### Batch G7 — Bulk FA Page Range Marker
+**Status**: ✅ Complete — CI GREEN ✅
+**Commit**: `919bf7d`
+
+**What was built:**
+- FAB on FA 2025 tab → opens `_BulkMarkSheet` bottom sheet
+- From/To page range fields (prefilled with next 10 unread pages)
+- Status dropdown: Read | Anki Done
+- `bulkMarkFAPages(from, to, status)` method in AppProvider
+- SnackBar confirmation: "✅ X pages marked as Read"
+- 🎉 Celebration SnackBar if X >= 10 pages marked at once
+- Full validation (31–706 range, to >= from)
 
 ---
 
@@ -180,16 +174,8 @@
 
 ---
 
-### Batch G7 — Bulk FA Page Range Marker
-**Status**: 📋 Next — Gemini Flash
-- "Mark as Read" → dialog: From Page [__] To Page [__]
-- Auto-schedules SRS revision for each marked page
-- Celebration animation fires when 10+ pages marked in a day
-
----
-
 ### Batch G8 — Dashboard Full Rebuild
-**Status**: 📋 Planned — Claude Opus 4.6
+**Status**: 📋 Next — Claude direct push
 - Dual exam countdown (FMGE: X days, Step 1: ~Y days)
 - Available time block + pace insight row
 - Today's goals row: FA progress bar, Anki, Sketchy, Revision due
@@ -261,8 +247,7 @@
 | No auto backup | High | G13 |
 | No prayer time settings | Medium | G10 |
 | No exam date settings | Medium | G10 |
-| No bulk page marker | High | G7 ← Next |
-| Dashboard needs full rebuild | High | G8 |
+| Dashboard needs full rebuild | High | G8 ← Next |
 
 ---
 
@@ -280,7 +265,8 @@
 | Feb 25, 2026 PM | G3b ✅ — 10 orphaned screen directories deleted |
 | Feb 25, 2026 PM | G4 ✅ — ShellRoute + bottom nav + More sheet + fullScreenMode — CI GREEN |
 | Feb 25, 2026 PM | G5 ✅ — Unified Tracker screen (FA/Sketchy/Pathoma/UWorld) + 4 models + DB v2 — CI GREEN |
-| Feb 25, 2026 PM | **G6 ✅** — FA 2025 seed JSON (676 pages) + SeedService + wired into main.dart — CI GREEN |
+| Feb 25, 2026 PM | G6 ✅ — FA 2025 seed JSON (676 pages) + SeedService + wired into main.dart — CI GREEN |
+| Feb 25, 2026 PM | **G7 ✅** — Bulk FA page range marker + celebration snackbar — CI GREEN |
 
 ---
 
