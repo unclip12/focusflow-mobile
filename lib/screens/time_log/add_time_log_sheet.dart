@@ -56,7 +56,7 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
   String _formatTimeOfDay(TimeOfDay t) {
     final h = t.hour.toString().padLeft(2, '0');
     final m = t.minute.toString().padLeft(2, '0');
-    return '\$h:\$m';
+    return '$h:$m';
   }
 
   void _save() {
@@ -75,7 +75,7 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
     final app = context.read<AppProvider>();
     final now = DateTime.now();
     final dateStr = AppDateUtils.todayKey();
-    final id = 'tl_\${now.millisecondsSinceEpoch}';
+    final id = 'tl_${now.millisecondsSinceEpoch}';
 
     final startDt = DateTime(now.year, now.month, now.day,
         _startTime.hour, _startTime.minute);
@@ -121,7 +121,7 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Handle ────────────────────────────────────────────
+            // ── Handle ────────────────────────────────────────────────
             Center(
               child: Container(
                 width: 36,
@@ -139,7 +139,7 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
                     ?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 20),
 
-            // ── Activity name ─────────────────────────────────────
+            // ── Activity name ─────────────────────────────────────────
             TextField(
               controller: _activityController,
               decoration: InputDecoration(
@@ -153,7 +153,7 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
             ),
             const SizedBox(height: 16),
 
-            // ── Time pickers ──────────────────────────────────────
+            // ── Time pickers ──────────────────────────────────────────
             Row(
               children: [
                 Expanded(
@@ -184,7 +184,7 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    '\${_durationMinutes}m',
+                    '${_durationMinutes}m',
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
                       color: cs.primary,
@@ -196,7 +196,7 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
             ),
             const SizedBox(height: 16),
 
-            // ── Category dropdown ─────────────────────────────────
+            // ── Category dropdown ─────────────────────────────────────
             DropdownButtonFormField<TimeLogCategory>(
               value: _category,
               decoration: InputDecoration(
@@ -217,7 +217,7 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
             ),
             const SizedBox(height: 16),
 
-            // ── Notes ─────────────────────────────────────────────
+            // ── Notes ───────────────────────────────────────────────────
             TextField(
               controller: _notesController,
               decoration: InputDecoration(
@@ -231,7 +231,7 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
             ),
             const SizedBox(height: 24),
 
-            // ── Save button ───────────────────────────────────────
+            // ── Save button ───────────────────────────────────────────
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
@@ -271,7 +271,7 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
   }
 }
 
-// ── Time picker tile ────────────────────────────────────────────
+// ── Time picker tile ──────────────────────────────────────────────
 class _TimePicker extends StatelessWidget {
   final String label;
   final String time;
