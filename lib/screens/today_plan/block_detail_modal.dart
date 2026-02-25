@@ -1,5 +1,5 @@
-// =============================================================
-// BlockDetailModal — bottom sheet showing full Block details
+﻿// =============================================================
+// BlockDetailModal â€” bottom sheet showing full Block details
 // Task checkboxes, segment timeline, start/pause/complete controls
 // =============================================================
 
@@ -46,9 +46,9 @@ class BlockDetailModal extends StatelessWidget {
         expand: false,
         builder: (context, scrollController) => ListView(
           controller: scrollController,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           children: [
-            // ── Handle ────────────────────────────────────────────
+            // â”€â”€ Handle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Center(
               child: Container(
                 margin: const EdgeInsets.only(top: 12, bottom: 16),
@@ -61,13 +61,13 @@ class BlockDetailModal extends StatelessWidget {
               ),
             ),
 
-            // ── Title ─────────────────────────────────────────────
+            // â”€â”€ Title â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Text(latestBlock.title,
                 style: theme.textTheme.titleLarge
                     ?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
             Text(
-              '${latestBlock.plannedStartTime} – ${latestBlock.plannedEndTime}  •  ${latestBlock.plannedDurationMinutes}m',
+              '${latestBlock.plannedStartTime} â€“ ${latestBlock.plannedEndTime}  â€¢  ${latestBlock.plannedDurationMinutes}m',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: cs.onSurface.withValues(alpha: 0.5),
               ),
@@ -80,11 +80,11 @@ class BlockDetailModal extends StatelessWidget {
             ],
             const SizedBox(height: 20),
 
-            // ── Action buttons ────────────────────────────────────
+            // â”€â”€ Action buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             _ActionBar(block: latestBlock, dayPlan: dayPlan),
             const SizedBox(height: 20),
 
-            // ── Tasks ─────────────────────────────────────────────
+            // â”€â”€ Tasks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             if (tasks.isNotEmpty) ...[
               Text('Tasks',
                   style: theme.textTheme.titleMedium
@@ -101,7 +101,7 @@ class BlockDetailModal extends StatelessWidget {
               const SizedBox(height: 16),
             ],
 
-            // ── Segments ──────────────────────────────────────────
+            // â”€â”€ Segments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             if (segments.isNotEmpty) ...[
               Text('Timeline',
                   style: theme.textTheme.titleMedium
@@ -111,7 +111,7 @@ class BlockDetailModal extends StatelessWidget {
               const SizedBox(height: 16),
             ],
 
-            // ── Actual notes ──────────────────────────────────────
+            // â”€â”€ Actual notes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             if (latestBlock.actualNotes != null &&
                 latestBlock.actualNotes!.isNotEmpty) ...[
               Text('Notes',
@@ -129,7 +129,7 @@ class BlockDetailModal extends StatelessWidget {
               ),
             ],
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -161,7 +161,7 @@ class BlockDetailModal extends StatelessWidget {
   }
 }
 
-// ── Action bar (start / pause / complete) ───────────────────────
+// â”€â”€ Action bar (start / pause / complete) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _ActionBar extends StatelessWidget {
   final Block block;
   final DayPlan dayPlan;
@@ -235,7 +235,7 @@ class _ActionBar extends StatelessWidget {
         );
       case BlockStatus.done:
         return _ActionButton(
-          label: 'Completed ✓',
+          label: 'Completed âœ“',
           icon: Icons.check_circle_rounded,
           color: const Color(0xFF10B981).withValues(alpha: 0.5),
           onTap: null,
@@ -326,7 +326,7 @@ class _ActionBar extends StatelessWidget {
   }
 }
 
-// ── Styled action button ────────────────────────────────────────
+// â”€â”€ Styled action button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _ActionButton extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -370,7 +370,7 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-// ── Task checkbox tile ──────────────────────────────────────────
+// â”€â”€ Task checkbox tile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _TaskTile extends StatelessWidget {
   final BlockTask task;
   final VoidCallback onToggle;
@@ -438,7 +438,7 @@ class _TaskTile extends StatelessWidget {
   }
 }
 
-// ── Segment tile ────────────────────────────────────────────────
+// â”€â”€ Segment tile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _SegmentTile extends StatelessWidget {
   final BlockSegment segment;
 
@@ -464,7 +464,7 @@ class _SegmentTile extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Text(
-            '${segment.start} – $endStr',
+            '${segment.start} â€“ $endStr',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: cs.onSurface.withValues(alpha: 0.6),
               fontSize: 13,

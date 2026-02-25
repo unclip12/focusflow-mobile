@@ -1,5 +1,5 @@
-// =============================================================
-// NotificationSettingsSheet — modal bottom sheet
+﻿// =============================================================
+// NotificationSettingsSheet â€” modal bottom sheet
 // Toggles: study reminders, achievements, revision alerts,
 //          daily summary.  Quiet hours start/end time pickers.
 // Android rules: enableDrag: false, useSafeArea: true.
@@ -13,7 +13,7 @@ import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/models/app_settings.dart';
 
-// ── Public helper to open the sheet ───────────────────────────────
+// â”€â”€ Public helper to open the sheet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Future<void> showNotificationSettingsSheet(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
@@ -25,7 +25,7 @@ Future<void> showNotificationSettingsSheet(BuildContext context) {
   );
 }
 
-// ── Sheet widget ──────────────────────────────────────────────────
+// â”€â”€ Sheet widget â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _NotificationSettingsSheet extends StatefulWidget {
   const _NotificationSettingsSheet();
 
@@ -36,7 +36,7 @@ class _NotificationSettingsSheet extends StatefulWidget {
 
 class _NotificationSettingsSheetState
     extends State<_NotificationSettingsSheet> {
-  // Local copies — applied on change
+  // Local copies â€” applied on change
   late Map<String, bool> _types;
   late bool _quietEnabled;
   late String _quietStart;
@@ -60,7 +60,7 @@ class _NotificationSettingsSheetState
     _quietEnd     = qh.end;
   }
 
-  // ── Helpers ───────────────────────────────────────────────────
+  // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   void _setType(String key, bool value) {
     setState(() => _types[key] = value);
     _saveNotifications();
@@ -115,7 +115,7 @@ class _NotificationSettingsSheetState
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Drag pill ─────────────────────────────────────────
+          // â”€â”€ Drag pill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           const SizedBox(height: 12),
           Center(
             child: Container(
@@ -129,9 +129,9 @@ class _NotificationSettingsSheetState
           ),
           const SizedBox(height: 16),
 
-          // ── Header ───────────────────────────────────────────
+          // â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
                 Icon(Icons.tune_rounded, size: 20, color: cs.primary),
@@ -154,9 +154,9 @@ class _NotificationSettingsSheetState
           const Divider(height: 1),
           const SizedBox(height: 12),
 
-          // ── Notification type toggles ─────────────────────────
+          // â”€â”€ Notification type toggles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
               'Notification Types',
               style: theme.textTheme.labelSmall?.copyWith(
@@ -199,14 +199,14 @@ class _NotificationSettingsSheetState
 
           const SizedBox(height: 16),
           const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
+            padding: EdgeInsets.symmetric(horizontal: 16),
             child: Divider(height: 1),
           ),
           const SizedBox(height: 12),
 
-          // ── Quiet hours ───────────────────────────────────────
+          // â”€â”€ Quiet hours â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
                 Text(
@@ -220,7 +220,7 @@ class _NotificationSettingsSheetState
                 const Spacer(),
                 Switch.adaptive(
                   value:            _quietEnabled,
-                  activeColor: cs.primary,
+                  activeTrackColor: cs.primary,
                   onChanged: (v) {
                     setState(() => _quietEnabled = v);
                     _saveQuietHours();
@@ -233,7 +233,7 @@ class _NotificationSettingsSheetState
           if (_quietEnabled) ...[
             const SizedBox(height: 8),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
                   Expanded(
@@ -270,7 +270,7 @@ class _NotificationSettingsSheetState
   }
 }
 
-// ── Toggle tile ───────────────────────────────────────────────────
+// â”€â”€ Toggle tile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _ToggleTile extends StatelessWidget {
   final IconData icon;
   final Color    color;
@@ -313,7 +313,7 @@ class _ToggleTile extends StatelessWidget {
           ),
           Switch.adaptive(
             value:            value,
-            activeColor: cs.primary,
+            activeTrackColor: cs.primary,
             onChanged:        onChanged,
           ),
         ],
@@ -322,7 +322,7 @@ class _ToggleTile extends StatelessWidget {
   }
 }
 
-// ── Time tile ─────────────────────────────────────────────────────
+// â”€â”€ Time tile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _TimeTile extends StatelessWidget {
   final String       label;
   final String       time;

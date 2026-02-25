@@ -1,5 +1,5 @@
-// =============================================================
-// FALoggerScreen — rebuilt for First Aid (USMLE) page logging only.
+﻿// =============================================================
+// FALoggerScreen â€” rebuilt for First Aid (USMLE) page logging only.
 // Shows KB entries as FA study log cards with coverage bars.
 // =============================================================
 
@@ -57,11 +57,11 @@ class _FALoggerScreenState extends State<FALoggerScreen> {
       screenName: 'FA Logger',
       body: Column(
         children: [
-          // ── Search bar ──────────────────────────────────────
+          // â”€â”€ Search bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
                 color: cs.onSurface.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
@@ -71,7 +71,7 @@ class _FALoggerScreenState extends State<FALoggerScreen> {
                 onChanged: (v) => setState(() => _query = v.trim()),
                 style: theme.textTheme.bodyMedium,
                 decoration: InputDecoration(
-                  hintText: 'Search FA pages…',
+                  hintText: 'Search FA pagesâ€¦',
                   hintStyle: theme.textTheme.bodyMedium?.copyWith(
                     color: cs.onSurface.withValues(alpha: 0.35),
                   ),
@@ -87,7 +87,7 @@ class _FALoggerScreenState extends State<FALoggerScreen> {
             ),
           ),
 
-          // ── List / empty ────────────────────────────────────
+          // â”€â”€ List / empty â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Expanded(
             child: items.isEmpty
                 ? _EmptyState(hasQuery: _query.isNotEmpty)
@@ -112,9 +112,9 @@ class _FALoggerScreenState extends State<FALoggerScreen> {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // FA ENTRY CARD
-// ══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _FAEntryCard extends StatelessWidget {
   final KnowledgeBaseEntry entry;
@@ -147,7 +147,7 @@ class _FAEntryCard extends StatelessWidget {
       final dt = DateTime.tryParse(entry.lastStudiedAt!);
       if (dt != null) {
         dateLabel =
-            '${DateFormat('MMM d').format(dt)} · ${DateFormat('h:mm a').format(dt)}';
+            '${DateFormat('MMM d').format(dt)} Â· ${DateFormat('h:mm a').format(dt)}';
       }
     }
 
@@ -155,7 +155,7 @@ class _FAEntryCard extends StatelessWidget {
     final subtopics = entry.topics.map((t) => t.name).toList();
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: BorderRadius.circular(14),
@@ -172,7 +172,7 @@ class _FAEntryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Header row ────────────────────────────────────
+          // â”€â”€ Header row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Row(
             children: [
               Container(
@@ -222,7 +222,7 @@ class _FAEntryCard extends StatelessWidget {
 
           const SizedBox(height: 10),
 
-          // ── Coverage progress bar ─────────────────────────
+          // â”€â”€ Coverage progress bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Row(
             children: [
               Expanded(
@@ -249,7 +249,7 @@ class _FAEntryCard extends StatelessWidget {
             ],
           ),
 
-          // ── Subtopic chips ────────────────────────────────
+          // â”€â”€ Subtopic chips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           if (subtopics.isNotEmpty) ...[
             const SizedBox(height: 8),
             Wrap(
@@ -281,9 +281,9 @@ class _FAEntryCard extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // EMPTY STATE
-// ══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _EmptyState extends StatelessWidget {
   final bool hasQuery;

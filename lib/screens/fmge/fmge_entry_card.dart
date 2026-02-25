@@ -1,5 +1,5 @@
-// =============================================================
-// FMGEEntryCard — compact card for FMGE list items
+﻿// =============================================================
+// FMGEEntryCard â€” compact card for FMGE list items
 // Shows: subject, slide range (topic), log count badge,
 //        last score as 5-star display, next revision chip.
 // =============================================================
@@ -27,7 +27,7 @@ class FMGEEntryCard extends StatelessWidget {
     final isOverdue =
         SrsService.isDueNow(nextRevisionAt: entry.nextRevisionAt);
 
-    // ── Next revision chip ───────────────────────────────────────
+    // â”€â”€ Next revision chip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     Color chipColor;
     String chipText;
     if (isMastered) {
@@ -55,10 +55,10 @@ class FMGEEntryCard extends StatelessWidget {
       chipText = 'Not started';
     }
 
-    // ── Last score (from most recent log's notes field) ──────────
+    // â”€â”€ Last score (from most recent log's notes field) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     final lastScore = _parseLastScore(entry);
 
-    // ── Subject colour ───────────────────────────────────────────
+    // â”€â”€ Subject colour â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     final subjectColor = AppColors.subjectColors[
         entry.subject.hashCode.abs() % AppColors.subjectColors.length];
 
@@ -66,7 +66,7 @@ class FMGEEntryCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: cs.surface,
           borderRadius: BorderRadius.circular(14),
@@ -75,7 +75,7 @@ class FMGEEntryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Top row: subject chip + revision chip ─────────────
+            // â”€â”€ Top row: subject chip + revision chip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Row(
               children: [
                 Container(
@@ -113,16 +113,16 @@ class FMGEEntryCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
-            // ── Slide range (topic) ──────────────────────────────
+            // â”€â”€ Slide range (topic) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Text(
-              'Slides ${entry.slideStart}–${entry.slideEnd}',
+              'Slides ${entry.slideStart}â€“${entry.slideEnd}',
               style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 8),
 
-            // ── Bottom row: log count badge + 5-star display ─────
+            // â”€â”€ Bottom row: log count badge + 5-star display â”€â”€â”€â”€â”€
             Row(
               children: [
                 // Log count badge

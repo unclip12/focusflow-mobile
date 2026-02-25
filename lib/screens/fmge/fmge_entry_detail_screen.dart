@@ -1,5 +1,5 @@
-// =============================================================
-// FMGEEntryDetailScreen — full detail view for one FMGEEntry
+﻿// =============================================================
+// FMGEEntryDetailScreen â€” full detail view for one FMGEEntry
 // Shows subject, slide range, notes, revision timeline,
 // "Mark Revised" button with 5-star tap row.
 // Saves via AppProvider.upsertFMGEEntry().
@@ -59,7 +59,7 @@ class FMGEEntryDetailScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
-          // ── Back ──────────────────────────────────────────────────
+          // â”€â”€ Back â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Align(
             alignment: Alignment.centerLeft,
             child: IconButton(
@@ -70,16 +70,16 @@ class FMGEEntryDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 4),
 
-          // ── Title ─────────────────────────────────────────────────
+          // â”€â”€ Title â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Text(
-            'Slides ${entry.slideStart}–${entry.slideEnd}',
+            'Slides ${entry.slideStart}â€“${entry.slideEnd}',
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 8),
 
-          // ── Badges ────────────────────────────────────────────────
+          // â”€â”€ Badges â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Wrap(
             spacing: 6,
             runSpacing: 4,
@@ -93,7 +93,7 @@ class FMGEEntryDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // ── Mastery card ──────────────────────────────────────────
+          // â”€â”€ Mastery card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _SectionCard(
             title: 'Mastery Progress',
             child: Column(
@@ -164,7 +164,7 @@ class FMGEEntryDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // ── Mark Revised button ────────────────────────────────────
+          // â”€â”€ Mark Revised button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           if (!isMastered)
             SizedBox(
               width: double.infinity,
@@ -183,7 +183,7 @@ class FMGEEntryDetailScreen extends StatelessWidget {
             ),
           const SizedBox(height: 16),
 
-          // ── Details card ───────────────────────────────────────────
+          // â”€â”€ Details card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _SectionCard(
             title: 'Details',
             child: Column(
@@ -191,7 +191,7 @@ class FMGEEntryDetailScreen extends StatelessWidget {
               children: [
                 _DetailRow('Subject', entry.subject),
                 _DetailRow(
-                    'Slide Range', '${entry.slideStart}–${entry.slideEnd}'),
+                    'Slide Range', '${entry.slideStart}â€“${entry.slideEnd}'),
                 _DetailRow('Revision Count', '${entry.revisionCount}'),
                 _DetailRow(
                     'Revision Index', '${entry.currentRevisionIndex}'),
@@ -203,7 +203,7 @@ class FMGEEntryDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // ── Notes ──────────────────────────────────────────────────
+          // â”€â”€ Notes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           if (entry.notes != null && entry.notes!.isNotEmpty)
             _SectionCard(
               title: 'Notes',
@@ -218,7 +218,7 @@ class FMGEEntryDetailScreen extends StatelessWidget {
           if (entry.notes != null && entry.notes!.isNotEmpty)
             const SizedBox(height: 12),
 
-          // ── Revision Log Timeline ──────────────────────────────────
+          // â”€â”€ Revision Log Timeline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _SectionCard(
             title: 'Revision Log (${entry.logs.length})',
             child: entry.logs.isEmpty
@@ -233,13 +233,13 @@ class FMGEEntryDetailScreen extends StatelessWidget {
                   ),
           ),
 
-          const SizedBox(height: 40),
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  // ── Mark Revised dialog ────────────────────────────────────────
+  // â”€â”€ Mark Revised dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   void _showMarkRevisedDialog(BuildContext context, FMGEEntry entry) {
     int score = 4;
     showDialog(
@@ -285,8 +285,8 @@ class FMGEEntryDetailScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   score >= 4
-                      ? '✅ Counts toward mastery'
-                      : '⚠️ Won\'t advance mastery',
+                      ? 'âœ… Counts toward mastery'
+                      : 'âš ï¸ Won\'t advance mastery',
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: score >= 4 ? AppColors.success : AppColors.warning,
                     fontWeight: FontWeight.w600,
@@ -365,7 +365,7 @@ class FMGEEntryDetailScreen extends StatelessWidget {
   }
 }
 
-// ── Helper widgets ──────────────────────────────────────────────
+// â”€â”€ Helper widgets â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _Badge extends StatelessWidget {
   final String label;
@@ -405,7 +405,7 @@ class _SectionCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: BorderRadius.circular(14),
@@ -538,7 +538,7 @@ class _FMGELogTile extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
                   child: Text(
-                    'Slides ${log.slideStart}–${log.slideEnd}',
+                    'Slides ${log.slideStart}â€“${log.slideEnd}',
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: cs.onSurface.withValues(alpha: 0.35),
                     ),

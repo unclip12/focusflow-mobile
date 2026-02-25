@@ -1,5 +1,5 @@
-// =============================================================
-// ProfileScreen — user profile with avatar, name, study goals,
+﻿// =============================================================
+// ProfileScreen â€” user profile with avatar, name, study goals,
 // streak card, and account actions.
 // Android rules: resizeToAvoidBottomInset: true (via AppScaffold),
 //                enableDrag: false, useSafeArea: true on sheets.
@@ -29,7 +29,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // ignore: prefer_final_fields
   int _targetBlocks = 4;
 
-  // ── Open edit sheet ───────────────────────────────────────
+  // â”€â”€ Open edit sheet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<void> _openEditSheet(BuildContext context, AppProvider ap) async {
     final result = await showModalBottomSheet<bool>(
       context: context,
@@ -57,7 +57,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // ── Avatar initials ───────────────────────────────────────
+  // â”€â”€ Avatar initials â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   String _initials(String? name) {
     if (name == null || name.isEmpty) return '?';
     final parts = name.trim().split(' ');
@@ -93,9 +93,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // AVATAR + NAME
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           Center(
             child: Column(
               children: [
@@ -179,17 +179,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 24),
 
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // STREAK CARD
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           _sectionLabel('Activity Streak', theme, cs),
           const SizedBox(height: 8),
           StreakCard(ap: ap),
           const SizedBox(height: 20),
 
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // STUDY STATS
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           _sectionLabel('Study Stats', theme, cs),
           const SizedBox(height: 8),
           _StatsGrid(
@@ -222,9 +222,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 20),
 
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // STUDY GOAL SETTINGS
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           _sectionLabel('Daily Goals', theme, cs),
           const SizedBox(height: 8),
           _GoalRow(
@@ -246,9 +246,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 20),
 
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // ACCOUNT ACTIONS
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           _sectionLabel('Account', theme, cs),
           const SizedBox(height: 8),
           _ActionTile(
@@ -269,7 +269,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onTap: () => _showPlaceholder(context, 'Sign out'),
             danger: true,
           ),
-          const SizedBox(height: 40),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -278,7 +278,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _showPlaceholder(BuildContext context, String action) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$action — coming soon'),
+        content: Text('$action â€” coming soon'),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ),
@@ -286,9 +286,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // HELPER WIDGETS
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 Widget _sectionLabel(String label, ThemeData theme, ColorScheme cs) {
   return Text(

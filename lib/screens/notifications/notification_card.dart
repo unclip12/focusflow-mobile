@@ -1,7 +1,7 @@
-// =============================================================
-// NotificationCard — single notification list item
-// Type icons: reminder→alarm, achievement→emoji_events,
-//             revisionDue→replay, streak→local_fire_department
+﻿// =============================================================
+// NotificationCard â€” single notification list item
+// Type icons: reminderâ†’alarm, achievementâ†’emoji_events,
+//             revisionDueâ†’replay, streakâ†’local_fire_department
 // Tap: markNotificationRead + navigate via GoRouter named route.
 // =============================================================
 
@@ -16,7 +16,7 @@ class NotificationCard extends StatelessWidget {
 
   const NotificationCard({super.key, required this.notification});
 
-  // ── Type → icon + colour ──────────────────────────────────────
+  // â”€â”€ Type â†’ icon + colour â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   static IconData _iconFor(AppNotificationType type) {
     switch (type) {
       case AppNotificationType.reminder:
@@ -43,7 +43,7 @@ class NotificationCard extends StatelessWidget {
     }
   }
 
-  // ── Time ago string ───────────────────────────────────────────
+  // â”€â”€ Time ago string â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   static String _timeAgo(DateTime dt) {
     final diff = DateTime.now().difference(dt);
     if (diff.inMinutes < 1) return 'just now';
@@ -75,7 +75,7 @@ class NotificationCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isUnread
               ? cs.primary.withValues(alpha: 0.05)
@@ -90,7 +90,7 @@ class NotificationCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Type icon ──────────────────────────────────────
+            // â”€â”€ Type icon â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Container(
               padding: const EdgeInsets.all(9),
               decoration: BoxDecoration(
@@ -105,7 +105,7 @@ class NotificationCard extends StatelessWidget {
             ),
             const SizedBox(width: 12),
 
-            // ── Text content ────────────────────────────────────
+            // â”€â”€ Text content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -136,7 +136,7 @@ class NotificationCard extends StatelessWidget {
               ),
             ),
 
-            // ── Unread dot ──────────────────────────────────────
+            // â”€â”€ Unread dot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             if (isUnread) ...[
               const SizedBox(width: 8),
               Padding(

@@ -1,7 +1,7 @@
-// =============================================================
-// InfoFilesScreen — grid of study material cards
+﻿// =============================================================
+// InfoFilesScreen â€” grid of study material cards
 // Filter chips: All / PDF / Image / Notes
-// FAB → AddMaterialSheet
+// FAB â†’ AddMaterialSheet
 // =============================================================
 
 import 'package:flutter/material.dart';
@@ -47,7 +47,7 @@ class _InfoFilesScreenState extends State<InfoFilesScreen> {
       screenName: 'Info Files',
       body: Column(
         children: [
-          // ── Filter chips ────────────────────────────────────
+          // â”€â”€ Filter chips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
             child: SizedBox(
@@ -87,7 +87,7 @@ class _InfoFilesScreenState extends State<InfoFilesScreen> {
             ),
           ),
 
-          // ── Grid / Empty ────────────────────────────────────
+          // â”€â”€ Grid / Empty â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Expanded(
             child: items.isEmpty
                 ? _EmptyState()
@@ -129,7 +129,7 @@ class _InfoFilesScreenState extends State<InfoFilesScreen> {
       backgroundColor:    Colors.transparent,
       builder: (_) => Container(
         margin: const EdgeInsets.only(top: 80),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: cs.surface,
           borderRadius:
@@ -179,9 +179,9 @@ class _InfoFilesScreenState extends State<InfoFilesScreen> {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // EMPTY STATE
-// ══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _EmptyState extends StatelessWidget {
   @override

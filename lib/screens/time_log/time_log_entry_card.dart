@@ -1,5 +1,5 @@
-// =============================================================
-// TimeLogEntryCard — card for a single TimeLogEntry
+﻿// =============================================================
+// TimeLogEntryCard â€” card for a single TimeLogEntry
 // Shows activity, duration, time range, category chip, swipe delete
 // =============================================================
 
@@ -61,7 +61,7 @@ class TimeLogEntryCard extends StatelessWidget {
   }
 
   String _formatTimeRange() {
-    // startTime and endTime are ISO strings — extract HH:mm
+    // startTime and endTime are ISO strings â€” extract HH:mm
     String extract(String iso) {
       final dt = DateTime.tryParse(iso);
       if (dt != null) {
@@ -71,7 +71,7 @@ class TimeLogEntryCard extends StatelessWidget {
       if (iso.length >= 5) return iso.substring(0, 5);
       return iso;
     }
-    return '${extract(entry.startTime)} → ${extract(entry.endTime)}';
+    return '${extract(entry.startTime)} â†’ ${extract(entry.endTime)}';
   }
 
   @override
@@ -115,7 +115,7 @@ class TimeLogEntryCard extends StatelessWidget {
       onDismissed: (_) => onDelete(),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: cs.surface,
           borderRadius: BorderRadius.circular(14),
@@ -123,7 +123,7 @@ class TimeLogEntryCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // ── Category dot ──────────────────────────────────────
+            // â”€â”€ Category dot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Container(
               width: 4,
               height: 40,
@@ -134,7 +134,7 @@ class TimeLogEntryCard extends StatelessWidget {
             ),
             const SizedBox(width: 12),
 
-            // ── Content ───────────────────────────────────────────
+            // â”€â”€ Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -160,7 +160,7 @@ class TimeLogEntryCard extends StatelessWidget {
 
             const SizedBox(width: 8),
 
-            // ── Duration ──────────────────────────────────────────
+            // â”€â”€ Duration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Text(
               _formatDuration(entry.durationMinutes),
               style: theme.textTheme.labelLarge?.copyWith(
@@ -171,7 +171,7 @@ class TimeLogEntryCard extends StatelessWidget {
 
             const SizedBox(width: 10),
 
-            // ── Category chip ─────────────────────────────────────
+            // â”€â”€ Category chip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(

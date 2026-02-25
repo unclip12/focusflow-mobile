@@ -1,7 +1,7 @@
-// =============================================================
-// DashboardScreen — main landing page
+﻿// =============================================================
+// DashboardScreen â€” main landing page
 // Uses AppScaffold, shows welcome, TodayGlance, Activity chart,
-// Due Now list (KB + FMGE entries where nextRevisionAt ≤ now)
+// Due Now list (KB + FMGE entries where nextRevisionAt â‰¤ now)
 // Pull-to-refresh, shimmer loading, proper empty states.
 // Performance: RepaintBoundary, const children, context.select.
 // =============================================================
@@ -26,7 +26,7 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ── Selective rebuilds: only watch the fields we need ─────────
+    // â”€â”€ Selective rebuilds: only watch the fields we need â”€â”€â”€â”€â”€â”€â”€â”€â”€
     final loaded = context.select<AppProvider, bool>((p) => p.loaded);
 
     Widget content;
@@ -70,9 +70,9 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
-// DASHBOARD BODY — separated to allow fine-grained selects
-// ══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// DASHBOARD BODY â€” separated to allow fine-grained selects
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _DashboardBody extends StatelessWidget {
   const _DashboardBody();
@@ -87,41 +87,41 @@ class _DashboardBody extends StatelessWidget {
     final displayName = app.userProfile?.displayName ?? 'Student';
     final now = DateTime.now();
 
-    // ── Today's plan data ────────────────────────────────────────
+    // â”€â”€ Today's plan data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     final DayPlan? todayPlan = app.getDayPlan(todayStr);
     final blocks = todayPlan?.blocks ?? [];
     final blocksDone = blocks.where((b) => b.status == BlockStatus.done).length;
     final blocksTotal = blocks.length;
 
-    // ── Study hours today (from timeLogs) ────────────────────────
+    // â”€â”€ Study hours today (from timeLogs) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     final todayLogs =
         app.timeLogs.where((l) => l.date == todayStr).toList();
     final studyMinutesToday =
         todayLogs.fold<int>(0, (sum, l) => sum + l.durationMinutes);
     final studyHoursToday = studyMinutesToday / 60.0;
 
-    // ── 14-day activity data ─────────────────────────────────────
+    // â”€â”€ 14-day activity data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     final minutesByDate = <String, int>{};
     for (final log in app.timeLogs) {
       minutesByDate[log.date] =
           (minutesByDate[log.date] ?? 0) + log.durationMinutes;
     }
 
-    // ── Due Now: KB entries ──────────────────────────────────────
+    // â”€â”€ Due Now: KB entries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     final dueKB = app.knowledgeBase.where((e) {
       if (e.nextRevisionAt == null) return false;
       final next = DateTime.tryParse(e.nextRevisionAt!);
       return next != null && now.isAfter(next);
     }).toList();
 
-    // ── Due Now: FMGE entries ────────────────────────────────────
+    // â”€â”€ Due Now: FMGE entries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     final dueFMGE = app.fmgeEntries.where((e) {
       if (e.nextRevisionAt == null) return false;
       final next = DateTime.tryParse(e.nextRevisionAt!);
       return next != null && now.isAfter(next);
     }).toList();
 
-    // ── Streak (consecutive days with ≥1 time log) ──────────────
+    // â”€â”€ Streak (consecutive days with â‰¥1 time log) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     int streak = 0;
     for (int i = 0; i < 365; i++) {
       final d = now.subtract(Duration(days: i));
@@ -144,9 +144,9 @@ class _DashboardBody extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           children: [
-            // ── Welcome ─────────────────────────────────────────────
+            // â”€â”€ Welcome â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Text(
-              'Hey, $displayName 👋',
+              'Hey, $displayName ðŸ‘‹',
               style: theme.textTheme.displayMedium?.copyWith(
                 fontWeight: FontWeight.w800,
               ),
@@ -160,7 +160,7 @@ class _DashboardBody extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            // ── Today's Glance ──────────────────────────────────────
+            // â”€â”€ Today's Glance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             RepaintBoundary(
               child: blocksTotal > 0
                   ? TodayGlanceCard(
@@ -170,14 +170,14 @@ class _DashboardBody extends StatelessWidget {
                     )
                   : _SectionEmptyState(
                       icon: Icons.checklist_outlined,
-                      message: "No tasks for today — add one!",
+                      message: "No tasks for today â€” add one!",
                       buttonLabel: "Today's Plan",
                       routeName: Routes.todaysPlan,
                     ),
             ),
             const SizedBox(height: 16),
 
-            // ── Quick Stats Row ─────────────────────────────────────
+            // â”€â”€ Quick Stats Row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             RepaintBoundary(
               child: Row(
                 children: [
@@ -203,22 +203,22 @@ class _DashboardBody extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // ── Activity Graph / Study Streak ───────────────────────
+            // â”€â”€ Activity Graph / Study Streak â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             RepaintBoundary(
               child: minutesByDate.isNotEmpty
                   ? ActivityGraph(minutesByDate: minutesByDate)
                   : _SectionEmptyState(
                       icon: Icons.local_fire_department_outlined,
-                      message: "No study sessions yet — start your streak!",
+                      message: "No study sessions yet â€” start your streak!",
                       buttonLabel: 'Focus Timer',
                       routeName: Routes.focusTimer,
                     ),
             ),
             const SizedBox(height: 20),
 
-            // ── Due Now list ────────────────────────────────────────
+            // â”€â”€ Due Now list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             if (dueKB.isNotEmpty || dueFMGE.isNotEmpty) ...[
-              Text('📋 Due for Revision',
+              Text('ðŸ“‹ Due for Revision',
                   style: theme.textTheme.titleMedium
                       ?.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
@@ -234,18 +234,18 @@ class _DashboardBody extends StatelessWidget {
                     child: _DueTile(
                       icon: Icons.medical_services_rounded,
                       title: e.subject,
-                      subtitle: 'Slides ${e.slideStart}–${e.slideEnd}',
+                      subtitle: 'Slides ${e.slideStart}â€“${e.slideEnd}',
                       color: const Color(0xFF10B981),
                     ),
                   )),
               const SizedBox(height: 8),
             ],
 
-            // ── Empty state — no due revisions ──────────────────────
+            // â”€â”€ Empty state â€” no due revisions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             if (dueKB.isEmpty && dueFMGE.isEmpty)
               _SectionEmptyState(
                 icon: Icons.auto_awesome_outlined,
-                message: "No revisions due — you're all caught up!",
+                message: "No revisions due â€” you're all caught up!",
                 buttonLabel: 'Knowledge Base',
                 routeName: Routes.knowledgeBase,
               ),
@@ -258,9 +258,9 @@ class _DashboardBody extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PER-SECTION EMPTY STATE
-// ══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _SectionEmptyState extends StatelessWidget {
   final IconData icon;
@@ -290,7 +290,7 @@ class _SectionEmptyState extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: cs.primary.withValues(alpha: 0.08),
               shape: BoxShape.circle,
@@ -318,9 +318,9 @@ class _SectionEmptyState extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // SHIMMER LOADING PLACEHOLDER
-// ══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _ShimmerLoading extends StatefulWidget {
   @override
@@ -398,7 +398,7 @@ class _ShimmerLoadingState extends State<_ShimmerLoading>
   }
 }
 
-// ── Due revision tile ───────────────────────────────────────────
+// â”€â”€ Due revision tile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _DueTile extends StatelessWidget {
   final IconData icon;
   final String title;

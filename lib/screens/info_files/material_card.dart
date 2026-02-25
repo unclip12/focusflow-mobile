@@ -1,5 +1,5 @@
-// =============================================================
-// MaterialCard — grid card for study material
+﻿// =============================================================
+// MaterialCard â€” grid card for study material
 // Type icon, title, source chip, date, tap handler.
 // =============================================================
 
@@ -59,7 +59,7 @@ class MaterialCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color:        cs.surface,
           borderRadius: BorderRadius.circular(14),
@@ -75,7 +75,7 @@ class MaterialCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Type icon ──────────────────────────────────
+            // â”€â”€ Type icon â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -87,7 +87,7 @@ class MaterialCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
 
-            // ── Title ──────────────────────────────────────
+            // â”€â”€ Title â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Text(
               material.title,
               style: theme.textTheme.bodyMedium
@@ -97,7 +97,7 @@ class MaterialCard extends StatelessWidget {
             ),
             const Spacer(),
 
-            // ── Type chip + date ───────────────────────────
+            // â”€â”€ Type chip + date â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Row(
               children: [
                 Container(

@@ -1,5 +1,5 @@
-// =============================================================
-// StudyPlanItemCard — compact card for study plan list items
+﻿// =============================================================
+// StudyPlanItemCard â€” compact card for study plan list items
 // Shows: topic, subject (pageNumber), target date, completion
 //        progress bar (completed subTasks / total), status chip.
 // =============================================================
@@ -21,14 +21,14 @@ class StudyPlanItemCard extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    // ── Progress computation ─────────────────────────────────────
+    // â”€â”€ Progress computation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     final tasks = item.subTasks ?? [];
     final totalTasks = tasks.length;
     final doneTasks = tasks.where((t) => t.done).length;
     final double progress =
         totalTasks > 0 ? doneTasks / totalTasks : (item.isCompleted ? 1.0 : 0.0);
 
-    // ── Status chip ──────────────────────────────────────────────
+    // â”€â”€ Status chip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     final bool isOverdue =
         !item.isCompleted && _isDatePast(item.date);
 
@@ -45,7 +45,7 @@ class StudyPlanItemCard extends StatelessWidget {
       statusColor = AppColors.warning;
     }
 
-    // ── Type icon ────────────────────────────────────────────────
+    // â”€â”€ Type icon â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     IconData typeIcon;
     switch (item.type) {
       case 'VIDEO':
@@ -58,7 +58,7 @@ class StudyPlanItemCard extends StatelessWidget {
         typeIcon = Icons.menu_book_rounded;
     }
 
-    // ── Date formatting ──────────────────────────────────────────
+    // â”€â”€ Date formatting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     final dateDt = DateTime.tryParse(item.date);
     final dateStr = dateDt != null
         ? DateFormat('d MMM').format(dateDt)
@@ -68,7 +68,7 @@ class StudyPlanItemCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: cs.surface,
           borderRadius: BorderRadius.circular(14),
@@ -77,7 +77,7 @@ class StudyPlanItemCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Top row: type icon + topic + status chip ─────────
+            // â”€â”€ Top row: type icon + topic + status chip â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Row(
               children: [
                 Container(
@@ -118,7 +118,7 @@ class StudyPlanItemCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
-            // ── Meta row: page number + date + est. time ─────────
+            // â”€â”€ Meta row: page number + date + est. time â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Row(
               children: [
                 if (item.pageNumber.isNotEmpty) ...[
@@ -161,7 +161,7 @@ class StudyPlanItemCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
 
-            // ── Progress bar ─────────────────────────────────────
+            // â”€â”€ Progress bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Row(
               children: [
                 Expanded(

@@ -1,5 +1,5 @@
-// =============================================================
-// KBEntryDetailScreen — full detail view for one KnowledgeBaseEntry
+﻿// =============================================================
+// KBEntryDetailScreen â€” full detail view for one KnowledgeBaseEntry
 // Shows all fields, topics list, revision log timeline,
 // "Mark Revised" button, "Add Note" FAB.
 // Keyed by pageNumber (never id).
@@ -16,7 +16,7 @@ import 'package:focusflow_mobile/core/theme/app_colors.dart';
 import 'package:focusflow_mobile/widgets/app_scaffold.dart';
 
 class KBEntryDetailScreen extends StatelessWidget {
-  /// Primary key — we look up the entry by [pageNumber].
+  /// Primary key â€” we look up the entry by [pageNumber].
   final String pageNumber;
 
   const KBEntryDetailScreen({super.key, required this.pageNumber});
@@ -63,7 +63,7 @@ class KBEntryDetailScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
-          // ── Back button ──────────────────────────────────────────
+          // â”€â”€ Back button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Align(
             alignment: Alignment.centerLeft,
             child: IconButton(
@@ -74,7 +74,7 @@ class KBEntryDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 4),
 
-          // ── Title & page number ────────────────────────────────
+          // â”€â”€ Title & page number â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Text(
             entry.title,
             style: theme.textTheme.headlineSmall?.copyWith(
@@ -99,7 +99,7 @@ class KBEntryDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // ── Mastery card ───────────────────────────────────────
+          // â”€â”€ Mastery card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _SectionCard(
             title: 'Mastery Progress',
             child: Column(
@@ -170,7 +170,7 @@ class KBEntryDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // ── Mark Revised button ────────────────────────────────
+          // â”€â”€ Mark Revised button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           if (!isMastered)
             SizedBox(
               width: double.infinity,
@@ -189,7 +189,7 @@ class KBEntryDetailScreen extends StatelessWidget {
             ),
           const SizedBox(height: 16),
 
-          // ── Details card ───────────────────────────────────────
+          // â”€â”€ Details card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _SectionCard(
             title: 'Details',
             child: Column(
@@ -212,7 +212,7 @@ class KBEntryDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // ── Notes ──────────────────────────────────────────────
+          // â”€â”€ Notes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           if (entry.notes.isNotEmpty)
             _SectionCard(
               title: 'Notes',
@@ -226,7 +226,7 @@ class KBEntryDetailScreen extends StatelessWidget {
             ),
           if (entry.notes.isNotEmpty) const SizedBox(height: 12),
 
-          // ── Key Points ─────────────────────────────────────────
+          // â”€â”€ Key Points â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           if (entry.keyPoints != null && entry.keyPoints!.isNotEmpty)
             _SectionCard(
               title: 'Key Points',
@@ -238,7 +238,7 @@ class KBEntryDetailScreen extends StatelessWidget {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('• ',
+                              Text('â€¢ ',
                                   style: TextStyle(
                                       color: cs.primary,
                                       fontWeight: FontWeight.w700)),
@@ -258,7 +258,7 @@ class KBEntryDetailScreen extends StatelessWidget {
           if (entry.keyPoints != null && entry.keyPoints!.isNotEmpty)
             const SizedBox(height: 12),
 
-          // ── Topics (quiz questions list) ───────────────────────
+          // â”€â”€ Topics (quiz questions list) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           if (entry.topics.isNotEmpty) ...[
             _SectionCard(
               title: 'Topics',
@@ -271,7 +271,7 @@ class KBEntryDetailScreen extends StatelessWidget {
             const SizedBox(height: 12),
           ],
 
-          // ── Video Links ────────────────────────────────────────
+          // â”€â”€ Video Links â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           if (entry.videoLinks.isNotEmpty) ...[
             _SectionCard(
               title: 'Video Resources',
@@ -303,7 +303,7 @@ class KBEntryDetailScreen extends StatelessWidget {
             const SizedBox(height: 12),
           ],
 
-          // ── Revision Log Timeline ──────────────────────────────
+          // â”€â”€ Revision Log Timeline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _SectionCard(
             title: 'Revision Log (${entry.logs.length})',
             child: entry.logs.isEmpty
@@ -318,13 +318,13 @@ class KBEntryDetailScreen extends StatelessWidget {
                   ),
           ),
 
-          const SizedBox(height: 40),
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  // ── Mark Revised dialog ────────────────────────────────────────
+  // â”€â”€ Mark Revised dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   void _showMarkRevisedDialog(
       BuildContext context, KnowledgeBaseEntry entry) {
     int score = 4;
@@ -371,8 +371,8 @@ class KBEntryDetailScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   score >= 4
-                      ? '✅ Counts toward mastery'
-                      : '⚠️ Won\'t advance mastery',
+                      ? 'âœ… Counts toward mastery'
+                      : 'âš ï¸ Won\'t advance mastery',
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: score >= 4 ? AppColors.success : AppColors.warning,
                     fontWeight: FontWeight.w600,
@@ -442,7 +442,7 @@ class KBEntryDetailScreen extends StatelessWidget {
     await app.upsertKBEntry(updated);
   }
 
-  // ── Add Note dialog ────────────────────────────────────────────
+  // â”€â”€ Add Note dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   void _showAddNoteDialog(BuildContext context, KnowledgeBaseEntry entry) {
     final controller = TextEditingController();
     showDialog(
@@ -462,7 +462,7 @@ class KBEntryDetailScreen extends StatelessWidget {
             maxLines: 4,
             autofocus: true,
             decoration: InputDecoration(
-              hintText: 'Write a note…',
+              hintText: 'Write a noteâ€¦',
               hintStyle: theme.textTheme.bodyMedium
                   ?.copyWith(color: cs.onSurface.withValues(alpha: 0.3)),
               filled: true,
@@ -509,7 +509,7 @@ class KBEntryDetailScreen extends StatelessWidget {
   }
 }
 
-// ── Helper widgets ──────────────────────────────────────────────
+// â”€â”€ Helper widgets â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _Badge extends StatelessWidget {
   final String label;
@@ -549,7 +549,7 @@ class _SectionCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: BorderRadius.circular(14),
@@ -632,7 +632,7 @@ class _TopicTile extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
-                '${topic.revisionCount} revisions • Index ${topic.currentRevisionIndex}',
+                '${topic.revisionCount} revisions â€¢ Index ${topic.currentRevisionIndex}',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: cs.onSurface.withValues(alpha: 0.45),
                 ),
@@ -647,7 +647,7 @@ class _TopicTile extends StatelessWidget {
                     .map((st) => Padding(
                           padding: const EdgeInsets.only(bottom: 2),
                           child: Text(
-                            '↳ ${st.name}',
+                            'â†³ ${st.name}',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: cs.onSurface.withValues(alpha: 0.5),
                             ),

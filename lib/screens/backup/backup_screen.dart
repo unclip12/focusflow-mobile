@@ -1,5 +1,5 @@
-// =============================================================
-// BackupScreen — AppScaffold, Auto Backup, Manual Backup,
+﻿// =============================================================
+// BackupScreen â€” AppScaffold, Auto Backup, Manual Backup,
 // Restore, Backup History.
 // Android rules: resizeToAvoidBottomInset: true (via AppScaffold),
 //                enableDrag: false, useSafeArea: true on sheets.
@@ -41,7 +41,7 @@ class _BackupScreenState extends State<BackupScreen> {
     _BackupEntry(date: '2026-02-20 14:45', size: '2.1 MB'),
   ];
 
-  // ── Export backup as JSON ──────────────────────────────────
+  // â”€â”€ Export backup as JSON â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<void> _exportBackup() async {
     setState(() => _exporting = true);
     HapticFeedback.lightImpact();
@@ -92,7 +92,7 @@ class _BackupScreenState extends State<BackupScreen> {
     }
   }
 
-  // ── Restore from JSON file ─────────────────────────────────
+  // â”€â”€ Restore from JSON file â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<void> _pickAndRestore() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -116,7 +116,7 @@ class _BackupScreenState extends State<BackupScreen> {
       await file.readAsString(); // Validate file is readable
 
       if (mounted) {
-        // Restore is a placeholder — AppProvider.restoreFromBackup
+        // Restore is a placeholder â€” AppProvider.restoreFromBackup
         // will be wired when that method is added.
         // For now, just show success.
         _showSnack('Data restored successfully');
@@ -147,13 +147,13 @@ class _BackupScreenState extends State<BackupScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // AUTO BACKUP
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           _sectionLabel('Auto Backup', theme, cs),
           const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(16),
             decoration: _cardDecor(cs),
             child: Column(
               children: [
@@ -250,9 +250,9 @@ class _BackupScreenState extends State<BackupScreen> {
           ),
           const SizedBox(height: 20),
 
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // MANUAL BACKUP / RESTORE
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           _sectionLabel('Manual', theme, cs),
           const SizedBox(height: 8),
           Row(
@@ -282,9 +282,9 @@ class _BackupScreenState extends State<BackupScreen> {
           ),
           const SizedBox(height: 20),
 
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // BACKUP HISTORY
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           _sectionLabel('Backup History', theme, cs),
           const SizedBox(height: 8),
           if (_history.isEmpty)
@@ -320,16 +320,16 @@ class _BackupScreenState extends State<BackupScreen> {
                 },
               );
             }),
-          const SizedBox(height: 40),
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // LOCAL MODELS + HELPERS
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _BackupEntry {
   final String date;
@@ -355,7 +355,7 @@ Widget _sectionLabel(String label, ThemeData theme, ColorScheme cs) {
   );
 }
 
-// ── Action button with loading state ─────────────────────────
+// â”€â”€ Action button with loading state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;

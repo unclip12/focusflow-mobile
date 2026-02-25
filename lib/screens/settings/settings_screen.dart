@@ -1,5 +1,5 @@
-// =============================================================
-// SettingsScreen — grouped settings list via AppScaffold
+﻿// =============================================================
+// SettingsScreen â€” grouped settings list via AppScaffold
 // Sections: Appearance, Notifications, Menu, Data, About
 // Android rules: resizeToAvoidBottomInset: true on Scaffolds,
 //                enableDrag: false, useSafeArea: true on sheets.
@@ -28,13 +28,13 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
-          // ═════════════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // APPEARANCE
-          // ═════════════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           _SectionHeader(title: 'Appearance'),
           const SizedBox(height: 8),
 
-          // ── Theme picker (horizontal scroll) ────────────────────
+          // â”€â”€ Theme picker (horizontal scroll) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _SectionCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -66,7 +66,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
 
-          // ── Dark mode toggle ────────────────────────────────────
+          // â”€â”€ Dark mode toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _SettingsTile(
             icon: Icons.dark_mode_rounded,
             title: 'Dark Mode',
@@ -78,7 +78,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
 
-          // ── Font size slider ────────────────────────────────────
+          // â”€â”€ Font size slider â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _SectionCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,9 +148,9 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
-          // ═════════════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // NOTIFICATIONS
-          // ═════════════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           _SectionHeader(title: 'Notifications'),
           const SizedBox(height: 8),
 
@@ -158,7 +158,7 @@ class SettingsScreen extends StatelessWidget {
             icon: Icons.do_not_disturb_on_rounded,
             title: 'Quiet Hours',
             subtitle: sp.settings.quietHours.enabled
-                ? '${sp.settings.quietHours.start} – ${sp.settings.quietHours.end}'
+                ? '${sp.settings.quietHours.start} â€“ ${sp.settings.quietHours.end}'
                 : 'Disabled',
             trailing: Switch.adaptive(
               value: sp.settings.quietHours.enabled,
@@ -169,7 +169,7 @@ class SettingsScreen extends StatelessWidget {
               },
             ),
           ),
-          // ── Time pickers (shown when quiet hours enabled) ───────
+          // â”€â”€ Time pickers (shown when quiet hours enabled) â”€â”€â”€â”€â”€â”€â”€
           if (sp.settings.quietHours.enabled) ...[
             const SizedBox(height: 6),
             Row(
@@ -204,17 +204,17 @@ class SettingsScreen extends StatelessWidget {
           ],
           const SizedBox(height: 20),
 
-          // ═════════════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // MENU CONFIGURATION
-          // ═════════════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           _SectionHeader(title: 'Menu'),
           const SizedBox(height: 8),
           _MenuReorderSection(sp: sp),
           const SizedBox(height: 20),
 
-          // ═════════════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // DATA
-          // ═════════════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           _SectionHeader(title: 'Data'),
           const SizedBox(height: 8),
           Row(
@@ -240,9 +240,9 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
-          // ═════════════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // ABOUT
-          // ═════════════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           _SectionHeader(title: 'About'),
           const SizedBox(height: 8),
           _SectionCard(
@@ -254,7 +254,7 @@ class SettingsScreen extends StatelessWidget {
                 _DetailRow('Build', '1'),
                 const SizedBox(height: 4),
                 Text(
-                  'Built with ❤️ for FMGE prep',
+                  'Built with â¤ï¸ for FMGE prep',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: cs.onSurface.withValues(alpha: 0.3),
                   ),
@@ -262,13 +262,13 @@ class SettingsScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 40),
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  // ── Time picker helper ─────────────────────────────────────────
+  // â”€â”€ Time picker helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<void> _pickTime(
       BuildContext context, String current, ValueChanged<String> onPicked) async {
     final parts = current.split(':');
@@ -295,9 +295,9 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // HELPER WIDGETS
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _SectionHeader extends StatelessWidget {
   final String title;
@@ -327,7 +327,7 @@ class _SectionCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: BorderRadius.circular(14),
@@ -513,9 +513,9 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // MENU REORDER SECTION
-// ═══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _MenuReorderSection extends StatefulWidget {
   final SettingsProvider sp;

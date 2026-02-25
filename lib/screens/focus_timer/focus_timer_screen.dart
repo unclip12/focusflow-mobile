@@ -1,5 +1,5 @@
-// =============================================================
-// FocusTimerScreen — circular countdown timer with wakelock
+﻿// =============================================================
+// FocusTimerScreen â€” circular countdown timer with wakelock
 // Shows active block name, session type, time remaining
 // Start/Pause/Stop with WakelockPlus integration
 // Animations: smooth arc via AnimatedBuilder, pulse when running.
@@ -178,7 +178,7 @@ class _FocusTimerScreenState extends State<FocusTimerScreen>
         children: [
           const SizedBox(height: 24),
 
-          // ── Session type chip ────────────────────────────────────
+          // â”€â”€ Session type chip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             decoration: BoxDecoration(
@@ -195,7 +195,7 @@ class _FocusTimerScreenState extends State<FocusTimerScreen>
             ),
           ),
 
-          // ── Block name ──────────────────────────────────────────
+          // â”€â”€ Block name â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           if (_blockName.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
@@ -208,7 +208,7 @@ class _FocusTimerScreenState extends State<FocusTimerScreen>
 
           const Spacer(),
 
-          // ── Circular timer with pulse ─────────────────────────────
+          // â”€â”€ Circular timer with pulse â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           AnimatedBuilder(
             animation: Listenable.merge([_controller, _pulseController]),
             builder: (context, child) {
@@ -297,7 +297,7 @@ class _FocusTimerScreenState extends State<FocusTimerScreen>
 
           const Spacer(),
 
-          // ── Preset chips (only when idle) ────────────────────────
+          // â”€â”€ Preset chips (only when idle) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           if (_state == TimerState.idle)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -341,9 +341,9 @@ class _FocusTimerScreenState extends State<FocusTimerScreen>
               ),
             ),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
 
-          // ── Controls ────────────────────────────────────────────
+          // â”€â”€ Controls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           TimerControls(
             state: _state,
             onStart: _start,
@@ -352,14 +352,14 @@ class _FocusTimerScreenState extends State<FocusTimerScreen>
             onStop: _stop,
           ),
 
-          const SizedBox(height: 40),
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
 }
 
-// ── Circular arc painter ────────────────────────────────────────
+// â”€â”€ Circular arc painter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _CircularTimerPainter extends CustomPainter {
   final double progress;
   final Color trackColor;
@@ -389,7 +389,7 @@ class _CircularTimerPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round,
     );
 
-    // Progress arc (counts down, so sweep = 2π * (1-progress))
+    // Progress arc (counts down, so sweep = 2Ï€ * (1-progress))
     if (progress > 0) {
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius),

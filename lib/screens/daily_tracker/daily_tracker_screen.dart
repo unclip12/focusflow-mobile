@@ -1,8 +1,8 @@
-// =============================================================
-// DailyTrackerScreen — full day view with sections:
+﻿// =============================================================
+// DailyTrackerScreen â€” full day view with sections:
 //   Mood check-in, Water intake, Study hours (read-only),
 //   Habits checklist, Daily notes.
-// FAB → AddHabitSheet.
+// FAB â†’ AddHabitSheet.
 // Android rules: resizeToAvoidBottomInset: true (via AppScaffold),
 //                enableDrag: false, useSafeArea: true on sheets.
 // =============================================================
@@ -19,8 +19,8 @@ import 'package:focusflow_mobile/widgets/app_scaffold.dart';
 import 'package:focusflow_mobile/screens/daily_tracker/habit_card.dart';
 import 'package:focusflow_mobile/screens/daily_tracker/add_habit_sheet.dart';
 
-// ── Mood emojis ──────────────────────────────────────────────
-const _moods = ['😢', '😕', '😐', '😊', '🤩'];
+// â”€â”€ Mood emojis â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const _moods = ['ðŸ˜¢', 'ðŸ˜•', 'ðŸ˜', 'ðŸ˜Š', 'ðŸ¤©'];
 
 
 class DailyTrackerScreen extends StatefulWidget {
@@ -47,7 +47,7 @@ class _DailyTrackerScreenState extends State<DailyTrackerScreen> {
     super.dispose();
   }
 
-  // ── Date navigation ────────────────────────────────────────
+  // â”€â”€ Date navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   void _changeDate(int delta) {
     HapticFeedback.selectionClick();
     setState(() {
@@ -58,7 +58,7 @@ class _DailyTrackerScreenState extends State<DailyTrackerScreen> {
     });
   }
 
-  // ── Study hours from time logs ─────────────────────────────
+  // â”€â”€ Study hours from time logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   double _studyHours(AppProvider ap) {
     final mins = ap.timeLogs
         .where((t) => t.date == _dateKey)
@@ -66,7 +66,7 @@ class _DailyTrackerScreenState extends State<DailyTrackerScreen> {
     return mins / 60.0;
   }
 
-  // ── Show add habit sheet ───────────────────────────────────
+  // â”€â”€ Show add habit sheet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   void _showAddHabitSheet() {
     showModalBottomSheet<void>(
       context: context,
@@ -106,9 +106,9 @@ class _DailyTrackerScreenState extends State<DailyTrackerScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // DATE HEADER
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           _DateHeader(
             date: _currentDate,
             isToday: isToday,
@@ -117,9 +117,9 @@ class _DailyTrackerScreenState extends State<DailyTrackerScreen> {
           ),
           const SizedBox(height: 16),
 
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // MOOD CHECK-IN
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           _sectionLabel('How are you feeling?', theme, cs),
           const SizedBox(height: 8),
           _MoodSelector(
@@ -131,9 +131,9 @@ class _DailyTrackerScreenState extends State<DailyTrackerScreen> {
           ),
           const SizedBox(height: 20),
 
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // WATER INTAKE
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           _sectionLabel('Water Intake', theme, cs),
           const SizedBox(height: 8),
           _WaterTracker(
@@ -153,17 +153,17 @@ class _DailyTrackerScreenState extends State<DailyTrackerScreen> {
           ),
           const SizedBox(height: 20),
 
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // STUDY HOURS (read-only)
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           _sectionLabel('Study Hours Today', theme, cs),
           const SizedBox(height: 8),
           _StudyHoursCard(hours: _studyHours(ap)),
           const SizedBox(height: 20),
 
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // HABITS CHECKLIST
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           Row(
             children: [
               Expanded(child: _sectionLabel('Habits', theme, cs)),
@@ -196,9 +196,9 @@ class _DailyTrackerScreenState extends State<DailyTrackerScreen> {
             }),
           const SizedBox(height: 20),
 
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // DAILY NOTES
-          // ═══════════════════════════════════════════════════
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           _sectionLabel('Daily Notes', theme, cs),
           const SizedBox(height: 8),
           Container(
@@ -217,7 +217,7 @@ class _DailyTrackerScreenState extends State<DailyTrackerScreen> {
                 hintStyle: theme.textTheme.bodySmall?.copyWith(
                   color: cs.onSurface.withValues(alpha: 0.3),
                 ),
-                contentPadding: const EdgeInsets.all(14),
+                contentPadding: const EdgeInsets.all(16),
                 border: InputBorder.none,
               ),
             ),
@@ -229,9 +229,9 @@ class _DailyTrackerScreenState extends State<DailyTrackerScreen> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // LOCAL HABIT MODEL
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _HabitItem {
   final String id;
@@ -249,9 +249,9 @@ class _HabitItem {
   });
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // HELPER WIDGETS
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 Widget _sectionLabel(String label, ThemeData theme, ColorScheme cs) {
   return Text(
@@ -263,7 +263,7 @@ Widget _sectionLabel(String label, ThemeData theme, ColorScheme cs) {
   );
 }
 
-// ── Date header ──────────────────────────────────────────────
+// â”€â”€ Date header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _DateHeader extends StatelessWidget {
   final DateTime date;
   final bool isToday;
@@ -344,7 +344,7 @@ class _DateHeader extends StatelessWidget {
   }
 }
 
-// ── Mood selector ────────────────────────────────────────────
+// â”€â”€ Mood selector â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _MoodSelector extends StatelessWidget {
   final int selected;
   final ValueChanged<int> onSelect;
@@ -395,7 +395,7 @@ class _MoodSelector extends StatelessWidget {
   }
 }
 
-// ── Water tracker ────────────────────────────────────────────
+// â”€â”€ Water tracker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _WaterTracker extends StatelessWidget {
   final int glasses;
   final VoidCallback onIncrement;
@@ -422,7 +422,7 @@ class _WaterTracker extends StatelessWidget {
       child: Row(
         children: [
           // Glass icon + count
-          const Text('💧', style: TextStyle(fontSize: 22)),
+          const Text('ðŸ’§', style: TextStyle(fontSize: 22)),
           const SizedBox(width: 10),
           Text(
             '$glasses',
@@ -473,7 +473,7 @@ class _WaterTracker extends StatelessWidget {
   }
 }
 
-// ── Study hours card (read-only) ─────────────────────────────
+// â”€â”€ Study hours card (read-only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _StudyHoursCard extends StatelessWidget {
   final double hours;
   const _StudyHoursCard({required this.hours});
@@ -552,7 +552,7 @@ class _StudyHoursCard extends StatelessWidget {
   }
 }
 
-// ── Empty habits state ───────────────────────────────────────
+// â”€â”€ Empty habits state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _EmptyHabits extends StatelessWidget {
   final VoidCallback onAdd;
   const _EmptyHabits({required this.onAdd});

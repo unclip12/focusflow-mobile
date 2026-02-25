@@ -1,5 +1,5 @@
-// =============================================================
-// KBEntryCard — compact card for Knowledge Base list items
+﻿// =============================================================
+// KBEntryCard â€” compact card for Knowledge Base list items
 // Shows: pageNumber, topic, subject chip, system chip,
 //        mastery progress bar, next revision date badge.
 // =============================================================
@@ -20,7 +20,7 @@ class KBEntryCard extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    // ── Mastery computation ──────────────────────────────────────
+    // â”€â”€ Mastery computation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const String mode = 'strict';
     final int totalSteps = SrsService.totalSteps(mode);
     final int masteredCount = entry.currentRevisionIndex.clamp(0, totalSteps);
@@ -29,7 +29,7 @@ class KBEntryCard extends StatelessWidget {
     final bool isMastered =
         SrsService.isMastered(revisionIndex: entry.currentRevisionIndex, mode: mode);
 
-    // ── Next revision badge ──────────────────────────────────────
+    // â”€â”€ Next revision badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     final now = DateTime.now();
     final bool isOverdue = SrsService.isDueNow(nextRevisionAt: entry.nextRevisionAt);
     final DateTime? nextDate = entry.nextRevisionAt != null
@@ -59,7 +59,7 @@ class KBEntryCard extends StatelessWidget {
       badgeText = 'Not started';
     }
 
-    // ── Subject colour ───────────────────────────────────────────
+    // â”€â”€ Subject colour â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     final subjectHash = entry.subject.hashCode.abs();
     final subjectColor =
         AppColors.subjectColors[subjectHash % AppColors.subjectColors.length];
@@ -68,7 +68,7 @@ class KBEntryCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: cs.surface,
           borderRadius: BorderRadius.circular(14),
@@ -77,7 +77,7 @@ class KBEntryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Top row: page number + badge ──────────────────────
+            // â”€â”€ Top row: page number + badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Row(
               children: [
                 Container(
@@ -115,7 +115,7 @@ class KBEntryCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
-            // ── Title ────────────────────────────────────────────
+            // â”€â”€ Title â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Text(
               entry.title,
               maxLines: 2,
@@ -126,7 +126,7 @@ class KBEntryCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
-            // ── Chips row ────────────────────────────────────────
+            // â”€â”€ Chips row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Wrap(
               spacing: 6,
               runSpacing: 4,
@@ -140,7 +140,7 @@ class KBEntryCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
 
-            // ── Mastery progress bar ─────────────────────────────
+            // â”€â”€ Mastery progress bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Row(
               children: [
                 Expanded(
@@ -173,7 +173,7 @@ class KBEntryCard extends StatelessWidget {
   }
 }
 
-// ── Tiny chip widget ──────────────────────────────────────────────
+// â”€â”€ Tiny chip widget â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _Chip extends StatelessWidget {
   final String label;
   final Color color;

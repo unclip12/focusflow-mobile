@@ -1,5 +1,5 @@
-// =============================================================
-// SessionScreen — Full-screen focus timer with motivational quotes
+﻿// =============================================================
+// SessionScreen â€” Full-screen focus timer with motivational quotes
 // Receives a Block (and its index/date) via GoRouter extra.
 // =============================================================
 
@@ -23,13 +23,13 @@ class SessionScreen extends StatefulWidget {
 }
 
 class _SessionScreenState extends State<SessionScreen> {
-  // ── Timer state ──────────────────────────────────────────────
+  // â”€â”€ Timer state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   late final DateTime _startedAt;
   int _elapsedSeconds = 0;
   Timer? _tickTimer;
   bool _isPaused = false;
 
-  // ── Quote rotation ──────────────────────────────────────────
+  // â”€â”€ Quote rotation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Timer? _quoteTimer;
   late String _currentQuote;
   final _rng = Random();
@@ -90,7 +90,7 @@ class _SessionScreenState extends State<SessionScreen> {
     );
   }
 
-  // ── Formatting helpers ──────────────────────────────────────
+  // â”€â”€ Formatting helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   String _formatElapsed(int totalSeconds) {
     final h = totalSeconds ~/ 3600;
     final m = (totalSeconds % 3600) ~/ 60;
@@ -112,7 +112,7 @@ class _SessionScreenState extends State<SessionScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // ── Top bar ────────────────────────────────────────
+            // â”€â”€ Top bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
               child: Row(
@@ -157,7 +157,7 @@ class _SessionScreenState extends State<SessionScreen> {
 
             const Spacer(flex: 2),
 
-            // ── Task name ──────────────────────────────────────
+            // â”€â”€ Task name â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Text(
@@ -172,9 +172,9 @@ class _SessionScreenState extends State<SessionScreen> {
               ),
             ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
 
-            // ── Large timer ────────────────────────────────────
+            // â”€â”€ Large timer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Container(
               padding: const EdgeInsets.symmetric(
                   horizontal: 40, vertical: 24),
@@ -195,7 +195,7 @@ class _SessionScreenState extends State<SessionScreen> {
 
             const SizedBox(height: 12),
 
-            // ── Started at label ───────────────────────────────
+            // â”€â”€ Started at label â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Text(
               'Started at ${DateFormat('h:mm a').format(_startedAt)}',
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -205,7 +205,7 @@ class _SessionScreenState extends State<SessionScreen> {
 
             const Spacer(flex: 2),
 
-            // ── Control buttons ────────────────────────────────
+            // â”€â”€ Control buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 40),
               child: Row(
@@ -240,7 +240,7 @@ class _SessionScreenState extends State<SessionScreen> {
 
             const Spacer(flex: 1),
 
-            // ── Motivational quote ─────────────────────────────
+            // â”€â”€ Motivational quote â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: AnimatedSwitcher(
@@ -258,7 +258,7 @@ class _SessionScreenState extends State<SessionScreen> {
               ),
             ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -290,9 +290,9 @@ class _SessionScreenState extends State<SessionScreen> {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // ACTION BUTTON
-// ══════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _ActionButton extends StatelessWidget {
   final IconData icon;

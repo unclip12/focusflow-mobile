@@ -1,5 +1,5 @@
-// =============================================================
-// AddMaterialSheet — bottom sheet to add a new StudyMaterial
+﻿// =============================================================
+// AddMaterialSheet â€” bottom sheet to add a new StudyMaterial
 // Fields: title, type selector, URL/path, subject tag, notes.
 // enableDrag: false, useSafeArea: true
 // =============================================================
@@ -109,7 +109,7 @@ class _AddMaterialSheetState extends State<_AddMaterialSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Handle ────────────────────────────────────────
+            // â”€â”€ Handle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Center(
               child: Container(
                 width: 36, height: 4,
@@ -125,13 +125,13 @@ class _AddMaterialSheetState extends State<_AddMaterialSheet> {
                     ?.copyWith(fontWeight: FontWeight.w700)),
             const SizedBox(height: 16),
 
-            // ── Title ─────────────────────────────────────────
+            // â”€â”€ Title â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             _label(theme, 'Title'),
             const SizedBox(height: 6),
             _input(cs, theme, _titleCtrl, 'Material name'),
             const SizedBox(height: 14),
 
-            // ── Type selector ─────────────────────────────────
+            // â”€â”€ Type selector â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             _label(theme, 'Type'),
             const SizedBox(height: 8),
             Row(
@@ -181,23 +181,23 @@ class _AddMaterialSheetState extends State<_AddMaterialSheet> {
             ),
             const SizedBox(height: 14),
 
-            // ── URL / Path ────────────────────────────────────
+            // â”€â”€ URL / Path â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             _label(theme, 'URL / File Path'),
             const SizedBox(height: 6),
-            _input(cs, theme, _urlCtrl, 'https://… or local path'),
+            _input(cs, theme, _urlCtrl, 'https://â€¦ or local path'),
             const SizedBox(height: 14),
 
-            // ── Subject tag ───────────────────────────────────
+            // â”€â”€ Subject tag â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             _label(theme, 'Subject Tag'),
             const SizedBox(height: 6),
             _input(cs, theme, _subjectCtrl, 'e.g. Anatomy'),
             const SizedBox(height: 14),
 
-            // ── Notes ─────────────────────────────────────────
+            // â”€â”€ Notes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             _label(theme, 'Notes'),
             const SizedBox(height: 6),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
                 color:        cs.onSurface.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
@@ -207,7 +207,7 @@ class _AddMaterialSheetState extends State<_AddMaterialSheet> {
                 maxLines:   3,
                 style: theme.textTheme.bodyMedium,
                 decoration: InputDecoration(
-                  hintText:  'Optional notes…',
+                  hintText:  'Optional notesâ€¦',
                   hintStyle: theme.textTheme.bodyMedium?.copyWith(
                     color: cs.onSurface.withValues(alpha: 0.3),
                   ),
@@ -219,7 +219,7 @@ class _AddMaterialSheetState extends State<_AddMaterialSheet> {
             ),
             const SizedBox(height: 20),
 
-            // ── Save button ───────────────────────────────────
+            // â”€â”€ Save button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             SizedBox(
               width: double.infinity,
               child: FilledButton(
@@ -249,7 +249,7 @@ class _AddMaterialSheetState extends State<_AddMaterialSheet> {
   Widget _input(ColorScheme cs, ThemeData theme,
       TextEditingController ctrl, String hint) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color:        cs.onSurface.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),

@@ -1,5 +1,5 @@
-// =============================================================
-// StreakCard — fire emoji + current streak, longest streak,
+﻿// =============================================================
+// StreakCard â€” fire emoji + current streak, longest streak,
 // 7-day mini activity grid derived from AppProvider.timeLogs
 // and AppProvider.dayPlans.
 // =============================================================
@@ -14,7 +14,7 @@ class StreakCard extends StatelessWidget {
 
   const StreakCard({super.key, required this.ap});
 
-  // ── Compute streak + 7-day activity from timeLogs/dayPlans ──
+  // â”€â”€ Compute streak + 7-day activity from timeLogs/dayPlans â”€â”€
   _StreakData _compute() {
     final today = DateTime.now();
     final fmt = DateFormat('yyyy-MM-dd');
@@ -90,7 +90,7 @@ class StreakCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Streak numbers row ─────────────────────────────
+          // â”€â”€ Streak numbers row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Row(
             children: [
               // Current streak
@@ -101,7 +101,7 @@ class StreakCard extends StatelessWidget {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const Text('🔥', style: TextStyle(fontSize: 28)),
+                        const Text('ðŸ”¥', style: TextStyle(fontSize: 28)),
                         const SizedBox(width: 6),
                         Text(
                           '${data.current}',
@@ -130,7 +130,7 @@ class StreakCard extends StatelessWidget {
                 width: 1,
                 height: 44,
                 color: cs.onSurface.withValues(alpha: 0.08),
-                margin: const EdgeInsets.symmetric(horizontal: 20),
+                margin: const EdgeInsets.symmetric(horizontal: 16),
               ),
 
               // Longest streak
@@ -158,7 +158,7 @@ class StreakCard extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // ── 7-day activity grid ────────────────────────────
+          // â”€â”€ 7-day activity grid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Row(
             children: data.grid.map((day) {
               return Expanded(
@@ -172,7 +172,7 @@ class StreakCard extends StatelessWidget {
   }
 }
 
-// ── Data model ───────────────────────────────────────────────
+// â”€â”€ Data model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _StreakData {
   final int current;
   final int longest;
@@ -189,7 +189,7 @@ class _DayActivity {
       {required this.date, required this.active, required this.isToday});
 }
 
-// ── Mini day square widget ────────────────────────────────────
+// â”€â”€ Mini day square widget â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _DaySquare extends StatelessWidget {
   final _DayActivity day;
   final ColorScheme cs;

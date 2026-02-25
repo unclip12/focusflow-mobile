@@ -1,5 +1,5 @@
-// =============================================================
-// StatsCard / TodayGlance — reusable dashboard stat widgets
+﻿// =============================================================
+// StatsCard / TodayGlance â€” reusable dashboard stat widgets
 // =============================================================
 
 import 'package:flutter/material.dart';
@@ -81,7 +81,7 @@ class _StatsCardState extends State<StatsCard> {
   }
 }
 
-/// Today's Glance card — blocks done/total + study hours today.
+/// Today's Glance card â€” blocks done/total + study hours today.
 class TodayGlanceCard extends StatelessWidget {
   final int blocksDone;
   final int blocksTotal;
@@ -101,7 +101,7 @@ class TodayGlanceCard extends StatelessWidget {
     final progress = blocksTotal > 0 ? blocksDone / blocksTotal : 0.0;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -116,7 +116,7 @@ class TodayGlanceCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // ── Ring chart ──────────────────────────────────────────
+          // â”€â”€ Ring chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           SizedBox(
             width: 64,
             height: 64,
@@ -139,7 +139,7 @@ class TodayGlanceCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 20),
-          // ── Stats ──────────────────────────────────────────────
+          // â”€â”€ Stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -208,7 +208,7 @@ class _MiniStat extends StatelessWidget {
   }
 }
 
-// ── Ring painter ─────────────────────────────────────────────────
+// â”€â”€ Ring painter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _RingPainter extends CustomPainter {
   final double progress;
   final Color trackColor;
