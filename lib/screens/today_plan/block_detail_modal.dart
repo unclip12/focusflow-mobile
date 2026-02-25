@@ -9,6 +9,7 @@ import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
+import 'package:focusflow_mobile/screens/session/session_screen.dart';
 
 class BlockDetailModal extends StatelessWidget {
   final Block block;
@@ -178,7 +179,7 @@ class _ActionBar extends StatelessWidget {
           label: 'Start Block',
           icon: Icons.play_arrow_rounded,
           color: cs.primary,
-          onTap: () => _startBlock(app),
+          onTap: () => _startBlock(app, context),
         );
       case BlockStatus.inProgress:
         return Row(
@@ -260,25 +261,38 @@ class _ActionBar extends StatelessWidget {
     }
   }
 
-  void _startBlock(AppProvider app) {
+  void _startBlock(AppProvider app, BuildContext context) {
     final now = DateTime.now().toIso8601String();
-    // Pause any currently active block first
     final plan = app.getDayPlan(dayPlan.date);
-    if (plan?.blocks != null) {
-      for (int i = 0; i < plan!.blocks!.length; i++) {
-        if (plan.blocks![i].status == BlockStatus.inProgress &&
-            plan.blocks![i].id != block.id) {
-          final paused = plan.blocks![i].copyWith(status: BlockStatus.paused);
-          _updateBlock(app, paused);
-        }
+    if (plan == null) return;
+
+    final blocks = List<Block>.from(plan.blocks ?? []);
+
+    // Pause any other currently active block
+    for (int i = 0; i < blocks.length; i++) {
+      if (blocks[i].status == BlockStatus.inProgress &&
+          blocks[i].id != block.id) {
+        blocks[i] = blocks[i].copyWith(status: BlockStatus.paused);
       }
     }
-    _updateBlock(
-        app,
-        block.copyWith(
-          status: BlockStatus.inProgress,
-          actualStartTime: block.actualStartTime ?? now,
-        ));
+
+    // Mark this block inProgress
+    final idx = blocks.indexWhere((b) => b.id == block.id);
+    if (idx < 0) return;
+    blocks[idx] = blocks[idx].copyWith(
+      status: BlockStatus.inProgress,
+      actualStartTime: blocks[idx].actualStartTime ?? now,
+    );
+
+    final updatedPlan = plan.copyWith(blocks: blocks);
+    app.upsertDayPlan(updatedPlan);
+
+    // CRITICAL: capture navigator BEFORE any pops
+    final nav = Navigator.of(context);
+    nav.pop();  // close BlockDetailModal
+    nav.push(MaterialPageRoute(
+      builder: (_) => SessionScreen(block: blocks[idx], plan: updatedPlan),
+    ));
   }
 
   void _pauseBlock(AppProvider app) {

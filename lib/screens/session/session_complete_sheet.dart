@@ -191,8 +191,9 @@ class _CompletionSheetState extends State<_CompletionSheet> {
 
       // 6. Navigate back — pop the sheet, then pop the session screen
       if (mounted) {
-        Navigator.of(context).pop(); // close sheet
-        Navigator.of(context).pop(); // pop session screen back to Today's Plan
+        final nav = Navigator.of(context);  // capture BEFORE first pop
+        nav.pop();  // close completion sheet
+        nav.pop();  // pop SessionScreen back to Today's Plan
       }
     } catch (e) {
       if (mounted) {
