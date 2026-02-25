@@ -1,6 +1,6 @@
 # FocusFlow Mobile — Development Progress
 
-> Last updated: 2026-02-25 (Session 2)
+> Last updated: 2026-02-25 (Session 3 — G3 Execution)
 > Session: Claude + Arsh — Antigravity workflow
 > **App is now a personal study OS for Arsh only. Full vision reset completed.**
 
@@ -39,7 +39,7 @@
 **Status**: ✅ Complete
 - 12-step SRS engine (strict/relaxed modes)
 - KnowledgeBaseEntry model + screens
-- AI Mentor JSON importer (to be replaced by Claude Import in G12)
+- AI Mentor JSON importer (replaced by Claude Import in G12)
 - Exam-aware task planner with smart focus batch calculator
 
 ---
@@ -67,7 +67,7 @@
 ### Bug Fix — TextSanitizer + Revision Card
 **Status**: ✅ Complete
 - `lib/utils/text_sanitizer.dart` created
-- `â€¢` → `•`, `â€"` → `—`, `â` → `✓` etc.
+- `â€¢` → `•`, `â€“` → `—`, `â` → `✓` etc.
 - revision_card.dart garbled chars fixed
 
 ---
@@ -90,33 +90,81 @@
 
 ---
 
+### Batch G3 — Screen Cleanup (Dead Screen Deletion)
+**Status**: ✅ Complete
+**Commits**: `c200807`, `f1ddad2`
+
+**What was done:**
+- `app_router.dart`: Removed 12 dead routes + 11 dead imports
+  - Removed routes: `/study-tracker`, `/focus-timer`, `/calendar`, `/fmge`, `/fmge/:id`,
+    `/daily-tracker`, `/data`, `/chat`, `/ai-memory`, `/mentor`, `/notifications`, `/profile`
+  - Routes class trimmed from 19 → 10 constants
+- `constants.dart`: MenuItemId trimmed from 16 → 8 live screens
+  - Removed: `studyTracker`, `focusTimer`, `calendar`, `fmge`, `dailyTracker`, `data`, `chat`, `aiMemory`
+  - `kDefaultMenuOrder` and `kMenuItemLabels` updated to 8 live items
+  - `kAiTones` removed
+- `nav_overlay.dart`: `_menuIdToRoute` and `_menuIcons` maps cleaned to 8 live entries
+  - `_ExtraNavItem` class + `_extraNavItems` const removed entirely
+  - Analytics promoted from “extra” section into main nav maps
+  - Notifications + Profile (dead) removed from nav
+
+**Dead screen directories (orphaned, CI passing, to be manually deleted):**
+- `lib/screens/mentor/`
+- `lib/screens/backup/`
+- `lib/screens/calendar/`
+- `lib/screens/daily_tracker/`
+- `lib/screens/fmge/`
+- `lib/screens/focus_timer/`
+- `lib/screens/info_files/`
+- `lib/screens/study_plan/`
+- `lib/screens/notifications/`
+- `lib/screens/profile/`
+
+**Live screens after G3:**
+| Route | Screen | File |
+|---|---|---|
+| `/dashboard` | Dashboard | `dashboard/dashboard_screen.dart` |
+| `/todays-plan` | Today's Plan | `today_plan/today_plan_screen.dart` |
+| `/time-logger` | Time Logger | `time_log/time_log_screen.dart` |
+| `/fa-logger` | FA Logger | `fa_logger/fa_logger_screen.dart` |
+| `/revision` | Revision Hub | `revision_hub/revision_hub_screen.dart` |
+| `/knowledge-base` | Knowledge Base | `knowledge_base/knowledge_base_screen.dart` |
+| `/analytics` | Analytics | `analytics/analytics_screen.dart` |
+| `/settings` | Settings | `settings/settings_screen.dart` |
+| `/session` | Session | `session/session_screen.dart` |
+
+---
+
 ## 🔄 In Progress / Up Next
 
 ---
 
-### Batch G3 — Screen Cleanup (Dead Screen Deletion)
-**Status**: 📋 Next — Direct Claude push
+### Batch G3b — Dead Directory Deletion
+**Status**: 📋 Next — Direct Claude push (file deletions)
 **What it does:**
-- Delete these screens entirely:
-  - `lib/screens/mentor/` (AI Mentor/chat) → replaced by Claude Import
-  - `lib/screens/ai_memory/` (AI Memory)
-  - `lib/screens/data/` (Info Files)
-  - `lib/screens/fmge/` (standalone FMGE Prep)
-  - `lib/screens/daily_tracker/` (Daily Tracker → merged into Today's Plan)
-  - `lib/screens/study_tracker/` (Study Tracker → merged into Dashboard)
-  - `lib/screens/calendar/` (Calendar → countdown on Dashboard only)
-- Remove dead routes from `app_router.dart`
-- Remove dead entries from `constants.dart` menu items
-- Clean up `AppProvider` references to deleted screens
-- `flutter analyze --no-fatal-infos` must pass
+- Delete all 11 orphaned screen files from 10 dead directories
+- Directories disappear once their files are removed (Git has no empty dirs)
+
+Files to delete:
+- `lib/screens/mentor/mentor_screen.dart`
+- `lib/screens/backup/backup_screen.dart`
+- `lib/screens/calendar/calendar_screen.dart`
+- `lib/screens/daily_tracker/daily_tracker_screen.dart`
+- `lib/screens/fmge/fmge_screen.dart`
+- `lib/screens/fmge/fmge_entry_detail_screen.dart`
+- `lib/screens/focus_timer/focus_timer_screen.dart`
+- `lib/screens/info_files/info_files_screen.dart`
+- `lib/screens/study_plan/study_plan_screen.dart`
+- `lib/screens/notifications/notifications_screen.dart`
+- `lib/screens/profile/profile_screen.dart`
 
 ---
 
 ### Batch G4 — Bottom Nav Redesign
 **Status**: 📋 Planned — Claude Sonnet 4.6
 **What it does:**
-- 4 customizable pinned tabs (default: Dashboard, Revision Hub, Today's Plan, Tracker)
-- Permanent 5th tab: "More ▲"
+- 4 customizable pinned tabs (default: Dashboard, Revision Hub, Today’s Plan, Tracker)
+- Permanent 5th tab: “More ▲”
 - Tapping More → beautiful slide-up bottom sheet grid with remaining screens
 - Full Screen Mode option in Settings: hides bottom nav, shows hamburger drawer instead
 - Settings screen: user picks which 4 screens to pin
@@ -146,17 +194,17 @@ New screen `lib/screens/tracker/tracker_screen.dart` with scrollable top tab bar
 - Claude generates `assets/data/fa_2025_seed.json` with all ~672 FA pages
 - Each page: `{ "page": 31, "title": "Molecular Biology", "subject": "Biochemistry", "system": "General", "status": "unread" }`
 - `lib/services/seed_service.dart` detects first launch, seeds all pages into AppProvider
-- Pages 33–49 marked as `read` (Arsh's current progress)
-- bundled in `pubspec.yaml` as asset
+- Pages 33–49 marked as `read` (Arsh’s current progress)
+- Bundled in `pubspec.yaml` as asset
 
 ---
 
 ### Batch G7 — Bulk FA Page Range Marker
 **Status**: 📋 Planned — Gemini Flash
 **What it does:**
-- "Mark as Read" button in FA Tracker → opens dialog: From Page [__] To Page [__]
+- “Mark as Read” button in FA Tracker → opens dialog: From Page [__] To Page [__]
 - Marks all pages in range as `read`, auto-schedules SRS revision for each
-- Separate "Mark Anki Done" range action
+- Separate “Mark Anki Done” range action
 - Celebration animation fires when 10+ pages marked in a day
 
 ---
@@ -165,22 +213,22 @@ New screen `lib/screens/tracker/tracker_screen.dart` with scrollable top tab bar
 **Status**: 📋 Planned — Claude Opus 4.6
 **What it does:**
 - Dual exam countdown cards (FMGE: X days, Step 1: ~Y days)
-- Today's available time block (wake → sleep − prayer blocks − tasks)
+- Today’s available time block (wake → sleep − prayer blocks − tasks)
 - Pace insight row: avg pages/day, projected FA completion date, on-track indicator
-- Today's goals row: FA progress bar, Anki status, Sketchy progress, Revision due
+- Today’s goals row: FA progress bar, Anki status, Sketchy progress, Revision due
 - Streak + motivation row
 - All values pulled live from AppProvider
 
 ---
 
-### Batch G9 — Today's Plan Rebuild
+### Batch G9 — Today’s Plan Rebuild
 **Status**: 📋 Planned — Gemini Pro High
 **What it does:**
 - Available time calculator at top
 - Prayer blocks auto-populated from Settings
 - Add task types: FA Pages, Sketchy, Pathoma, Anki, UWorld, Personal, Break
 - Running time total — shows overflow alert if plan exceeds available time
-- "Doesn't fit — reduce by X min" warning
+- “Doesn’t fit — reduce by X min” warning
 
 ---
 
@@ -262,7 +310,7 @@ New screen `lib/screens/tracker/tracker_screen.dart` with scrollable top tab bar
 | No auto backup | High | G13 |
 | No FA pre-seeded content | High | G6 |
 | No Tracker screen (unified) | High | G5 |
-| Dead screens still in codebase | Medium | G3 |
+| ~~Dead screens still in codebase~~ | ~~Medium~~ | ✅ G3 (routes+nav clean; files pending deletion) |
 | No prayer time settings | Medium | G10 |
 | No exam date settings | Medium | G10 |
 | No bulk page marker | High | G7 |
@@ -285,10 +333,11 @@ New screen `lib/screens/tracker/tracker_screen.dart` with scrollable top tab bar
 | Feb 25, 2026 PM | New batch plan G3–I defined |
 | Feb 25, 2026 PM | Claude Import JSON schema designed |
 | Feb 25, 2026 PM | MASTER_PLAN + PROGRESS fully rewritten with all new context |
+| Feb 25, 2026 PM | **G3 ✅** — app_router + constants + nav_overlay all cleaned (routes, MenuItemIds, nav maps) |
 
 ---
 
-## 📌 Arsh's Current FA Progress
+## 📌 Arsh’s Current FA Progress
 
 | Status | Pages | Subject |
 |---|---|---|
