@@ -1,9 +1,7 @@
 // =============================================================
-// DashboardScreen — main landing page
-// Uses AppScaffold, shows welcome, TodayGlance, Activity chart,
-// Due Now list (KB + FMGE entries where nextRevisionAt ≤ now)
-// Pull-to-refresh, shimmer loading, proper empty states.
-// Performance: RepaintBoundary, const children, context.select.
+// DashboardScreen — G8 full rebuild
+// 6 sections: Exam Countdown, Study Stats, FA Progress,
+// Revision Queue, Activity Heatmap, Subject Breakdown
 // =============================================================
 
 import 'package:flutter/material.dart';
@@ -12,27 +10,20 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
-import 'package:focusflow_mobile/app_router.dart';
-import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart' as du;
-import 'package:focusflow_mobile/widgets/app_scaffold.dart';
-import 'package:focusflow_mobile/widgets/stats_card.dart';
-import 'package:focusflow_mobile/widgets/activity_graph.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // ── Selective rebuilds: only watch the fields we need ─────────
     final loaded = context.select<AppProvider, bool>((p) => p.loaded);
 
     Widget content;
     if (!loaded) {
-      content = AppScaffold(
-        screenName: 'Dashboard',
+      content = Scaffold(
+        appBar: _buildAppBar(context),
         body: _ShimmerLoading(),
       );
     } else {
@@ -61,17 +52,43 @@ class DashboardScreen extends StatelessWidget {
           ),
         );
         if (shouldExit == true && context.mounted) {
-          // ignore: use_build_context_synchronously
           SystemNavigator.pop();
         }
       },
       child: content,
     );
   }
+
+  static PreferredSizeWidget _buildAppBar(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return AppBar(
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'FocusFlow',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 20,
+              color: cs.onSurface,
+            ),
+          ),
+          Text(
+            'Your Study OS',
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurfaceVariant,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════
-// DASHBOARD BODY — separated to allow fine-grained selects
+// DASHBOARD BODY
 // ══════════════════════════════════════════════════════════════════
 
 class _DashboardBody extends StatelessWidget {
@@ -80,176 +97,292 @@ class _DashboardBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final cs = Theme.of(context).colorScheme;
 
     final todayStr = du.AppDateUtils.todayKey();
-    final displayName = app.userProfile?.displayName ?? 'Student';
     final now = DateTime.now();
 
-    // ── Today's plan data ─────────────────────────────────────────
-    final DayPlan? todayPlan = app.getDayPlan(todayStr);
-    final blocks = todayPlan?.blocks ?? [];
-    final blocksDone = blocks.where((b) => b.status == BlockStatus.done).length;
-    final blocksTotal = blocks.length;
+    // ── Exam dates ──────────────────────────────────────────────
+    final fmgeDate = DateTime(2026, 6, 28);
+    final step1Date = DateTime(2026, 6, 15);
+    final today = DateTime(now.year, now.month, now.day);
+    final fmgeDays = fmgeDate.difference(today).inDays;
+    final step1Days = step1Date.difference(today).inDays;
 
-    // ── Study hours today (from timeLogs) ─────────────────────────
-    final todayLogs =
-        app.timeLogs.where((l) => l.date == todayStr).toList();
+    // ── Study time calculations ─────────────────────────────────
+    final todayLogs = app.timeLogs.where((l) => l.date == todayStr).toList();
     final studyMinutesToday =
         todayLogs.fold<int>(0, (sum, l) => sum + l.durationMinutes);
-    final studyHoursToday = studyMinutesToday / 60.0;
 
-    // ── 14-day activity data ──────────────────────────────────────
-    final minutesByDate = <String, int>{};
+    // This week (Mon–today)
+    final weekday = now.weekday; // 1=Mon, 7=Sun
+    final monday = today.subtract(Duration(days: weekday - 1));
+    int weekMinutes = 0;
     for (final log in app.timeLogs) {
-      minutesByDate[log.date] =
-          (minutesByDate[log.date] ?? 0) + log.durationMinutes;
+      final logDate = du.AppDateUtils.parseDate(log.date);
+      if (logDate != null &&
+          !logDate.isBefore(monday) &&
+          !logDate.isAfter(today)) {
+        weekMinutes += log.durationMinutes;
+      }
     }
+    final weekHours = weekMinutes ~/ 60;
 
-    // ── Due Now: KB entries ───────────────────────────────────────
-    final dueKB = app.knowledgeBase.where((e) {
-      if (e.nextRevisionAt == null) return false;
-      final next = DateTime.tryParse(e.nextRevisionAt!);
-      return next != null && now.isAfter(next);
-    }).toList();
-
-    // ── Due Now: FMGE entries ─────────────────────────────────────
-    final dueFMGE = app.fmgeEntries.where((e) {
-      if (e.nextRevisionAt == null) return false;
-      final next = DateTime.tryParse(e.nextRevisionAt!);
-      return next != null && now.isAfter(next);
-    }).toList();
-
-    // ── Streak (consecutive days with ≥1 time log) ───────────────
+    // ── Streak ──────────────────────────────────────────────────
+    final logDates = <String>{};
+    for (final log in app.timeLogs) {
+      logDates.add(log.date);
+    }
     int streak = 0;
     for (int i = 0; i < 365; i++) {
-      final d = now.subtract(Duration(days: i));
+      final d = today.subtract(Duration(days: i));
       final dateStr = DateFormat('yyyy-MM-dd').format(d);
-      if (minutesByDate.containsKey(dateStr) && minutesByDate[dateStr]! > 0) {
+      if (logDates.contains(dateStr)) {
         streak++;
       } else {
-        if (i == 0) continue;
+        if (i == 0) continue; // today might not have a log yet
         break;
       }
     }
 
-    return AppScaffold(
-      screenName: 'Dashboard',
-      streakCount: streak,
+    // ── FA Progress ─────────────────────────────────────────────
+    final readPages =
+        app.faPages.where((p) => p.status != 'unread').length;
+    final ankiDone =
+        app.faPages.where((p) => p.status == 'anki_done').length;
+    final unread =
+        app.faPages.where((p) => p.status == 'unread').length;
+
+    // ── Revision due ────────────────────────────────────────────
+    final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
+    final dueRevisions = app.revisionItems.where((r) {
+      final due = DateTime.tryParse(r.nextRevisionAt);
+      return due != null && !due.isAfter(todayEnd);
+    }).length;
+
+    // ── Activity heatmap (last 7 days) ──────────────────────────
+    final last7 = List.generate(7, (i) => today.subtract(Duration(days: 6 - i)));
+
+    // ── Subject breakdown ───────────────────────────────────────
+    final subjectMinutes = <String, int>{};
+    for (final log in app.timeLogs) {
+      final key = log.activity.isNotEmpty ? log.activity : 'Other';
+      subjectMinutes[key] = (subjectMinutes[key] ?? 0) + log.durationMinutes;
+    }
+    final sortedSubjects = subjectMinutes.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final topSubjects = sortedSubjects.take(4).toList();
+    final maxSubjectMinutes =
+        topSubjects.isNotEmpty ? topSubjects.first.value : 1;
+
+    return Scaffold(
+      appBar: DashboardScreen._buildAppBar(context),
       body: RefreshIndicator(
         color: cs.primary,
         onRefresh: () => app.loadAll(),
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          children: [
-            // ── Welcome ────────────────────────────────────────────
-            Text(
-              'Hey, $displayName 👋',
-              style: theme.textTheme.displayMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              DateFormat('EEEE, d MMMM').format(now),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: cs.onSurface.withValues(alpha: 0.5),
-              ),
-            ),
-            const SizedBox(height: 20),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 8),
 
-            // ── Today's Glance ─────────────────────────────────────
-            RepaintBoundary(
-              child: blocksTotal > 0
-                  ? TodayGlanceCard(
-                      blocksDone: blocksDone,
-                      blocksTotal: blocksTotal,
-                      studyHoursToday: studyHoursToday,
-                    )
-                  : _SectionEmptyState(
-                      icon: Icons.checklist_outlined,
-                      message: "No tasks for today — add one!",
-                      buttonLabel: "Today's Plan",
-                      routeName: Routes.todaysPlan,
-                    ),
-            ),
-            const SizedBox(height: 16),
-
-            // ── Quick Stats Row ────────────────────────────────────
-            RepaintBoundary(
-              child: Row(
+              // ═══ SECTION 1: Exam Countdown ═══════════════════
+              _sectionHeader(context, 'EXAM COUNTDOWN'),
+              const SizedBox(height: 8),
+              Row(
                 children: [
                   Expanded(
-                    child: StatsCard(
-                      icon: Icons.menu_book_rounded,
-                      label: 'KB Pages',
-                      value: '${app.knowledgeBase.length}',
-                      accentColor: const Color(0xFF8B5CF6),
+                    child: _ExamCountdownCard(
+                      label: 'FMGE',
+                      daysRemaining: fmgeDays,
+                      subtitle: 'Jun 28, 2026',
+                      accentColor: cs.primary,
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: StatsCard(
-                      icon: Icons.replay_rounded,
-                      label: 'Due Now',
-                      value: '${dueKB.length + dueFMGE.length}',
-                      accentColor: const Color(0xFFF43F5E),
+                    child: _ExamCountdownCard(
+                      label: 'Step 1',
+                      daysRemaining: step1Days,
+                      subtitle: 'Jun 15, 2026',
+                      accentColor: Colors.deepOrange,
                     ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
-            // ── Activity Graph ─────────────────────────────────────
-            RepaintBoundary(
-              child: minutesByDate.isNotEmpty
-                  ? ActivityGraph(minutesByDate: minutesByDate)
-                  : _SectionEmptyState(
-                      icon: Icons.local_fire_department_outlined,
-                      message: "No study sessions yet — start your streak!",
-                      buttonLabel: "Today's Plan",
-                      routeName: Routes.todaysPlan,
-                    ),
-            ),
-            const SizedBox(height: 20),
-
-            // ── Due Now list ───────────────────────────────────────
-            if (dueKB.isNotEmpty || dueFMGE.isNotEmpty) ...[
-              Text('📋 Due for Revision',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w700)),
+              // ═══ SECTION 2: Today's Study Stats ══════════════
+              _sectionHeader(context, "TODAY'S STUDY"),
               const SizedBox(height: 8),
-              ...dueKB.take(5).map((e) => RepaintBoundary(
-                    child: _DueTile(
-                      icon: Icons.menu_book_rounded,
-                      title: 'Page \${e.pageNumber}',
-                      subtitle: e.title,
-                      color: const Color(0xFF6366F1),
+              Row(
+                children: [
+                  Expanded(
+                    child: _MiniStatCard(
+                      label: 'Today',
+                      value: _formatHM(studyMinutesToday),
+                      icon: Icons.schedule_rounded,
+                      color: cs.primary,
                     ),
-                  )),
-              ...dueFMGE.take(5).map((e) => RepaintBoundary(
-                    child: _DueTile(
-                      icon: Icons.medical_services_rounded,
-                      title: e.subject,
-                      subtitle: 'Slides \${e.slideStart}–\${e.slideEnd}',
-                      color: const Color(0xFF10B981),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _MiniStatCard(
+                      label: 'This Week',
+                      value: '${weekHours}h',
+                      icon: Icons.date_range_rounded,
+                      color: cs.tertiary,
                     ),
-                  )),
-              const SizedBox(height: 8),
-            ],
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _MiniStatCard(
+                      label: 'Streak',
+                      value: '$streak days 🔥',
+                      icon: Icons.local_fire_department_rounded,
+                      color: Colors.deepOrange,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
 
-            // ── Empty state — no due revisions ─────────────────────
-            if (dueKB.isEmpty && dueFMGE.isEmpty)
-              _SectionEmptyState(
-                icon: Icons.auto_awesome_outlined,
-                message: "No revisions due — you're all caught up!",
-                buttonLabel: 'Knowledge Base',
-                routeName: Routes.knowledgeBase,
+              // ═══ SECTION 3: FA 2025 Progress ═════════════════
+              _sectionHeader(context, 'FIRST AID 2025'),
+              const SizedBox(height: 8),
+              _FAProgressCard(
+                readPages: readPages,
+                ankiDone: ankiDone,
+                unread: unread,
+                onNavigate: () => context.go('/tracker'),
+              ),
+              const SizedBox(height: 20),
+
+              // ═══ SECTION 4: Revision Queue ═══════════════════
+              _sectionHeader(context, 'REVISION QUEUE'),
+              const SizedBox(height: 8),
+              _RevisionCard(
+                dueCount: dueRevisions,
+                onNavigate: () => context.go('/revision'),
+              ),
+              const SizedBox(height: 20),
+
+              // ═══ SECTION 5: Activity Heatmap ═════════════════
+              _sectionHeader(context, 'LAST 7 DAYS'),
+              const SizedBox(height: 8),
+              _ActivityHeatmap(
+                days: last7,
+                logDates: logDates,
+                today: today,
+              ),
+              const SizedBox(height: 20),
+
+              // ═══ SECTION 6: Subject Breakdown ════════════════
+              _sectionHeader(context, 'TIME BY SUBJECT'),
+              const SizedBox(height: 8),
+              _SubjectBreakdownCard(
+                topSubjects: topSubjects,
+                maxMinutes: maxSubjectMinutes,
               ),
 
-            const SizedBox(height: 24),
+              const SizedBox(height: 80), // bottom nav clearance
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static Widget _sectionHeader(BuildContext context, String title) {
+    final cs = Theme.of(context).colorScheme;
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: cs.onSurfaceVariant,
+        letterSpacing: 0.5,
+      ),
+    );
+  }
+
+  static String _formatHM(int minutes) {
+    if (minutes <= 0) return '0m';
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    if (h == 0) return '${m}m';
+    if (m == 0) return '${h}h';
+    return '${h}h ${m}m';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION 1: Exam Countdown Card
+// ══════════════════════════════════════════════════════════════════
+
+class _ExamCountdownCard extends StatelessWidget {
+  final String label;
+  final int daysRemaining;
+  final String subtitle;
+  final Color accentColor;
+
+  const _ExamCountdownCard({
+    required this.label,
+    required this.daysRemaining,
+    required this.subtitle,
+    required this.accentColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border(
+            left: BorderSide(color: accentColor, width: 4),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: accentColor,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '$daysRemaining',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                color: cs.onSurface,
+              ),
+            ),
+            Text(
+              'days left',
+              style: TextStyle(
+                fontSize: 12,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 11,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
           ],
         ),
       ),
@@ -258,60 +391,405 @@ class _DashboardBody extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// PER-SECTION EMPTY STATE
+// SECTION 2: Mini Stat Card
 // ══════════════════════════════════════════════════════════════════
 
-class _SectionEmptyState extends StatelessWidget {
+class _MiniStatCard extends StatelessWidget {
+  final String label;
+  final String value;
   final IconData icon;
-  final String message;
-  final String buttonLabel;
-  final String routeName;
+  final Color color;
 
-  const _SectionEmptyState({
+  const _MiniStatCard({
+    required this.label,
+    required this.value,
     required this.icon,
-    required this.message,
-    required this.buttonLabel,
-    required this.routeName,
+    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
-      decoration: BoxDecoration(
-        color: cs.primary.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.primary.withValues(alpha: 0.08)),
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+        child: Column(
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: cs.primary.withValues(alpha: 0.08),
-              shape: BoxShape.circle,
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION 3: FA Progress Card
+// ══════════════════════════════════════════════════════════════════
+
+class _FAProgressCard extends StatelessWidget {
+  final int readPages;
+  final int ankiDone;
+  final int unread;
+  final VoidCallback onNavigate;
+
+  const _FAProgressCard({
+    required this.readPages,
+    required this.ankiDone,
+    required this.unread,
+    required this.onNavigate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final progress = readPages / 676;
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'First Aid 2025',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
+                  ),
+                ),
+                ActionChip(
+                  label: const Text('Mark Pages →'),
+                  onPressed: onNavigate,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
             ),
-            child: Icon(icon,
-                size: 28, color: cs.primary.withValues(alpha: 0.5)),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: cs.onSurface.withValues(alpha: 0.5),
-              fontWeight: FontWeight.w600,
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 10,
+                backgroundColor: cs.surfaceContainerHighest,
+                color: cs.primary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '$readPages / 676 pages read',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Text(
+                  '$ankiDone Anki Done',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: cs.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    '|',
+                    style: TextStyle(color: cs.onSurfaceVariant),
+                  ),
+                ),
+                Text(
+                  '$unread Unread',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION 4: Revision Queue Card
+// ══════════════════════════════════════════════════════════════════
+
+class _RevisionCard extends StatelessWidget {
+  final int dueCount;
+  final VoidCallback onNavigate;
+
+  const _RevisionCard({
+    required this.dueCount,
+    required this.onNavigate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Revision Due',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  if (dueCount == 0)
+                    Text(
+                      '✅ All caught up!',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.green.shade600,
+                      ),
+                    )
+                  else
+                    Text(
+                      '$dueCount pages due',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.orange.shade700,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (dueCount > 0)
+              IconButton.filled(
+                onPressed: onNavigate,
+                icon: const Icon(Icons.arrow_forward_rounded),
+                style: IconButton.styleFrom(
+                  backgroundColor: cs.primaryContainer,
+                  foregroundColor: cs.onPrimaryContainer,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION 5: Activity Heatmap (7 days)
+// ══════════════════════════════════════════════════════════════════
+
+class _ActivityHeatmap extends StatelessWidget {
+  final List<DateTime> days;
+  final Set<String> logDates;
+  final DateTime today;
+
+  const _ActivityHeatmap({
+    required this.days,
+    required this.logDates,
+    required this.today,
+  });
+
+  static const _dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: days.map((d) {
+            final dateStr = DateFormat('yyyy-MM-dd').format(d);
+            final studied = logDates.contains(dateStr);
+            final isToday = d.year == today.year &&
+                d.month == today.month &&
+                d.day == today.day;
+            final dayLabel = _dayLabels[d.weekday - 1];
+
+            return Column(
+              children: [
+                Text(
+                  dayLabel,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+                    color: isToday ? cs.primary : cs.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: studied
+                        ? Colors.green.withValues(alpha: 0.15)
+                        : cs.surfaceContainerHighest,
+                    border: isToday
+                        ? Border.all(color: cs.primary, width: 2)
+                        : null,
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: studied ? Colors.green : cs.outline.withValues(alpha: 0.3),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION 6: Subject Breakdown Card
+// ══════════════════════════════════════════════════════════════════
+
+class _SubjectBreakdownCard extends StatelessWidget {
+  final List<MapEntry<String, int>> topSubjects;
+  final int maxMinutes;
+
+  const _SubjectBreakdownCard({
+    required this.topSubjects,
+    required this.maxMinutes,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    if (topSubjects.isEmpty) {
+      return Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Center(
+            child: Text(
+              'Start logging study sessions to see breakdown',
+              style: TextStyle(
+                fontSize: 13,
+                color: cs.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
             ),
           ),
-          const SizedBox(height: 10),
-          TextButton(
-            onPressed: () => context.goNamed(routeName),
-            child: Text(buttonLabel),
-          ),
-        ],
+        ),
+      );
+    }
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: topSubjects.map((entry) {
+            final fraction = entry.value / maxMinutes;
+            final h = entry.value ~/ 60;
+            final m = entry.value % 60;
+            final timeLabel =
+                h > 0 ? (m > 0 ? '${h}h ${m}m' : '${h}h') : '${m}m';
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          entry.key,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurface,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        timeLabel,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: fraction,
+                      minHeight: 6,
+                      backgroundColor: cs.surfaceContainerHighest,
+                      color: cs.primary,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -352,28 +830,36 @@ class _ShimmerLoadingState extends State<_ShimmerLoading>
     return AnimatedBuilder(
       animation: _ctrl,
       builder: (_, __) {
-        final shimmer = cs.onSurface.withValues(
-            alpha: 0.04 + 0.04 * _ctrl.value);
+        final shimmer =
+            cs.onSurface.withValues(alpha: 0.04 + 0.04 * _ctrl.value);
 
         return ListView(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           physics: const NeverScrollableScrollPhysics(),
           children: [
-            _shimmerBox(shimmer, 200, 28),
-            const SizedBox(height: 8),
-            _shimmerBox(shimmer, 140, 14),
-            const SizedBox(height: 24),
-            _shimmerBox(shimmer, double.infinity, 100, radius: 16),
+            Row(
+              children: [
+                Expanded(child: _shimmerBox(shimmer, double.infinity, 100, radius: 12)),
+                const SizedBox(width: 12),
+                Expanded(child: _shimmerBox(shimmer, double.infinity, 100, radius: 12)),
+              ],
+            ),
             const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(child: _shimmerBox(shimmer, double.infinity, 72, radius: 12)),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
+                Expanded(child: _shimmerBox(shimmer, double.infinity, 72, radius: 12)),
+                const SizedBox(width: 8),
                 Expanded(child: _shimmerBox(shimmer, double.infinity, 72, radius: 12)),
               ],
             ),
             const SizedBox(height: 16),
-            _shimmerBox(shimmer, double.infinity, 140, radius: 16),
+            _shimmerBox(shimmer, double.infinity, 120, radius: 12),
+            const SizedBox(height: 16),
+            _shimmerBox(shimmer, double.infinity, 70, radius: 12),
+            const SizedBox(height: 16),
+            _shimmerBox(shimmer, double.infinity, 60, radius: 12),
           ],
         );
       },
@@ -388,67 +874,6 @@ class _ShimmerLoadingState extends State<_ShimmerLoading>
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(radius),
-      ),
-    );
-  }
-}
-
-// ── Due revision tile ──────────────────────────────────────────────
-class _DueTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-
-  const _DueTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.onSurface.withValues(alpha: 0.06)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, size: 18, color: color),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: theme.textTheme.bodyLarge
-                        ?.copyWith(fontWeight: FontWeight.w600)),
-                Text(subtitle,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: cs.onSurface.withValues(alpha: 0.5),
-                      fontSize: 12,
-                    )),
-              ],
-            ),
-          ),
-          Icon(Icons.chevron_right_rounded,
-              color: cs.onSurface.withValues(alpha: 0.3)),
-        ],
       ),
     );
   }
