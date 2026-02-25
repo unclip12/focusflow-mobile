@@ -95,9 +95,11 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
 
     return AppScaffold(
       screenName: 'Knowledge Base',
-      body: Column(
+      body: Stack(
         children: [
-          // ── Search bar ───────────────────────────────────────────
+          Column(
+            children: [
+              // ── Search bar ───────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: TextField(
@@ -203,8 +205,27 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
                     },
                   ),
           ),
+            ],
+          ),
+          Positioned(
+            bottom: 20,
+            right: 20,
+            child: FloatingActionButton(
+              onPressed: () => _showAddEntrySheet(context),
+              child: const Icon(Icons.add_rounded),
+            ),
+          ),
         ],
       ),
+    );
+  }
+
+  void _showAddEntrySheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _AddKBEntrySheet(),
     );
   }
 }
@@ -332,6 +353,149 @@ class _FilterChip extends StatelessWidget {
             color: selected ? cs.primary : cs.onSurface.withValues(alpha: 0.55),
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AddKBEntrySheet extends StatefulWidget {
+  const _AddKBEntrySheet();
+  @override
+  State<_AddKBEntrySheet> createState() => _AddKBEntrySheetState();
+}
+
+class _AddKBEntrySheetState extends State<_AddKBEntrySheet> {
+  final _pageCtrl  = TextEditingController();
+  final _titleCtrl = TextEditingController();
+  String? _subject;
+  String? _system;
+
+  @override
+  void dispose() {
+    _pageCtrl.dispose();
+    _titleCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_titleCtrl.text.trim().isEmpty) return;
+    final app = context.read<AppProvider>();
+
+    final entry = KnowledgeBaseEntry(
+      pageNumber: _pageCtrl.text.trim(),
+      title: _titleCtrl.text.trim(),
+      subject: _subject ?? '',
+      system: _system ?? '',
+      revisionCount: 0,
+      currentRevisionIndex: 0,
+      ankiTotal: 0,
+      ankiCovered: 0,
+      videoLinks: const [],
+      tags: const [],
+      notes: '',
+      logs: const [],
+      topics: const [],
+    );
+
+    await app.upsertKBEntry(entry);
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Container(
+      padding: EdgeInsets.only(
+        left: 20, right: 20, top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36, height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Text('Add KB Entry',
+                style: theme.textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _pageCtrl,
+              decoration: InputDecoration(
+                labelText: 'Page number',
+                hintText: 'e.g. 180',
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _titleCtrl,
+              decoration: InputDecoration(
+                labelText: 'Topic / Title',
+                hintText: 'e.g. TORCH Infections',
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              textCapitalization: TextCapitalization.sentences,
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _subject,
+              decoration: InputDecoration(
+                labelText: 'Subject',
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              items: kFmgeSubjects
+                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                  .toList(),
+              onChanged: (v) => setState(() => _subject = v),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _system,
+              decoration: InputDecoration(
+                labelText: 'System',
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              items: kBodySystems
+                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                  .toList(),
+              onChanged: (v) => setState(() => _system = v),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _save,
+                icon: const Icon(Icons.check_rounded, size: 18),
+                label: const Text('Save Entry'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

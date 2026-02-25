@@ -8,8 +8,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-
 import 'package:focusflow_mobile/providers/app_provider.dart';
+import 'package:focusflow_mobile/utils/text_sanitizer.dart';
 import 'package:focusflow_mobile/models/knowledge_base.dart';
 import 'package:focusflow_mobile/services/srs_service.dart';
 import 'package:focusflow_mobile/core/theme/app_colors.dart';
@@ -53,7 +53,7 @@ class KBEntryDetailScreen extends StatelessWidget {
         SrsService.isDueNow(nextRevisionAt: entry.nextRevisionAt);
 
     return AppScaffold(
-      screenName: 'Page ${entry.pageNumber}',
+      screenName: 'Page ${TextSanitizer.clean(entry.pageNumber)}',
       floatingActionButton: FloatingActionButton.small(
         heroTag: 'kb_add_note',
         backgroundColor: cs.primary,
@@ -76,7 +76,7 @@ class KBEntryDetailScreen extends StatelessWidget {
 
           // â”€â”€ Title & page number â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Text(
-            entry.title,
+            TextSanitizer.clean(entry.title),
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w800,
             ),
@@ -84,16 +84,16 @@ class KBEntryDetailScreen extends StatelessWidget {
           const SizedBox(height: 6),
           Row(
             children: [
-              _Badge(label: 'Page ${entry.pageNumber}', color: cs.primary),
+              _Badge(label: 'Page ${TextSanitizer.clean(entry.pageNumber)}', color: cs.primary),
               const SizedBox(width: 6),
               _Badge(
-                  label: entry.subject,
+                  label: TextSanitizer.clean(entry.subject),
                   color: AppColors.subjectColors[
                       entry.subject.hashCode.abs() %
                           AppColors.subjectColors.length]),
               const SizedBox(width: 6),
               _Badge(
-                  label: entry.system,
+                  label: TextSanitizer.clean(entry.system),
                   color: cs.onSurface.withValues(alpha: 0.5)),
             ],
           ),
@@ -204,9 +204,9 @@ class KBEntryDetailScreen extends StatelessWidget {
                       'Last Studied', _formatDate(entry.lastStudiedAt!)),
                 _DetailRow('Anki', '${entry.ankiCovered}/${entry.ankiTotal}'),
                 if (entry.ankiTag != null)
-                  _DetailRow('Anki Tag', entry.ankiTag!),
+                  _DetailRow('Anki Tag', TextSanitizer.clean(entry.ankiTag!)),
                 if (entry.tags.isNotEmpty)
-                  _DetailRow('Tags', entry.tags.join(', ')),
+                  _DetailRow('Tags', TextSanitizer.clean(entry.tags.join(', '))),
               ],
             ),
           ),
@@ -217,7 +217,7 @@ class KBEntryDetailScreen extends StatelessWidget {
             _SectionCard(
               title: 'Notes',
               child: Text(
-                entry.notes,
+                TextSanitizer.clean(entry.notes),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: cs.onSurface.withValues(alpha: 0.7),
                   height: 1.5,
@@ -243,7 +243,7 @@ class KBEntryDetailScreen extends StatelessWidget {
                                       color: cs.primary,
                                       fontWeight: FontWeight.w700)),
                               Expanded(
-                                child: Text(k,
+                                child: Text(TextSanitizer.clean(k),
                                     style: theme.textTheme.bodyMedium
                                         ?.copyWith(
                                             color: cs.onSurface
@@ -286,7 +286,7 @@ class KBEntryDetailScreen extends StatelessWidget {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  v.title.isNotEmpty ? v.title : v.url,
+                                  TextSanitizer.clean(v.title.isNotEmpty ? v.title : v.url),
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     color: cs.primary,
                                   ),
@@ -625,7 +625,7 @@ class _TopicTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(topic.name,
+          Text(TextSanitizer.clean(topic.name),
               style: theme.textTheme.bodyMedium
                   ?.copyWith(fontWeight: FontWeight.w600)),
           if (topic.logs.isNotEmpty)
@@ -647,7 +647,7 @@ class _TopicTile extends StatelessWidget {
                     .map((st) => Padding(
                           padding: const EdgeInsets.only(bottom: 2),
                           child: Text(
-                            'â†³ ${st.name}',
+                            'â†³ ${TextSanitizer.clean(st.name)}',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: cs.onSurface.withValues(alpha: 0.5),
                             ),
@@ -728,7 +728,7 @@ class _RevisionLogTile extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
-                      log.notes!,
+                      TextSanitizer.clean(log.notes!),
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: cs.onSurface.withValues(alpha: 0.45),
                       ),

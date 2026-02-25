@@ -200,7 +200,7 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
 
             // ── Category dropdown ─────────────────────────────────
             DropdownButtonFormField<TimeLogCategory>(
-              value: _category,
+              initialValue: _category,
               decoration: InputDecoration(
                 labelText: 'Category',
                 border: OutlineInputBorder(
