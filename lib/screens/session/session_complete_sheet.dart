@@ -13,6 +13,7 @@ import 'package:uuid/uuid.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/models/knowledge_base.dart';
 import 'package:focusflow_mobile/models/revision_item.dart';
+import 'package:focusflow_mobile/models/time_log_entry.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/services/srs_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
@@ -170,6 +171,39 @@ class _CompletionSheetState extends State<_CompletionSheet> {
       // 2. Update block status to 'done' in DayPlan
       await _updateBlockStatus(app);
 
+      // 2b. Save a TimeLogEntry for this session
+      final TimeLogCategory logCategory;
+      switch (_taskType) {
+        case 'FA':
+        case 'REVISION':
+        case 'FMGE':
+          logCategory = TimeLogCategory.revision;
+          break;
+        case 'VIDEO':
+          logCategory = TimeLogCategory.video;
+          break;
+        case 'QBANK':
+          logCategory = TimeLogCategory.qbank;
+          break;
+        case 'ANKI':
+          logCategory = TimeLogCategory.anki;
+          break;
+        default:
+          logCategory = TimeLogCategory.study;
+      }
+      final logEntry = TimeLogEntry(
+        id: _uuid.v4(),
+        date: widget.dayPlanDate,
+        startTime: widget.startedAt.toIso8601String(),
+        endTime: widget.endedAt.toIso8601String(),
+        durationMinutes: widget.elapsedSeconds ~/ 60,
+        category: logCategory,
+        source: TimeLogSource.todaysPlan,
+        activity: widget.block.title,
+        notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
+      );
+      await app.upsertTimeLog(logEntry);
+
       // 3. Handle coverage < 100% for FA tasks
       if ((_taskType == 'FA' || _taskType == 'FMGE' || _taskType == 'REVISION') &&
           _coveragePercent < 100) {
@@ -266,7 +300,7 @@ class _CompletionSheetState extends State<_CompletionSheet> {
         firstStudiedAt: existing?.firstStudiedAt ?? now.toIso8601String(),
         nextRevisionAt: nextRevision,
         revisionCount: (existing?.revisionCount ?? 0) + 1,
-        currentRevisionIndex: _coveragePercent.toInt(),
+        currentRevisionIndex: (existing?.currentRevisionIndex ?? 0),
       );
 
       await app.upsertKBEntry(updatedEntry);
