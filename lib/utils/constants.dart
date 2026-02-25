@@ -7,6 +7,7 @@ class MenuItemId {
   static const String dashboard     = 'dashboard';
   static const String todaysPlan    = 'todays-plan';
   static const String faLogger      = 'fa-logger';
+  static const String tracker       = 'tracker';
   static const String revision      = 'revision';
   static const String knowledgeBase = 'knowledge-base';
   static const String timeLogger    = 'time-logger';
@@ -18,6 +19,7 @@ const List<String> kDefaultMenuOrder = [
   MenuItemId.dashboard,
   MenuItemId.todaysPlan,
   MenuItemId.faLogger,
+  MenuItemId.tracker,
   MenuItemId.revision,
   MenuItemId.knowledgeBase,
   MenuItemId.timeLogger,
@@ -29,6 +31,7 @@ const Map<String, String> kMenuItemLabels = {
   MenuItemId.dashboard:     'Dashboard',
   MenuItemId.todaysPlan:    "Today's Plan",
   MenuItemId.faLogger:      'FA Tracker',
+  MenuItemId.tracker:       'Tracker',
   MenuItemId.revision:      'Revision Hub',
   MenuItemId.knowledgeBase: 'Knowledge Base',
   MenuItemId.timeLogger:    'Time Logger',
@@ -41,6 +44,7 @@ const Map<String, String> kPinnableScreenLabels = {
   MenuItemId.dashboard:     'Dashboard',
   MenuItemId.todaysPlan:    "Today's Plan",
   MenuItemId.faLogger:      'FA Tracker',
+  'tracker':                'Tracker',
   MenuItemId.revision:      'Revision',
   MenuItemId.knowledgeBase: 'Knowledge',
   MenuItemId.timeLogger:    'Time Log',
@@ -50,10 +54,10 @@ const Map<String, String> kPinnableScreenLabels = {
 
 // Default 4 pinned tabs shown in bottom nav
 const List<String> kDefaultPinnedTabs = [
-  MenuItemId.dashboard,
-  MenuItemId.revision,
-  MenuItemId.todaysPlan,
-  MenuItemId.faLogger,
+  'dashboard',
+  'revision',
+  'todays-plan',
+  'tracker',
 ];
 
 // ── FMGE Subjects (19) ───────────────────────────────────────

@@ -20,6 +20,10 @@ import 'package:focusflow_mobile/models/mentor_message.dart';
 import 'package:focusflow_mobile/models/user_profile.dart';
 import 'package:focusflow_mobile/models/app_snapshot.dart';
 import 'package:focusflow_mobile/models/revision_item.dart';
+import 'package:focusflow_mobile/models/fa_page.dart';
+import 'package:focusflow_mobile/models/sketchy_item.dart';
+import 'package:focusflow_mobile/models/pathoma_item.dart';
+import 'package:focusflow_mobile/models/uworld_session.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 
 // ── AppNotification ───────────────────────────────────────────────
@@ -114,6 +118,10 @@ class AppProvider extends ChangeNotifier {
   List<AppNotification> notifications = [];
   List<Habit> habits = [];
   List<RevisionItem> revisionItems = [];
+  List<FAPage> faPages = [];
+  List<SketchyItem> sketchyItems = [];
+  List<PathomaItem> pathomaItems = [];
+  List<UWorldSession> uWorldSessions = [];
 
   MentorMemory? mentorMemory;
   AISettings? aiSettings;
@@ -164,6 +172,19 @@ class AppProvider extends ChangeNotifier {
 
     revisionItems = (await _db.getAllRevisionItems())
         .map((j) => RevisionItem.fromJson(j))
+        .toList();
+
+    faPages = (await _db.getAllFAPages())
+        .map((j) => FAPage.fromJson(j))
+        .toList();
+    sketchyItems = (await _db.getAllSketchyItems())
+        .map((j) => SketchyItem.fromJson(j))
+        .toList();
+    pathomaItems = (await _db.getAllPathomaItems())
+        .map((j) => PathomaItem.fromJson(j))
+        .toList();
+    uWorldSessions = (await _db.getAllUWorldSessions())
+        .map((j) => UWorldSession.fromJson(j))
         .toList();
 
     // Singletons
@@ -492,6 +513,83 @@ class AppProvider extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════════
+  // FA PAGES (G5)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> upsertFAPage(FAPage page) async {
+    await _db.upsertFAPage(page.toJson());
+    final idx = faPages.indexWhere((p) => p.pageNum == page.pageNum);
+    if (idx >= 0) { faPages[idx] = page; } else { faPages.add(page); }
+    notifyListeners();
+  }
+
+  Future<void> updateFAPageStatus(int pageNum, String status) async {
+    final idx = faPages.indexWhere((p) => p.pageNum == pageNum);
+    if (idx < 0) return;
+    final updated = faPages[idx].copyWith(
+      status: status,
+      lastReviewed: DateTime.now().toIso8601String(),
+    );
+    await upsertFAPage(updated);
+  }
+
+  Future<void> deleteFAPage(int pageNum) async {
+    await _db.deleteFAPage(pageNum);
+    faPages.removeWhere((p) => p.pageNum == pageNum);
+    notifyListeners();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // SKETCHY ITEMS (G5)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> upsertSketchyItem(SketchyItem item) async {
+    await _db.upsertSketchyItem(item.toJson());
+    final idx = sketchyItems.indexWhere((i) => i.id == item.id);
+    if (idx >= 0) { sketchyItems[idx] = item; } else { sketchyItems.add(item); }
+    notifyListeners();
+  }
+
+  Future<void> updateSketchyStatus(String id, String status) async {
+    final idx = sketchyItems.indexWhere((i) => i.id == id);
+    if (idx < 0) return;
+    await upsertSketchyItem(sketchyItems[idx].copyWith(status: status));
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // PATHOMA ITEMS (G5)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> upsertPathomaItem(PathomaItem item) async {
+    await _db.upsertPathomaItem(item.toJson());
+    final idx = pathomaItems.indexWhere((i) => i.id == item.id);
+    if (idx >= 0) { pathomaItems[idx] = item; } else { pathomaItems.add(item); }
+    notifyListeners();
+  }
+
+  Future<void> updatePathomaStatus(String id, String status) async {
+    final idx = pathomaItems.indexWhere((i) => i.id == id);
+    if (idx < 0) return;
+    await upsertPathomaItem(pathomaItems[idx].copyWith(status: status));
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // UWORLD SESSIONS (G5)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> addUWorldSession(UWorldSession session) async {
+    await _db.insertUWorldSession(session.toJson());
+    uWorldSessions.add(session);
+    notifyListeners();
+  }
+
+  Future<void> deleteUWorldSession(String id) async {
+    await _db.deleteUWorldSession(id);
+    uWorldSessions.removeWhere((s) => s.id == id);
+    notifyListeners();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // NOTIFICATIONS
   // ═══════════════════════════════════════════════════════════════
 
@@ -658,6 +756,10 @@ class AppProvider extends ChangeNotifier {
     notifications.clear();
     habits.clear();
     revisionItems.clear();
+    faPages.clear();
+    sketchyItems.clear();
+    pathomaItems.clear();
+    uWorldSessions.clear();
     mentorMemory = null;
     aiSettings = null;
     userProfile = null;

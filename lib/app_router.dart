@@ -18,6 +18,7 @@ import 'package:focusflow_mobile/screens/settings/settings_screen.dart';
 import 'package:focusflow_mobile/screens/fa_logger/fa_logger_screen.dart';
 import 'package:focusflow_mobile/screens/analytics/analytics_screen.dart';
 import 'package:focusflow_mobile/screens/session/session_screen.dart';
+import 'package:focusflow_mobile/screens/tracker/tracker_screen.dart';
 
 // ── Route names ─────────────────────────────────────────────────
 class Routes {
@@ -32,6 +33,7 @@ class Routes {
   static const analytics     = 'analytics';
   static const settings      = 'settings';
   static const session       = 'session';
+  static const tracker       = 'tracker';
 }
 
 // ── Router ──────────────────────────────────────────────────────
@@ -96,6 +98,11 @@ final GoRouter appRouter = GoRouter(
           path: '/settings',
           name: Routes.settings,
           builder: (context, state) => const SettingsScreen(),
+        ),
+        GoRoute(
+          path: '/tracker',
+          name: Routes.tracker,
+          builder: (context, state) => const TrackerScreen(),
         ),
       ],
     ),

@@ -13,7 +13,7 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._();
 
   static const _dbName = 'focusflow.db';
-  static const _dbVersion = 1;
+  static const _dbVersion = 2;
 
   Database? _database;
 
@@ -30,6 +30,7 @@ class DatabaseService {
       path,
       version: _dbVersion,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -50,6 +51,10 @@ class DatabaseService {
   static const tHistory = 'history';
   static const tRevisionSettings = 'revision_settings';
   static const tRevisionItems = 'revision_items';
+  static const tFaPages = 'fa_pages';
+  static const tSketchyItems = 'sketchy_items';
+  static const tPathomaItems = 'pathoma_items';
+  static const tUworldSessions = 'uworld_sessions';
 
   Future<void> _onCreate(Database db, int version) async {
     // Knowledge Base — pageNumber is the primary key
@@ -202,6 +207,46 @@ class DatabaseService {
         pageNumber TEXT
       )
     ''');
+
+    // ── G5 Tracker tables ──────────────────────────────────────
+    await _createG5Tables(db);
+  }
+
+  /// Create G5 tracker tables — called from both _onCreate and _onUpgrade.
+  Future<void> _createG5Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tFaPages (
+        pageNum INTEGER PRIMARY KEY,
+        data TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tSketchyItems (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tPathomaItems (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tUworldSessions (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await _createG5Tables(db);
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -546,6 +591,61 @@ class DatabaseService {
       deleteById(tRevisionItems, 'id', id);
 
   // ═══════════════════════════════════════════════════════════════
+  // FA PAGES (G5)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<List<Map<String, dynamic>>> getAllFAPages() => getAll(tFaPages);
+
+  Future<void> upsertFAPage(Map<String, dynamic> json) => upsert(
+        tFaPages, 'pageNum', json['pageNum']?.toString() ?? '', json,
+      );
+
+  Future<int> deleteFAPage(int pageNum) =>
+      deleteById(tFaPages, 'pageNum', pageNum.toString());
+
+  // ═══════════════════════════════════════════════════════════════
+  // SKETCHY ITEMS (G5)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<List<Map<String, dynamic>>> getAllSketchyItems() =>
+      getAll(tSketchyItems);
+
+  Future<void> upsertSketchyItem(Map<String, dynamic> json) => upsert(
+        tSketchyItems, 'id', json['id'] ?? '', json,
+      );
+
+  Future<int> deleteSketchyItem(String id) =>
+      deleteById(tSketchyItems, 'id', id);
+
+  // ═══════════════════════════════════════════════════════════════
+  // PATHOMA ITEMS (G5)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<List<Map<String, dynamic>>> getAllPathomaItems() =>
+      getAll(tPathomaItems);
+
+  Future<void> upsertPathomaItem(Map<String, dynamic> json) => upsert(
+        tPathomaItems, 'id', json['id'] ?? '', json,
+      );
+
+  Future<int> deletePathomaItem(String id) =>
+      deleteById(tPathomaItems, 'id', id);
+
+  // ═══════════════════════════════════════════════════════════════
+  // UWORLD SESSIONS (G5)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<List<Map<String, dynamic>>> getAllUWorldSessions() =>
+      getAll(tUworldSessions);
+
+  Future<void> insertUWorldSession(Map<String, dynamic> json) => upsert(
+        tUworldSessions, 'id', json['id'] ?? '', json,
+      );
+
+  Future<int> deleteUWorldSession(String id) =>
+      deleteById(tUworldSessions, 'id', id);
+
+  // ═══════════════════════════════════════════════════════════════
   // BULK OPERATIONS (for backup restore)
   // ═══════════════════════════════════════════════════════════════
 
@@ -558,6 +658,7 @@ class DatabaseService {
         tTimeLogs, tDailyTracker, tStudyEntries, tStudyMaterials,
         tMentorMessages, tMentorMemory, tAiSettings, tUserProfile,
         tSettings, tHistory, tRevisionSettings, tRevisionItems,
+        tFaPages, tSketchyItems, tPathomaItems, tUworldSessions,
       ]) {
         await txn.delete(table);
       }
