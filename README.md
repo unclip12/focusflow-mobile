@@ -4,6 +4,41 @@ Premium Flutter study app for USMLE Step 1 & FMGE students. Offline-first, SQLit
 
 ---
 
+## How This App Is Built — The Workflow
+
+This app is built entirely using **AI-assisted development via Antigravity** — a tool that lets you run AI models (Claude Opus, Gemini) directly inside a cloned local repository. No manual code writing. The human (owner) directs, the AI codes.
+
+### The Exact Process
+
+1. **Perplexity (planning layer)** — The owner discusses features, bugs, and design decisions with Perplexity. Perplexity reads the GitHub repo using MCP tools, understands the current state, diagnoses bugs, and writes precise prompts for the AI coding agents.
+
+2. **Antigravity (execution layer)** — The owner pastes those prompts into Antigravity, which runs the AI model against the actual local repo files. The AI reads every relevant file, writes/edits code, runs `flutter analyze`, fixes any errors, then commits and pushes to `main`.
+
+3. **Two AI models are used depending on task type:**
+   - **Claude Opus (via Antigravity)** — Used for complex logic: SRS algorithm, session flow, data wiring, provider integration, navigation fixes. Claude is better at reading large codebases and getting multi-file logic right.
+   - **Gemini (via Antigravity)** — Used for UI work, polish, theme fixes, deprecation warnings, empty states. Gemini is faster for visual/styling tasks.
+
+4. **Testing** — Owner tests the app on a real Android device (via `flutter run`). Bugs are reported back to Perplexity, which reads the repo again and writes a new targeted fix prompt.
+
+5. **This loop repeats** — Plan → Prompt → Antigravity executes → Test → Debug → Repeat.
+
+### Why This Works
+- Perplexity reads the live repo via GitHub MCP before every prompt, so context is always fresh
+- Antigravity gives the AI model full filesystem access to read/edit files
+- Every change is committed with a descriptive message so history is traceable
+- `flutter analyze --no-fatal-infos` is mandatory before every commit — no broken code ever reaches main
+
+### Prompt Format Used
+Every prompt sent to Antigravity follows this structure:
+```
+[Context: what screen/file this is about]
+[What currently exists and what is broken]
+[Exact steps the AI must do — numbered]
+[flutter analyze --no-fatal-infos → git commit -m "..." → git push origin main]
+```
+
+---
+
 ## Tech Stack
 
 - **Flutter** (stable 3.29)
@@ -47,47 +82,51 @@ lib/
 
 ## ✅ Completed (committed to main)
 
-### Batch A — Core Foundation
+### Batch A — Core Foundation (Claude Opus via Antigravity)
 - `1864df2` — All screens wired, AppScaffold navigation, dashboard empty state
 - `939110b` — Strict 12-revision SRS algorithm, AI Mentor JSON importer → Knowledge Base
 
-### Batch B — Exam-Aware Task Planner
+### Batch B — Exam-Aware Task Planner (Claude Opus via Antigravity)
 - `58b313a` — USMLE + FMGE task planner, focus batch calculator, menu reorder
-- `cea1551` — TextFormField fix (CI green)
+- `cea1551` — TextFormField fix (flutter analyze clean)
 
-### Batch X — Critical Bug Fixes
+### Batch X — Critical Bug Fixes (Claude Opus via Antigravity)
 - `063ccde` — Data persistence fix, Android back navigation, date picker on Today's Plan, removed Generate Plan button
 - `b88a40f` — Task save without times, exit dialog on dashboard back press
 - `19b1f65` — **AppProvider.loadAll() called on startup** (data now survives force close)
 
-### Batch C — Session Timer + FA Logger
+### Batch C — Session Timer + FA Logger (Claude Opus via Antigravity)
 - `3f2da99` — SessionScreen (countdown timer, 100+ motivational quotes, pause/end), SessionCompleteSheet, FA Logger redesign
 - `203c7d4` — Wired SessionScreen navigation from Today's Plan block start
 
 ---
 
-## 🔴 Current Bug (fix this first)
+## 🔴 Current Bug (fix this first in new session)
 
-**Session flow not fully wired:**
+**Session completion does not save data anywhere.**
 
-1. `SessionScreen` navigation from `_startBlock()` in `today_plan_screen.dart` — needs to confirm it actually opens the timer screen when Start is tapped on a block
-2. `session_complete_sheet.dart` — on Save & Complete must:
-   - Call `app.upsertDayPlan()` to mark block as `done`
-   - For FA Pages: call `app.upsertKBEntry()` with updated `lastStudiedAt`, `completionPercent`, `nextRevisionAt`
-   - Create/update `RevisionItem` for each page studied
-   - Navigate back to Today's Plan after save
-3. FA Logger FAB quick-add must also trigger `upsertKBEntry()` + revision item creation
+The `SessionScreen` and `SessionCompleteSheet` exist and the timer works. But when Save & Complete is tapped, nothing is written to the database. Also the Today's Plan page does not update block status to done.
 
-**Fix command for Antigravity (Claude Opus):**
+**How this bug was found:** Owner tested on device — tapped Start on a block, session screen opened with timer running correctly. Tapped End Session → completion sheet appeared. Tapped Save & Complete → nothing happened, block still showed as not started.
+
+**Root cause (diagnosed by Perplexity reading repo):** `SessionCompleteSheet` has no calls to `app.upsertDayPlan()` or `app.upsertKBEntry()`. The UI exists but the save logic was never wired.
+
+**Fix prompt for Antigravity (Claude Opus):**
 ```
-The SessionScreen and SessionCompleteSheet exist but completion data 
-is not being saved anywhere. When Save & Complete is tapped:
-1. Mark the block as done in DayPlan via app.upsertDayPlan()
-2. For FA Pages blocks, update each KnowledgeBaseEntry with 
-   lastStudiedAt, completionPercent, nextRevisionAt via app.upsertKBEntry()
-3. Create RevisionItem for each page via app.upsertRevisionItem()
-4. Navigate back to Today's Plan after saving
-5. FA Logger FAB save must do the same KB + revision updates
+Read session_complete_sheet.dart fully.
+The Save & Complete button currently does nothing useful.
+Fix it so that when Save & Complete is tapped:
+1. Mark the block as done in DayPlan via context.read<AppProvider>().upsertDayPlan()
+2. For FA Pages blocks (block.type == BlockType.revisionFa):
+   - For each page studied, call upsertKBEntry() with updated
+     lastStudiedAt = DateTime.now().toIso8601String()
+     completionPercent = value from slider
+     nextRevisionAt = SrsService.calculateNextRevision(entry.revisionIndex)
+   - Create a RevisionItem via upsertRevisionItem() for each page
+3. After saving, pop back to Today's Plan:
+   Navigator.of(context).pop(); // pop sheet
+   Navigator.of(context).pop(); // pop session screen
+4. Also fix FA Logger FAB save to call upsertKBEntry() + create RevisionItem
 flutter analyze --no-fatal-infos → commit → push
 ```
 
@@ -95,26 +134,27 @@ flutter analyze --no-fatal-infos → commit → push
 
 ## ⏳ Remaining Batches
 
-### Batch D — Dashboard Live Data (Gemini)
-Replace all empty/mock data on the dashboard with real data from AppProvider:
-- Today's blocks list with completion status
-- Due revisions count from KnowledgeBase entries where `nextRevisionAt <= now`
-- Current streak (consecutive days with timeLogs)
-- Subject breakdown chart from timeLogs
-- Recent activity heatmap
+### Batch D — Dashboard Live Data (Gemini via Antigravity)
+Replace all empty/mock data on the dashboard with real AppProvider data:
+- Today's blocks list with completion status rings
+- Due revisions count: KB entries where `nextRevisionAt <= DateTime.now()`
+- Current streak: count consecutive days with at least one TimeLogEntry
+- Subject breakdown: pie/bar from timeLogs grouped by subject
+- Recent activity heatmap (last 30 days)
 
-### Batch E — Revision Hub (Claude Opus)
-- List all KB entries where `nextRevisionAt <= now` (due for revision)
-- Show SRS countdown for future entries (e.g. "Due in 3 days")
-- "Mark Revised" button per entry that calls `SrsService.calculateNextRevision()` and increments `revisionIndex`
+### Batch E — Revision Hub (Claude Opus via Antigravity)
+- List all KB entries where `nextRevisionAt <= now` (due)
+- Show SRS countdown for future entries ("Due in 3 days")
+- "Mark Revised" button → calls `SrsService.calculateNextRevision()`, increments `revisionIndex`, saves via `upsertKBEntry()`
 - Overdue entries highlighted in red
+- Sort: overdue first, then soonest due
 
-### Batch F — Polish & Cleanup (Gemini)
-- Fix deprecated `activeColor` warnings in `notification_settings_sheet.dart`
-- Fix deprecated `value` warning in `add_time_log_sheet.dart` and `add_task_sheet.dart`
-- Dark mode consistency check
+### Batch F — Polish & Cleanup (Gemini via Antigravity)
+- Fix all deprecated `activeColor`, `value`, `background` warnings
+- Dark mode consistency check across all screens
 - Spacing and typography pass
-- Empty states for all screens
+- Empty states with illustration + CTA for all screens
+- `flutter analyze --no-fatal-infos` must exit 0 with zero warnings
 
 ---
 
@@ -131,12 +171,14 @@ Replace all empty/mock data on the dashboard with real data from AppProvider:
 
 ---
 
-## Rules for AI Agents
+## Rules for AI Agents Working on This Repo
 
-- **Always** run `flutter analyze --no-fatal-infos` before committing
+- **Always read the relevant files before writing anything**
+- **Always** run `flutter analyze --no-fatal-infos` before committing — fix ALL warnings, not just errors
 - **Always** commit with a descriptive message and push to `main`
-- **Do NOT** rewrite `database_service.dart`, `app_provider.dart`, or any model files — they are stable
+- **Do NOT** rewrite `database_service.dart`, `app_provider.dart`, or any model files — they are stable and correct
 - Use `context.watch<AppProvider>()` in `build()` methods
-- Use `context.read<AppProvider>()` in event handlers
-- `AppProvider.loadAll()` is called once in `main()` — do not call it again
-- No storage permissions needed — SQLite uses app-internal storage automatically
+- Use `context.read<AppProvider>()` in event handlers and callbacks
+- `AppProvider.loadAll()` is called once in `main.dart` — do not call it anywhere else
+- No storage permissions needed — SQLite uses app-internal storage automatically (no AndroidManifest changes needed)
+- GoRouter is already configured — add new routes there if needed, do not use `Navigator.pushNamed`
