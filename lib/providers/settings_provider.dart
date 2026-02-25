@@ -1,11 +1,11 @@
 // =============================================================
 // SettingsProvider — ChangeNotifier wrapping AppSettings
-// Loaded from DatabaseService, drives theme in app.dart
 // =============================================================
 
 import 'package:flutter/material.dart';
 import 'package:focusflow_mobile/models/app_settings.dart';
 import 'package:focusflow_mobile/services/database_service.dart';
+import 'package:focusflow_mobile/utils/constants.dart';
 
 class SettingsProvider extends ChangeNotifier {
   AppSettings _settings = AppSettings.defaults().copyWith(darkMode: false);
@@ -14,22 +14,30 @@ class SettingsProvider extends ChangeNotifier {
   AppSettings get settings => _settings;
   bool get loaded => _loaded;
 
-  // ── Convenience getters used by app.dart ───────────────────────
+  // ── Convenience getters ────────────────────────────────────────
   String get currentTheme => _settings.themeId ?? 'default';
   bool get isDarkMode => _settings.darkMode;
   String get primaryColor => _settings.primaryColor;
   String get fontSize => _settings.fontSize;
 
-  // ── Load from SQLite ──────────────────────────────────────────
+  // ── G4: Bottom nav ────────────────────────────────────────────
+  List<String> get pinnedTabs => _settings.pinnedTabs ?? kDefaultPinnedTabs;
+  bool get fullScreenMode => _settings.fullScreenMode ?? false;
+
+  Future<void> setPinnedTabs(List<String> tabs) async {
+    _settings = _settings.copyWith(pinnedTabs: tabs);
+    await _persist();
+  }
+
+  Future<void> setFullScreenMode(bool value) async {
+    _settings = _settings.copyWith(fullScreenMode: value);
+    await _persist();
+  }
+
+  // ── Load from storage ─────────────────────────────────────────
   Future<void> loadSettings() async {
     final json = await DatabaseService.instance.getSettings();
     if (json != null) {
-      // Force darkMode to false if it's not present in the stored settings
-      // or if we want to ensure any legacy stored 'true' becomes 'false' for this transition.
-      // However, the prompt says "Change the default to false".
-      // Usually that means if it's NULL (missing) in prefs, use false.
-      // In our case, AppSettings.fromJson already has a fallback.
-      // We can override the json before parsing or override the settings after parsing.
       var data = Map<String, dynamic>.from(json);
       if (!data.containsKey('darkMode')) {
         data['darkMode'] = false;
@@ -47,7 +55,7 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Theme ─────────────────────────────────────────────────────
+  // ── Theme ──────────────────────────────────────────────────────
   Future<void> changeTheme(String themeId) async {
     _settings = _settings.copyWith(themeId: themeId);
     await _persist();
@@ -63,19 +71,19 @@ class SettingsProvider extends ChangeNotifier {
     await _persist();
   }
 
-  // ── Accent Color ──────────────────────────────────────────────
+  // ── Accent Color ───────────────────────────────────────────────
   Future<void> changePrimaryColor(String color) async {
     _settings = _settings.copyWith(primaryColor: color);
     await _persist();
   }
 
-  // ── Font Size ─────────────────────────────────────────────────
+  // ── Font Size ──────────────────────────────────────────────────
   Future<void> changeFontSize(String size) async {
     _settings = _settings.copyWith(fontSize: size);
     await _persist();
   }
 
-  // ── Menu Configuration ────────────────────────────────────────
+  // ── Menu Configuration ─────────────────────────────────────────
   Future<void> updateMenuConfig(List<MenuItemConfig> config) async {
     _settings = _settings.copyWith(menuConfiguration: config);
     await _persist();
@@ -84,7 +92,7 @@ class SettingsProvider extends ChangeNotifier {
   List<MenuItemConfig> get menuConfiguration =>
       _settings.menuConfiguration ?? [];
 
-  // ── Notifications ─────────────────────────────────────────────
+  // ── Notifications ──────────────────────────────────────────────
   Future<void> updateNotifications(NotificationConfig config) async {
     _settings = _settings.copyWith(notifications: config);
     await _persist();
@@ -95,7 +103,7 @@ class SettingsProvider extends ChangeNotifier {
     await _persist();
   }
 
-  // ── Anki ──────────────────────────────────────────────────────
+  // ── Anki ───────────────────────────────────────────────────────
   Future<void> updateAnkiHost(String host) async {
     _settings = _settings.copyWith(ankiHost: host);
     await _persist();
@@ -106,7 +114,7 @@ class SettingsProvider extends ChangeNotifier {
     await _persist();
   }
 
-  // ── Full replace (backup restore) ─────────────────────────────
+  // ── Full replace (backup restore) ──────────────────────────────
   Future<void> replaceSettings(AppSettings s) async {
     _settings = s;
     await _persist();

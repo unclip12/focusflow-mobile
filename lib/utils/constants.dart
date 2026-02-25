@@ -1,18 +1,17 @@
 // =============================================================
 // FocusFlow Constants
-// G3: Dead screen menu items removed. 8 live screens only.
 // =============================================================
 
-// ── Menu Item IDs (8 live screens) ─────────────────────────────
+// ── Menu Item IDs (live screens only — G3 cleaned up dead entries) ─
 class MenuItemId {
-  static const String dashboard     = 'DASHBOARD';
-  static const String todaysPlan    = 'TODAYS_PLAN';
-  static const String timeLogger    = 'TIME_LOGGER';
-  static const String faLogger      = 'FA_LOGGER';
-  static const String revision      = 'REVISION';
-  static const String knowledgeBase = 'KNOWLEDGE_BASE';
-  static const String analytics     = 'ANALYTICS';
-  static const String settings      = 'SETTINGS';
+  static const String dashboard     = 'dashboard';
+  static const String todaysPlan    = 'todays-plan';
+  static const String faLogger      = 'fa-logger';
+  static const String revision      = 'revision';
+  static const String knowledgeBase = 'knowledge-base';
+  static const String timeLogger    = 'time-logger';
+  static const String analytics     = 'analytics';
+  static const String settings      = 'settings';
 }
 
 const List<String> kDefaultMenuOrder = [
@@ -29,13 +28,33 @@ const List<String> kDefaultMenuOrder = [
 const Map<String, String> kMenuItemLabels = {
   MenuItemId.dashboard:     'Dashboard',
   MenuItemId.todaysPlan:    "Today's Plan",
-  MenuItemId.timeLogger:    'Time Logger',
-  MenuItemId.faLogger:      'FA Logger',
+  MenuItemId.faLogger:      'FA Tracker',
   MenuItemId.revision:      'Revision Hub',
   MenuItemId.knowledgeBase: 'Knowledge Base',
+  MenuItemId.timeLogger:    'Time Logger',
   MenuItemId.analytics:     'Analytics',
   MenuItemId.settings:      'Settings',
 };
+
+// ── Pinnable screens for bottom nav ──────────────────────────────
+const Map<String, String> kPinnableScreenLabels = {
+  MenuItemId.dashboard:     'Dashboard',
+  MenuItemId.todaysPlan:    "Today's Plan",
+  MenuItemId.faLogger:      'FA Tracker',
+  MenuItemId.revision:      'Revision',
+  MenuItemId.knowledgeBase: 'Knowledge',
+  MenuItemId.timeLogger:    'Time Log',
+  MenuItemId.analytics:     'Analytics',
+  MenuItemId.settings:      'Settings',
+};
+
+// Default 4 pinned tabs shown in bottom nav
+const List<String> kDefaultPinnedTabs = [
+  MenuItemId.dashboard,
+  MenuItemId.revision,
+  MenuItemId.todaysPlan,
+  MenuItemId.faLogger,
+];
 
 // ── FMGE Subjects (19) ───────────────────────────────────────
 const List<String> kFmgeSubjects = [
@@ -79,7 +98,27 @@ const List<String> kBodySystems = [
   'Psychiatry',
 ];
 
-// ── Block Types ─────────────────────────────────────────────
+// ── FA 2025 Subjects (for Tracker) ────────────────────────────
+const List<String> kFaSubjects = [
+  'Biochemistry',
+  'Immunology',
+  'Microbiology',
+  'Pathology',
+  'Pharmacology',
+  'Public Health Sciences',
+  'Cardiovascular',
+  'Endocrine',
+  'Gastrointestinal',
+  'Hematology & Oncology',
+  'Musculoskeletal & Skin',
+  'Neurology & Special Senses',
+  'Psychiatry',
+  'Renal',
+  'Reproductive',
+  'Respiratory',
+];
+
+// ── Block Types ───────────────────────────────────────────────
 enum BlockType {
   video,
   revisionFa,
@@ -118,7 +157,7 @@ enum BlockType {
   }
 }
 
-// ── Block Status ────────────────────────────────────────────
+// ── Block Status ──────────────────────────────────────────────
 enum BlockStatus {
   notStarted,
   inProgress,
@@ -147,7 +186,7 @@ enum BlockStatus {
   }
 }
 
-// ── Time Log Categories ────────────────────────────────────────
+// ── Time Log Categories ───────────────────────────────────────
 enum TimeLogCategory {
   study,
   revision,
@@ -200,7 +239,7 @@ enum TimeLogCategory {
   }
 }
 
-// ── Time Log Source ──────────────────────────────────────────
+// ── Time Log Source ───────────────────────────────────────────
 enum TimeLogSource {
   manual,
   focusTimer,
@@ -223,7 +262,7 @@ enum TimeLogSource {
   }
 }
 
-// ── Revision Mode ───────────────────────────────────────────
+// ── Revision Mode ─────────────────────────────────────────────
 enum RevisionMode {
   fast,
   balanced,
@@ -260,6 +299,9 @@ const Map<String, List<int>> kRevisionSchedules = {
 
 // ── Block Durations (minutes) ─────────────────────────────────
 const List<int> kBlockDurations = [30, 40, 45, 50];
+
+// ── AI Tone Options ───────────────────────────────────────────
+const List<String> kAiTones = ['strict', 'encouraging', 'balanced'];
 
 // ── Font Size Options ─────────────────────────────────────────
 const List<String> kFontSizes = ['small', 'medium', 'large'];

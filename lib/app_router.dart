@@ -1,9 +1,11 @@
 // =============================================================
-// AppRouter — GoRouter with named routes for all live screens.
-// G3: 12 dead routes removed. Only active screens remain.
+// AppRouter — GoRouter with ShellRoute for bottom nav (G4)
+// /session stays outside shell (full-screen focus timer)
 // =============================================================
 
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:focusflow_mobile/widgets/main_shell.dart';
 
 // ── Screen imports ──────────────────────────────────────────────
 import 'package:focusflow_mobile/screens/dashboard/dashboard_screen.dart';
@@ -32,77 +34,73 @@ class Routes {
   static const session       = 'session';
 }
 
-// ── Router configuration ────────────────────────────────────────
+// ── Router ──────────────────────────────────────────────────────
 final GoRouter appRouter = GoRouter(
   initialLocation: '/dashboard',
   routes: [
-    // ── Dashboard (home) ──────────────────────────────────────
-    GoRoute(
-      path: '/dashboard',
-      name: Routes.dashboard,
-      builder: (context, state) => const DashboardScreen(),
-    ),
-
-    // ── Today's Plan ──────────────────────────────────────────
-    GoRoute(
-      path: '/todays-plan',
-      name: Routes.todaysPlan,
-      builder: (context, state) => const TodayPlanScreen(),
-    ),
-
-    // ── Time Logger ───────────────────────────────────────────
-    GoRoute(
-      path: '/time-logger',
-      name: Routes.timeLogger,
-      builder: (context, state) => const TimeLogScreen(),
-    ),
-
-    // ── FA Logger (interim — replaced by Tracker in G5) ───────
-    GoRoute(
-      path: '/fa-logger',
-      name: Routes.faLogger,
-      builder: (context, state) => const FALoggerScreen(),
-    ),
-
-    // ── Revision Hub ──────────────────────────────────────────
-    GoRoute(
-      path: '/revision',
-      name: Routes.revision,
-      builder: (context, state) => const RevisionHubScreen(),
-    ),
-
-    // ── Knowledge Base ────────────────────────────────────────
-    GoRoute(
-      path: '/knowledge-base',
-      name: Routes.knowledgeBase,
-      builder: (context, state) => const KnowledgeBaseScreen(),
+    // ── Shell: 8 screens share the bottom nav ──────────────────
+    ShellRoute(
+      builder: (BuildContext context, GoRouterState state, Widget child) {
+        return MainShell(
+          currentLocation: state.uri.path,
+          child: child,
+        );
+      },
       routes: [
         GoRoute(
-          path: ':id',
-          name: Routes.kbDetail,
-          builder: (context, state) {
-            final id = state.pathParameters['id']!;
-            return KBEntryDetailScreen(pageNumber: id);
-          },
+          path: '/dashboard',
+          name: Routes.dashboard,
+          builder: (context, state) => const DashboardScreen(),
+        ),
+        GoRoute(
+          path: '/todays-plan',
+          name: Routes.todaysPlan,
+          builder: (context, state) => const TodayPlanScreen(),
+        ),
+        GoRoute(
+          path: '/time-logger',
+          name: Routes.timeLogger,
+          builder: (context, state) => const TimeLogScreen(),
+        ),
+        GoRoute(
+          path: '/fa-logger',
+          name: Routes.faLogger,
+          builder: (context, state) => const FALoggerScreen(),
+        ),
+        GoRoute(
+          path: '/revision',
+          name: Routes.revision,
+          builder: (context, state) => const RevisionHubScreen(),
+        ),
+        GoRoute(
+          path: '/knowledge-base',
+          name: Routes.knowledgeBase,
+          builder: (context, state) => const KnowledgeBaseScreen(),
+          routes: [
+            GoRoute(
+              path: ':id',
+              name: Routes.kbDetail,
+              builder: (context, state) {
+                final id = state.pathParameters['id']!;
+                return KBEntryDetailScreen(pageNumber: id);
+              },
+            ),
+          ],
+        ),
+        GoRoute(
+          path: '/analytics',
+          name: Routes.analytics,
+          builder: (context, state) => const AnalyticsScreen(),
+        ),
+        GoRoute(
+          path: '/settings',
+          name: Routes.settings,
+          builder: (context, state) => const SettingsScreen(),
         ),
       ],
     ),
 
-    // ── Analytics ─────────────────────────────────────────────
-    GoRoute(
-      path: '/analytics',
-      name: Routes.analytics,
-      builder: (context, state) => const AnalyticsScreen(),
-    ),
-
-    // ── Settings ──────────────────────────────────────────────
-    GoRoute(
-      path: '/settings',
-      name: Routes.settings,
-      builder: (context, state) => const SettingsScreen(),
-    ),
-
-    // ── Session (focus timer embedded in study blocks) ─────────
+    // ── Session: outside shell — full screen, no nav bar ───────
     GoRoute(
       path: '/session',
       name: Routes.session,
