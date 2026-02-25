@@ -6,6 +6,7 @@
 
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:focusflow_mobile/services/notification_service.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
@@ -29,13 +30,14 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
   late DateTime _selectedDate;
   String? _completedBlockId; // triggers celebration
 
-  // ── Prayer times (virtual blocks, today only) ─────────────────
+  // ── Prayer times — Vijayawada (block = leave 10 min before prayer → +20 min)
+  // Format: (name, blockStartH, blockStartM, blockEndH, blockEndM, prayerH, prayerM)
   static const _prayers = [
-    ('Fajr',    5, 30),
-    ('Zuhr',   13,  0),
-    ('Asr',    16, 30),
-    ('Maghrib',19, 15),
-    ('Isha',   20, 30),
+    ('Fajr',     5, 35,  6,  5,  5, 45),
+    ('Zuhr',    13, 20, 13, 50, 13, 30),
+    ('Asr',     16, 50, 17, 20, 17,  0),
+    ('Maghrib', 18, 20, 18, 50, 18, 30),
+    ('Isha',    20,  5, 20, 35, 20, 15),
   ];
 
   static const _availableMinutes = 870; // 17h day − 150 min prayer
@@ -43,14 +45,13 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
   List<Block> _buildPrayerBlocks() {
     final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
     return _prayers.map((p) {
-      final hour = p.$2;
-      final minute = p.$3;
-      final start = '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
-      final endDt = TimeOfDay(hour: hour, minute: minute).replacing(
-        hour: (hour * 60 + minute + 30) ~/ 60,
-        minute: (minute + 30) % 60,
-      );
-      final end = '${endDt.hour.toString().padLeft(2, '0')}:${endDt.minute.toString().padLeft(2, '0')}';
+      final startH = p.$2;
+      final startM = p.$3;
+      final endH = p.$4;
+      final endM = p.$5;
+      final dur = (endH * 60 + endM) - (startH * 60 + startM);
+      final start = '${startH.toString().padLeft(2, '0')}:${startM.toString().padLeft(2, '0')}';
+      final end = '${endH.toString().padLeft(2, '0')}:${endM.toString().padLeft(2, '0')}';
       return Block(
         id: 'prayer_${p.$1.toLowerCase()}',
         index: 0,
@@ -59,17 +60,43 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
         plannedEndTime: end,
         type: BlockType.other,
         title: '${p.$1} 🕌',
-        plannedDurationMinutes: 30,
+        plannedDurationMinutes: dur,
         status: BlockStatus.done,
         isVirtual: true,
       );
     }).toList();
   }
 
+  /// Schedule OS notifications for today's prayers (10 min before prayer).
+  void _schedulePrayerNotifications() {
+    if (!_isToday) return;
+    NotificationService.instance.cancelAll();
+    final now = DateTime.now();
+    for (int i = 0; i < _prayers.length; i++) {
+      final p = _prayers[i];
+      // Notification fires at block start time (= prayer − 10 min)
+      final notifTime = DateTime(
+        now.year, now.month, now.day, p.$2, p.$3,
+      );
+      if (notifTime.isAfter(now)) {
+        NotificationService.instance.scheduleAt(
+          id: 1000 + i,
+          title: '${p.$1} 🕌',
+          body: 'Time to head to the mosque — ${p.$1} prayer in 10 minutes.',
+          when: notifTime,
+        );
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _selectedDate = AppDateUtils.getAdjustedDate();
+    // Schedule prayer notifications for today on launch
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _schedulePrayerNotifications();
+    });
   }
 
   String get _dateKey => AppDateUtils.formatDate(_selectedDate);
@@ -654,9 +681,25 @@ class _PrayerBlockCard extends StatelessWidget {
   final Block block;
   const _PrayerBlockCard({required this.block});
 
+  /// Format "HH:mm" → "h:mm AM/PM"
+  static String _fmt24to12(String hhmm) {
+    final parts = hhmm.split(':');
+    final h = int.parse(parts[0]);
+    final m = int.parse(parts[1]);
+    final suffix = h >= 12 ? 'PM' : 'AM';
+    final h12 = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+    return '$h12:${m.toString().padLeft(2, '0')} $suffix';
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final startStr = block.plannedStartTime;
+    final endStr = block.plannedEndTime;
+    final timeRange = endStr.isNotEmpty
+        ? '${_fmt24to12(startStr)} – ${_fmt24to12(endStr)}'
+        : _fmt24to12(startStr);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -682,7 +725,7 @@ class _PrayerBlockCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Prayer time',
+                  timeRange,
                   style: TextStyle(
                     fontSize: 11,
                     color: cs.onSecondaryContainer.withValues(alpha: 0.6),

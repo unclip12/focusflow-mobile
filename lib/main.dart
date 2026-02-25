@@ -5,10 +5,14 @@ import 'app.dart';
 import 'providers/app_provider.dart';
 import 'providers/settings_provider.dart';
 import 'services/database_service.dart';
+import 'services/notification_service.dart';
 import 'services/seed_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialise local notifications
+  await NotificationService.instance.init();
 
   // Initialise SQLite — creates all tables on first run
   await DatabaseService.instance.database;
