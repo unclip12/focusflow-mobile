@@ -29,6 +29,43 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
   late DateTime _selectedDate;
   String? _completedBlockId; // triggers celebration
 
+  // ── Prayer times (virtual blocks, today only) ─────────────────
+  static const _prayers = [
+    ('Fajr',    5, 30),
+    ('Zuhr',   13,  0),
+    ('Asr',    16, 30),
+    ('Maghrib',19, 15),
+    ('Isha',   20, 30),
+  ];
+
+  static const _availableMinutes = 870; // 17h day − 150 min prayer
+
+  List<Block> _buildPrayerBlocks() {
+    final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+    return _prayers.map((p) {
+      final hour = p.$2;
+      final minute = p.$3;
+      final start = '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+      final endDt = TimeOfDay(hour: hour, minute: minute).replacing(
+        hour: (hour * 60 + minute + 30) ~/ 60,
+        minute: (minute + 30) % 60,
+      );
+      final end = '${endDt.hour.toString().padLeft(2, '0')}:${endDt.minute.toString().padLeft(2, '0')}';
+      return Block(
+        id: 'prayer_${p.$1.toLowerCase()}',
+        index: 0,
+        date: dateStr,
+        plannedStartTime: start,
+        plannedEndTime: end,
+        type: BlockType.other,
+        title: '${p.$1} 🕌',
+        plannedDurationMinutes: 30,
+        status: BlockStatus.done,
+        isVirtual: true,
+      );
+    }).toList();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -66,9 +103,22 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
     final DayPlan? plan = app.getDayPlan(DateFormat('yyyy-MM-dd').format(_selectedDate));
-    final blocks = List<Block>.from(plan?.blocks ?? []);
-    // Sort blocks by startTime
-    blocks.sort((a, b) => a.plannedStartTime.compareTo(b.plannedStartTime));
+    final realBlocks = List<Block>.from(plan?.blocks ?? []);
+
+    // Merge prayer blocks for today
+    final List<Block> displayBlocks;
+    if (_isToday) {
+      displayBlocks = [...realBlocks, ..._buildPrayerBlocks()];
+    } else {
+      displayBlocks = List<Block>.from(realBlocks);
+    }
+    displayBlocks.sort((a, b) => a.plannedStartTime.compareTo(b.plannedStartTime));
+
+    // Planned minutes (real blocks only)
+    final plannedMinutes = realBlocks.fold<int>(
+      0, (sum, b) => sum + b.plannedDurationMinutes,
+    );
+    final isOverflow = _isToday && plannedMinutes > _availableMinutes;
 
     // Calculate streak for scaffold
     final now = DateTime.now();
@@ -123,19 +173,35 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
 
               // ── Plan summary bar ────────────────────────────────────
               if (plan != null)
-                _PlanSummaryBar(plan: plan, blocks: blocks),
+                _PlanSummaryBar(plan: plan, blocks: realBlocks),
+
+              // ── Available time banner (today only) ──────────────────
+              if (_isToday)
+                _AvailableTimeBanner(plannedMinutes: plannedMinutes),
+
+              // ── Overflow warning ────────────────────────────────────
+              if (isOverflow)
+                _OverflowWarning(
+                  overflowMinutes: plannedMinutes - _availableMinutes,
+                ),
 
               // ── Block list or empty ─────────────────────────────────
-                   Expanded(
-                child: blocks.isEmpty
+              Expanded(
+                child: displayBlocks.isEmpty
                     ? _EmptyState(
                         hasNoPlan: plan == null,
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                        itemCount: blocks.length,
+                        itemCount: displayBlocks.length,
                         itemBuilder: (context, i) {
-                          final b = blocks[i];
+                          final b = displayBlocks[i];
+
+                          // Prayer blocks → distinct card
+                          if (b.isVirtual == true && b.id.startsWith('prayer_')) {
+                            return _PrayerBlockCard(block: b);
+                          }
+
                           final canSwipe =
                               b.status != BlockStatus.done &&
                               b.status != BlockStatus.skipped;
@@ -578,6 +644,171 @@ class _EmptyState extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Prayer block card ───────────────────────────────────────────
+class _PrayerBlockCard extends StatelessWidget {
+  final Block block;
+  const _PrayerBlockCard({required this.block});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: cs.secondaryContainer.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.nightlight_round, size: 22, color: cs.onSecondaryContainer),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  block.title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSecondaryContainer,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Prayer time',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: cs.onSecondaryContainer.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '${block.plannedDurationMinutes} min',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: cs.onSecondaryContainer.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Available time banner ───────────────────────────────────────
+class _AvailableTimeBanner extends StatelessWidget {
+  final int plannedMinutes;
+  const _AvailableTimeBanner({required this.plannedMinutes});
+
+  String _fmt(int mins) {
+    final h = mins ~/ 60;
+    final m = mins % 60;
+    if (m == 0) return '${h}h';
+    return '${h}h ${m}m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    const available = _TodayPlanScreenState._availableMinutes;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: cs.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.timer_outlined, size: 14,
+              color: cs.onSurface.withValues(alpha: 0.5)),
+          const SizedBox(width: 6),
+          Text(
+            'Available today: ',
+            style: TextStyle(
+                fontSize: 12, color: cs.onSurface.withValues(alpha: 0.5)),
+          ),
+          Text(
+            _fmt(available),
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text('|',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: cs.onSurface.withValues(alpha: 0.25))),
+          ),
+          Text(
+            'Planned: ',
+            style: TextStyle(
+                fontSize: 12, color: cs.onSurface.withValues(alpha: 0.5)),
+          ),
+          Text(
+            _fmt(plannedMinutes),
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: cs.primary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Overflow warning ────────────────────────────────────────────
+class _OverflowWarning extends StatelessWidget {
+  final int overflowMinutes;
+  const _OverflowWarning({required this.overflowMinutes});
+
+  String _fmt(int mins) {
+    final h = mins ~/ 60;
+    final m = mins % 60;
+    if (m == 0) return '${h}h';
+    return '${h}h ${m}m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.deepOrange.withValues(alpha: 0.12),
+        border: Border.all(color: Colors.deepOrange.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded,
+              size: 16, color: Colors.deepOrange),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Plan exceeds available time by ${_fmt(overflowMinutes)}. '
+              'Consider removing some blocks.',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.deepOrange,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
