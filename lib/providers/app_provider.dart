@@ -533,6 +533,24 @@ class AppProvider extends ChangeNotifier {
     await upsertFAPage(updated);
   }
 
+  /// Bulk-update FA pages in range [from..to] to the given status.
+  /// Returns the count of pages actually updated.
+  Future<int> bulkMarkFAPages(int from, int to, String status) async {
+    int count = 0;
+    final now = DateTime.now().toIso8601String();
+    for (int i = 0; i < faPages.length; i++) {
+      final p = faPages[i];
+      if (p.pageNum >= from && p.pageNum <= to && p.status != status) {
+        final updated = p.copyWith(status: status, lastReviewed: now);
+        await _db.upsertFAPage(updated.toJson());
+        faPages[i] = updated;
+        count++;
+      }
+    }
+    if (count > 0) notifyListeners();
+    return count;
+  }
+
   Future<void> deleteFAPage(int pageNum) async {
     await _db.deleteFAPage(pageNum);
     faPages.removeWhere((p) => p.pageNum == pageNum);

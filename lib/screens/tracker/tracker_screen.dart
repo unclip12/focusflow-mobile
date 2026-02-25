@@ -30,6 +30,9 @@ class _TrackerScreenState extends State<TrackerScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) setState(() {});
+    });
   }
 
   @override
@@ -67,6 +70,22 @@ class _TrackerScreenState extends State<TrackerScreen>
           _UWorldTab(),
         ],
       ),
+      floatingActionButton: _tabController.index == 0
+          ? FloatingActionButton(
+              onPressed: () {
+                showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(20)),
+                  ),
+                  builder: (_) => const _BulkMarkSheet(),
+                );
+              },
+              child: const Icon(Icons.playlist_add_check_rounded),
+            )
+          : null,
     );
   }
 }
@@ -695,6 +714,241 @@ class _EmptyPlaceholder extends StatelessWidget {
             style: TextStyle(
               color: cs.onSurfaceVariant,
               fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Bulk Mark FA Pages Bottom Sheet
+// ═══════════════════════════════════════════════════════════════
+
+class _BulkMarkSheet extends StatefulWidget {
+  const _BulkMarkSheet();
+
+  @override
+  State<_BulkMarkSheet> createState() => _BulkMarkSheetState();
+}
+
+class _BulkMarkSheetState extends State<_BulkMarkSheet> {
+  late TextEditingController _fromCtrl;
+  late TextEditingController _toCtrl;
+  String _selectedStatus = 'read';
+  String? _fromError;
+  String? _toError;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final app = context.read<AppProvider>();
+    // Find lowest unread page
+    final unreadPages = app.faPages
+        .where((p) => p.status == 'unread')
+        .toList()
+      ..sort((a, b) => a.pageNum.compareTo(b.pageNum));
+    final lowestUnread = unreadPages.isNotEmpty ? unreadPages.first.pageNum : 31;
+    _fromCtrl = TextEditingController(text: '$lowestUnread');
+    _toCtrl = TextEditingController(text: '${(lowestUnread + 9).clamp(31, 706)}');
+  }
+
+  @override
+  void dispose() {
+    _fromCtrl.dispose();
+    _toCtrl.dispose();
+    super.dispose();
+  }
+
+  bool _validate() {
+    final from = int.tryParse(_fromCtrl.text.trim());
+    final to = int.tryParse(_toCtrl.text.trim());
+    String? fErr;
+    String? tErr;
+
+    if (from == null || from < 31 || from > 706) {
+      fErr = 'Must be between 31 and 706';
+    }
+    if (to == null || to > 706) {
+      tErr = 'Must be ≤ 706';
+    } else if (from != null && to < from) {
+      tErr = 'Must be ≥ From page';
+    }
+
+    setState(() {
+      _fromError = fErr;
+      _toError = tErr;
+    });
+    return fErr == null && tErr == null;
+  }
+
+  bool get _isValid {
+    final from = int.tryParse(_fromCtrl.text.trim());
+    final to = int.tryParse(_toCtrl.text.trim());
+    if (from == null || from < 31 || from > 706) return false;
+    if (to == null || to > 706 || to < from) return false;
+    return true;
+  }
+
+  Future<void> _confirm() async {
+    if (!_validate()) return;
+    setState(() => _saving = true);
+    final from = int.parse(_fromCtrl.text.trim());
+    final to = int.parse(_toCtrl.text.trim());
+    final app = context.read<AppProvider>();
+    final count = await app.bulkMarkFAPages(from, to, _selectedStatus);
+    if (!mounted) return;
+    Navigator.of(context).pop();
+
+    final statusLabel = _selectedStatus == 'read' ? 'Read' : 'Anki Done';
+    if (count >= 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('🎉 Amazing! You read $count pages today! Keep going!'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('✅ $count pages marked as $statusLabel')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        24,
+        16,
+        24,
+        24 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: cs.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Text(
+            'Bulk Mark FA Pages',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: cs.onSurface,
+            ),
+          ),
+          const SizedBox(height: 20),
+          // From / To fields side by side
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _fromCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'From Page',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (_) => setState(() {
+                        _fromError = null;
+                      }),
+                    ),
+                    if (_fromError != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4, left: 4),
+                        child: Text(
+                          _fromError!,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _toCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'To Page',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (_) => setState(() {
+                        _toError = null;
+                      }),
+                    ),
+                    if (_toError != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4, left: 4),
+                        child: Text(
+                          _toError!,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Status dropdown
+          DropdownButtonFormField<String>(
+            value: _selectedStatus,
+            decoration: const InputDecoration(
+              labelText: 'Mark as',
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'read', child: Text('Read')),
+              DropdownMenuItem(value: 'anki_done', child: Text('Anki Done')),
+            ],
+            onChanged: (v) {
+              if (v != null) setState(() => _selectedStatus = v);
+            },
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _saving || !_isValid ? null : _confirm,
+              child: _saving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Mark Pages'),
             ),
           ),
         ],
