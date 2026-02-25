@@ -29,12 +29,23 @@ class SeedService {
     // Parse and insert each FA page into SQLite
     for (final item in jsonList) {
       final json = item as Map<String, dynamic>;
+      
+      // Extract title from topics array (use first topic or subject name as fallback)
+      String title = json['subject'] as String? ?? 'Untitled';
+      final topics = json['topics'] as List<dynamic>?;
+      if (topics != null && topics.isNotEmpty) {
+        final firstTopic = topics[0] as Map<String, dynamic>?;
+        if (firstTopic != null && firstTopic['t'] != null) {
+          title = firstTopic['t'] as String;
+        }
+      }
+      
       final page = FAPage(
         pageNum: json['pageNum'] as int,
         subject: json['subject'] as String? ?? '',
         system: json['system'] as String? ?? '',
+        title: title,
         status: json['status'] as String? ?? 'unread',
-        topics: json['topics'] as List<dynamic>? ?? [],
       );
       await db.upsertFAPage(page.toJson());
     }
