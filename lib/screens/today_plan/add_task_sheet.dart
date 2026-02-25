@@ -1,5 +1,5 @@
-﻿// =============================================================
-// AddTaskSheet â€” multi-step exam-aware task creation flow
+// =============================================================
+// AddTaskSheet – multi-step exam-aware task creation flow
 // Step 1: Exam selector (USMLE Step 1 / FMGE)
 // Step 2: Task type selector (horizontal chips)
 // Step 3: Detail form with focus batch preview
@@ -17,13 +17,13 @@ import 'package:focusflow_mobile/services/srs_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/focus_batch_calculator.dart';
 
-// â”€â”€ Task type enums â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Task type enums ──────────────────────────────────────────────
 enum ExamType { usmle, fmge }
 
 enum UsmleTaskType { faPages, videoLecture, qbankSession, ankiReview, revision, other }
 enum FmgeTaskType { cerebellumLecture, fmgeQbank, subjectReading, revision, other }
 
-// â”€â”€ Chip data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Chip data ────────────────────────────────────────────────────
 class _TaskTypeChip {
   final String label;
   final IconData icon;
@@ -47,9 +47,9 @@ const _fmgeChips = <FmgeTaskType, _TaskTypeChip>{
   FmgeTaskType.other:             _TaskTypeChip('Other', Icons.more_horiz_rounded),
 };
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════
 // AddTaskSheet widget
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════
 
 class AddTaskSheet extends StatefulWidget {
   final String dateKey; // YYYY-MM-DD
@@ -63,12 +63,12 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   static const _uuid = Uuid();
   int _step = 0; // 0 = exam, 1 = task type, 2 = details
 
-  // â”€â”€ Selections â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Selections ──────────────────────────────────────────────
   ExamType? _exam;
   UsmleTaskType? _usmleType;
   FmgeTaskType? _fmgeType;
 
-  // â”€â”€ Form controllers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Form controllers ────────────────────────────────────────
   final _pageCtrl       = TextEditingController();
   final _topicCtrl      = TextEditingController();
   final _titleCtrl      = TextEditingController();
@@ -102,7 +102,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     super.dispose();
   }
 
-  // â”€â”€ Computed â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Computed ────────────────────────────────────────────────
   String get _taskTitle {
     if (_exam == ExamType.usmle) {
       switch (_usmleType) {
@@ -171,7 +171,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     return calculateFocusBatches(start, end);
   }
 
-  // â”€â”€ Time picker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Time picker ──────────────────────────────────────────────
   Future<void> _pickTime(bool isStart) async {
     final initial = isStart
         ? (_startTime ?? TimeOfDay.now())
@@ -184,7 +184,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     }
   }
 
-  // â”€â”€ Save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Save ────────────────────────────────────────────────────
   Future<void> _save() async {
     final app = context.read<AppProvider>();
     final batches = _focusBatches;
@@ -291,9 +291,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   String _formatTimeOfDay(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════
   // BUILD
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════
 
   @override
   Widget build(BuildContext context) {
@@ -314,7 +314,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // â”€â”€ Handle bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Handle bar ────────────────────────────────────────
             const SizedBox(height: 8),
             Container(
               width: 40, height: 4,
@@ -325,7 +325,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
             ),
             const SizedBox(height: 12),
 
-            // â”€â”€ Header with back â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Header with back ──────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -355,7 +355,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
             ),
             const SizedBox(height: 8),
 
-            // â”€â”€ Body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Body ──────────────────────────────────────────────
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -372,9 +372,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     );
   }
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-  // STEP 0 â€” Exam Selector
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════
+  // STEP 0 – Exam Selector
+  // ═══════════════════════════════════════════════════════════
 
   Widget _buildExamSelector(ThemeData theme, ColorScheme cs) {
     return Padding(
@@ -409,9 +409,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     );
   }
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-  // STEP 1 â€” Task Type Selector
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════
+  // STEP 1 – Task Type Selector
+  // ═══════════════════════════════════════════════════════════
 
   Widget _buildTaskTypeSelector(ThemeData theme, ColorScheme cs) {
     if (_exam == ExamType.usmle) {
@@ -472,9 +472,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     );
   }
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-  // STEP 2 â€” Detail Form
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════
+  // STEP 2 – Detail Form
+  // ═══════════════════════════════════════════════════════════
 
   Widget _buildDetailForm(ThemeData theme, ColorScheme cs) {
     final fields = <Widget>[];
@@ -556,7 +556,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     );
   }
 
-  // â”€â”€ FA Pages fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── FA Pages fields ──────────────────────────────────────────
   List<Widget> _buildFaPagesFields(ColorScheme cs) {
     final app = context.read<AppProvider>();
     return [
@@ -608,7 +608,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     ];
   }
 
-  // â”€â”€ Video fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Video fields ──────────────────────────────────────────────
   List<Widget> _buildVideoFields(ColorScheme cs, {required bool isUsmle}) {
     final sources = isUsmle
         ? ['Boards & Beyond', 'Sketchy', 'Pathoma', 'Dirty Medicine', 'Ninja Nerd', 'YouTube', 'Other']
@@ -617,7 +617,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       _dropdown(label: 'Source', value: _selectedSource, items: sources,
           onChanged: (v) => setState(() => _selectedSource = v)),
       const SizedBox(height: 12),
-      _field(label: 'Topic / Title', hint: 'e.g. Cardiology â€“ Valvular Disease', controller: _topicCtrl),
+      _field(label: 'Topic / Title', hint: 'e.g. Cardiology – Valvular Disease', controller: _topicCtrl),
       const SizedBox(height: 12),
       _dropdown(label: 'System', value: _selectedSystem, items: kBodySystems,
           onChanged: (v) => setState(() => _selectedSystem = v)),
@@ -626,7 +626,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     ];
   }
 
-  // â”€â”€ Qbank fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Qbank fields ──────────────────────────────────────────────
   List<Widget> _buildQbankFields(ColorScheme cs, {required bool isUsmle}) {
     final platforms = isUsmle
         ? ['UWorld', 'Amboss', 'NBME', 'Free120', 'Other']
@@ -647,7 +647,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     ];
   }
 
-  // â”€â”€ Anki fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Anki fields ───────────────────────────────────────────────
   List<Widget> _buildAnkiFields(ColorScheme cs) {
     return [
       _field(label: 'Deck name', hint: 'e.g. AnKing Step 1', controller: _deckCtrl),
@@ -656,7 +656,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     ];
   }
 
-  // â”€â”€ Revision fields (due pages from KB) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Revision fields (due pages from KB) ──────────────────────
   List<Widget> _buildRevisionFields(ColorScheme cs) {
     final app = context.read<AppProvider>();
     final duePages = app.knowledgeBase
@@ -673,7 +673,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
               Icon(Icons.check_circle_outline_rounded, size: 48,
                   color: cs.primary.withValues(alpha: 0.4)),
               const SizedBox(height: 12),
-              Text('No pages due today ðŸŽ‰',
+              Text('No pages due today 🎉',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600,
                       color: cs.onSurface.withValues(alpha: 0.5))),
             ],
@@ -689,7 +689,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       ...duePages.map((e) => CheckboxListTile(
         dense: true,
         contentPadding: EdgeInsets.zero,
-        title: Text('Page ${e.pageNumber} â€” ${e.title}',
+        title: Text('Page ${e.pageNumber} – ${e.title}',
             style: const TextStyle(fontSize: 13)),
         value: _selectedRevisionPages.contains(e.pageNumber),
         onChanged: (v) => setState(() {
@@ -704,7 +704,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     ];
   }
 
-  // â”€â”€ Cerebellum Lecture fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Cerebellum Lecture fields ─────────────────────────────────
   List<Widget> _buildCerebellumFields(ColorScheme cs) {
     return [
       _dropdown(label: 'Subject', value: _selectedSubject, items: kFmgeSubjects,
@@ -716,7 +716,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     ];
   }
 
-  // â”€â”€ Subject Reading fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Subject Reading fields ────────────────────────────────────
   List<Widget> _buildSubjectReadingFields(ColorScheme cs) {
     return [
       _dropdown(label: 'Subject', value: _selectedSubject, items: kFmgeSubjects,
@@ -726,16 +726,16 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     ];
   }
 
-  // â”€â”€ Other fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Other fields ──────────────────────────────────────────────
   List<Widget> _buildOtherFields(ColorScheme cs) {
     return [
       _field(label: 'Title', hint: 'e.g. Review notes', controller: _titleCtrl),
       const SizedBox(height: 12),
-      _field(label: 'Notes', hint: 'Optional notesâ€¦', controller: _notesCtrl, maxLines: 3),
+      _field(label: 'Notes', hint: 'Optional notes…', controller: _notesCtrl, maxLines: 3),
     ];
   }
 
-  // â”€â”€ Time pickers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Time pickers ──────────────────────────────────────────────
   List<Widget> _buildTimePickers(ColorScheme cs) {
     return [
       const SizedBox(height: 16),
@@ -767,7 +767,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
               children: [
                 Text(label, style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.5))),
                 Text(
-                  time != null ? _formatTimeOfDay(time) : 'â€” : â€”',
+                  time != null ? _formatTimeOfDay(time) : '– : –',
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600,
                       color: time != null ? cs.onSurface : cs.onSurface.withValues(alpha: 0.3)),
                 ),
@@ -779,7 +779,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     );
   }
 
-  // â”€â”€ Focus batch preview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Focus batch preview ───────────────────────────────────────
   Widget _buildBatchPreview(ThemeData theme, ColorScheme cs, List<FocusBatch> batches) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -817,9 +817,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     );
   }
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════
   // Reusable form helpers
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ═══════════════════════════════════════════════════════════
 
   Widget _field({
     required String label,
@@ -850,7 +850,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     required void Function(String?) onChanged,
   }) {
     return DropdownButtonFormField<String>(
-      initialValue: value,
+      value: value,
       decoration: InputDecoration(
         labelText: label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -891,9 +891,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   }
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════
 // Exam Card widget
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════
 
 class _ExamCard extends StatelessWidget {
   final String label;
