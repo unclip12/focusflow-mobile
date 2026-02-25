@@ -1,5 +1,5 @@
-﻿// =============================================================
-// RevisionCard â€” card for a single KB entry in Revision Hub
+// =============================================================
+// RevisionCard — card for a single KB entry in Revision Hub
 // Shows pageNumber, topic, subject chip, days until due,
 // SRS step indicator, Mark Revised button, View button
 // =============================================================
@@ -11,6 +11,7 @@ import 'package:focusflow_mobile/models/knowledge_base.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/services/srs_service.dart';
 import 'package:focusflow_mobile/app_router.dart';
+import 'package:focusflow_mobile/utils/text_sanitizer.dart';
 
 class RevisionCard extends StatefulWidget {
   final KnowledgeBaseEntry entry;
@@ -56,6 +57,10 @@ class _RevisionCardState extends State<RevisionCard> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
+    // Sanitize display text
+    final displayTitle = TextSanitizer.clean(entry.title);
+    final displayPage  = TextSanitizer.clean(entry.pageNumber);
+
     // Calculate days until due
     final nextRev = entry.nextRevisionAt != null
         ? DateTime.tryParse(entry.nextRevisionAt!)
@@ -69,13 +74,13 @@ class _RevisionCardState extends State<RevisionCard> {
     final Color dueColor;
     final String dueLabel;
     if (daysUntilDue < 0) {
-      dueColor = const Color(0xFFEF4444); // overdue â€” red
+      dueColor = const Color(0xFFEF4444); // overdue - red
       dueLabel = '${-daysUntilDue}d overdue';
     } else if (daysUntilDue == 0) {
-      dueColor = const Color(0xFFF59E0B); // today â€” amber
+      dueColor = const Color(0xFFF59E0B); // today - amber
       dueLabel = 'Due today';
     } else {
-      dueColor = const Color(0xFF10B981); // upcoming â€” green
+      dueColor = const Color(0xFF10B981); // upcoming - green
       dueLabel = 'In ${daysUntilDue}d';
     }
 
@@ -89,7 +94,7 @@ class _RevisionCardState extends State<RevisionCard> {
       ),
       child: Row(
         children: [
-          // â”€â”€ Left color indicator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // Left color indicator
           Container(
             width: 4,
             height: 48,
@@ -100,16 +105,16 @@ class _RevisionCardState extends State<RevisionCard> {
           ),
           const SizedBox(width: 12),
 
-          // â”€â”€ Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // Content
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Page number + topic
                 Text(
-                  entry.pageNumber.isNotEmpty
-                      ? 'Page ${entry.pageNumber} â€” ${entry.title}'
-                      : entry.title,
+                  displayPage.isNotEmpty
+                      ? 'Page $displayPage \u2014 $displayTitle'
+                      : displayTitle,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -173,11 +178,11 @@ class _RevisionCardState extends State<RevisionCard> {
 
           const SizedBox(width: 8),
 
-          // â”€â”€ Action buttons (stacked vertically) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // Action buttons (stacked vertically)
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Mark Revised âœ“
+              // Mark Revised
               FilledButton.tonal(
                 onPressed: _saving ? null : _markRevised,
                 style: FilledButton.styleFrom(
@@ -196,7 +201,7 @@ class _RevisionCardState extends State<RevisionCard> {
                         height: 14,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Mark Revised âœ“'),
+                    : const Text('Mark Revised \u2713'),
               ),
               const SizedBox(height: 4),
               // View
