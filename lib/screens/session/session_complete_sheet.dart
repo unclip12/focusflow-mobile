@@ -6,7 +6,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
@@ -190,10 +189,10 @@ class _CompletionSheetState extends State<_CompletionSheet> {
       // 5. Show congratulation overlay
       if (mounted) await _showCongratulationOverlay();
 
-      // 6. Navigate back
+      // 6. Navigate back — pop the sheet, then pop the session screen
       if (mounted) {
-        Navigator.pop(context); // close sheet
-        context.go('/todays-plan');
+        Navigator.of(context).pop(); // close sheet
+        Navigator.of(context).pop(); // pop session screen back to Today's Plan
       }
     } catch (e) {
       if (mounted) {
@@ -266,7 +265,7 @@ class _CompletionSheetState extends State<_CompletionSheet> {
         firstStudiedAt: existing?.firstStudiedAt ?? now.toIso8601String(),
         nextRevisionAt: nextRevision,
         revisionCount: (existing?.revisionCount ?? 0) + 1,
-        currentRevisionIndex: 0,
+        currentRevisionIndex: _coveragePercent.toInt(),
       );
 
       await app.upsertKBEntry(updatedEntry);
