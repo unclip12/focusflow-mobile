@@ -1,347 +1,344 @@
-# FocusFlow Mobile — Progress Tracker
+# FocusFlow Mobile — Development Progress
 
-**Last Updated:** 2026-02-24  
-**Next Batch:** None — Project Complete 🎉
-
----
-
-## 📊 Batch Status
-
-| Batch | Description | Status | Done |
-|---|---|---|---|
-| 0 | Repo setup, MASTER_PLAN.md | ✅ Done | 2026-02-23 |
-| 1 | pubspec + main + app + constants + date_utils | ✅ Done | 2026-02-23 |
-| 2 | All 14 model files in `lib/models/` | ✅ Done | 2026-02-24 |
-| 3 | DB service + SRS service + haptics service | ✅ Done | 2026-02-24 |
-| 4 | Providers + app_theme + app_router | ✅ Done | 2026-02-24 |
-| 5 | app_scaffold + nav_overlay widgets | ✅ Done | 2026-02-24 |
-| 6 | Dashboard screen + stats_card + activity_graphs | ✅ Done | 2026-02-24 |
-| 7 | Today's Plan core (screen + block_card) | ✅ Done | 2026-02-24 |
-| 8 | Today's Plan modals (5 modals) | ✅ Done | 2026-02-24 |
-| 9 | Focus Timer screen | ✅ Done | 2026-02-24 |
-| 10 | Knowledge Base screen + page_detail_modal | ✅ Done | 2026-02-24 |
-| 11 | Revision Hub + log_revision_modal | ✅ Done | 2026-02-24 |
-| 12 | FA Logger screen + fa_log_modal | ✅ Done | 2026-02-24 |
-| 13 | Revision Hub + bottom sheets fix | ✅ Done | 2026-02-24 |
-| 14 | Settings screen + theme_picker | ✅ Done | 2026-02-24 |
-| 15 | Calendar screen | ✅ Done | 2026-02-24 |
-| 16 | Notifications screen | ✅ Done | 2026-02-24 |
-| 17 | User Profile screen | ✅ Done | 2026-02-24 |
-| 18 | Analytics screen | ✅ Done | 2026-02-24 |
-| 19 | Daily Tracker screen | ✅ Done | 2026-02-24 |
-| 20 | AI Mentor chat UI | ✅ Done | 2026-02-24 |
-| 21 | App Router wiring | ✅ Done | 2026-02-24 |
-| 22 | AppProvider methods | ✅ Done | 2026-02-24 |
-| 23 | Backup & Restore screen | ✅ Done | 2026-02-24 |
-| 24 | FA Logger + Info Files screens | ✅ Done | 2026-02-24 |
-| 25 | Animations & Polish | ✅ Done | 2026-02-24 |
-| 26 | App Polish and UX Fixes | ✅ Done | 2026-02-24 |
-| 27 | Final Integration & Bug Fixes | ✅ Done | 2026-02-24 |
+> Last updated: 2026-02-25
+> Session: Claude + Arsh — Antigravity workflow
 
 ---
 
-## 📂 Batch 1 — Files Committed
+## ✅ Completed Batches
 
-| File | Notes |
+---
+
+### Batch A — Android Build Setup
+**Status**: ✅ Complete
+**Commits**: `fix: commit android folder with NDK 27`, `fix: align Java and Kotlin JVM targets to 17`, `ci: add Gradle and pub package caching`
+
+**What was done:**
+- Android folder committed with NDK 27
+- Core library desugaring enabled
+- Java + Kotlin JVM targets aligned to 17
+- GitHub Actions CI workflow created with flutter analyze gate
+- Gradle + pub package caching for faster builds
+
+---
+
+### Batch B — Data Persistence
+**Status**: ✅ Complete
+**Commits**: `fix: call AppProvider.loadAll() on startup so data persists across restarts`
+
+**What was done:**
+- `AppProvider.loadAll()` called on app startup in `main.dart`
+- All data (tasks, KB, time logs) now persists across app restarts
+- Previously: data was lost on every restart
+
+---
+
+### Batch C — Navigation Fixes
+**Status**: ✅ Complete
+**Commits**: `fix: data persistence, back navigation, date picker, remove generate plan`, `fix: task save without times, exit dialog on dashboard`
+
+**What was done:**
+- Task saves correctly without requiring start/end times
+- Exit dialog appears on dashboard Android back button press
+- Date picker works on Today Plan header
+- Generate Plan button removed (was placeholder)
+- Back navigation fixed app-wide
+
+---
+
+### Batch D — SRS + Knowledge Base + Task Planner
+**Status**: ✅ Complete
+**Commits**: `feat: strict SRS mode, AI Mentor JSON importer, KB pipeline`, `feat: exam-aware task planner, smart focus batch calculator, menu reorder`, `fix: replace initialValue with TextFormField in add_task_sheet`
+
+**What was done:**
+
+#### SRS Engine
+- 12-step SRS revision schedule implemented
+- Two modes: `strict` (default) and `relaxed`
+- `SrsService.calculateNextRevisionDateString()` for scheduling
+- `SrsService.isDueNow()` and `SrsService.isMastered()` helpers
+
+#### Knowledge Base
+- `KnowledgeBaseEntry` model: pageNumber, title, subject, system, topics, SRS fields
+- `knowledge_base_screen.dart`: search, filter by subject/system/mastery
+- `kb_entry_detail_screen.dart`: full page detail view with key points
+- `kb_entry_card.dart`: compact card for list view
+
+#### AI Mentor Importer
+- JSON import via AI Mentor screen
+- Paste Gemini JSON output → parsed → saved to KB
+- Auto-populates: pageNumber, title, subject, system, keyPoints
+
+#### Task Planner
+- Step 1: Exam selector card (USMLE Step 1, FMGE)
+- Step 2: Study type chips (FA Pages, Video Lecture, Qbank, Anki, Revision, Other)
+- Step 3: Page/topic fields based on study type
+- Smart focus batch calculator: given start/end times → auto-suggests 25/50min blocks
+- Menu reordered for better flow
+
+#### Bug Fix in Batch D
+- `initialValue` on `TextFormField` was wrong in `add_task_sheet.dart` (Gemini hallucinated it) — fixed
+
+---
+
+### Batch E — Session Timer + FA Logger
+**Status**: ✅ Complete
+**Commits**: `feat: session timer with quotes, completion flow, FA Logger redesign`, `fix: wire session screen navigation from today plan block start`, `fix: wire session navigation, completion saves to KB and FA Logger`
+
+**What was done:**
+
+#### Session Screen
+- Full countdown timer with start/pause/stop
+- Rotating motivational quotes during session
+- Completion screen with session summary
+- Start Block button on Today Plan → opens SessionScreen correctly
+
+#### Completion Flow
+- Session complete → auto-creates `TimeLogEntry` in Time Log
+- Session complete → updates `KnowledgeBaseEntry.lastStudiedAt`
+- Session complete → logs to FA Logger
+
+#### FA Logger Redesign
+- Redesigned with cleaner layout
+- Shows per-page stats: time spent, revision count, SRS step
+
+#### Navigation
+- Back from session → returns to Today Plan (no double-pop)
+- Start Block → Session → Complete → Back to Today Plan ✔
+
+---
+
+### Batch F — Critical Bug Fixes
+**Status**: ✅ Complete
+**Commits**: `fix: Start Block opens SessionScreen, fix navigator double-pop on save`, `fix: remove duplicate AppScaffold on dashboard, fix blocksDone count`, `fix: correct SRS index field, add TimeLogEntry on session save`, `chore: fix all deprecations, dark mode consistency, spacing pass`, `fix: replace initialValue with value in DropdownButtonFormField (2 files)`
+
+**What was done:**
+
+#### Dashboard
+- Removed duplicate `AppScaffold` wrapper (was showing double bottom nav)
+- Fixed `blocksDone` counter (was always showing 0)
+
+#### Session Navigation
+- Start Block → SessionScreen (was crashing or going to wrong screen)
+- Double-pop bug fixed (was jumping past Today Plan)
+
+#### SRS
+- Correct field used for SRS index (was referencing wrong field name)
+- `TimeLogEntry` now auto-created when session saves
+
+#### Code Quality
+- All deprecated APIs replaced (`withOpacity` → `withValues(alpha:)`)
+- Dark mode consistency pass across all screens
+- Spacing standardized
+- `initialValue` on `DropdownButtonFormField` → `value` (2 files: `add_time_log_sheet.dart`, `add_task_sheet.dart`)
+
+---
+
+### Bug Fix — TextSanitizer + Revision Card
+**Status**: ✅ Complete
+**Commits**: `fix: add TextSanitizer utility + fix garbled chars in revision_card`
+
+**What was done:**
+
+#### Root Cause
+AI-generated content (from JSON imports) had UTF-8 bytes read as Windows-1252,
+creating garbled sequences: `â€¢` (for •), `â€”` (for —), `â` (for ✓)
+
+#### Fix 1: New Utility
+`lib/utils/text_sanitizer.dart` — `TextSanitizer.clean(String)` method
+Maps all common Windows-1252-over-UTF-8 garbled sequences to correct Unicode.
+
+#### Fix 2: revision_card.dart
+- Source code had garbled chars in string literals
+- `â€”` → `\u2014` (em dash) in page title string
+- `â` → `\u2713` (check mark) in 'Mark Revised' button
+- `TextSanitizer.clean()` now applied to `entry.title` and `entry.pageNumber` before display
+
+---
+
+## 🔄 In Progress
+
+---
+
+### Batch G1 — Milky Theme Update
+**Status**: 🔄 Prompt given to Gemini 3 Flash — may or may not be committed yet
+**Model**: Gemini 3 Flash (UI-only, no logic)
+
+**What it does:**
+- Replaces all 12 theme color pairs (lightBg, lightSurface, darkBg, darkSurface)
+- Milky soft backgrounds: light = white-lavender, dark = charcoal (not navy)
+- Softer card shadows in light mode, subtle border in dark mode
+- Default theme changed to light mode (`isDarkMode = false` default)
+- Softer border colors
+
+**Files to change:**
+- `lib/utils/app_theme.dart`
+- `lib/providers/settings_provider.dart`
+
+**Check after running:**
+- App opens in LIGHT mode by default
+- Backgrounds have soft milky tint (not stark white)
+- Dark mode is charcoal not navy
+- All 12 themes cycle correctly
+
+---
+
+### Batch G2 — KB Garbled Chars + Manual Add Entry
+**Status**: 🔄 Prompt given to Gemini Pro High — currently running
+**Model**: Gemini 3 Pro High
+
+**What it does:**
+1. Apply `TextSanitizer.clean()` to all text display in `kb_entry_detail_screen.dart`
+   (fixes bullet points showing as `â€¢` in the Page view)
+2. Add FAB + `_AddKBEntrySheet` to `knowledge_base_screen.dart`
+   (allows manual creation of KB entries without AI import)
+
+**Files to change:**
+- `lib/screens/knowledge_base/kb_entry_detail_screen.dart`
+- `lib/screens/knowledge_base/knowledge_base_screen.dart`
+
+**Check after running:**
+- Page detail view shows clean bullet points • not `â€¢`
+- `+` FAB visible on Knowledge Base screen
+- Tapping `+` opens sheet with: Page #, Topic, Subject dropdown, System dropdown
+- Save creates entry that appears in KB list
+
+---
+
+## 📋 Upcoming Batches
+
+---
+
+### Batch H — Gemini AI Service
+**Status**: 📋 Planned — most complex batch
+**Model**: Gemini 3 Pro High, High thinking budget
+
+**14 functions to implement in `lib/services/gemini_service.dart`:**
+1. `generateStudyPlan(examDate, weakSubjects, dailyHours)` → JSON plan
+2. `debriefSession(sessionData, kbEntry)` → feedback string
+3. `autoTagKBEntry(rawContent)` → subject, system, keyPoints
+4. `generateMCQ(kbEntry)` → USMLE-style question + answer + explanation
+5. `detectWeakAreas(timeLogs, kbEntries)` → ranked weak area list
+6. `getDailyMotivation(streak, examDate)` → motivational string
+7. `getExamCoaching(daysLeft, coverage)` → strategy advice
+8. `summarizeFAPage(pageContent)` → condensed summary
+9. `analyzeMistakePatterns(wrongAnswers)` → pattern report
+10. `rankRevisionPriority(kbEntries)` → sorted by urgency
+11. `predictStudyTime(topic, userHistory)` → estimated minutes
+12. `detectKnowledgeGaps(kbEntries, qbankData)` → gap list
+13. `analyzeQbankPerformance(results)` → subject performance map
+14. `generateStudyTip(currentFocus, timeOfDay)` → tip string
+
+**Files to create/update:**
+- `lib/services/gemini_service.dart` (new)
+- `lib/screens/mentor/mentor_screen.dart` (wire all 14)
+- `lib/providers/app_provider.dart` (expose AI results)
+- `pubspec.yaml` (add `google_generative_ai` if not present)
+
+---
+
+### Batch I — Analytics & Charts
+**Status**: 📋 Planned
+**Model**: Gemini 3 Flash
+
+- Study hours by day (7-day bar chart)
+- Time per subject (pie chart)
+- SRS due vs mastered over time (line chart)
+- Streak visualization
+- Screen: `lib/screens/analytics/analytics_screen.dart`
+
+---
+
+### Batch J — Notifications
+**Status**: 📋 Planned
+**Model**: Gemini 3 Flash
+
+- Daily revision reminder (8 AM)
+- SRS due alert when items are overdue
+- Streak protection reminder if no session by 9 PM
+- Package: `flutter_local_notifications`
+
+---
+
+### Batch K — Backup & Export
+**Status**: 📋 Planned
+**Model**: Gemini 3 Pro High
+
+- Export KB + time logs to JSON file
+- Import backup JSON
+- Share as file (share_plus)
+- Screen: `lib/screens/backup/backup_screen.dart`
+
+---
+
+### Batch L — Polish & Release Prep
+**Status**: 📋 Planned
+**Model**: Gemini 3 Flash
+
+- App icon finalization
+- Splash screen
+- Onboarding flow (exam type selection)
+- Play Store metadata
+- Version bump to 1.0.0
+
+---
+
+## 🐛 Known Issues / Tech Debt
+
+| Issue | Severity | Status |
+|---|---|---|
+| KB content from AI JSON has garbled chars | High | G2 fixing |
+| Manual KB entry not possible | High | G2 fixing |
+| Analytics screen is placeholder | Medium | Batch I |
+| No notifications yet | Medium | Batch J |
+| Mentor screen wired but AI not connected | High | Batch H |
+| No backup/restore | Medium | Batch K |
+| Study plan generator is placeholder | Low | Future |
+
+---
+
+## 🛠️ Model Selection Guide
+
+| Task Type | Use | Thinking |
+|---|---|---|
+| Color / theme / UI tweaks | 3 Flash | Off |
+| Single widget refactor | 3 Flash | Off |
+| New screen with state logic | 3 Pro High | Low |
+| AI service / complex provider | 3 Pro High | High |
+| Multi-file architecture | 3 Pro High | High |
+| Anything touching Firebase | 3 Pro High | High |
+| Build errors / quick fixes | Direct Claude push | — |
+
+---
+
+## 🔒 Prompt Quality Rules
+
+Every Gemini prompt must have:
+```
+STRICT RULE: Only use Flutter/Dart APIs you are 100% certain exist.
+Do NOT invent parameter names. If unsure, use the simplest known alternative.
+
+Read these files fully before writing anything:
+- [list relevant files]
+
+[Exact code blocks to insert]
+
+DO NOT TOUCH:
+- [list files to leave alone]
+
+flutter analyze --no-fatal-infos
+Fix any errors found, then:
+git add [files changed]
+git commit -m "[message]"
+git push origin main
+```
+
+---
+
+## 📆 Session Log
+
+| Date | Work Done |
 |---|---|
-| `pubspec.yaml` | All 16 deps from MASTER_PLAN (sqflite, provider, go_router, etc.) |
-| `lib/main.dart` | Entry point — DB init, portrait lock, MultiProvider |
-| `lib/app.dart` | MaterialApp.router — wires SettingsProvider → AppTheme → appRouter |
-| `lib/utils/constants.dart` | All enums (BlockType, BlockStatus, TimeLogCategory, TimeLogSource, RevisionMode) + kFmgeSubjects, kBodySystems, kDefaultMenuOrder, kRevisionSchedules, kBlockDurations |
-| `lib/utils/date_utils.dart` | AppDateUtils — getAdjustedDate (4 AM cutoff), formatters, parsers, daysBetween, daysInMonth |
-
----
-
-## 📂 Batch 2 — Files Committed
-
-| File | Notes |
-|---|---|
-| 14 model files in `lib/models/` | All field names match `types.ts`, fromJson/toJson/copyWith on every model |
-
-✅ `flutter analyze lib/` → No issues found
-
----
-
-## 📂 Batch 3 — Files Committed
-
-| File | Notes |
-|---|---|
-| `lib/services/database_service.dart` | SQLite CRUD for all 15 data tables |
-| `lib/services/srs_service.dart` | Spaced repetition scheduling |
-| `lib/services/haptics_service.dart` | Thin wrapper around HapticFeedback (light/medium/heavy/selection) |
-
-✅ `flutter analyze lib/` → No issues found
-
----
-
-## 📂 Batch 4 — Files Committed
-
-| File | Notes |
-|---|---|
-| `lib/utils/app_theme.dart` | 12 themes, 6 accent colors, google_fonts Inter, font size scaling |
-| `lib/providers/settings_provider.dart` | ChangeNotifier for AppSettings, theme/darkMode/primaryColor/fontSize getters |
-| `lib/providers/app_provider.dart` | Central state, loads all 15 tables, typed CRUD for each domain |
-| `lib/app_router.dart` | GoRouter, 15 named routes (Routes class), placeholder screens |
-
-✅ `flutter analyze lib/` → No issues found
-
----
-
-## 📂 Batch 5 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/widgets/app_scaffold.dart` | Common scaffold, header bar (menu icon + screen name → nav overlay, streak 🔥 N right), accepts body/screenName/actions/streakCount |
-| `lib/widgets/nav_overlay.dart` | SpringSimulation (stiffness 300, damping 30), left-anchored, scrim, filters by menuConfiguration.visible, active highlight, GoRouter named nav |
-
-✅ `flutter analyze lib/` → No issues found
-
----
-
-## 📂 Batch 6 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/widgets/stats_card.dart` | `TodayGlanceCard` (ring chart, blocks done/total, study hours), `StatsCard` (icon/label/value) |
-| `lib/widgets/activity_graph.dart` | fl_chart `BarChart`, 14-day study hours, today highlighted, tooltips, clean grid |
-| `lib/screens/dashboard/dashboard_screen.dart` | AppScaffold, welcome header (displayName), TodayGlance, KB/FMGE stats, activity chart, due revision list, streak counter, empty state |
-
-✅ `flutter analyze lib/` → No issues found
-
----
-
-## 📂 Batch 7 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/screens/today_plan/today_plan_screen.dart` | AppScaffold, date nav (prev/next arrows), plan summary bar, sorted block list, start/skip with auto-pause, empty state with Generate Plan |
-| `lib/screens/today_plan/block_card.dart` | Type icon, title + time range, progress bar, status chip, tap → detail modal, long-press → haptic + context menu |
-| `lib/screens/today_plan/block_detail_modal.dart` | Draggable bottom sheet, task checkboxes, segment timeline, start/pause/resume/complete actions, haptics on task check and block complete |
-
-✅ `flutter analyze lib/screens/today_plan/` → No issues found
-
----
-
-## 📂 Batch 10 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/screens/knowledge_base/knowledge_base_screen.dart` | Knowledge base listing screen |
-| `lib/screens/knowledge_base/kb_entry_card.dart` | Card widget for KB entries |
-| `lib/screens/knowledge_base/kb_entry_detail_screen.dart` | Detail view for a single KB entry |
-
----
-
-## 📂 Batch 8 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/screens/time_log/time_log_screen.dart` | AppScaffold, logs grouped by date, daily total hours, FAB → add sheet, streak counter |
-| `lib/screens/time_log/time_log_entry_card.dart` | Category color dot, activity, time range, duration, category chip, swipe-to-delete |
-| `lib/screens/time_log/add_time_log_sheet.dart` | Activity field, time pickers, category dropdown (13 values), notes, save via AppProvider |
-
-✅ `flutter analyze lib/screens/time_log/` → No issues found
-
----
-
-## 📂 Batch 11 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/screens/study_plan/study_plan_screen.dart` | Study plan listing screen |
-| `lib/screens/study_plan/study_plan_item_card.dart` | Card widget for study plan items |
-| `lib/screens/study_plan/add_study_plan_sheet.dart` | Bottom sheet for adding study plan items |
-
----
-
-## 📂 Batch 9 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `pubspec.yaml` | Added `wakelock_plus: ^1.1.4` |
-| `lib/screens/focus_timer/focus_timer_screen.dart` | Circular countdown AnimationController, presets (15-90m), WakelockPlus on/off, haptics on complete |
-| `lib/screens/focus_timer/timer_controls.dart` | Start (green) / Pause (amber) / Stop (red) with AnimatedSwitcher |
-| `lib/screens/focus_timer/session_complete_dialog.dart` | Duration/block/subject stats, Log Time via AppProvider, Start Break / Done |
-
-✅ `flutter analyze lib/screens/focus_timer/` → No issues found
-
----
-
-## 📂 Batch 12 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/screens/fmge/fmge_screen.dart` | FMGE prep listing screen |
-| `lib/screens/fmge/fmge_entry_card.dart` | Card widget for FMGE entries |
-| `lib/screens/fmge/fmge_entry_detail_screen.dart` | Detail view for a single FMGE entry |
-
-## 📂 Batch 13 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/screens/revision_hub/revision_hub_screen.dart` | DUE/UPCOMING tabs with SrsService, due count banner, styled tab bar |
-| `lib/screens/revision_hub/revision_card.dart` | Page/topic, subject chip, due status color, Revise button |
-| `lib/screens/today_plan/block_card.dart` | Patched `showModalBottomSheet` with `enableDrag: false` and `useSafeArea: true` |
-| `lib/screens/time_log/time_log_screen.dart` | Patched `showModalBottomSheet` with `enableDrag: false` and `useSafeArea: true` |
-| `lib/screens/study_plan/add_study_plan_sheet.dart` | Patched `showModalBottomSheet` with `enableDrag: false` and `useSafeArea: true` |
-
----
-
-## 📂 Batch 14 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/screens/settings/settings_screen.dart` | Settings screen implementation |
-| `lib/screens/settings/theme_picker_card.dart` | Theme picker card component |
-
----
-
-## 📂 Batch 15 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `pubspec.yaml` | Added `table_calendar: ^3.0.9` |
-| `lib/screens/calendar/calendar_screen.dart` | AppScaffold month-view calendar, custom day cells, month picker header, selected-day summary strip |
-| `lib/screens/calendar/day_activities_sheet.dart` | Bottom sheet — blocks, time logs, study plan items as timeline cards; empty state; `enableDrag: false`, `useSafeArea: true` |
-| `lib/screens/calendar/calendar_date_marker.dart` | Up to 3 colored dots (blue=block, green=log, amber=study) below date number |
-
-✅ `flutter analyze lib/screens/calendar/` → No issues found
-
----
-
-## 📂 Batch 16 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/screens/notifications/notifications_screen.dart` | Notifications listing screen |
-| `lib/screens/notifications/notification_card.dart` | Card widget for notification items |
-| `lib/screens/notifications/notification_settings_sheet.dart` | Bottom sheet for notification settings |
-| `lib/providers/app_provider.dart` | Added `AppNotification` model support |
-
----
-
-## 📂 Batch 17 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/screens/profile/profile_screen.dart` | AppScaffold, avatar with initials + edit overlay, display name + email, StreakCard, 4-cell stats grid, daily goal rows, account actions (backup + sign out placeholders) |
-| `lib/screens/profile/edit_profile_sheet.dart` | Bottom sheet: display name, email, study hours slider (1–12), blocks counter (1–10), save via AppProvider; `enableDrag: false`, `useSafeArea: true` |
-| `lib/screens/profile/streak_card.dart` | 🔥 current + longest streak, 7-day mini activity grid derived from timeLogs + dayPlans |
-
-✅ `flutter analyze lib/screens/profile/` → No issues found
-
----
-
-## 📂 Batch 18 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/screens/analytics/analytics_screen.dart` | Analytics screen implementation |
-| `lib/screens/analytics/analytics_chart_card.dart` | Chart card component for analytics |
-| `lib/screens/analytics/subject_breakdown_card.dart` | Subject breakdown card component |
-
----
-
-## 📂 Batch 19 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/screens/daily_tracker/daily_tracker_screen.dart` | AppScaffold, date header with prev/next, 5-emoji mood selector, water intake counter (0–8), read-only study hours from timeLogs with progress ring, habits checklist, daily notes, FAB → AddHabitSheet |
-| `lib/screens/daily_tracker/add_habit_sheet.dart` | Bottom sheet: habit name, frequency selector (Daily/Weekdays/Custom), 6-color picker; `enableDrag: false`, `useSafeArea: true` |
-| `lib/screens/daily_tracker/habit_card.dart` | Colored left border, animated checkbox, habit name with strikethrough, frequency label, 🔥 streak badge |
-
-✅ `flutter analyze lib/screens/daily_tracker/` → No issues found
-
----
-
-## 📂 Batch 20 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/screens/mentor/mentor_screen.dart` | AI Mentor chat screen implementation |
-| `lib/screens/mentor/mentor_message_bubble.dart` | Chat message bubble component |
-| `lib/screens/mentor/mentor_suggestions_bar.dart` | Quick suggestion chips bar |
-
----
-
-## 📂 Batch 21 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/app_router.dart` | 17 routes wired to real screens, nested sub-routes for KB detail (`:id` → `KBEntryDetailScreen`) and FMGE detail (`:id` → `FMGEEntryDetailScreen`), 3 remaining placeholders (FA Logger, Info Files, AI Memory) |
-| `lib/widgets/nav_overlay.dart` | Added Notifications, Profile, Analytics as extra nav items below main 15 menu items with divider |
-
-✅ `flutter analyze lib/app_router.dart lib/widgets/nav_overlay.dart` → No issues found
-
----
-
-## 📂 Batch 22 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/providers/app_provider.dart` | Added all missing methods: `getActivitiesForDate`, `getSubjectBreakdown`, `sendMentorMessage`, `addHabit`, `todayHabits`, `recentActivity`, `markNotificationRead`, `updateUserProfile` |
-
----
-
-## 📂 Batch 23 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/screens/backup/backup_screen.dart` | AppScaffold, auto backup toggle + frequency selector (Daily/Weekly/Manual), manual export (JSON → `Share.shareXFiles`), restore (FilePicker → confirm dialog), backup history list (max 5) |
-| `lib/screens/backup/backup_history_card.dart` | Card: backup icon, date, file size, restore text button, delete icon with confirm dialog |
-| `lib/screens/backup/restore_confirm_dialog.dart` | AlertDialog: warning icon, destructive message, Cancel + Restore buttons |
-| `pubspec.yaml` | `file_picker: ^8.0.0` (existing), `share_plus` updated `^9.0.0` → `^10.0.0` |
-
-✅ `flutter analyze lib/screens/backup/` → No issues found
-
----
-
-## 📂 Batch 24 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/screens/fa_logger/fa_logger_screen.dart` | FA Logger screen implementation |
-| `lib/screens/fa_logger/fa_log_modal.dart` | FA log entry modal |
-| `lib/screens/info_files/info_files_screen.dart` | Info Files / Data screen implementation |
-| `lib/screens/info_files/add_material_sheet.dart` | Bottom sheet for adding study materials |
-| `lib/screens/info_files/material_card.dart` | Material card component |
-
----
-
-## 📂 Batch 25 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/widgets/block_card.dart` | AnimatedContainer, AnimatedSwitcher, TweenAnimationBuilder |
-| `lib/screens/dashboard/dashboard_screen.dart` | Staggered entry animations |
-| `lib/screens/focus_timer/focus_timer_screen.dart` | Pulse + glow animations |
-
----
-
-## 📂 Batch 26 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/utils/app_theme.dart` | 13-level typography, radius const, widget themes |
-| `lib/screens/dashboard/dashboard_screen.dart` | RefreshIndicator, shimmer loading |
-| `lib/screens/today_plan/today_plan_screen.dart` | Dismissible swipe + confetti overlay |
-| `lib/widgets/app_scaffold.dart` | resizeToAvoidBottomInset: true |
-
----
-
-## 📂 Batch 27 — Files Committed
-
-| File | Key Notes |
-|---|---|
-| `lib/screens/revision_hub/revision_card.dart` | Fixed `entry.topic` → `entry.title`, `pageNumber` null check → `.isNotEmpty` |
-| `lib/screens/revision_hub/revision_hub_screen.dart` | Removed unused `now` and `cs` variables |
-| `lib/screens/settings/settings_screen.dart` | Removed unused `intl` import, `activeColor` → `activeTrackColor` |
-| `lib/screens/today_plan/today_plan_screen.dart` | Confetti overlay dismissed on animation complete via status listener |
-
-✅ `flutter analyze lib/` → No issues found
-
----
-
-## 🎉 Project Complete
-
-All 28 batches (0–27) implemented. `flutter analyze lib/` passes clean.
+| Feb 24, 2026 | Batches A, B, C, D, E all completed in one session |
+| Feb 25, 2026 | Batch F (critical fixes), TextSanitizer bug fix, G1/G2 prompts written |
+| Feb 25, 2026 | MASTER_PLAN.md + PROGRESS.md updated with full state |
