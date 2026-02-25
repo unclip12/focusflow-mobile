@@ -1,7 +1,8 @@
 # FocusFlow Mobile — Development Progress
 
-> Last updated: 2026-02-25
+> Last updated: 2026-02-25 (Session 2)
 > Session: Claude + Arsh — Antigravity workflow
+> **App is now a personal study OS for Arsh only. Full vision reset completed.**
 
 ---
 
@@ -11,274 +12,243 @@
 
 ### Batch A — Android Build Setup
 **Status**: ✅ Complete
-**Commits**: `fix: commit android folder with NDK 27`, `fix: align Java and Kotlin JVM targets to 17`, `ci: add Gradle and pub package caching`
-
-**What was done:**
-- Android folder committed with NDK 27
-- Core library desugaring enabled
+- Android folder committed with NDK 27, core library desugaring
 - Java + Kotlin JVM targets aligned to 17
-- GitHub Actions CI workflow created with flutter analyze gate
-- Gradle + pub package caching for faster builds
+- GitHub Actions CI with flutter analyze gate
+- Gradle + pub package caching
 
 ---
 
 ### Batch B — Data Persistence
 **Status**: ✅ Complete
-**Commits**: `fix: call AppProvider.loadAll() on startup so data persists across restarts`
-
-**What was done:**
-- `AppProvider.loadAll()` called on app startup in `main.dart`
-- All data (tasks, KB, time logs) now persists across app restarts
-- Previously: data was lost on every restart
+- `AppProvider.loadAll()` called on startup in `main.dart`
+- All data persists across app restarts
 
 ---
 
 ### Batch C — Navigation Fixes
 **Status**: ✅ Complete
-**Commits**: `fix: data persistence, back navigation, date picker, remove generate plan`, `fix: task save without times, exit dialog on dashboard`
-
-**What was done:**
-- Task saves correctly without requiring start/end times
-- Exit dialog appears on dashboard Android back button press
-- Date picker works on Today Plan header
-- Generate Plan button removed (was placeholder)
+- Task saves without requiring times
+- Exit dialog on dashboard Android back button
+- Date picker works on Today Plan
 - Back navigation fixed app-wide
 
 ---
 
-### Batch D — SRS + Knowledge Base + Task Planner
+### Batch D — SRS + KB + Task Planner
 **Status**: ✅ Complete
-**Commits**: `feat: strict SRS mode, AI Mentor JSON importer, KB pipeline`, `feat: exam-aware task planner, smart focus batch calculator, menu reorder`, `fix: replace initialValue with TextFormField in add_task_sheet`
-
-**What was done:**
-
-#### SRS Engine
-- 12-step SRS revision schedule implemented
-- Two modes: `strict` (default) and `relaxed`
-- `SrsService.calculateNextRevisionDateString()` for scheduling
-- `SrsService.isDueNow()` and `SrsService.isMastered()` helpers
-
-#### Knowledge Base
-- `KnowledgeBaseEntry` model: pageNumber, title, subject, system, topics, SRS fields
-- `knowledge_base_screen.dart`: search, filter by subject/system/mastery
-- `kb_entry_detail_screen.dart`: full page detail view with key points
-- `kb_entry_card.dart`: compact card for list view
-
-#### AI Mentor Importer
-- JSON import via AI Mentor screen
-- Paste Gemini JSON output → parsed → saved to KB
-- Auto-populates: pageNumber, title, subject, system, keyPoints
-
-#### Task Planner
-- Step 1: Exam selector card (USMLE Step 1, FMGE)
-- Step 2: Study type chips (FA Pages, Video Lecture, Qbank, Anki, Revision, Other)
-- Step 3: Page/topic fields based on study type
-- Smart focus batch calculator: given start/end times → auto-suggests 25/50min blocks
-- Menu reordered for better flow
-
-#### Bug Fix in Batch D
-- `initialValue` on `TextFormField` was wrong in `add_task_sheet.dart` (Gemini hallucinated it) — fixed
+- 12-step SRS engine (strict/relaxed modes)
+- KnowledgeBaseEntry model + screens
+- AI Mentor JSON importer (to be replaced by Claude Import in G12)
+- Exam-aware task planner with smart focus batch calculator
 
 ---
 
 ### Batch E — Session Timer + FA Logger
 **Status**: ✅ Complete
-**Commits**: `feat: session timer with quotes, completion flow, FA Logger redesign`, `fix: wire session screen navigation from today plan block start`, `fix: wire session navigation, completion saves to KB and FA Logger`
-
-**What was done:**
-
-#### Session Screen
-- Full countdown timer with start/pause/stop
-- Rotating motivational quotes during session
-- Completion screen with session summary
-- Start Block button on Today Plan → opens SessionScreen correctly
-
-#### Completion Flow
-- Session complete → auto-creates `TimeLogEntry` in Time Log
-- Session complete → updates `KnowledgeBaseEntry.lastStudiedAt`
-- Session complete → logs to FA Logger
-
-#### FA Logger Redesign
-- Redesigned with cleaner layout
-- Shows per-page stats: time spent, revision count, SRS step
-
-#### Navigation
-- Back from session → returns to Today Plan (no double-pop)
-- Start Block → Session → Complete → Back to Today Plan ✔
+- Countdown timer with motivational quotes
+- Completion flow: auto-creates TimeLogEntry, updates KB, logs FA
+- FA Logger redesigned
+- Session navigation fixed
 
 ---
 
 ### Batch F — Critical Bug Fixes
 **Status**: ✅ Complete
-**Commits**: `fix: Start Block opens SessionScreen, fix navigator double-pop on save`, `fix: remove duplicate AppScaffold on dashboard, fix blocksDone count`, `fix: correct SRS index field, add TimeLogEntry on session save`, `chore: fix all deprecations, dark mode consistency, spacing pass`, `fix: replace initialValue with value in DropdownButtonFormField (2 files)`
-
-**What was done:**
-
-#### Dashboard
-- Removed duplicate `AppScaffold` wrapper (was showing double bottom nav)
-- Fixed `blocksDone` counter (was always showing 0)
-
-#### Session Navigation
-- Start Block → SessionScreen (was crashing or going to wrong screen)
-- Double-pop bug fixed (was jumping past Today Plan)
-
-#### SRS
-- Correct field used for SRS index (was referencing wrong field name)
-- `TimeLogEntry` now auto-created when session saves
-
-#### Code Quality
-- All deprecated APIs replaced (`withOpacity` → `withValues(alpha:)`)
-- Dark mode consistency pass across all screens
-- Spacing standardized
-- `initialValue` on `DropdownButtonFormField` → `value` (2 files: `add_time_log_sheet.dart`, `add_task_sheet.dart`)
+- Duplicate AppScaffold removed from dashboard
+- blocksDone counter fixed
+- Session navigation double-pop fixed
+- All deprecated APIs replaced
+- Dark mode consistency pass
+- DropdownButtonFormField `initialValue` → `value` fix
 
 ---
 
 ### Bug Fix — TextSanitizer + Revision Card
 **Status**: ✅ Complete
-**Commits**: `fix: add TextSanitizer utility + fix garbled chars in revision_card`
-
-**What was done:**
-
-#### Root Cause
-AI-generated content (from JSON imports) had UTF-8 bytes read as Windows-1252,
-creating garbled sequences: `â€¢` (for •), `â€”` (for —), `â` (for ✓)
-
-#### Fix 1: New Utility
-`lib/utils/text_sanitizer.dart` — `TextSanitizer.clean(String)` method
-Maps all common Windows-1252-over-UTF-8 garbled sequences to correct Unicode.
-
-#### Fix 2: revision_card.dart
-- Source code had garbled chars in string literals
-- `â€”` → `\u2014` (em dash) in page title string
-- `â` → `\u2713` (check mark) in 'Mark Revised' button
-- `TextSanitizer.clean()` now applied to `entry.title` and `entry.pageNumber` before display
+- `lib/utils/text_sanitizer.dart` created
+- `â€¢` → `•`, `â€"` → `—`, `â` → `✓` etc.
+- revision_card.dart garbled chars fixed
 
 ---
 
-## 🔄 In Progress
-
----
-
-### Batch G1 — Milky Theme Update
-**Status**: 🔄 Prompt given to Gemini 3 Flash — may or may not be committed yet
-**Model**: Gemini 3 Flash (UI-only, no logic)
-
-**What it does:**
-- Replaces all 12 theme color pairs (lightBg, lightSurface, darkBg, darkSurface)
-- Milky soft backgrounds: light = white-lavender, dark = charcoal (not navy)
-- Softer card shadows in light mode, subtle border in dark mode
-- Default theme changed to light mode (`isDarkMode = false` default)
-- Softer border colors
-
-**Files to change:**
-- `lib/utils/app_theme.dart`
-- `lib/providers/settings_provider.dart`
-
-**Check after running:**
-- App opens in LIGHT mode by default
-- Backgrounds have soft milky tint (not stark white)
-- Dark mode is charcoal not navy
-- All 12 themes cycle correctly
+### Batch G1 — Milky Theme
+**Status**: ✅ Complete
+**Commit**: `feat: milky theme light+dark, soft card shadows, light default`
+- All 12 theme pairs replaced with milky soft backgrounds
+- Light = white-lavender, Dark = charcoal (not navy)
+- Default changed to light mode
 
 ---
 
 ### Batch G2 — KB Garbled Chars + Manual Add Entry
-**Status**: 🔄 Prompt given to Gemini Pro High — currently running
-**Model**: Gemini 3 Pro High
+**Status**: ✅ Complete
+**Commit**: `fix: sanitize KB content chars, add manual KB entry sheet`
+- `TextSanitizer.clean()` applied to all text in `kb_entry_detail_screen.dart`
+- FAB + `_AddKBEntrySheet` added to `knowledge_base_screen.dart`
+- Manual KB entry creation now works
 
+---
+
+## 🔄 In Progress / Up Next
+
+---
+
+### Batch G3 — Screen Cleanup (Dead Screen Deletion)
+**Status**: 📋 Next — Direct Claude push
 **What it does:**
-1. Apply `TextSanitizer.clean()` to all text display in `kb_entry_detail_screen.dart`
-   (fixes bullet points showing as `â€¢` in the Page view)
-2. Add FAB + `_AddKBEntrySheet` to `knowledge_base_screen.dart`
-   (allows manual creation of KB entries without AI import)
-
-**Files to change:**
-- `lib/screens/knowledge_base/kb_entry_detail_screen.dart`
-- `lib/screens/knowledge_base/knowledge_base_screen.dart`
-
-**Check after running:**
-- Page detail view shows clean bullet points • not `â€¢`
-- `+` FAB visible on Knowledge Base screen
-- Tapping `+` opens sheet with: Page #, Topic, Subject dropdown, System dropdown
-- Save creates entry that appears in KB list
+- Delete these screens entirely:
+  - `lib/screens/mentor/` (AI Mentor/chat) → replaced by Claude Import
+  - `lib/screens/ai_memory/` (AI Memory)
+  - `lib/screens/data/` (Info Files)
+  - `lib/screens/fmge/` (standalone FMGE Prep)
+  - `lib/screens/daily_tracker/` (Daily Tracker → merged into Today's Plan)
+  - `lib/screens/study_tracker/` (Study Tracker → merged into Dashboard)
+  - `lib/screens/calendar/` (Calendar → countdown on Dashboard only)
+- Remove dead routes from `app_router.dart`
+- Remove dead entries from `constants.dart` menu items
+- Clean up `AppProvider` references to deleted screens
+- `flutter analyze --no-fatal-infos` must pass
 
 ---
 
-## 📋 Upcoming Batches
+### Batch G4 — Bottom Nav Redesign
+**Status**: 📋 Planned — Claude Sonnet 4.6
+**What it does:**
+- 4 customizable pinned tabs (default: Dashboard, Revision Hub, Today's Plan, Tracker)
+- Permanent 5th tab: "More ▲"
+- Tapping More → beautiful slide-up bottom sheet grid with remaining screens
+- Full Screen Mode option in Settings: hides bottom nav, shows hamburger drawer instead
+- Settings screen: user picks which 4 screens to pin
 
 ---
 
-### Batch H — Gemini AI Service
-**Status**: 📋 Planned — most complex batch
-**Model**: Gemini 3 Pro High, High thinking budget
+### Batch G5 — Tracker Screen (Unified)
+**Status**: 📋 Planned — Claude Opus 4.6
+**What it does:**
+New screen `lib/screens/tracker/tracker_screen.dart` with scrollable top tab bar:
+- **FA 2025 tab**: Full page list grouped by subject, status badges, bulk range marker
+- **Sketchy tab**: Micro (organisms by type) + Pharma, per-item status, daily goal
+- **Pathoma tab**: Chapters list, per-chapter status
+- **UWorld tab**: Per-subject questions done/total/%, log session button
 
-**14 functions to implement in `lib/services/gemini_service.dart`:**
-1. `generateStudyPlan(examDate, weakSubjects, dailyHours)` → JSON plan
-2. `debriefSession(sessionData, kbEntry)` → feedback string
-3. `autoTagKBEntry(rawContent)` → subject, system, keyPoints
-4. `generateMCQ(kbEntry)` → USMLE-style question + answer + explanation
-5. `detectWeakAreas(timeLogs, kbEntries)` → ranked weak area list
-6. `getDailyMotivation(streak, examDate)` → motivational string
-7. `getExamCoaching(daysLeft, coverage)` → strategy advice
-8. `summarizeFAPage(pageContent)` → condensed summary
-9. `analyzeMistakePatterns(wrongAnswers)` → pattern report
-10. `rankRevisionPriority(kbEntries)` → sorted by urgency
-11. `predictStudyTime(topic, userHistory)` → estimated minutes
-12. `detectKnowledgeGaps(kbEntries, qbankData)` → gap list
-13. `analyzeQbankPerformance(results)` → subject performance map
-14. `generateStudyTip(currentFocus, timeOfDay)` → tip string
-
-**Files to create/update:**
-- `lib/services/gemini_service.dart` (new)
-- `lib/screens/mentor/mentor_screen.dart` (wire all 14)
-- `lib/providers/app_provider.dart` (expose AI results)
-- `pubspec.yaml` (add `google_generative_ai` if not present)
+**Models to create:**
+- `lib/models/fa_page.dart` — FAPage (pageNum, title, subject, system, status, srsFields)
+- `lib/models/sketchy_item.dart` — SketchyItem (name, type, status, srsFields)
+- `lib/models/pathoma_item.dart` — PathomaItem (chapter, subject, status)
+- `lib/models/uworld_session.dart` — UWorldSession (subject, done, correct, date)
 
 ---
 
-### Batch I — Analytics & Charts
-**Status**: 📋 Planned
-**Model**: Gemini 3 Flash
-
-- Study hours by day (7-day bar chart)
-- Time per subject (pie chart)
-- SRS due vs mastered over time (line chart)
-- Streak visualization
-- Screen: `lib/screens/analytics/analytics_screen.dart`
-
----
-
-### Batch J — Notifications
-**Status**: 📋 Planned
-**Model**: Gemini 3 Flash
-
-- Daily revision reminder (8 AM)
-- SRS due alert when items are overdue
-- Streak protection reminder if no session by 9 PM
-- Package: `flutter_local_notifications`
+### Batch G6 — FA 2025 Pre-seed
+**Status**: 📋 Planned — Direct Claude push
+**What it does:**
+- Claude generates `assets/data/fa_2025_seed.json` with all ~672 FA pages
+- Each page: `{ "page": 31, "title": "Molecular Biology", "subject": "Biochemistry", "system": "General", "status": "unread" }`
+- `lib/services/seed_service.dart` detects first launch, seeds all pages into AppProvider
+- Pages 33–49 marked as `read` (Arsh's current progress)
+- bundled in `pubspec.yaml` as asset
 
 ---
 
-### Batch K — Backup & Export
-**Status**: 📋 Planned
-**Model**: Gemini 3 Pro High
-
-- Export KB + time logs to JSON file
-- Import backup JSON
-- Share as file (share_plus)
-- Screen: `lib/screens/backup/backup_screen.dart`
+### Batch G7 — Bulk FA Page Range Marker
+**Status**: 📋 Planned — Gemini Flash
+**What it does:**
+- "Mark as Read" button in FA Tracker → opens dialog: From Page [__] To Page [__]
+- Marks all pages in range as `read`, auto-schedules SRS revision for each
+- Separate "Mark Anki Done" range action
+- Celebration animation fires when 10+ pages marked in a day
 
 ---
 
-### Batch L — Polish & Release Prep
-**Status**: 📋 Planned
-**Model**: Gemini 3 Flash
+### Batch G8 — Dashboard Full Rebuild
+**Status**: 📋 Planned — Claude Opus 4.6
+**What it does:**
+- Dual exam countdown cards (FMGE: X days, Step 1: ~Y days)
+- Today's available time block (wake → sleep − prayer blocks − tasks)
+- Pace insight row: avg pages/day, projected FA completion date, on-track indicator
+- Today's goals row: FA progress bar, Anki status, Sketchy progress, Revision due
+- Streak + motivation row
+- All values pulled live from AppProvider
 
-- App icon finalization
-- Splash screen
-- Onboarding flow (exam type selection)
-- Play Store metadata
+---
+
+### Batch G9 — Today's Plan Rebuild
+**Status**: 📋 Planned — Gemini Pro High
+**What it does:**
+- Available time calculator at top
+- Prayer blocks auto-populated from Settings
+- Add task types: FA Pages, Sketchy, Pathoma, Anki, UWorld, Personal, Break
+- Running time total — shows overflow alert if plan exceeds available time
+- "Doesn't fit — reduce by X min" warning
+
+---
+
+### Batch G10 — Settings Expansion
+**Status**: 📋 Planned — Claude Sonnet 4.6
+**New settings fields:**
+- Exam Dates: FMGE date, Step 1 date
+- Sleep time + Wake time
+- Daily FA page goal (default: 10)
+- Anki batch size (default: 4 pages)
+- Prayer times: 5 prayers, each with azan time (departure auto-calculated)
+- Nav customizer: pick 4 pinned bottom tabs
+- Full Screen Mode toggle
+
+---
+
+### Batch G11 — Motivation System (Lottie Animations)
+**Status**: 📋 Planned — Gemini Flash
+**What it does:**
+- Add `lottie` package to pubspec.yaml
+- Bundle Lottie JSON files in `assets/lottie/`
+- `CelebrationOverlay` widget wrapping the app
+- Triggers: 10 pages/day, Anki batch done, all revisions cleared, 7-day streak,
+  subject complete, daily goal before 6 PM, 30-day streak
+
+---
+
+### Batch G12 — Claude Import Window
+**Status**: 📋 Planned — Gemini Pro High
+**What it does:**
+- New screen `lib/screens/claude_import/claude_import_screen.dart`
+- Large paste area for JSON
+- Parse button → validates + shows action preview list
+- Confirm → executes all actions via `ClaudeImportService`
+- Supported actions: mark_fa_pages_read, mark_fa_anki_done, add_today_task,
+  add_study_block, log_uworld_session, set_daily_goals, set_exam_dates,
+  mark_sketchy_watched, mark_pathoma_watched
+- Error handling: shows which actions failed and why
+
+---
+
+### Batch G13 — Auto Local Backup
+**Status**: 📋 Planned — Gemini Pro High
+**What it does:**
+- `lib/services/backup_service.dart`
+- Saves complete app state to device storage as JSON after every significant change
+- Backup file: `[device_documents]/focusflow_backup.json`
+- On app start: detect if backup exists → offer restore if data is empty
+- Manual export/import option in Settings
+- Uses `path_provider` package
+
+---
+
+### Batch H — Analytics
+**Status**: 📋 Planned — Gemini Flash
+- FA pages per day (7-day bar chart)
+- Subject distribution (pie chart)
+- Pace projection line (actual vs needed)
+- Exam readiness score (pages done / total needed)
+
+---
+
+### Batch I — Final Polish
+**Status**: 📋 Planned — Gemini Flash
+- Wake alarm (flutter_local_notifications)
+- Math challenge to confirm wake-up
+- App icon + splash screen
+- Onboarding flow (exam type, dates, prayer times setup)
 - Version bump to 1.0.0
 
 ---
@@ -287,51 +257,16 @@ Maps all common Windows-1252-over-UTF-8 garbled sequences to correct Unicode.
 
 | Issue | Severity | Status |
 |---|---|---|
-| KB content from AI JSON has garbled chars | High | G2 fixing |
-| Manual KB entry not possible | High | G2 fixing |
-| Analytics screen is placeholder | Medium | Batch I |
-| No notifications yet | Medium | Batch J |
-| Mentor screen wired but AI not connected | High | Batch H |
-| No backup/restore | Medium | Batch K |
-| Study plan generator is placeholder | Low | Future |
-
----
-
-## 🛠️ Model Selection Guide
-
-| Task Type | Use | Thinking |
-|---|---|---|
-| Color / theme / UI tweaks | 3 Flash | Off |
-| Single widget refactor | 3 Flash | Off |
-| New screen with state logic | 3 Pro High | Low |
-| AI service / complex provider | 3 Pro High | High |
-| Multi-file architecture | 3 Pro High | High |
-| Anything touching Firebase | 3 Pro High | High |
-| Build errors / quick fixes | Direct Claude push | — |
-
----
-
-## 🔒 Prompt Quality Rules
-
-Every Gemini prompt must have:
-```
-STRICT RULE: Only use Flutter/Dart APIs you are 100% certain exist.
-Do NOT invent parameter names. If unsure, use the simplest known alternative.
-
-Read these files fully before writing anything:
-- [list relevant files]
-
-[Exact code blocks to insert]
-
-DO NOT TOUCH:
-- [list files to leave alone]
-
-flutter analyze --no-fatal-infos
-Fix any errors found, then:
-git add [files changed]
-git commit -m "[message]"
-git push origin main
-```
+| Analytics screen is placeholder | Medium | Batch H |
+| No Claude Import window yet | High | G12 |
+| No auto backup | High | G13 |
+| No FA pre-seeded content | High | G6 |
+| No Tracker screen (unified) | High | G5 |
+| Dead screens still in codebase | Medium | G3 |
+| No prayer time settings | Medium | G10 |
+| No exam date settings | Medium | G10 |
+| No bulk page marker | High | G7 |
+| Dashboard needs full rebuild | High | G8 |
 
 ---
 
@@ -339,6 +274,27 @@ git push origin main
 
 | Date | Work Done |
 |---|---|
-| Feb 24, 2026 | Batches A, B, C, D, E all completed in one session |
-| Feb 25, 2026 | Batch F (critical fixes), TextSanitizer bug fix, G1/G2 prompts written |
-| Feb 25, 2026 | MASTER_PLAN.md + PROGRESS.md updated with full state |
+| Feb 24, 2026 | Batches A, B, C, D, E completed in one session |
+| Feb 25, 2026 AM | Batch F (critical fixes), TextSanitizer bug fix, G1+G2 prompts written |
+| Feb 25, 2026 AM | MASTER_PLAN.md + PROGRESS.md first version created |
+| Feb 25, 2026 PM | G1 ✅ + G2 ✅ both confirmed complete |
+| Feb 25, 2026 PM | **FULL APP VISION RESET** — app is now personal study OS for Arsh only |
+| Feb 25, 2026 PM | FA 2025 (35th Ed) uploaded — full section map extracted |
+| Feb 25, 2026 PM | New design language defined (premium vibrant milky) |
+| Feb 25, 2026 PM | New screen map finalised (8 dead screens removed, Tracker + Claude Import added) |
+| Feb 25, 2026 PM | New batch plan G3–I defined |
+| Feb 25, 2026 PM | Claude Import JSON schema designed |
+| Feb 25, 2026 PM | MASTER_PLAN + PROGRESS fully rewritten with all new context |
+
+---
+
+## 📌 Arsh's Current FA Progress
+
+| Status | Pages | Subject |
+|---|---|---|
+| ✅ Read | 33–49 | Biochemistry (early sections) |
+| ⬜ Not started | 50–92 | Biochemistry (remaining) |
+| ⬜ Not started | 93–706 | Everything else |
+
+**Next pages to read:** 50 onwards (Biochemistry continuing)
+**Next Anki batch due:** Pages 46–49 (if not done yet — confirm with Arsh)
