@@ -107,15 +107,15 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     if (_exam == ExamType.usmle) {
       switch (_usmleType) {
         case UsmleTaskType.faPages:
-          return 'FA Pages ${_pageCtrl.text}'.trim();
+          return 'FA Pages \${_pageCtrl.text}'.trim();
         case UsmleTaskType.videoLecture:
           return _topicCtrl.text.isNotEmpty ? _topicCtrl.text : 'Video Lecture';
         case UsmleTaskType.qbankSession:
-          return 'Qbank ${_selectedPlatform ?? ''} ${_questionCtrl.text}Q'.trim();
+          return 'Qbank \${_selectedPlatform ?? ''} \${_questionCtrl.text}Q'.trim();
         case UsmleTaskType.ankiReview:
-          return 'Anki ${_deckCtrl.text}'.trim();
+          return 'Anki \${_deckCtrl.text}'.trim();
         case UsmleTaskType.revision:
-          return 'Revision (${_selectedRevisionPages.length} pages)';
+          return 'Revision (\${_selectedRevisionPages.length} pages)';
         case UsmleTaskType.other:
           return _titleCtrl.text.isNotEmpty ? _titleCtrl.text : 'Study Task';
         case null:
@@ -124,13 +124,13 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     } else {
       switch (_fmgeType) {
         case FmgeTaskType.cerebellumLecture:
-          return 'Cerebellum ${_topicCtrl.text}'.trim();
+          return 'Cerebellum \${_topicCtrl.text}'.trim();
         case FmgeTaskType.fmgeQbank:
-          return 'FMGE Qbank ${_selectedPlatform ?? ''} ${_questionCtrl.text}Q'.trim();
+          return 'FMGE Qbank \${_selectedPlatform ?? ''} \${_questionCtrl.text}Q'.trim();
         case FmgeTaskType.subjectReading:
-          return '${_selectedSubject ?? ''} ${_topicCtrl.text}'.trim();
+          return '\${_selectedSubject ?? ''} \${_topicCtrl.text}'.trim();
         case FmgeTaskType.revision:
-          return 'FMGE Revision (${_selectedRevisionPages.length} pages)';
+          return 'FMGE Revision (\${_selectedRevisionPages.length} pages)';
         case FmgeTaskType.other:
           return _titleCtrl.text.isNotEmpty ? _titleCtrl.text : 'FMGE Task';
         case null:
@@ -190,7 +190,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     final batches = _focusBatches;
     final title = _taskTitle;
 
-    // Build blocks from focus batches
     DayPlan? existing = app.getDayPlan(widget.dateKey);
     final existingBlocks = List<Block>.from(existing?.blocks ?? []);
     final newBlocks = <Block>[];
@@ -209,7 +208,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         status: BlockStatus.notStarted,
       ));
     } else if (batches.isEmpty) {
-      // Single block, no batches
       newBlocks.add(Block(
         id: _uuid.v4(),
         index: existingBlocks.length,
@@ -233,7 +231,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
             plannedStartTime: timeFormat.format(b.startTime),
             plannedEndTime: timeFormat.format(b.endTime),
             type: BlockType.breakBlock,
-            title: '${b.label} (${b.durationMinutes}m)',
+            title: '\${b.label} (\${b.durationMinutes}m)',
             plannedDurationMinutes: b.durationMinutes,
             status: BlockStatus.notStarted,
           ));
@@ -254,7 +252,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     }
 
     final focusBlockCount = newBlocks.where((b) => b.type != BlockType.breakBlock).length;
-
     final allBlocks = [...existingBlocks, ...newBlocks];
 
     final plan = existing?.copyWith(blocks: allBlocks) ?? DayPlan(
@@ -280,16 +277,16 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     if (mounted) {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Task added with $focusBlockCount focus block${focusBlockCount == 1 ? '' : 's'}'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+        SnackBar(
+          content: Text('Task added with \$focusBlockCount focus block\${focusBlockCount == 1 ? '' : 's'}'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
   String _formatTimeOfDay(TimeOfDay t) =>
-      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+      '\${t.hour.toString().padLeft(2, '0')}:\${t.minute.toString().padLeft(2, '0')}';
 
   // ═══════════════════════════════════════════════════════════
   // BUILD
@@ -314,7 +311,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Handle bar ────────────────────────────────────────
             const SizedBox(height: 8),
             Container(
               width: 40, height: 4,
@@ -325,7 +321,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
             ),
             const SizedBox(height: 12),
 
-            // ── Header with back ──────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -355,7 +350,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
             ),
             const SizedBox(height: 8),
 
-            // ── Body ──────────────────────────────────────────────
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -524,17 +518,14 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       }
     }
 
-    // Time pickers
     fields.addAll(_buildTimePickers(cs));
 
-    // Focus batch preview
     final batches = _focusBatches;
     if (batches.isNotEmpty) {
       fields.add(const SizedBox(height: 16));
       fields.add(_buildBatchPreview(theme, cs, batches));
     }
 
-    // Save button
     fields.add(const SizedBox(height: 20));
     fields.add(SizedBox(
       width: double.infinity,
@@ -581,7 +572,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       if (_studyMode == 'specific') ...[
         const SizedBox(height: 12),
         Builder(builder: (_) {
-          // Try to pre-fill from KB
           final page = _pageCtrl.text.trim();
           final kbEntry = app.knowledgeBase.cast<KnowledgeBaseEntry?>().firstWhere(
             (e) => e!.pageNumber == page,
@@ -689,7 +679,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       ...duePages.map((e) => CheckboxListTile(
         dense: true,
         contentPadding: EdgeInsets.zero,
-        title: Text('Page ${e.pageNumber} – ${e.title}',
+        title: Text('Page \${e.pageNumber} – \${e.title}',
             style: const TextStyle(fontSize: 13)),
         value: _selectedRevisionPages.contains(e.pageNumber),
         onChanged: (v) => setState(() {
@@ -806,7 +796,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                   border: Border.all(color: color.withValues(alpha: 0.3)),
                 ),
                 child: Text(
-                  '${b.label} ${b.durationMinutes}m',
+                  '\${b.label} \${b.durationMinutes}m',
                   style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
                 ),
               );
@@ -850,7 +840,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     required void Function(String?) onChanged,
   }) {
     return DropdownButtonFormField<String>(
-      initialValue: value,
+      value: value,
       decoration: InputDecoration(
         labelText: label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

@@ -155,7 +155,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
             child: Row(
               children: [
                 Text(
-                  '${filtered.length} entries',
+                  '\${filtered.length} entries',
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: cs.onSurface.withValues(alpha: 0.45),
                     fontWeight: FontWeight.w500,
@@ -457,7 +457,7 @@ class _AddKBEntrySheetState extends State<_AddKBEntrySheet> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              initialValue: _subject,
+              value: _subject,
               decoration: InputDecoration(
                 labelText: 'Subject',
                 border: OutlineInputBorder(
@@ -470,7 +470,7 @@ class _AddKBEntrySheetState extends State<_AddKBEntrySheet> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              initialValue: _system,
+              value: _system,
               decoration: InputDecoration(
                 labelText: 'System',
                 border: OutlineInputBorder(

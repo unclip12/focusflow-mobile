@@ -36,7 +36,7 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
     final startMin = _startTime.hour * 60 + _startTime.minute;
     final endMin = _endTime.hour * 60 + _endTime.minute;
     final diff = endMin - startMin;
-    return diff > 0 ? diff : diff + 1440; // handle midnight crossover
+    return diff > 0 ? diff : diff + 1440;
   }
 
   Future<void> _pickTime(bool isStart) async {
@@ -56,7 +56,7 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
   String _formatTimeOfDay(TimeOfDay t) {
     final h = t.hour.toString().padLeft(2, '0');
     final m = t.minute.toString().padLeft(2, '0');
-    return '$h:$m';
+    return '\$h:\$m';
   }
 
   void _save() {
@@ -75,9 +75,8 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
     final app = context.read<AppProvider>();
     final now = DateTime.now();
     final dateStr = AppDateUtils.todayKey();
-    final id = 'tl_${now.millisecondsSinceEpoch}';
+    final id = 'tl_\${now.millisecondsSinceEpoch}';
 
-    // Build ISO start/end strings
     final startDt = DateTime(now.year, now.month, now.day,
         _startTime.hour, _startTime.minute);
     final endDt = DateTime(
@@ -177,7 +176,6 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Duration display
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -186,7 +184,7 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    '${_durationMinutes}m',
+                    '\${_durationMinutes}m',
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
                       color: cs.primary,
@@ -200,7 +198,7 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
 
             // ── Category dropdown ─────────────────────────────────
             DropdownButtonFormField<TimeLogCategory>(
-              initialValue: _category,
+              value: _category,
               decoration: InputDecoration(
                 labelText: 'Category',
                 border: OutlineInputBorder(
