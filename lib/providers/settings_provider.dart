@@ -8,7 +8,7 @@ import 'package:focusflow_mobile/models/app_settings.dart';
 import 'package:focusflow_mobile/services/database_service.dart';
 
 class SettingsProvider extends ChangeNotifier {
-  AppSettings _settings = AppSettings.defaults();
+  AppSettings _settings = AppSettings.defaults().copyWith(darkMode: false);
   bool _loaded = false;
 
   AppSettings get settings => _settings;
@@ -24,7 +24,19 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> loadSettings() async {
     final json = await DatabaseService.instance.getSettings();
     if (json != null) {
-      _settings = AppSettings.fromJson(json);
+      // Force darkMode to false if it's not present in the stored settings
+      // or if we want to ensure any legacy stored 'true' becomes 'false' for this transition.
+      // However, the prompt says "Change the default to false".
+      // Usually that means if it's NULL (missing) in prefs, use false.
+      // In our case, AppSettings.fromJson already has a fallback.
+      // We can override the json before parsing or override the settings after parsing.
+      var data = Map<String, dynamic>.from(json);
+      if (!data.containsKey('darkMode')) {
+        data['darkMode'] = false;
+      }
+      _settings = AppSettings.fromJson(data);
+    } else {
+      _settings = AppSettings.defaults().copyWith(darkMode: false);
     }
     _loaded = true;
     notifyListeners();

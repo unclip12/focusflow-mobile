@@ -47,63 +47,87 @@ class _ThemeDef {
 const _themes = <_ThemeDef>[
   _ThemeDef(
     id: 'default', name: 'Flow White',
-    lightBg: Color(0xFFF1F5F9), lightSurface: Color(0xFFFFFFFF),
-    darkBg: Color(0xFF0F172A), darkSurface: Color(0xFF1E293B),
+    lightBg: Color(0xFFF4F6FB),
+    lightSurface: Color(0xFFFFFFFF),
+    darkBg: Color(0xFF16171F),
+    darkSurface: Color(0xFF21222D),
   ),
   _ThemeDef(
     id: 'midnight', name: 'Midnight Deep',
-    lightBg: Color(0xFFCBD5E1), lightSurface: Color(0xFFFFFFFF),
-    darkBg: Color(0xFF020617), darkSurface: Color(0xFF0F172A),
+    lightBg: Color(0xFFF0F2F8),
+    lightSurface: Color(0xFFFFFFFF),
+    darkBg: Color(0xFF13141C),
+    darkSurface: Color(0xFF1D1E28),
   ),
   _ThemeDef(
     id: 'forest', name: 'Mystic Forest',
-    lightBg: Color(0xFFF0FFF5), lightSurface: Color(0xFFFFFFFF),
-    darkBg: Color(0xFF022C22), darkSurface: Color(0xFF064E3B),
+    lightBg: Color(0xFFF0FAF4),
+    lightSurface: Color(0xFFFFFFFF),
+    darkBg: Color(0xFF141C18),
+    darkSurface: Color(0xFF1E2B22),
   ),
   _ThemeDef(
     id: 'ocean', name: 'Deep Ocean',
-    lightBg: Color(0xFFF0F8FF), lightSurface: Color(0xFFFFFFFF),
-    darkBg: Color(0xFF172554), darkSurface: Color(0xFF1E3A8A),
+    lightBg: Color(0xFFF0F6FF),
+    lightSurface: Color(0xFFFFFFFF),
+    darkBg: Color(0xFF141820),
+    darkSurface: Color(0xFF1E2430),
   ),
   _ThemeDef(
     id: 'sunset', name: 'Pastel Sunset',
-    lightBg: Color(0xFFFAF0F5), lightSurface: Color(0xFFFFFFFF),
-    darkBg: Color(0xFF1E1428), darkSurface: Color(0xFF2D1E3C),
+    lightBg: Color(0xFFFAF2F6),
+    lightSurface: Color(0xFFFFFFFF),
+    darkBg: Color(0xFF1E161C),
+    darkSurface: Color(0xFF2A1F26),
   ),
   _ThemeDef(
     id: 'rose', name: 'Soft Lilac',
-    lightBg: Color(0xFFFAF0FA), lightSurface: Color(0xFFFFFFFF),
-    darkBg: Color(0xFF230F28), darkSurface: Color(0xFF321E3C),
+    lightBg: Color(0xFFFAF0FD),
+    lightSurface: Color(0xFFFFFFFF),
+    darkBg: Color(0xFF1D1420),
+    darkSurface: Color(0xFF29202E),
   ),
   _ThemeDef(
     id: 'slate', name: 'Cloudy Sky',
-    lightBg: Color(0xFFF8FAFC), lightSurface: Color(0xFFFFFFFF),
-    darkBg: Color(0xFF1F2937), darkSurface: Color(0xFF374151),
+    lightBg: Color(0xFFF6F8FC),
+    lightSurface: Color(0xFFFFFFFF),
+    darkBg: Color(0xFF171A20),
+    darkSurface: Color(0xFF20242C),
   ),
   _ThemeDef(
     id: 'amber', name: 'Citrus Burst',
-    lightBg: Color(0xFFFFFAF0), lightSurface: Color(0xFFFFFFFF),
-    darkBg: Color(0xFF281900), darkSurface: Color(0xFF3C2814),
+    lightBg: Color(0xFFFDF8F0),
+    lightSurface: Color(0xFFFFFFFF),
+    darkBg: Color(0xFF1E1910),
+    darkSurface: Color(0xFF2A2318),
   ),
   _ThemeDef(
     id: 'violet', name: 'Royal Violet',
-    lightBg: Color(0xFFFAF5FF), lightSurface: Color(0xFFFFFFFF),
-    darkBg: Color(0xFF140A1E), darkSurface: Color(0xFF28143C),
+    lightBg: Color(0xFFF8F4FF),
+    lightSurface: Color(0xFFFFFFFF),
+    darkBg: Color(0xFF18142A),
+    darkSurface: Color(0xFF231E36),
   ),
   _ThemeDef(
     id: 'teal', name: 'Fresh Mint',
-    lightBg: Color(0xFFEBFAFA), lightSurface: Color(0xFFFFFFFF),
-    darkBg: Color(0xFF0A2323), darkSurface: Color(0xFF14322D),
+    lightBg: Color(0xFFEEFAF8),
+    lightSurface: Color(0xFFFFFFFF),
+    darkBg: Color(0xFF121D1C),
+    darkSurface: Color(0xFF1A2A28),
   ),
   _ThemeDef(
     id: 'crimson', name: 'Warm Peach',
-    lightBg: Color(0xFFFFF5F5), lightSurface: Color(0xFFFFFFFF),
-    darkBg: Color(0xFF280F0F), darkSurface: Color(0xFF3C1E1E),
+    lightBg: Color(0xFFFFF4F2),
+    lightSurface: Color(0xFFFFFFFF),
+    darkBg: Color(0xFF1E1414),
+    darkSurface: Color(0xFF2C1E1E),
   ),
   _ThemeDef(
     id: 'mint', name: 'Night Sky',
-    lightBg: Color(0xFFF0F8FF), lightSurface: Color(0xFFFFFFFF),
-    darkBg: Color(0xFF020024), darkSurface: Color(0xFF111827),
+    lightBg: Color(0xFFF0F4FF),
+    lightSurface: Color(0xFFFFFFFF),
+    darkBg: Color(0xFF12131E),
+    darkSurface: Color(0xFF1C1E2C),
   ),
 ];
 
@@ -145,8 +169,9 @@ class AppTheme {
     final primaryText = isDark ? Colors.white : const Color(0xFF1C1C1E);
     final secondaryText =
         isDark ? const Color(0xFFAEAEB2) : const Color(0xFF8E8E93);
-    final border =
-        isDark ? const Color(0xFF2A2A38) : const Color(0xFFE5E5EA);
+    final border = isDark
+        ? const Color(0xFF2E2F3D)
+        : const Color(0xFFE8EAF0);
 
     final baseText = isDark
         ? ThemeData.dark().textTheme
@@ -199,10 +224,16 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         color: surface,
-        elevation: 0,
+        elevation: isDark ? 0 : 1,
+        shadowColor: isDark
+            ? Colors.transparent
+            : Colors.black.withValues(alpha: 0.07),
+        surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radius),
-          side: BorderSide(color: border, width: 0.5),
+          side: isDark
+              ? BorderSide(color: border, width: 0.5)
+              : BorderSide.none,
         ),
       ),
       chipTheme: ChipThemeData(
