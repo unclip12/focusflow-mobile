@@ -42,7 +42,6 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
     const String mode = 'strict';
     var filtered = entries.toList();
 
-    // ── Text search ──────────────────────────────────────────────
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
       filtered = filtered.where((e) {
@@ -52,19 +51,16 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
       }).toList();
     }
 
-    // ── Subject filter ───────────────────────────────────────────
     if (_selectedSubject != null) {
       filtered =
           filtered.where((e) => e.subject == _selectedSubject).toList();
     }
 
-    // ── System filter ────────────────────────────────────────────
     if (_selectedSystem != null) {
       filtered =
           filtered.where((e) => e.system == _selectedSystem).toList();
     }
 
-    // ── Mastery filter ───────────────────────────────────────────
     switch (_masteryFilter) {
       case _MasteryFilter.due:
         filtered = filtered
@@ -99,7 +95,6 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
         children: [
           Column(
             children: [
-              // ── Search bar ───────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: TextField(
@@ -136,7 +131,6 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
           ),
           const SizedBox(height: 8),
 
-          // ── Filter bar ─────────────────────────────────────────
           _FilterBar(
             selectedSubject: _selectedSubject,
             selectedSystem: _selectedSystem,
@@ -149,7 +143,6 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
           ),
           const SizedBox(height: 4),
 
-          // ── Results count ──────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Row(
@@ -165,7 +158,6 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
             ),
           ),
 
-          // ── Entry list ─────────────────────────────────────────
           Expanded(
             child: filtered.isEmpty
                 ? Center(
@@ -230,10 +222,8 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
   }
 }
 
-// ── Mastery filter enum ─────────────────────────────────────────
 enum _MasteryFilter { all, due, mastered }
 
-// ── Filter bar widget ───────────────────────────────────────────
 class _FilterBar extends StatelessWidget {
   final String? selectedSubject;
   final String? selectedSystem;
@@ -262,7 +252,6 @@ class _FilterBar extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         children: [
-          // ── Mastery toggle chips ─────────────────────────────────
           for (final mf in _MasteryFilter.values)
             Padding(
               padding: const EdgeInsets.only(right: 6),
@@ -273,14 +262,12 @@ class _FilterBar extends StatelessWidget {
               ),
             ),
 
-          // Separator
           Container(
             width: 1,
             margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
             color: cs.onSurface.withValues(alpha: 0.1),
           ),
 
-          // ── Subject chips ──────────────────────────────────────
           for (final subj in kFmgeSubjects)
             Padding(
               padding: const EdgeInsets.only(right: 6),
@@ -291,14 +278,12 @@ class _FilterBar extends StatelessWidget {
               ),
             ),
 
-          // Separator
           Container(
             width: 1,
             margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
             color: cs.onSurface.withValues(alpha: 0.1),
           ),
 
-          // ── System chips ───────────────────────────────────────
           for (final sys in kBodySystems)
             Padding(
               padding: const EdgeInsets.only(right: 6),
@@ -314,7 +299,6 @@ class _FilterBar extends StatelessWidget {
   }
 }
 
-// ── Individual filter chip ──────────────────────────────────────
 class _FilterChip extends StatelessWidget {
   final String label;
   final bool selected;
@@ -457,7 +441,7 @@ class _AddKBEntrySheetState extends State<_AddKBEntrySheet> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              initialValue: _subject,
+              value: _subject,
               decoration: InputDecoration(
                 labelText: 'Subject',
                 border: OutlineInputBorder(
@@ -470,7 +454,7 @@ class _AddKBEntrySheetState extends State<_AddKBEntrySheet> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              initialValue: _system,
+              value: _system,
               decoration: InputDecoration(
                 labelText: 'System',
                 border: OutlineInputBorder(

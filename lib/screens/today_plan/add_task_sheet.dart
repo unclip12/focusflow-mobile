@@ -61,14 +61,12 @@ class AddTaskSheet extends StatefulWidget {
 
 class _AddTaskSheetState extends State<AddTaskSheet> {
   static const _uuid = Uuid();
-  int _step = 0; // 0 = exam, 1 = task type, 2 = details
+  int _step = 0;
 
-  // ── Selections ──────────────────────────────────────────────
   ExamType? _exam;
   UsmleTaskType? _usmleType;
   FmgeTaskType? _fmgeType;
 
-  // ── Form controllers ────────────────────────────────────────
   final _pageCtrl       = TextEditingController();
   final _topicCtrl      = TextEditingController();
   final _titleCtrl      = TextEditingController();
@@ -82,7 +80,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   String? _selectedSubject;
   String? _selectedSource;
   String? _selectedPlatform;
-  String _studyMode = 'full'; // 'full' | 'specific'
+  String _studyMode = 'full';
   final List<String> _selectedSubtopics = [];
   final List<String> _selectedRevisionPages = [];
 
@@ -102,7 +100,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     super.dispose();
   }
 
-  // ── Computed ────────────────────────────────────────────────
   String get _taskTitle {
     if (_exam == ExamType.usmle) {
       switch (_usmleType) {
@@ -171,7 +168,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     return calculateFocusBatches(start, end);
   }
 
-  // ── Time picker ──────────────────────────────────────────────
   Future<void> _pickTime(bool isStart) async {
     final initial = isStart
         ? (_startTime ?? TimeOfDay.now())
@@ -184,7 +180,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     }
   }
 
-  // ── Save ────────────────────────────────────────────────────
   Future<void> _save() async {
     final app = context.read<AppProvider>();
     final batches = _focusBatches;
@@ -291,10 +286,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   String _formatTimeOfDay(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
-  // ═══════════════════════════════════════════════════════════
-  // BUILD
-  // ═══════════════════════════════════════════════════════════
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -369,10 +360,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // STEP 0 – Exam Selector
-  // ═══════════════════════════════════════════════════════════
-
   Widget _buildExamSelector(ThemeData theme, ColorScheme cs) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24),
@@ -405,10 +392,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       ),
     );
   }
-
-  // ═══════════════════════════════════════════════════════════
-  // STEP 1 – Task Type Selector
-  // ═══════════════════════════════════════════════════════════
 
   Widget _buildTaskTypeSelector(ThemeData theme, ColorScheme cs) {
     if (_exam == ExamType.usmle) {
@@ -468,10 +451,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       ),
     );
   }
-
-  // ═══════════════════════════════════════════════════════════
-  // STEP 2 – Detail Form
-  // ═══════════════════════════════════════════════════════════
 
   Widget _buildDetailForm(ThemeData theme, ColorScheme cs) {
     final fields = <Widget>[];
@@ -550,7 +529,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     );
   }
 
-  // ── FA Pages fields ──────────────────────────────────────────
   List<Widget> _buildFaPagesFields(ColorScheme cs) {
     final app = context.read<AppProvider>();
     return [
@@ -601,7 +579,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     ];
   }
 
-  // ── Video fields ──────────────────────────────────────────────
   List<Widget> _buildVideoFields(ColorScheme cs, {required bool isUsmle}) {
     final sources = isUsmle
         ? ['Boards & Beyond', 'Sketchy', 'Pathoma', 'Dirty Medicine', 'Ninja Nerd', 'YouTube', 'Other']
@@ -619,7 +596,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     ];
   }
 
-  // ── Qbank fields ──────────────────────────────────────────────
   List<Widget> _buildQbankFields(ColorScheme cs, {required bool isUsmle}) {
     final platforms = isUsmle
         ? ['UWorld', 'Amboss', 'NBME', 'Free120', 'Other']
@@ -640,7 +616,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     ];
   }
 
-  // ── Anki fields ───────────────────────────────────────────────
   List<Widget> _buildAnkiFields(ColorScheme cs) {
     return [
       _field(label: 'Deck name', hint: 'e.g. AnKing Step 1', controller: _deckCtrl),
@@ -649,7 +624,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     ];
   }
 
-  // ── Revision fields (due pages from KB) ──────────────────────
   List<Widget> _buildRevisionFields(ColorScheme cs) {
     final app = context.read<AppProvider>();
     final duePages = app.knowledgeBase
@@ -697,7 +671,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     ];
   }
 
-  // ── Cerebellum Lecture fields ─────────────────────────────────
   List<Widget> _buildCerebellumFields(ColorScheme cs) {
     return [
       _dropdown(label: 'Subject', value: _selectedSubject, items: kFmgeSubjects,
@@ -709,7 +682,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     ];
   }
 
-  // ── Subject Reading fields ────────────────────────────────────
   List<Widget> _buildSubjectReadingFields(ColorScheme cs) {
     return [
       _dropdown(label: 'Subject', value: _selectedSubject, items: kFmgeSubjects,
@@ -719,7 +691,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     ];
   }
 
-  // ── Other fields ──────────────────────────────────────────────
   List<Widget> _buildOtherFields(ColorScheme cs) {
     return [
       _field(label: 'Title', hint: 'e.g. Review notes', controller: _titleCtrl),
@@ -728,7 +699,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     ];
   }
 
-  // ── Time pickers ──────────────────────────────────────────────
   List<Widget> _buildTimePickers(ColorScheme cs) {
     return [
       const SizedBox(height: 16),
@@ -772,7 +742,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     );
   }
 
-  // ── Focus batch preview ───────────────────────────────────────
   Widget _buildBatchPreview(ThemeData theme, ColorScheme cs, List<FocusBatch> batches) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -810,10 +779,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // Reusable form helpers
-  // ═══════════════════════════════════════════════════════════
-
   Widget _field({
     required String label,
     required String hint,
@@ -843,7 +808,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     required void Function(String?) onChanged,
   }) {
     return DropdownButtonFormField<String>(
-      initialValue: value,
+      value: value,
       decoration: InputDecoration(
         labelText: label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

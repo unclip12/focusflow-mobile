@@ -121,7 +121,6 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Handle ────────────────────────────────────────────────
             Center(
               child: Container(
                 width: 36,
@@ -139,7 +138,6 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
                     ?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 20),
 
-            // ── Activity name ─────────────────────────────────────────
             TextField(
               controller: _activityController,
               decoration: InputDecoration(
@@ -153,7 +151,6 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
             ),
             const SizedBox(height: 16),
 
-            // ── Time pickers ──────────────────────────────────────────
             Row(
               children: [
                 Expanded(
@@ -196,9 +193,8 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
             ),
             const SizedBox(height: 16),
 
-            // ── Category dropdown ─────────────────────────────────────
             DropdownButtonFormField<TimeLogCategory>(
-              initialValue: _category,
+              value: _category,
               decoration: InputDecoration(
                 labelText: 'Category',
                 border: OutlineInputBorder(
@@ -217,7 +213,6 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
             ),
             const SizedBox(height: 16),
 
-            // ── Notes ───────────────────────────────────────────────────
             TextField(
               controller: _notesController,
               decoration: InputDecoration(
@@ -231,7 +226,6 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
             ),
             const SizedBox(height: 24),
 
-            // ── Save button ───────────────────────────────────────────
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
@@ -271,7 +265,6 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
   }
 }
 
-// ── Time picker tile ──────────────────────────────────────────────
 class _TimePicker extends StatelessWidget {
   final String label;
   final String time;

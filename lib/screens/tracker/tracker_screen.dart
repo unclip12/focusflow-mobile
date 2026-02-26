@@ -380,7 +380,6 @@ class _PathomaTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AppProvider>(
       builder: (context, app, _) {
-        // Use G6 pathomaChapters if available, fall back to old pathomaItems
         final chapters = app.pathomaChapters;
 
         if (chapters.isEmpty) {
@@ -397,7 +396,6 @@ class _PathomaTab extends StatelessWidget {
 
         return Column(
           children: [
-            // Progress bar
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Column(
@@ -424,7 +422,6 @@ class _PathomaTab extends StatelessWidget {
                 ],
               ),
             ),
-            // Chapter list
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.only(bottom: 80),
@@ -467,7 +464,6 @@ class _UWorldTab extends StatelessWidget {
 
     return Consumer<AppProvider>(
       builder: (context, app, _) {
-        // Aggregate per subject
         final totals = <String, _SubjectStats>{};
         for (final subj in kFmgeSubjects) {
           totals[subj] = _SubjectStats(0, 0);
@@ -480,7 +476,6 @@ class _UWorldTab extends StatelessWidget {
           }
         }
 
-        // Grand total
         int totalDone = 0;
         for (final v in totals.values) {
           totalDone += v.done;
@@ -489,7 +484,6 @@ class _UWorldTab extends StatelessWidget {
         return ListView(
           padding: const EdgeInsets.only(bottom: 80),
           children: [
-            // Summary card
             Card(
               margin: const EdgeInsets.all(16),
               child: Padding(
@@ -522,8 +516,6 @@ class _UWorldTab extends StatelessWidget {
                 ),
               ),
             ),
-
-            // Per-subject list
             ...kFmgeSubjects.map((subj) {
               final stats = totals[subj]!;
               final pct = stats.done > 0
@@ -573,8 +565,6 @@ class _SubjectStats {
   final int correct;
   const _SubjectStats(this.done, this.correct);
 }
-
-// ── Add UWorld Session Bottom Sheet ──────────────────────────────
 
 class _AddUWorldSessionSheet extends StatefulWidget {
   final String subject;
@@ -766,7 +756,6 @@ class _BulkMarkSheetState extends State<_BulkMarkSheet> {
   void initState() {
     super.initState();
     final app = context.read<AppProvider>();
-    // Find lowest unread page
     final unreadPages = app.faPages
         .where((p) => p.status == 'unread')
         .toList()
@@ -854,7 +843,6 @@ class _BulkMarkSheetState extends State<_BulkMarkSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Drag handle
           Center(
             child: Container(
               width: 40,
@@ -875,7 +863,6 @@ class _BulkMarkSheetState extends State<_BulkMarkSheet> {
             ),
           ),
           const SizedBox(height: 20),
-          // From / To fields side by side
           Row(
             children: [
               Expanded(
@@ -940,9 +927,8 @@ class _BulkMarkSheetState extends State<_BulkMarkSheet> {
             ],
           ),
           const SizedBox(height: 16),
-          // Status dropdown
           DropdownButtonFormField<String>(
-            initialValue: _selectedStatus,
+            value: _selectedStatus,
             decoration: const InputDecoration(
               labelText: 'Mark as',
               border: OutlineInputBorder(),
