@@ -11,6 +11,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import 'package:focusflow_mobile/providers/app_provider.dart';
+import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart' as du;
 
 class DashboardScreen extends StatelessWidget {
@@ -97,14 +98,15 @@ class _DashboardBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
+    final sp = context.watch<SettingsProvider>();
     final cs = Theme.of(context).colorScheme;
 
     final todayStr = du.AppDateUtils.todayKey();
     final now = DateTime.now();
 
-    // ── Exam dates ──────────────────────────────────────────────
-    final fmgeDate = DateTime(2026, 6, 28);
-    final step1Date = DateTime(2026, 6, 15);
+    // ── Exam dates (from Settings) ──────────────────────────────
+    final fmgeDate = DateTime.parse(sp.fmgeDate);
+    final step1Date = DateTime.parse(sp.step1Date);
     final today = DateTime(now.year, now.month, now.day);
     final fmgeDays = fmgeDate.difference(today).inDays;
     final step1Days = step1Date.difference(today).inDays;
@@ -197,7 +199,7 @@ class _DashboardBody extends StatelessWidget {
                     child: _ExamCountdownCard(
                       label: 'FMGE',
                       daysRemaining: fmgeDays,
-                      subtitle: 'Jun 28, 2026',
+                      subtitle: DateFormat('MMM d, y').format(fmgeDate),
                       accentColor: cs.primary,
                     ),
                   ),
@@ -206,7 +208,7 @@ class _DashboardBody extends StatelessWidget {
                     child: _ExamCountdownCard(
                       label: 'Step 1',
                       daysRemaining: step1Days,
-                      subtitle: 'Jun 15, 2026',
+                      subtitle: DateFormat('MMM d, y').format(step1Date),
                       accentColor: Colors.deepOrange,
                     ),
                   ),

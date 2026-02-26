@@ -10,6 +10,7 @@ import 'package:focusflow_mobile/services/notification_service.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
+import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart';
@@ -40,7 +41,10 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
     ('Isha',    20,  5, 20, 35, 20, 15),
   ];
 
-  static const _availableMinutes = 870; // 17h day − 150 min prayer
+  static TimeOfDay _parseTime(String hhmm) {
+    final parts = hhmm.split(':');
+    return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+  }
 
   List<Block> _buildPrayerBlocks() {
     final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
@@ -129,6 +133,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
+    final sp = context.watch<SettingsProvider>();
     final DayPlan? plan = app.getDayPlan(DateFormat('yyyy-MM-dd').format(_selectedDate));
     final realBlocks = List<Block>.from(plan?.blocks ?? []);
 
@@ -141,11 +146,20 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
     }
     displayBlocks.sort((a, b) => a.plannedStartTime.compareTo(b.plannedStartTime));
 
+    // Available time (from Settings)
+    final wake = _parseTime(sp.wakeTime);
+    final sleep = _parseTime(sp.sleepTime);
+    final wakeMinutes = wake.hour * 60 + wake.minute;
+    final sleepMinutes = sleep.hour * 60 + sleep.minute;
+    final daySpan = sleepMinutes - wakeMinutes;
+    const prayerMinutes = 150; // 5 prayers × 30 min
+    final availableMinutes = daySpan - prayerMinutes;
+
     // Planned minutes (real blocks only)
     final plannedMinutes = realBlocks.fold<int>(
       0, (sum, b) => sum + b.plannedDurationMinutes,
     );
-    final isOverflow = _isToday && plannedMinutes > _availableMinutes;
+    final isOverflow = _isToday && plannedMinutes > availableMinutes;
 
     // Calculate streak for scaffold
     final now = DateTime.now();
@@ -204,12 +218,15 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
 
               // ── Available time banner (today only) ──────────────────
               if (_isToday)
-                _AvailableTimeBanner(plannedMinutes: plannedMinutes),
+                _AvailableTimeBanner(
+                  plannedMinutes: plannedMinutes,
+                  availableMinutes: availableMinutes,
+                ),
 
               // ── Overflow warning ────────────────────────────────────
               if (isOverflow)
                 _OverflowWarning(
-                  overflowMinutes: plannedMinutes - _availableMinutes,
+                  overflowMinutes: plannedMinutes - availableMinutes,
                 ),
 
               // ── Block list or empty ─────────────────────────────────
@@ -751,7 +768,11 @@ class _PrayerBlockCard extends StatelessWidget {
 // ── Available time banner ───────────────────────────────────────
 class _AvailableTimeBanner extends StatelessWidget {
   final int plannedMinutes;
-  const _AvailableTimeBanner({required this.plannedMinutes});
+  final int availableMinutes;
+  const _AvailableTimeBanner({
+    required this.plannedMinutes,
+    required this.availableMinutes,
+  });
 
   String _fmt(int mins) {
     final h = mins ~/ 60;
@@ -763,7 +784,7 @@ class _AvailableTimeBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    const available = _TodayPlanScreenState._availableMinutes;
+    final available = availableMinutes;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
