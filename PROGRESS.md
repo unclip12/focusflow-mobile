@@ -1,8 +1,8 @@
 # FocusFlow Mobile — Development Progress
 
-> Last updated: 2026-02-25 (Session 4 — G7 Complete)
+> Last updated: 2026-02-26 (Session 5 — G10 Complete)
 > Session: Claude + Arsh — direct push + Antigravity workflow
-> **App is a personal study OS for Arsh only. Tracker screen live. FA 2025 fully seeded. Bulk marker live.**
+> **App is a personal study OS for Arsh only. Tracker live. Dashboard live. Settings expanded.**
 
 ---
 
@@ -87,7 +87,6 @@
 
 ### Batch G3 — Screen Cleanup
 **Status**: ✅ Complete
-**Commits**: `c200807`, `f1ddad2`, `715a7b5`, `612efe2`
 - `app_router.dart`: 12 dead routes + 11 dead imports removed
 - `constants.dart`: MenuItemId trimmed from 16 → 9 live screens
 - `nav_overlay.dart`: dead map entries + `_extraNavItems` removed
@@ -98,7 +97,6 @@
 
 ### Batch G4 — Bottom Nav Shell
 **Status**: ✅ Complete — CI GREEN ✅
-**Commits**: `2c7dd4b`, `c8a1910`
 - `lib/widgets/main_shell.dart` — ShellRoute builder, 4 pinned tabs + More sheet
 - `lib/app_router.dart` — 8 screens in ShellRoute; `/session` outside
 - `lib/models/app_settings.dart` — `pinnedTabs` + `fullScreenMode` fields
@@ -114,44 +112,24 @@
 **Status**: ✅ Complete — CI GREEN ✅
 **Commit**: `1a38f10`
 
-**New files:**
 - `lib/models/fa_page.dart` — FAPage model (unread → read → anki_done)
 - `lib/models/sketchy_item.dart` — SketchyItem (micro/pharma, status cycling)
 - `lib/models/pathoma_item.dart` — PathomaItem (chapters 1–19, status cycling)
 - `lib/models/uworld_session.dart` — UWorldSession (per-subject Q bank log)
 - `lib/screens/tracker/tracker_screen.dart` — 4-tab tracker
-
-**Modified files:**
 - `database_service.dart` — 4 new tables, DB version 1→2 with onUpgrade migration
 - `app_provider.dart` — data stores, loadAll, full CRUD for all 4 new domains
-- `constants.dart` — tracker menu item, `fa-logger` replaced by `tracker` in default pinned tabs
-- `app_router.dart` — `/tracker` route added
-- `main_shell.dart` — `track_changes_rounded` icon added
-
-**Tracker tabs:**
-| Tab | Content |
-|---|---|
-| FA 2025 | Pages grouped by subject, status chips, tap to cycle |
-| Sketchy | Micro + Pharma grouped by category, status cycling |
-| Pathoma | Chapters 1–19, status cycling |
-| UWorld | Per-subject Q bank totals + log session bottom sheet |
 
 ---
 
 ### Batch G6 — FA 2025 Pre-seed
 **Status**: ✅ Complete — CI GREEN ✅
-**Commits**: `e69f323`, `a7b5c87`, `16781b4`
 
-**New files:**
 - `assets/data/fa_2025_seed.json` — 676 FA pages (31–706) with hierarchical topics
-- `scripts/generate_fa_seed.py` — Python parser that extracts pages from FA text file
+- `scripts/generate_fa_seed.py` — Python parser
 - `lib/services/seed_service.dart` — Seeds SQLite from bundled JSON on first launch
-
-**Modified files:**
 - `lib/main.dart` — `SeedService.seedIfNeeded()` called before `AppProvider.loadAll()`
-- `pubspec.yaml` — `assets/data/` declaration added
-
-**Pages 33–49 pre-marked as "read"** (Arsh's current progress at time of seeding)
+- Pages 33–49 pre-marked as "read"
 
 ---
 
@@ -159,14 +137,60 @@
 **Status**: ✅ Complete — CI GREEN ✅
 **Commit**: `919bf7d`
 
-**What was built:**
 - FAB on FA 2025 tab → opens `_BulkMarkSheet` bottom sheet
 - From/To page range fields (prefilled with next 10 unread pages)
 - Status dropdown: Read | Anki Done
-- `bulkMarkFAPages(from, to, status)` method in AppProvider
-- SnackBar confirmation: "✅ X pages marked as Read"
-- 🎉 Celebration SnackBar if X >= 10 pages marked at once
-- Full validation (31–706 range, to >= from)
+- `bulkMarkFAPages(from, to, status)` in AppProvider
+- 🎉 Celebration SnackBar if ≥ 10 pages marked at once
+- Full validation (31–706 range)
+
+---
+
+### Batch G8 — Dashboard Full Rebuild
+**Status**: ✅ Complete — CI GREEN ✅
+**Commit**: `0638e46`
+
+- Dual exam countdown cards (FMGE · Step 1)
+- Today's study stats: Today / This Week / Streak
+- FA 2025 progress bar (X/676)
+- Revision queue status
+- 7-day activity heatmap
+- Subject breakdown (top 4 by time)
+
+---
+
+### Batch G9 — Today's Plan Enhancements
+**Status**: ✅ Complete — CI GREEN ✅
+**Commit**: `d9684b2`
+
+- Prayer blocks (Fajr/Zuhr/Asr/Maghrib/Isha) injected into timeline (today only, non-deletable)
+- Available time banner (14h 30m after prayer deduction)
+- Overflow warning if planned time > 870 min
+
+---
+
+### Batch G10 (Rogue) — Prayer Times + Notifications
+**Status**: ✅ Complete — CI GREEN ✅
+**Commit**: `371c58a`
+
+- Real Vijayawada prayer times hardcoded
+- `lib/services/notification_service.dart` added
+- Local push notifications for prayer times
+- Wired into `main.dart`
+
+---
+
+### Batch G10 — Settings Expansion
+**Status**: ✅ Complete — CI GREEN ✅
+**Commit**: `09c242d`
+
+- `AppSettings` new fields: fmgeDate, step1Date, wakeTime, sleepTime, dailyFAGoal, ankiBatchSize
+- `SettingsProvider` new getters + setters for all 6 fields
+- Settings screen 4 new sections:
+  - **Exam Dates**: FMGE + Step 1 date pickers
+  - **Daily Goals**: FA pages/day slider + Anki cards/day slider
+  - **Daily Schedule**: Wake time + Sleep time pickers
+  - **Navigation**: Pinned tab chip manager (add/remove, max 4)
 
 ---
 
@@ -174,43 +198,8 @@
 
 ---
 
-### Batch G8 — Dashboard Full Rebuild
-**Status**: 📋 Next — Claude direct push
-- Dual exam countdown (FMGE: X days, Step 1: ~Y days)
-- Available time block + pace insight row
-- Today's goals row: FA progress bar, Anki, Sketchy, Revision due
-- Streak + motivation row
-
----
-
-### Batch G9 — Today's Plan Rebuild
-**Status**: 📋 Planned — Gemini Pro High
-- Available time calculator
-- Prayer blocks auto-populated from Settings
-- Task types: FA Pages, Sketchy, Pathoma, Anki, UWorld, Personal, Break
-- Overflow alert if plan exceeds available time
-
----
-
-### Batch G10 — Settings Expansion
-**Status**: 📋 Planned — Claude Sonnet 4.6
-- Exam Dates: FMGE date, Step 1 date
-- Sleep/Wake time, daily FA goal, Anki batch size
-- Prayer times: 5 prayers with azan time
-- Nav customizer: pick 4 pinned bottom tabs
-- Full Screen Mode toggle
-
----
-
-### Batch G11 — Motivation System (Lottie)
-**Status**: 📋 Planned — Gemini Flash
-- `lottie` package, `CelebrationOverlay` widget
-- Triggers: 10 pages/day, Anki batch done, all revisions cleared, 7-day streak etc.
-
----
-
-### Batch G12 — Claude Import Window
-**Status**: 📋 Planned — Gemini Pro High
+### Batch G11 — Claude Import Window
+**Status**: 📋 Next — Antigravity
 - JSON paste area → parse → action preview → confirm → execute
 - Actions: mark_fa_pages_read, mark_fa_anki_done, add_today_task,
   log_uworld_session, set_daily_goals, set_exam_dates,
@@ -218,8 +207,8 @@
 
 ---
 
-### Batch G13 — Auto Local Backup
-**Status**: 📋 Planned — Gemini Pro High
+### Batch G12 — Auto Local Backup
+**Status**: 📋 Planned
 - `lib/services/backup_service.dart`
 - Saves full app state to device as JSON after every significant change
 - Manual export/import in Settings
@@ -227,13 +216,13 @@
 ---
 
 ### Batch H — Analytics
-**Status**: 📋 Planned — Gemini Flash
+**Status**: 📋 Planned
 - FA pages/day 7-day bar chart, subject distribution pie, pace projection line
 
 ---
 
 ### Batch I — Final Polish
-**Status**: 📋 Planned — Gemini Flash
+**Status**: 📋 Planned
 - Wake alarm, math challenge, app icon, splash, onboarding, v1.0.0
 
 ---
@@ -242,12 +231,11 @@
 
 | Issue | Severity | Status |
 |---|---|---|
+| No Claude Import window yet | High | G11 ← Next |
+| No auto backup | High | G12 |
+| Dashboard hardcodes exam dates (not from Settings yet) | Medium | fix in G11 |
+| Available time banner ignores Settings wake/sleep time | Medium | fix in G11 |
 | Analytics screen is placeholder | Medium | Batch H |
-| No Claude Import window yet | High | G12 |
-| No auto backup | High | G13 |
-| No prayer time settings | Medium | G10 |
-| No exam date settings | Medium | G10 |
-| Dashboard needs full rebuild | High | G8 ← Next |
 
 ---
 
@@ -260,13 +248,11 @@
 | Feb 25, 2026 AM | MASTER_PLAN.md + PROGRESS.md created |
 | Feb 25, 2026 PM | G1 ✅ G2 ✅ confirmed |
 | Feb 25, 2026 PM | Full app vision reset — personal study OS |
-| Feb 25, 2026 PM | FA 2025 section map, design language, batch plan G3–I defined |
-| Feb 25, 2026 PM | G3 ✅ — routes + constants + nav cleaned, 5 CI errors fixed |
-| Feb 25, 2026 PM | G3b ✅ — 10 orphaned screen directories deleted |
-| Feb 25, 2026 PM | G4 ✅ — ShellRoute + bottom nav + More sheet + fullScreenMode — CI GREEN |
-| Feb 25, 2026 PM | G5 ✅ — Unified Tracker screen (FA/Sketchy/Pathoma/UWorld) + 4 models + DB v2 — CI GREEN |
-| Feb 25, 2026 PM | G6 ✅ — FA 2025 seed JSON (676 pages) + SeedService + wired into main.dart — CI GREEN |
-| Feb 25, 2026 PM | **G7 ✅** — Bulk FA page range marker + celebration snackbar — CI GREEN |
+| Feb 25, 2026 PM | G3 ✅ G3b ✅ G4 ✅ G5 ✅ G6 ✅ G7 ✅ — CI GREEN all |
+| Feb 25, 2026 PM | G8 ✅ — Dashboard full rebuild |
+| Feb 25, 2026 PM | G9 ✅ — Prayer blocks + available time + overflow |
+| Feb 25, 2026 PM | G10 Rogue ✅ — Prayer notifications |
+| Feb 26, 2026 PM | **G10 ✅** — Settings expansion (exam dates, goals, schedule, nav pins) |
 
 ---
 
@@ -275,8 +261,7 @@
 | Status | Pages | Subject |
 |---|---|---|
 | ✅ Read | 33–49 | Biochemistry (early sections) |
-| ⬜ Not started | 50–92 | Biochemistry (remaining) |
-| ⬜ Not started | 93–706 | Everything else |
+| ⬜ Not started | 50–706 | Everything else |
 
-**Next pages:** 50 onwards (Biochemistry continuing)
-**Exams:** FMGE June 28 · Step 1 ~June 2026 · 123 days
+**Next pages:** 50 onwards
+**Exams:** FMGE Jun 28 · Step 1 ~Jun 15 · ~122 days remaining
