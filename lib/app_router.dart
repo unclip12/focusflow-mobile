@@ -19,6 +19,7 @@ import 'package:focusflow_mobile/screens/fa_logger/fa_logger_screen.dart';
 import 'package:focusflow_mobile/screens/analytics/analytics_screen.dart';
 import 'package:focusflow_mobile/screens/session/session_screen.dart';
 import 'package:focusflow_mobile/screens/tracker/tracker_screen.dart';
+import 'package:focusflow_mobile/screens/import/import_screen.dart';
 
 // ── Route names ─────────────────────────────────────────────────
 class Routes {
@@ -103,6 +104,10 @@ final GoRouter appRouter = GoRouter(
           path: '/tracker',
           name: Routes.tracker,
           builder: (context, state) => const TrackerScreen(),
+        ),
+        GoRoute(
+          path: '/import',
+          builder: (_, __) => const ImportScreen(),
         ),
       ],
     ),

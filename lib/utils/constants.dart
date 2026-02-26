@@ -50,6 +50,7 @@ const Map<String, String> kPinnableScreenLabels = {
   MenuItemId.timeLogger:    'Time Log',
   MenuItemId.analytics:     'Analytics',
   MenuItemId.settings:      'Settings',
+  'import':                 'Import',
 };
 
 // Default 4 pinned tabs shown in bottom nav
