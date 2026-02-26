@@ -38,7 +38,6 @@ class _ImportScreenState extends State<ImportScreen> {
   final TextEditingController _jsonCtrl = TextEditingController();
   List<_ParsedAction> _actions = [];
   String? _parseError;
-  bool _executed = false;
 
   @override
   void dispose() {
@@ -51,7 +50,6 @@ class _ImportScreenState extends State<ImportScreen> {
     setState(() {
       _parseError = null;
       _actions = [];
-      _executed = false;
     });
 
     final text = _jsonCtrl.text.trim();
@@ -288,7 +286,6 @@ class _ImportScreenState extends State<ImportScreen> {
     if (!mounted) return;
 
     setState(() {
-      _executed = true;
       _actions = [];
       _jsonCtrl.clear();
     });
@@ -304,7 +301,6 @@ class _ImportScreenState extends State<ImportScreen> {
       _jsonCtrl.clear();
       _actions = [];
       _parseError = null;
-      _executed = false;
     });
   }
 
@@ -359,7 +355,7 @@ class _ImportScreenState extends State<ImportScreen> {
                       )
                     : null,
               ),
-              onChanged: (_) => setState(() {}), // refresh clear button
+              onChanged: (_) => setState(() {}),
             ),
 
             const SizedBox(height: 12),
