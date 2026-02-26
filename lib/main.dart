@@ -7,6 +7,7 @@ import 'providers/settings_provider.dart';
 import 'services/database_service.dart';
 import 'services/notification_service.dart';
 import 'services/seed_service.dart';
+import 'services/uworld_seed.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +20,9 @@ void main() async {
 
   // Seed FA 2025 pages from bundled JSON on first launch
   await SeedService.seedIfNeeded();
+
+  // Seed UWorld Data (V4)
+  await DatabaseService.instance.seedUWorld(uworldSeed);
 
   // Portrait-only layout
   await SystemChrome.setPreferredOrientations([

@@ -5,14 +5,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
-import 'package:intl/intl.dart';
-
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/fa_page.dart';
 import 'package:focusflow_mobile/models/sketchy_video.dart';
-import 'package:focusflow_mobile/models/uworld_session.dart';
-import 'package:focusflow_mobile/utils/constants.dart';
+import 'package:focusflow_mobile/models/uworld_topic.dart';
 
 class TrackerScreen extends StatefulWidget {
   const TrackerScreen({super.key});
@@ -345,8 +341,9 @@ class _SketchyVideoList extends StatelessWidget {
                           dense: true,
                           value: v.watched,
                           onChanged: (val) {
-                            if (v.id != null) {
-                              onToggle(v.id!, val ?? false);
+                            final id = v.id;
+                            if (id != null) {
+                              onToggle(id, val ?? false);
                             }
                           },
                           title: Text(
@@ -431,9 +428,9 @@ class _PathomaTab extends StatelessWidget {
                   return CheckboxListTile(
                     value: ch.watched,
                     onChanged: (val) {
-                      if (ch.id != null) {
-                        app.togglePathomaChapterWatched(
-                            ch.id!, val ?? false);
+                      final id = ch.id;
+                      if (id != null) {
+                        app.togglePathomaChapterWatched(id, val ?? false);
                       }
                     },
                     title: Text('Ch ${ch.chapter} — ${ch.title}'),
@@ -460,137 +457,231 @@ class _UWorldTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return Consumer<AppProvider>(
       builder: (context, app, _) {
-        final totals = <String, _SubjectStats>{};
-        for (final subj in kFmgeSubjects) {
-          totals[subj] = _SubjectStats(0, 0);
-        }
-        for (final s in app.uWorldSessions) {
-          final current = totals[s.subject];
-          if (current != null) {
-            totals[s.subject] =
-                _SubjectStats(current.done + s.done, current.correct + s.correct);
-          }
+        final topics = app.uworldTopics;
+
+        if (topics.isEmpty) {
+          return const _EmptyPlaceholder(
+            icon: Icons.quiz_rounded,
+            text: 'UWorld topics will appear here.',
+          );
         }
 
+        final cs = Theme.of(context).colorScheme;
+        
+        // Calculate totals
         int totalDone = 0;
-        for (final v in totals.values) {
-          totalDone += v.done;
+        int totalQs = 0;
+        int totalCorrect = 0;
+        
+        for (final t in topics) {
+          totalDone += t.doneQuestions;
+          totalQs += t.totalQuestions;
+          totalCorrect += t.correctQuestions;
         }
+        
+        final overallPct = totalDone > 0 ? (totalCorrect * 100 ~/ totalDone) : 0;
+        final overallProgress = totalQs > 0 ? totalDone / totalQs : 0.0;
 
-        return ListView(
-          padding: const EdgeInsets.only(bottom: 80),
+        // Group by system
+        final grouped = <String, List<UWorldTopic>>{};
+        for (final t in topics) {
+          grouped.putIfAbsent(t.system, () => []).add(t);
+        }
+        
+        // Ensure consistent order (e.g. general principles first, then alphabetical)
+        final systems = grouped.keys.toList()
+          ..sort((a, b) {
+            final aGen = a.contains('General Principles');
+            final bGen = b.contains('General Principles');
+            if (aGen && !bGen) return -1;
+            if (!aGen && bGen) return 1;
+            return a.compareTo(b);
+          });
+
+        return Column(
           children: [
-            Card(
-              margin: const EdgeInsets.all(16),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 20, vertical: 16),
-                child: Row(
-                  children: [
-                    Icon(Icons.quiz_rounded, color: cs.primary, size: 28),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Total Questions',
-                          style: TextStyle(
-                            color: cs.onSurfaceVariant,
-                            fontSize: 12,
-                          ),
+            // Sticky Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              color: cs.surface,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '$totalDone / $totalQs done',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurfaceVariant,
                         ),
-                        Text(
-                          '$totalDone done',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
+                      ),
+                      Text(
+                        '$overallPct% accuracy',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurfaceVariant,
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: overallProgress,
+                      minHeight: 8,
+                      backgroundColor: cs.surfaceContainerHighest,
+                      valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-            ...kFmgeSubjects.map((subj) {
-              final stats = totals[subj]!;
-              final pct = stats.done > 0
-                  ? (stats.correct * 100 ~/ stats.done)
-                  : 0;
-              final subtitle = stats.done > 0
-                  ? '${stats.done}q done · $pct% correct'
-                  : '0q done';
-
-              return ListTile(
-                title: Text(subj),
-                subtitle: Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: cs.onSurfaceVariant,
-                    fontSize: 12,
-                  ),
-                ),
-                trailing: IconButton(
-                  icon: Icon(Icons.add_circle_outline_rounded,
-                      color: cs.primary),
-                  onPressed: () =>
-                      _showAddSessionSheet(context, subj),
-                ),
-              );
-            }),
+            
+            // Body - ListView of Systems
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.only(bottom: 80),
+                itemCount: systems.length,
+                itemBuilder: (context, i) {
+                  final sys = systems[i];
+                  final subs = grouped[sys]!;
+                  
+                  int sysDone = 0;
+                  int sysTotal = 0;
+                  for (final s in subs) {
+                    sysDone += s.doneQuestions;
+                    sysTotal += s.totalQuestions;
+                  }
+                  
+                  return ExpansionTile(
+                    title: Text(sys, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    trailing: Text(
+                      '$sysDone / $sysTotal',
+                      style: TextStyle(
+                        color: cs.onSurfaceVariant,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    children: subs.map((sub) {
+                      final subPct = sub.doneQuestions > 0 
+                          ? (sub.correctQuestions * 100 ~/ sub.doneQuestions)
+                          : 0;
+                      final subProgress = sub.totalQuestions > 0 
+                          ? sub.doneQuestions / sub.totalQuestions 
+                          : 0.0;
+                          
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                        title: Text(
+                          sub.subtopic,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 60,
+                                child: Text(
+                                  '${sub.doneQuestions} / ${sub.totalQuestions}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(2),
+                                  child: LinearProgressIndicator(
+                                    value: subProgress,
+                                    minHeight: 4,
+                                    backgroundColor: cs.surfaceContainerHighest,
+                                    valueColor: AlwaysStoppedAnimation<Color>(cs.primary.withValues(alpha: 0.7)),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                            ],
+                          ),
+                        ),
+                        trailing: sub.doneQuestions > 0
+                            ? Chip(
+                                label: Text('$subPct%'),
+                                padding: EdgeInsets.zero,
+                                labelStyle: TextStyle(
+                                  fontSize: 11,
+                                  color: cs.onSurface,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                visualDensity: VisualDensity.compact,
+                                backgroundColor: cs.surfaceContainerHigh,
+                                side: BorderSide.none,
+                              )
+                            : const SizedBox(width: 48), // Placeholder to align
+                        onTap: () => _editSubtopicProgress(context, sub),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            ),
           ],
         );
       },
     );
   }
 
-  void _showAddSessionSheet(BuildContext context, String subject) {
+  void _editSubtopicProgress(BuildContext context, UWorldTopic sub) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => _AddUWorldSessionSheet(subject: subject),
+      builder: (_) => _EditUWorldProgressSheet(topic: sub),
     );
   }
 }
 
-class _SubjectStats {
-  final int done;
-  final int correct;
-  const _SubjectStats(this.done, this.correct);
-}
-
-class _AddUWorldSessionSheet extends StatefulWidget {
-  final String subject;
-  const _AddUWorldSessionSheet({required this.subject});
+class _EditUWorldProgressSheet extends StatefulWidget {
+  final UWorldTopic topic;
+  const _EditUWorldProgressSheet({required this.topic});
 
   @override
-  State<_AddUWorldSessionSheet> createState() =>
-      _AddUWorldSessionSheetState();
+  State<_EditUWorldProgressSheet> createState() => _EditUWorldProgressSheetState();
 }
 
-class _AddUWorldSessionSheetState extends State<_AddUWorldSessionSheet> {
-  final _doneCtrl = TextEditingController();
-  final _correctCtrl = TextEditingController();
-  late DateTime _selectedDate;
+class _EditUWorldProgressSheetState extends State<_EditUWorldProgressSheet> {
+  late int _done;
+  late int _correct;
 
   @override
   void initState() {
     super.initState();
-    _selectedDate = DateTime.now();
+    _done = widget.topic.doneQuestions;
+    _correct = widget.topic.correctQuestions;
   }
 
-  @override
-  void dispose() {
-    _doneCtrl.dispose();
-    _correctCtrl.dispose();
-    super.dispose();
+  void _updateDone(int delta) {
+    setState(() {
+      _done = (_done + delta).clamp(0, widget.topic.totalQuestions);
+      _correct = _correct.clamp(0, _done); // Correct can't exceed done
+    });
+  }
+
+  void _updateCorrect(int delta) {
+    setState(() {
+      _correct = (_correct + delta).clamp(0, _done);
+    });
   }
 
   @override
@@ -612,7 +703,7 @@ class _AddUWorldSessionSheetState extends State<_AddUWorldSessionSheet> {
             child: Container(
               width: 40,
               height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
+              margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
                 color: cs.outlineVariant,
                 borderRadius: BorderRadius.circular(2),
@@ -620,7 +711,7 @@ class _AddUWorldSessionSheetState extends State<_AddUWorldSessionSheet> {
             ),
           ),
           Text(
-            'Log UWorld Session',
+            widget.topic.subtopic,
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
@@ -629,67 +720,86 @@ class _AddUWorldSessionSheetState extends State<_AddUWorldSessionSheet> {
           ),
           const SizedBox(height: 4),
           Text(
-            widget.subject,
+            widget.topic.system,
             style: TextStyle(color: cs.primary, fontWeight: FontWeight.w600),
           ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: _doneCtrl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Questions Done',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _correctCtrl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Correct',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          InkWell(
-            onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: _selectedDate,
-                firstDate: DateTime(2024),
-                lastDate: DateTime.now(),
-              );
-              if (picked != null) {
-                setState(() => _selectedDate = picked);
-              }
-            },
-            child: InputDecorator(
-              decoration: const InputDecoration(
-                labelText: 'Date',
-                border: OutlineInputBorder(),
+          const SizedBox(height: 28),
+          
+          // Row 1: Done
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Questions done:',
+                style: TextStyle(fontSize: 16, color: cs.onSurface),
               ),
-              child: Text(DateFormat('yyyy-MM-dd').format(_selectedDate)),
-            ),
+              Row(
+                children: [
+                  IconButton.filledTonal(
+                    onPressed: _done > 0 ? () => _updateDone(-1) : null,
+                    icon: const Icon(Icons.remove),
+                    iconSize: 20,
+                  ),
+                  SizedBox(
+                    width: 48,
+                    child: Text(
+                      '$_done',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  IconButton.filledTonal(
+                    onPressed: _done < widget.topic.totalQuestions ? () => _updateDone(1) : null,
+                    icon: const Icon(Icons.add),
+                    iconSize: 20,
+                  ),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+          
+          // Row 2: Correct
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Correct:',
+                style: TextStyle(fontSize: 16, color: cs.onSurface),
+              ),
+              Row(
+                children: [
+                  IconButton.filledTonal(
+                    onPressed: _correct > 0 ? () => _updateCorrect(-1) : null,
+                    icon: const Icon(Icons.remove),
+                    iconSize: 20,
+                  ),
+                  SizedBox(
+                    width: 48,
+                    child: Text(
+                      '$_correct',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  IconButton.filledTonal(
+                    onPressed: _correct < _done ? () => _updateCorrect(1) : null,
+                    icon: const Icon(Icons.add),
+                    iconSize: 20,
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+          
           SizedBox(
             width: double.infinity,
             child: FilledButton(
               onPressed: () {
-                final done = int.tryParse(_doneCtrl.text.trim()) ?? 0;
-                final correct =
-                    int.tryParse(_correctCtrl.text.trim()) ?? 0;
-                if (done <= 0) return;
-
-                final session = UWorldSession(
-                  id: const Uuid().v4(),
-                  subject: widget.subject,
-                  done: done,
-                  correct: correct,
-                  date: DateFormat('yyyy-MM-dd').format(_selectedDate),
-                );
-                context.read<AppProvider>().addUWorldSession(session);
-                Navigator.of(context).pop();
+                final app = context.read<AppProvider>();
+                app.updateUWorldProgress(widget.topic.id!, _done, _correct);
+                Navigator.pop(context);
               },
               child: const Text('Save'),
             ),

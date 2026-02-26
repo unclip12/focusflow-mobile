@@ -8,14 +8,14 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 import 'package:focusflow_mobile/models/sketchy_video.dart';
+import 'package:focusflow_mobile/models/uworld_topic.dart';
 import 'package:focusflow_mobile/models/pathoma_chapter.dart';
-
 class DatabaseService {
   DatabaseService._();
   static final DatabaseService instance = DatabaseService._();
 
   static const _dbName = 'focusflow.db';
-  static const _dbVersion = 3;
+  static const _dbVersion = 4;
 
   Database? _database;
 
@@ -60,6 +60,7 @@ class DatabaseService {
   static const tSketchyMicroVideos = 'sketchy_micro_videos';
   static const tSketchyPharmVideos = 'sketchy_pharm_videos';
   static const tPathomaChapters = 'pathoma_chapters';
+  static const tUworldTopics = 'uworld_topics';
 
   Future<void> _onCreate(Database db, int version) async {
     // Knowledge Base — pageNumber is the primary key
@@ -283,12 +284,29 @@ class DatabaseService {
     ''');
   }
 
+  /// Create UWorld topics table (Version 4).
+  Future<void> _createV4Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tUworldTopics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        system TEXT NOT NULL,
+        subtopic TEXT NOT NULL,
+        total_questions INTEGER NOT NULL,
+        done_questions INTEGER NOT NULL DEFAULT 0,
+        correct_questions INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+  }
+
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await _createG5Tables(db);
     }
     if (oldVersion < 3) {
       await _createG6Tables(db);
+    }
+    if (oldVersion < 4) {
+      await _createV4Tables(db);
     }
   }
 
@@ -776,6 +794,39 @@ class DatabaseService {
   }
 
   // ═══════════════════════════════════════════════════════════════
+  // UWORLD TOPICS (v4)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> seedUWorld(List<UWorldTopic> topics) async {
+    final db = await database;
+    final count = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM uworld_topics'),
+    );
+    if (count != null && count > 0) return;
+    final batch = db.batch();
+    for (final t in topics) {
+      batch.insert('uworld_topics', t.toMap());
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<UWorldTopic>> getUWorldTopics() async {
+    final db = await database;
+    final rows = await db.query('uworld_topics', orderBy: 'id ASC');
+    return rows.map(UWorldTopic.fromMap).toList();
+  }
+
+  Future<void> updateUWorldProgress(int id, int done, int correct) async {
+    final db = await database;
+    await db.update(
+      'uworld_topics',
+      {'done_questions': done, 'correct_questions': correct},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // BULK OPERATIONS (for backup restore)
   // ═══════════════════════════════════════════════════════════════
 
@@ -788,7 +839,7 @@ class DatabaseService {
         tTimeLogs, tDailyTracker, tStudyEntries, tStudyMaterials,
         tMentorMessages, tMentorMemory, tAiSettings, tUserProfile,
         tSettings, tHistory, tRevisionSettings, tRevisionItems,
-        tFaPages, tSketchyItems, tPathomaItems, tUworldSessions,
+        tFaPages, tSketchyItems, tPathomaItems, tUworldSessions, tUworldTopics,
         tSketchyMicroVideos, tSketchyPharmVideos, tPathomaChapters,
       ]) {
         await txn.delete(table);

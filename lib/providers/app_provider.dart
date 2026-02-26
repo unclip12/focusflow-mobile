@@ -28,6 +28,7 @@ import 'package:focusflow_mobile/models/sketchy_item.dart';
 import 'package:focusflow_mobile/models/pathoma_item.dart';
 import 'package:focusflow_mobile/models/sketchy_video.dart';
 import 'package:focusflow_mobile/models/pathoma_chapter.dart';
+import 'package:focusflow_mobile/models/uworld_topic.dart';
 import 'package:focusflow_mobile/models/uworld_session.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 
@@ -130,6 +131,7 @@ class AppProvider extends ChangeNotifier {
   List<SketchyVideo> sketchyMicroVideos = [];
   List<SketchyVideo> sketchyPharmVideos = [];
   List<PathomaChapter> pathomaChapters = [];
+  List<UWorldTopic> uworldTopics = [];
 
   MentorMemory? mentorMemory;
   AISettings? aiSettings;
@@ -199,6 +201,7 @@ class AppProvider extends ChangeNotifier {
     sketchyMicroVideos = await _db.getSketchyMicroVideos();
     sketchyPharmVideos = await _db.getSketchyPharmVideos();
     pathomaChapters = await _db.getPathomaChapters();
+    uworldTopics = await _db.getUWorldTopics();
 
     // Singletons
     final memJson = await _db.getMentorMemory();
@@ -667,6 +670,21 @@ class AppProvider extends ChangeNotifier {
     await _db.deleteUWorldSession(id);
     uWorldSessions.removeWhere((s) => s.id == id);
     notifyListeners();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // UWORLD PROGRESS (G6/V4)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> loadUWorldTopics() async {
+    uworldTopics = await _db.getUWorldTopics();
+    notifyListeners();
+  }
+
+  Future<void> updateUWorldProgress(int id, int done, int correct) async {
+    await _db.updateUWorldProgress(id, done, correct);
+    await loadUWorldTopics();
+    unawaited(_triggerBackup());
   }
 
   // ═══════════════════════════════════════════════════════════════
