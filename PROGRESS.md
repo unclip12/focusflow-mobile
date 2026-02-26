@@ -1,8 +1,8 @@
 # FocusFlow Mobile — Development Progress
 
-> Last updated: 2026-02-26 (Session 5 — G13 Complete)
+> Last updated: 2026-02-26 (Session 5 — Batch I Complete)
 > Session: Claude + Arsh — direct push + Antigravity workflow
-> **App is a personal study OS for Arsh only. All core screens live. Analytics live. Backup live.**
+> **App is a personal study OS for Arsh only. All core screens live. Full tracker suite live.**
 
 ---
 
@@ -59,17 +59,33 @@
 **Status**: ✅ Complete — FA progress charts, study time bars, UWorld line chart, resource tracker
 **Commit**: `ff4a1ad`
 
+### Batch H — Final Polish
+**Status**: ✅ Complete — Dynamic exam dates, available time, app icon, splash
+**Commit**: `91fa54c`
+
+### Batch I — Sketchy Micro + Pharm + Pathoma Seed & Tracker UI
+**Status**: ✅ Complete
+- SketchyVideo + PathomaChapter models with SQLite serdes
+- 117 Sketchy Micro videos seeded (Bacteria, Fungi, Viruses, Parasites)
+- 128 Sketchy Pharm videos seeded (12 categories, 40+ subcategories)
+- 19 Pathoma chapters seeded
+- DB bumped to v3 with 3 new tables
+- AppProvider wired: load, toggle, memory-clear
+- tracker_screen.dart: Sketchy tab has Micro/Pharm sub-tabs; Pathoma tab with 19 chapters
+- 0 lint warnings, 0 regressions
+**Commit**: `118d4cd`
+
 ---
 
 ## 🔄 Up Next
 
-### Batch H — Final Polish
+### Batch J — UWorld Seed & Tracker UI
 **Status**: 📋 Next
-- App icon + splash screen
-- Onboarding flow (first launch)
-- v1.0.0 release prep
-- Dashboard wired to Settings exam dates (not hardcoded)
-- Available time banner uses Settings wake/sleep time
+- 3,661 questions across 116 subtopics, 23 systems
+- uworld_topics table (done_questions + correct_questions tracking)
+- UWorldTopic model
+- ExpansionTile grouped UI, accuracy %, quick increment bottom sheet
+- Total header: "X / 3661 done | XX% accuracy"
 
 ---
 
@@ -77,14 +93,12 @@
 
 | Issue | Severity | Status |
 |---|---|---|
-| Dashboard hardcodes exam dates | Medium | Batch H |
-| Available time banner ignores wake/sleep settings | Medium | Batch H |
-| No app icon / splash | Medium | Batch H |
-| No onboarding | Low | Batch H |
+| UWorld tracker not yet seeded with real data | High | Batch J |
+| No onboarding | Low | Future |
 
 ---
 
-## 📆 Session Log
+## 📅 Session Log
 
 | Date | Work Done |
 |---|---|
@@ -92,14 +106,18 @@
 | Feb 25, 2026 AM | Batch F, G1–G2 |
 | Feb 25, 2026 PM | G3 ✅ G4 ✅ G5 ✅ G6 ✅ G7 ✅ G8 ✅ G9 ✅ G10(rogue) ✅ |
 | Feb 26, 2026 AM | G10 ✅ G11 ✅ G12 ✅ G13 ✅ — CI GREEN all |
+| Feb 26, 2026 PM | H ✅ I ✅ — Full tracker suite live, CI GREEN |
 
 ---
 
-## 📌 Arsh's Current FA Progress
+## 📌 Arsh's Current Progress
 
-| Status | Pages |
-|---|---|
-| ✅ Read | 33–49 |
-| ⬜ Not started | 50–706 |
+| Resource | Done | Total | % |
+|---|---|---|---|
+| FA 2025 | 17 pages | 676 | 2.5% |
+| Sketchy Micro | 0 | 117 | 0% |
+| Sketchy Pharm | 0 | 128 | 0% |
+| Pathoma | 0 | 19 | 0% |
+| UWorld | 0 | 3,661 | 0% |
 
 **Exams:** FMGE Jun 28 · Step 1 Jun 15 · ~122 days
