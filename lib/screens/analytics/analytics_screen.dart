@@ -1,10 +1,7 @@
 // =============================================================
-// AnalyticsScreen — full analytics dashboard
-// Sections: Study Hours bar chart, Category pie chart,
-//           Block completion line chart, Streak history,
-//           Subject breakdown.
-// Time range selector: 7d / 30d / 90d in header.
-// Android rules: resizeToAvoidBottomInset: true (AppScaffold).
+// AnalyticsScreen — full analytics dashboard (G13)
+// Sections: FA Progress, Study Time, Subject Breakdown,
+//           UWorld Performance, Resource Completion.
 // =============================================================
 
 import 'package:flutter/material.dart';
@@ -13,884 +10,861 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import 'package:focusflow_mobile/providers/app_provider.dart';
-import 'package:focusflow_mobile/utils/constants.dart';
+import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/widgets/app_scaffold.dart';
-import 'package:focusflow_mobile/screens/analytics/analytics_chart_card.dart';
-import 'package:focusflow_mobile/screens/analytics/subject_breakdown_card.dart';
 
-// ── Colour palette for pie / legend ──────────────────────────────
-const _kPieColors = [
-  Color(0xFF6366F1), // indigo  – study
-  Color(0xFF8B5CF6), // violet  – revision
-  Color(0xFFEC4899), // pink    – qbank
-  Color(0xFFF59E0B), // amber   – anki
-  Color(0xFF3B82F6), // blue    – video
-  Color(0xFF10B981), // emerald – notes
-  Color(0xFF94A3B8), // slate   – other
-];
-
-class AnalyticsScreen extends StatefulWidget {
+class AnalyticsScreen extends StatelessWidget {
   const AnalyticsScreen({super.key});
 
   @override
-  State<AnalyticsScreen> createState() => _AnalyticsScreenState();
-}
-
-class _AnalyticsScreenState extends State<AnalyticsScreen> {
-  int _rangeDays = 7; // 7 | 30 | 90
-
-  // ── Range helper ───────────────────────────────────────────────
-  String get _rangeBadge => '${_rangeDays}d';
-
-  // ── Build date-range filter ────────────────────────────────────
-  bool _inRange(String dateStr) {
-    final date = DateTime.tryParse(dateStr);
-    if (date == null) return false;
-    return DateTime.now().difference(date).inDays < _rangeDays;
-  }
-
-  // ── Daily hours map ────────────────────────────────────────────
-  Map<String, double> _buildDailyHours(AppProvider app) {
-    final map = <String, double>{};
-    for (final log in app.timeLogs) {
-      if (!_inRange(log.date)) continue;
-      map[log.date] = (map[log.date] ?? 0) + log.durationMinutes / 60.0;
-    }
-    return map;
-  }
-
-  // ── Category breakdown ─────────────────────────────────────────
-  Map<TimeLogCategory, double> _buildCategoryHours(AppProvider app) {
-    final map = <TimeLogCategory, double>{};
-    for (final log in app.timeLogs) {
-      if (!_inRange(log.date)) continue;
-      map[log.category] =
-          (map[log.category] ?? 0) + log.durationMinutes / 60.0;
-    }
-    return map;
-  }
-
-  // ── Block completion rate per day ──────────────────────────────
-  /// Returns list of (date, completionFraction) sorted ascending.
-  List<_DayCompletion> _buildCompletionRate(AppProvider app) {
-    final result = <_DayCompletion>[];
-    for (final plan in app.dayPlans) {
-      if (!_inRange(plan.date)) continue;
-      final blocks = plan.blocks ?? [];
-      if (blocks.isEmpty) continue;
-      final done =
-          blocks.where((b) => b.status.value == 'COMPLETED').length;
-      result.add(_DayCompletion(
-        date:     plan.date,
-        fraction: done / blocks.length,
-      ));
-    }
-    result.sort((a, b) => a.date.compareTo(b.date));
-    return result;
-  }
-
-  // ── Subject breakdown (from timeLogs.activity) ─────────────────
-  /// Returns `AppProvider.getSubjectBreakdown()` equivalent:
-  /// group by activity (subject label) for study/revision logs only.
-  List<SubjectEntry> _buildSubjectBreakdown(AppProvider app) {
-    final map = <String, double>{};
-    final studyCats = {
-      TimeLogCategory.study,
-      TimeLogCategory.revision,
-      TimeLogCategory.video,
-      TimeLogCategory.qbank,
-      TimeLogCategory.anki,
-    };
-
-    for (final log in app.timeLogs) {
-      if (!_inRange(log.date)) continue;
-      if (!studyCats.contains(log.category)) continue;
-      final subject = log.activity.isNotEmpty ? log.activity : 'Other';
-      map[subject] = (map[subject] ?? 0) + log.durationMinutes / 60.0;
-    }
-
-    if (map.isEmpty) return [];
-
-    final total = map.values.fold<double>(0, (s, v) => s + v);
-    final entries = map.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    return entries.map((e) {
-      final frac = total > 0 ? e.value / total : 0.0;
-      return SubjectEntry(
-        subject:    e.key,
-        hours:      e.value,
-        fraction:   frac,
-        percentage: (frac * 100).round(),
-      );
-    }).take(8).toList();
-  }
-
-  // ── Streak history (rolling window) ───────────────────────────
-  /// Returns map of dateStr → bool (had activity).
-  List<_StreakDay> _buildStreakHistory(AppProvider app) {
-    final minutesByDate = <String, int>{};
-    for (final log in app.timeLogs) {
-      minutesByDate[log.date] =
-          (minutesByDate[log.date] ?? 0) + log.durationMinutes;
-    }
-
-    final days = <_StreakDay>[];
-    final now  = DateTime.now();
-    for (int i = _rangeDays - 1; i >= 0; i--) {
-      final d       = now.subtract(Duration(days: i));
-      final dateStr = DateFormat('yyyy-MM-dd').format(d);
-      days.add(_StreakDay(date: d, hasActivity: (minutesByDate[dateStr] ?? 0) > 0));
-    }
-    return days;
-  }
-
-  // ── Total hours in range ───────────────────────────────────────
-  double _totalHours(AppProvider app) {
-    return app.timeLogs
-        .where((l) => _inRange(l.date))
-        .fold<double>(0, (s, l) => s + l.durationMinutes / 60.0);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final app   = context.watch<AppProvider>();
-    final theme = Theme.of(context);
-    final cs    = theme.colorScheme;
-
-    final dailyHours      = _buildDailyHours(app);
-    final categoryHours   = _buildCategoryHours(app);
-    final completionRates = _buildCompletionRate(app);
-    final subjectData     = _buildSubjectBreakdown(app);
-    final streakHistory   = _buildStreakHistory(app);
-    final totalHrs        = _totalHours(app);
+    final app = context.watch<AppProvider>();
+    final settings = context.watch<SettingsProvider>();
 
     return AppScaffold(
       screenName: 'Analytics',
-      actions: [
-        // ── Range selector ────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.only(right: 4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [7, 30, 90].map((d) {
-              final selected = _rangeDays == d;
-              return GestureDetector(
-                onTap: () => setState(() => _rangeDays = d),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  margin: const EdgeInsets.only(left: 4),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 9, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? cs.primary
-                        : cs.onSurface.withValues(alpha: 0.07),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '${d}d',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: selected
-                          ? cs.onPrimary
-                          : cs.onSurface.withValues(alpha: 0.55),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── SECTION 1: FA Progress Overview ────────────
+            _FAProgressCard(app: app, settings: settings),
+            const SizedBox(height: 16),
+
+            // ── SECTION 2: Study Time ─────────────────────
+            _StudyTimeCard(app: app),
+            const SizedBox(height: 16),
+
+            // ── SECTION 3: Subject Breakdown ──────────────
+            _SubjectBreakdownCard(app: app),
+            const SizedBox(height: 16),
+
+            // ── SECTION 4: UWorld Performance ─────────────
+            _UWorldCard(app: app),
+            const SizedBox(height: 16),
+
+            // ── SECTION 5: Resource Completion ────────────
+            _ResourceTrackerCard(app: app),
+          ],
         ),
-      ],
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        children: [
-          // ── Summary strip ────────────────────────────────────
-          _SummaryStrip(
-            totalHours: totalHrs,
-            studyDays:  dailyHours.length,
-            rangeDays:  _rangeDays,
-          ),
-          const SizedBox(height: 16),
-
-          // ── 1. Study Hours bar chart ─────────────────────────
-          AnalyticsChartCard(
-            title:      'Study Hours',
-            subtitle:   'Daily hours studied',
-            rangeBadge: _rangeBadge,
-            child: _StudyHoursChart(
-              dailyHours: dailyHours,
-              rangeDays:  _rangeDays,
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // ── 2. Category Pie ──────────────────────────────────
-          AnalyticsChartCard(
-            title:      'Time Breakdown',
-            subtitle:   'Study type distribution',
-            rangeBadge: _rangeBadge,
-            child: _CategoryPieChart(categoryHours: categoryHours),
-          ),
-          const SizedBox(height: 14),
-
-          // ── 3. Block completion line chart ───────────────────
-          AnalyticsChartCard(
-            title:      'Block Completion Rate',
-            subtitle:   'Daily plan completion (%)',
-            rangeBadge: _rangeBadge,
-            child: completionRates.isEmpty
-                ? _EmptyChartPlaceholder(
-                    'No block data for $_rangeBadge')
-                : _CompletionLineChart(data: completionRates),
-          ),
-          const SizedBox(height: 14),
-
-          // ── 4. Streak history heatmap row ────────────────────
-          AnalyticsChartCard(
-            title:      'Activity Streak',
-            subtitle:   'Days with study sessions',
-            rangeBadge: _rangeBadge,
-            contentPadding:
-                const EdgeInsets.fromLTRB(14, 10, 14, 14),
-            child: _StreakGrid(days: streakHistory),
-          ),
-          const SizedBox(height: 14),
-
-          // ── 5. Subject breakdown ─────────────────────────────
-          AnalyticsChartCard(
-            title:      'Top Subjects',
-            subtitle:   'Hours per subject (study + revision)',
-            rangeBadge: _rangeBadge,
-            child: SubjectBreakdownCard(
-              subjects:   subjectData,
-              rangeBadge: _rangeBadge,
-            ),
-          ),
-
-          const SizedBox(height: 30),
-        ],
       ),
     );
   }
 }
 
 // ══════════════════════════════════════════════════════════════════
-// SUMMARY STRIP
+// SHARED HELPERS
 // ══════════════════════════════════════════════════════════════════
 
-class _SummaryStrip extends StatelessWidget {
-  final double totalHours;
-  final int    studyDays;
-  final int    rangeDays;
+/// Standard card wrapper with 12px radius and 16px padding inside.
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
 
-  const _SummaryStrip({
-    required this.totalHours,
-    required this.studyDays,
-    required this.rangeDays,
-  });
+  const _SectionCard({required this.title, required this.children});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cs    = theme.colorScheme;
+    final cs = theme.colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.onSurface.withValues(alpha: 0.06)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-    final avg = studyDays > 0 ? totalHours / studyDays : 0.0;
+/// Small stat chip.
+class _StatChip extends StatelessWidget {
+  final String label;
+  final Color color;
 
-    return Row(
+  const _StatChip({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Format minutes as "Xh Ym".
+String _fmtMinutes(int mins) {
+  final h = mins ~/ 60;
+  final m = mins % 60;
+  if (h == 0) return '${m}m';
+  if (m == 0) return '${h}h';
+  return '${h}h ${m}m';
+}
+
+/// Returns list of last 7 days (DateTime), oldest first.
+List<DateTime> _last7Days() {
+  final now = DateTime.now();
+  return List.generate(7, (i) => now.subtract(Duration(days: 6 - i)));
+}
+
+/// Day abbreviation (Mon, Tue...).
+String _dayAbbr(DateTime d) => DateFormat('E').format(d).substring(0, 3);
+
+/// Date key.
+String _dateKey(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION 1: FA PROGRESS OVERVIEW
+// ══════════════════════════════════════════════════════════════════
+
+class _FAProgressCard extends StatelessWidget {
+  final AppProvider app;
+  final SettingsProvider settings;
+
+  const _FAProgressCard({required this.app, required this.settings});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    const totalPages = 676;
+
+    final readCount = app.faPages
+        .where((p) => p.status == 'read' || p.status == 'anki_done')
+        .length;
+    final ankiCount =
+        app.faPages.where((p) => p.status == 'anki_done').length;
+    final remainCount =
+        app.faPages.where((p) => p.status == 'unread').length;
+
+    final pct = totalPages > 0 ? (readCount / totalPages * 100) : 0.0;
+    final progress = totalPages > 0 ? readCount / totalPages : 0.0;
+
+    final dailyGoal = settings.dailyFAGoal;
+
+    // Build last 7 days proxy pages from timeLogs
+    final days = _last7Days();
+    final dayProxyPages = <String, double>{};
+    for (final log in app.timeLogs) {
+      if (log.category.value == 'STUDY' ||
+          log.activity.toLowerCase().contains('fa')) {
+        dayProxyPages[log.date] =
+            (dayProxyPages[log.date] ?? 0) + log.durationMinutes / 3.0;
+      }
+    }
+
+    return _SectionCard(
+      title: 'First Aid 2025',
       children: [
-        _StatPill(
-          cs:    cs, theme: theme,
-          label: 'Total',
-          value: '${totalHours.toStringAsFixed(1)}h',
-          icon:  Icons.timer_rounded,
-          color: cs.primary,
+        // Stat chips
+        Row(
+          children: [
+            _StatChip(label: '$readCount Read', color: cs.primary),
+            const SizedBox(width: 8),
+            _StatChip(
+                label: '$ankiCount Anki Done', color: Colors.deepPurple),
+            const SizedBox(width: 8),
+            _StatChip(
+                label: '$remainCount Remaining',
+                color: cs.onSurfaceVariant),
+          ],
         ),
-        const SizedBox(width: 10),
-        _StatPill(
-          cs:    cs, theme: theme,
-          label: 'Active days',
-          value: '$studyDays',
-          icon:  Icons.calendar_today_rounded,
-          color: const Color(0xFF10B981),
+        const SizedBox(height: 12),
+
+        // Progress bar
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: progress.clamp(0.0, 1.0),
+            minHeight: 8,
+            backgroundColor: cs.onSurface.withValues(alpha: 0.07),
+            valueColor: AlwaysStoppedAnimation(cs.primary),
+          ),
         ),
-        const SizedBox(width: 10),
-        _StatPill(
-          cs:    cs, theme: theme,
-          label: 'Avg/day',
-          value: '${avg.toStringAsFixed(1)}h',
-          icon:  Icons.trending_up_rounded,
-          color: const Color(0xFFF59E0B),
+        const SizedBox(height: 6),
+        Text(
+          '$readCount / $totalPages pages · ${pct.toStringAsFixed(1)}% complete',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: cs.onSurface.withValues(alpha: 0.5),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Bar chart title
+        Text(
+          'Pages Read Last 7 Days',
+          style: theme.textTheme.labelMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: cs.onSurface.withValues(alpha: 0.7),
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Bar chart
+        SizedBox(
+          height: 160,
+          child: BarChart(
+            BarChartData(
+              maxY: _barMaxY(days, dayProxyPages, dailyGoal.toDouble()),
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipItem: (group, _, rod, __) => BarTooltipItem(
+                    '${rod.toY.toStringAsFixed(0)} pg',
+                    TextStyle(
+                      color: cs.onSurface,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+              titlesData: FlTitlesData(
+                topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false)),
+                leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false)),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (v, _) {
+                      final i = v.toInt();
+                      if (i < 0 || i >= days.length) return const SizedBox();
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 5),
+                        child: Text(
+                          _dayAbbr(days[i]),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: cs.onSurface.withValues(alpha: 0.5),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval:
+                    _barMaxY(days, dayProxyPages, dailyGoal.toDouble()) / 3,
+                getDrawingHorizontalLine: (_) => FlLine(
+                  color: cs.onSurface.withValues(alpha: 0.06),
+                  strokeWidth: 1,
+                ),
+              ),
+              borderData: FlBorderData(show: false),
+              extraLinesData: ExtraLinesData(
+                horizontalLines: [
+                  HorizontalLine(
+                    y: dailyGoal.toDouble(),
+                    color: cs.error.withValues(alpha: 0.5),
+                    strokeWidth: 1.5,
+                    dashArray: [6, 4],
+                    label: HorizontalLineLabel(
+                      show: true,
+                      alignment: Alignment.topRight,
+                      labelResolver: (_) => 'Goal: $dailyGoal',
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: cs.error.withValues(alpha: 0.7),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              barGroups: List.generate(days.length, (i) {
+                final key = _dateKey(days[i]);
+                final val = (dayProxyPages[key] ?? 0).roundToDouble();
+                return BarChartGroupData(x: i, barRods: [
+                  BarChartRodData(
+                    toY: val,
+                    width: 16,
+                    borderRadius: BorderRadius.circular(4),
+                    color: cs.primary,
+                  ),
+                ]);
+              }),
+            ),
+            duration: const Duration(milliseconds: 300),
+          ),
+        ),
+      ],
+    );
+  }
+
+  double _barMaxY(List<DateTime> days, Map<String, double> proxy, double goal) {
+    double mx = goal;
+    for (final d in days) {
+      final v = proxy[_dateKey(d)] ?? 0;
+      if (v > mx) mx = v;
+    }
+    return mx < 1 ? 2 : (mx * 1.3).ceilToDouble();
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION 2: STUDY TIME — LAST 7 DAYS
+// ══════════════════════════════════════════════════════════════════
+
+class _StudyTimeCard extends StatelessWidget {
+  final AppProvider app;
+
+  const _StudyTimeCard({required this.app});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final days = _last7Days();
+
+    // Minutes per day
+    final dayMins = <String, int>{};
+    for (final log in app.timeLogs) {
+      dayMins[log.date] = (dayMins[log.date] ?? 0) + log.durationMinutes;
+    }
+
+    // Only last 7 days
+    int weekTotal = 0;
+    for (final d in days) {
+      weekTotal += dayMins[_dateKey(d)] ?? 0;
+    }
+    final avgMins = days.isNotEmpty ? weekTotal ~/ 7 : 0;
+
+    final maxMins = days.fold<int>(
+        0, (m, d) => (dayMins[_dateKey(d)] ?? 0) > m ? (dayMins[_dateKey(d)] ?? 0) : m);
+    final yMax = maxMins < 30 ? 60.0 : (maxMins * 1.3).ceilToDouble();
+
+    return _SectionCard(
+      title: 'Study Time — Last 7 Days',
+      children: [
+        SizedBox(
+          height: 160,
+          child: BarChart(
+            BarChartData(
+              maxY: yMax,
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipItem: (group, _, rod, __) => BarTooltipItem(
+                    _fmtMinutes(rod.toY.toInt()),
+                    TextStyle(
+                      color: cs.onSurface,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+              titlesData: FlTitlesData(
+                topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false)),
+                leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false)),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (v, _) {
+                      final i = v.toInt();
+                      if (i < 0 || i >= days.length) return const SizedBox();
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 5),
+                        child: Text(
+                          _dayAbbr(days[i]),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: cs.onSurface.withValues(alpha: 0.5),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: yMax / 3,
+                getDrawingHorizontalLine: (_) => FlLine(
+                  color: cs.onSurface.withValues(alpha: 0.06),
+                  strokeWidth: 1,
+                ),
+              ),
+              borderData: FlBorderData(show: false),
+              barGroups: List.generate(days.length, (i) {
+                final key = _dateKey(days[i]);
+                return BarChartGroupData(x: i, barRods: [
+                  BarChartRodData(
+                    toY: (dayMins[key] ?? 0).toDouble(),
+                    width: 16,
+                    borderRadius: BorderRadius.circular(4),
+                    color: Colors.teal,
+                  ),
+                ]);
+              }),
+            ),
+            duration: const Duration(milliseconds: 300),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Summary chips
+        Row(
+          children: [
+            _StatChip(
+              label: 'This week: ${_fmtMinutes(weekTotal)}',
+              color: Colors.teal,
+            ),
+            const SizedBox(width: 8),
+            _StatChip(
+              label: 'Daily avg: ${_fmtMinutes(avgMins)}',
+              color: Colors.teal,
+            ),
+          ],
         ),
       ],
     );
   }
 }
 
-class _StatPill extends StatelessWidget {
-  final ColorScheme cs;
-  final ThemeData   theme;
-  final String      label;
-  final String      value;
-  final IconData    icon;
-  final Color       color;
+// ══════════════════════════════════════════════════════════════════
+// SECTION 3: SUBJECT BREAKDOWN (Time by Subject)
+// ══════════════════════════════════════════════════════════════════
 
-  const _StatPill({
-    required this.cs,
-    required this.theme,
+class _SubjectBreakdownCard extends StatelessWidget {
+  final AppProvider app;
+
+  const _SubjectBreakdownCard({required this.app});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+
+    // Group timeLogs by activity/category → top 5 by minutes
+    final grouped = <String, int>{};
+    for (final log in app.timeLogs) {
+      final key = log.activity.isNotEmpty ? log.activity : log.category.value;
+      grouped[key] = (grouped[key] ?? 0) + log.durationMinutes;
+    }
+
+    if (grouped.isEmpty) {
+      return _SectionCard(
+        title: 'Time by Subject',
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Center(
+              child: Text(
+                'No time logs yet',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: cs.onSurface.withValues(alpha: 0.4),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final sorted = grouped.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final top5 = sorted.take(5).toList();
+    final maxMins = top5.first.value;
+
+    const barColors = [
+      Color(0xFF6366F1),
+      Color(0xFF8B5CF6),
+      Color(0xFFEC4899),
+      Color(0xFF10B981),
+      Color(0xFFF59E0B),
+    ];
+
+    return _SectionCard(
+      title: 'Time by Subject',
+      children: [
+        ...List.generate(top5.length, (i) {
+          final entry = top5[i];
+          final frac = maxMins > 0 ? entry.value / maxMins : 0.0;
+          final color = barColors[i % barColors.length];
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 100,
+                  child: Text(
+                    entry.key,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: frac.clamp(0.0, 1.0),
+                      minHeight: 10,
+                      backgroundColor:
+                          cs.onSurface.withValues(alpha: 0.07),
+                      valueColor: AlwaysStoppedAnimation(color),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _fmtMinutes(entry.value),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION 4: UWORLD PERFORMANCE
+// ══════════════════════════════════════════════════════════════════
+
+class _UWorldCard extends StatelessWidget {
+  final AppProvider app;
+
+  const _UWorldCard({required this.app});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final sessions = app.uWorldSessions;
+
+    if (sessions.isEmpty) {
+      return _SectionCard(
+        title: 'UWorld Q-Bank',
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Center(
+              child: Text(
+                'No UWorld sessions logged yet',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: cs.onSurface.withValues(alpha: 0.4),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Overall stats
+    final totalQs = sessions.fold<int>(0, (s, e) => s + e.done);
+    final totalCorrect = sessions.fold<int>(0, (s, e) => s + e.correct);
+    final overallPct = totalQs > 0 ? (totalCorrect / totalQs * 100) : 0.0;
+
+    // Last 10 sessions for line chart
+    final recent = sessions.length > 10
+        ? sessions.sublist(sessions.length - 10)
+        : sessions;
+
+    return _SectionCard(
+      title: 'UWorld Q-Bank',
+      children: [
+        // Overall stats row
+        Row(
+          children: [
+            _StatChip(
+                label: 'Total Qs: $totalQs', color: Colors.orange),
+            const SizedBox(width: 8),
+            _StatChip(
+                label: 'Overall: ${overallPct.toStringAsFixed(0)}%',
+                color: Colors.orange),
+            const SizedBox(width: 8),
+            _StatChip(
+                label: 'Sessions: ${sessions.length}',
+                color: Colors.orange),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Line chart or message
+        if (recent.length < 2)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Center(
+              child: Text(
+                'Log more sessions to see trend',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: cs.onSurface.withValues(alpha: 0.4),
+                ),
+              ),
+            ),
+          )
+        else
+          SizedBox(
+            height: 140,
+            child: LineChart(
+              LineChartData(
+                minY: 0,
+                maxY: 100,
+                clipData: const FlClipData.all(),
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipItems: (touchedSpots) => touchedSpots
+                        .map((s) => LineTooltipItem(
+                              '${s.y.toStringAsFixed(0)}%',
+                              TextStyle(
+                                color: cs.onSurface,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (v, _) {
+                        final i = v.toInt();
+                        if (i < 0 || i >= recent.length) {
+                          return const SizedBox();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            '${i + 1}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color:
+                                  cs.onSurface.withValues(alpha: 0.45),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: 25,
+                  getDrawingHorizontalLine: (_) => FlLine(
+                    color: cs.onSurface.withValues(alpha: 0.06),
+                    strokeWidth: 1,
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: List.generate(recent.length, (i) {
+                      final s = recent[i];
+                      final pct =
+                          s.done > 0 ? s.correct / s.done * 100 : 0.0;
+                      return FlSpot(i.toDouble(), pct);
+                    }),
+                    isCurved: true,
+                    curveSmoothness: 0.35,
+                    color: Colors.orange,
+                    barWidth: 2.5,
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (_, __, ___, ____) =>
+                          FlDotCirclePainter(
+                        radius: 3,
+                        color: Colors.orange,
+                        strokeWidth: 0,
+                      ),
+                    ),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: Colors.orange.withValues(alpha: 0.1),
+                    ),
+                  ),
+                ],
+              ),
+              duration: const Duration(milliseconds: 300),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION 5: RESOURCE COMPLETION
+// ══════════════════════════════════════════════════════════════════
+
+class _ResourceTrackerCard extends StatelessWidget {
+  final AppProvider app;
+
+  const _ResourceTrackerCard({required this.app});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    // FA
+    const faTotal = 676;
+    final faRead = app.faPages
+        .where((p) => p.status == 'read' || p.status == 'anki_done')
+        .length;
+    final faPct = faTotal > 0 ? (faRead / faTotal * 100) : 0.0;
+
+    // Sketchy
+    final skTotal = app.sketchyItems.length;
+    final skDone = app.sketchyItems
+        .where((s) => s.status == 'watched' || s.status == 'mastered')
+        .length;
+
+    // Pathoma
+    final paTotal = app.pathomaItems.length;
+    final paDone = app.pathomaItems
+        .where((p) => p.status == 'watched' || p.status == 'reviewed')
+        .length;
+
+    return _SectionCard(
+      title: 'Resource Tracker',
+      children: [
+        _ResourceRow(
+          label: 'First Aid 2025',
+          done: faRead,
+          total: faTotal,
+          suffix: '${faPct.toStringAsFixed(0)}%',
+          color: cs.primary,
+        ),
+        const SizedBox(height: 10),
+        _ResourceRow(
+          label: 'Sketchy',
+          done: skDone,
+          total: skTotal,
+          suffix: '$skDone / $skTotal watched',
+          color: const Color(0xFF8B5CF6),
+        ),
+        const SizedBox(height: 10),
+        _ResourceRow(
+          label: 'Pathoma',
+          done: paDone,
+          total: paTotal,
+          suffix: '$paDone / $paTotal chapters',
+          color: const Color(0xFFEC4899),
+        ),
+      ],
+    );
+  }
+}
+
+class _ResourceRow extends StatelessWidget {
+  final String label;
+  final int done;
+  final int total;
+  final String suffix;
+  final Color color;
+
+  const _ResourceRow({
     required this.label,
-    required this.value,
-    required this.icon,
+    required this.done,
+    required this.total,
+    required this.suffix,
     required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-        decoration: BoxDecoration(
-          color:        cs.surface,
-          borderRadius: BorderRadius.circular(14),
-          border:       Border.all(color: cs.onSurface.withValues(alpha: 0.06)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(height: 6),
-            Text(value,
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w800, color: color)),
-            Text(label,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: cs.onSurface.withValues(alpha: 0.45),
-                )),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════
-// STUDY HOURS BAR CHART
-// ══════════════════════════════════════════════════════════════════
-
-class _StudyHoursChart extends StatelessWidget {
-  final Map<String, double> dailyHours;
-  final int rangeDays;
-
-  const _StudyHoursChart({
-    required this.dailyHours,
-    required this.rangeDays,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs  = Theme.of(context).colorScheme;
-    final now = DateTime.now();
-
-    final data = List.generate(rangeDays, (i) {
-      final d       = now.subtract(Duration(days: rangeDays - 1 - i));
-      final dateStr = DateFormat('yyyy-MM-dd').format(d);
-      return _Bar(
-        x:     i.toDouble(),
-        hours: dailyHours[dateStr] ?? 0,
-        label: DateFormat('d').format(d),
-      );
-    });
-
-    final maxH = data.fold<double>(0, (m, b) => b.hours > m ? b.hours : m);
-    final yMax = maxH < 1 ? 2.0 : (maxH * 1.3).ceilToDouble();
-
-    // Thin bars for >= 30 days
-    final barW = rangeDays <= 7 ? 18.0 : (rangeDays <= 30 ? 9.0 : 5.0);
-    // Label skip interval
-    final labelEvery = rangeDays <= 7 ? 1 : (rangeDays <= 30 ? 5 : 14);
-
-    return SizedBox(
-      height: 160,
-      child: BarChart(
-        BarChartData(
-          maxY: yMax,
-          barTouchData: BarTouchData(
-            touchTooltipData: BarTouchTooltipData(
-              getTooltipItem: (group, _, rod, __) => BarTooltipItem(
-                '${rod.toY.toStringAsFixed(1)}h',
-                TextStyle(
-                  color:      cs.onSurface,
-                  fontWeight: FontWeight.w700,
-                  fontSize:   12,
-                ),
-              ),
-            ),
-          ),
-          titlesData: FlTitlesData(
-            topTitles:   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles:   true,
-                reservedSize: 28,
-                interval:     yMax < 4 ? 1 : (yMax / 3).ceilToDouble(),
-                getTitlesWidget: (v, _) => Text('${v.toInt()}h',
-                    style: TextStyle(
-                      fontSize: 9,
-                      color:    cs.onSurface.withValues(alpha: 0.4),
-                    )),
-              ),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (v, _) {
-                  final i = v.toInt();
-                  if (i < 0 || i >= data.length) return const SizedBox();
-                  if (i % labelEvery != 0) return const SizedBox();
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 5),
-                    child: Text(data[i].label,
-                        style: TextStyle(
-                          fontSize: 9,
-                          color:    cs.onSurface.withValues(alpha: 0.45),
-                        )),
-                  );
-                },
-              ),
-            ),
-          ),
-          gridData: FlGridData(
-            show:             true,
-            drawVerticalLine: false,
-            horizontalInterval: yMax < 4 ? 1 : (yMax / 3).ceilToDouble(),
-            getDrawingHorizontalLine: (_) => FlLine(
-              color:       cs.onSurface.withValues(alpha: 0.06),
-              strokeWidth: 1,
-            ),
-          ),
-          borderData: FlBorderData(show: false),
-          barGroups: data.map((b) {
-            final isToday = b.x == data.length - 1;
-            return BarChartGroupData(x: b.x.toInt(), barRods: [
-              BarChartRodData(
-                toY:          b.hours,
-                width:        barW,
-                borderRadius: BorderRadius.circular(4),
-                color:        isToday
-                    ? cs.primary
-                    : cs.primary.withValues(alpha: 0.35),
-              ),
-            ]);
-          }).toList(),
-        ),
-        duration: const Duration(milliseconds: 300),
-      ),
-    );
-  }
-}
-
-class _Bar {
-  final double x;
-  final double hours;
-  final String label;
-  const _Bar({required this.x, required this.hours, required this.label});
-}
-
-// ══════════════════════════════════════════════════════════════════
-// CATEGORY PIE CHART
-// ══════════════════════════════════════════════════════════════════
-
-class _CategoryPieChart extends StatefulWidget {
-  final Map<TimeLogCategory, double> categoryHours;
-  const _CategoryPieChart({required this.categoryHours});
-
-  @override
-  State<_CategoryPieChart> createState() => _CategoryPieChartState();
-}
-
-class _CategoryPieChartState extends State<_CategoryPieChart> {
-  int _touchedIndex = -1;
-
-  static const _kLabels = {
-    TimeLogCategory.study:         'Study',
-    TimeLogCategory.revision:      'Revision',
-    TimeLogCategory.qbank:         'QBank',
-    TimeLogCategory.anki:          'Anki',
-    TimeLogCategory.video:         'Video',
-    TimeLogCategory.noteTaking:    'Notes',
-    TimeLogCategory.breakTime:     'Break',
-    TimeLogCategory.personal:      'Personal',
-    TimeLogCategory.sleep:         'Sleep',
-    TimeLogCategory.entertainment: 'Entertainment',
-    TimeLogCategory.outing:        'Outing',
-    TimeLogCategory.life:          'Life',
-    TimeLogCategory.other:         'Other',
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final cs    = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
-
-    final entries = widget.categoryHours.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    if (entries.isEmpty) {
-      return _EmptyChartPlaceholder('No data');
-    }
-
-    final total  = entries.fold<double>(0, (s, e) => s + e.value);
-    final colors = List.generate(entries.length,
-        (i) => _kPieColors[i % _kPieColors.length]);
-
-    return Row(
-      children: [
-        // ── Pie chart ────────────────────────────────────────────
-        SizedBox(
-          width:  140,
-          height: 140,
-          child: PieChart(
-            PieChartData(
-              sectionsSpace:    2,
-              centerSpaceRadius: 30,
-              pieTouchData: PieTouchData(
-                touchCallback: (ev, pieTouchResponse) {
-                  setState(() {
-                    if (!ev.isInterestedForInteractions ||
-                        pieTouchResponse == null ||
-                        pieTouchResponse.touchedSection == null) {
-                      _touchedIndex = -1;
-                      return;
-                    }
-                    _touchedIndex = pieTouchResponse
-                        .touchedSection!.touchedSectionIndex;
-                  });
-                },
-              ),
-              sections: List.generate(entries.length, (i) {
-                final touched = i == _touchedIndex;
-                final pct =
-                    total > 0 ? entries[i].value / total * 100 : 0.0;
-                return PieChartSectionData(
-                  value:      entries[i].value,
-                  color:      colors[i],
-                  radius:     touched ? 56 : 48,
-                  title:      touched ? '${pct.toStringAsFixed(0)}%' : '',
-                  titleStyle: TextStyle(
-                    fontSize:   11,
-                    fontWeight: FontWeight.w700,
-                    color:      Colors.white,
-                  ),
-                );
-              }),
-            ),
-          ),
-        ),
-        const SizedBox(width: 16),
-
-        // ── Legend ───────────────────────────────────────────────
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: List.generate(
-              entries.length.clamp(0, 6),
-              (i) {
-                final pct =
-                    total > 0 ? entries[i].value / total * 100 : 0.0;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 5),
-                  child: Row(
-                    children: [
-                      Container(
-                        width:  10, height: 10,
-                        decoration: BoxDecoration(
-                          color:  colors[i],
-                          shape:  BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          _kLabels[entries[i].key] ?? entries[i].key.value,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: cs.onSurface.withValues(alpha: 0.7),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Text(
-                        '${pct.toStringAsFixed(0)}%',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color:      colors[i],
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════
-// BLOCK COMPLETION LINE CHART
-// ══════════════════════════════════════════════════════════════════
-
-class _DayCompletion {
-  final String date;
-  final double fraction;
-  const _DayCompletion({required this.date, required this.fraction});
-}
-
-class _CompletionLineChart extends StatelessWidget {
-  final List<_DayCompletion> data;
-  const _CompletionLineChart({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs    = Theme.of(context).colorScheme;
-    const color = Color(0xFF10B981);
-
-    final spots = List.generate(data.length,
-        (i) => FlSpot(i.toDouble(), data[i].fraction * 100));
-
-    return SizedBox(
-      height: 140,
-      child: LineChart(
-        LineChartData(
-          minY: 0, maxY: 100,
-          clipData: const FlClipData.all(),
-          lineTouchData: LineTouchData(
-            touchTooltipData: LineTouchTooltipData(
-              getTooltipItems: (touchedSpots) => touchedSpots.map((s) =>
-                  LineTooltipItem(
-                    '${s.y.toStringAsFixed(0)}%',
-                    TextStyle(
-                      color:      cs.onSurface,
-                      fontWeight: FontWeight.w700,
-                      fontSize:   12,
-                    ),
-                  )).toList(),
-            ),
-          ),
-          titlesData: FlTitlesData(
-            topTitles:   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles:   true,
-                reservedSize: 30,
-                interval:     25,
-                getTitlesWidget: (v, _) => Text('${v.toInt()}%',
-                    style: TextStyle(
-                      fontSize: 9,
-                      color:    cs.onSurface.withValues(alpha: 0.4),
-                    )),
-              ),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (v, _) {
-                  final i = v.toInt();
-                  if (i < 0 || i >= data.length) return const SizedBox();
-                  if (data.length > 10 && i % 3 != 0)
-                    return const SizedBox();
-                  final d = DateTime.tryParse(data[i].date);
-                  if (d == null) return const SizedBox();
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(DateFormat('d').format(d),
-                        style: TextStyle(
-                          fontSize: 9,
-                          color:    cs.onSurface.withValues(alpha: 0.45),
-                        )),
-                  );
-                },
-              ),
-            ),
-          ),
-          gridData: FlGridData(
-            show:               true,
-            drawVerticalLine:   false,
-            horizontalInterval: 25,
-            getDrawingHorizontalLine: (_) => FlLine(
-              color:       cs.onSurface.withValues(alpha: 0.06),
-              strokeWidth: 1,
-            ),
-          ),
-          borderData: FlBorderData(show: false),
-          lineBarsData: [
-            LineChartBarData(
-              spots:        spots,
-              isCurved:     true,
-              curveSmoothness: 0.35,
-              color:        color,
-              barWidth:     2.5,
-              dotData:      FlDotData(
-                show: true,
-                getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
-                  radius: 3,
-                  color:  color,
-                  strokeWidth: 0,
-                ),
-              ),
-              belowBarData: BarAreaData(
-                show:  true,
-                color: color.withValues(alpha: 0.1),
-              ),
-            ),
-          ],
-        ),
-        duration: const Duration(milliseconds: 300),
-      ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════
-// STREAK GRID (mini heatmap dots)
-// ══════════════════════════════════════════════════════════════════
-
-class _StreakDay {
-  final DateTime date;
-  final bool     hasActivity;
-  const _StreakDay({required this.date, required this.hasActivity});
-}
-
-class _StreakGrid extends StatelessWidget {
-  final List<_StreakDay> days;
-  const _StreakGrid({required this.days});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs    = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
-
-    // Current streak count
-    int streak = 0;
-    for (final d in days.reversed) {
-      if (d.hasActivity) {
-        streak++;
-      } else if (d.date.day == DateTime.now().day) {
-        continue; // allow today to be empty
-      } else {
-        break;
-      }
-    }
+    final cs = theme.colorScheme;
+    final frac = total > 0 ? done / total : 0.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Streak count
         Row(
           children: [
-            Text('🔥', style: const TextStyle(fontSize: 16)),
-            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                label,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
             Text(
-              '$streak day streak',
-              style: theme.textTheme.titleSmall?.copyWith(
+              suffix,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: color,
                 fontWeight: FontWeight.w700,
-                color:      streak > 0
-                    ? const Color(0xFFFF6B35)
-                    : cs.onSurface.withValues(alpha: 0.4),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 10),
-        // Dot grid
-        Wrap(
-          spacing: 4,
-          runSpacing: 4,
-          children: days.map((d) {
-            return Tooltip(
-              message: DateFormat('d MMM').format(d.date),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width:  10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: d.hasActivity
-                      ? cs.primary.withValues(alpha: 0.8)
-                      : cs.onSurface.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: 6),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            _LegendDot(color: cs.onSurface.withValues(alpha: 0.1),
-                label: 'No study'),
-            const SizedBox(width: 10),
-            _LegendDot(color: cs.primary.withValues(alpha: 0.8),
-                label: 'Studied'),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _LegendDot extends StatelessWidget {
-  final Color  color;
-  final String label;
-  const _LegendDot({required this.color, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 8, height: 8,
-          decoration: BoxDecoration(
-            color:        color,
-            borderRadius: BorderRadius.circular(2),
+        const SizedBox(height: 4),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: frac.clamp(0.0, 1.0),
+            minHeight: 8,
+            backgroundColor: cs.onSurface.withValues(alpha: 0.07),
+            valueColor: AlwaysStoppedAnimation(color),
           ),
         ),
-        const SizedBox(width: 4),
-        Text(label, style: theme.textTheme.labelSmall?.copyWith(
-          color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-        )),
       ],
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════
-// SHARED EMPTY PLACEHOLDER
-// ══════════════════════════════════════════════════════════════════
-
-class _EmptyChartPlaceholder extends StatelessWidget {
-  final String message;
-  const _EmptyChartPlaceholder(this.message);
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return SizedBox(
-      height: 100,
-      child: Center(
-        child: Text(
-          message,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: cs.onSurface.withValues(alpha: 0.35),
-          ),
-        ),
-      ),
     );
   }
 }
