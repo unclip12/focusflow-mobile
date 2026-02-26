@@ -34,6 +34,44 @@ class SettingsProvider extends ChangeNotifier {
     await _persist();
   }
 
+  // ── G10: Exam dates, daily routine ─────────────────────────────
+  String get fmgeDate      => _settings.fmgeDate      ?? '2026-06-28';
+  String get step1Date     => _settings.step1Date     ?? '2026-06-15';
+  String get wakeTime      => _settings.wakeTime      ?? '06:00';
+  String get sleepTime     => _settings.sleepTime     ?? '23:00';
+  int    get dailyFAGoal   => _settings.dailyFAGoal   ?? 20;
+  int    get ankiBatchSize => _settings.ankiBatchSize ?? 50;
+
+  Future<void> setFmgeDate(String date) async {
+    _settings = _settings.copyWith(fmgeDate: date);
+    await _persist();
+  }
+
+  Future<void> setStep1Date(String date) async {
+    _settings = _settings.copyWith(step1Date: date);
+    await _persist();
+  }
+
+  Future<void> setWakeTime(String time) async {
+    _settings = _settings.copyWith(wakeTime: time);
+    await _persist();
+  }
+
+  Future<void> setSleepTime(String time) async {
+    _settings = _settings.copyWith(sleepTime: time);
+    await _persist();
+  }
+
+  Future<void> setDailyFAGoal(int pages) async {
+    _settings = _settings.copyWith(dailyFAGoal: pages);
+    await _persist();
+  }
+
+  Future<void> setAnkiBatchSize(int cards) async {
+    _settings = _settings.copyWith(ankiBatchSize: cards);
+    await _persist();
+  }
+
   // ── Load from storage ─────────────────────────────────────────
   Future<void> loadSettings() async {
     final json = await DatabaseService.instance.getSettings();

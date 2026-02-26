@@ -99,6 +99,16 @@ class AppSettings {
   final List<String>? pinnedTabs;
   final bool? fullScreenMode;
 
+  // G10: Exam dates (stored as 'yyyy-MM-dd' strings)
+  final String? fmgeDate;
+  final String? step1Date;
+
+  // G10: Daily routine
+  final String? wakeTime;
+  final String? sleepTime;
+  final int? dailyFAGoal;
+  final int? ankiBatchSize;
+
   const AppSettings({
     required this.darkMode,
     this.themeId,
@@ -112,6 +122,12 @@ class AppSettings {
     this.menuConfiguration,
     this.pinnedTabs,
     this.fullScreenMode,
+    this.fmgeDate,
+    this.step1Date,
+    this.wakeTime,
+    this.sleepTime,
+    this.dailyFAGoal,
+    this.ankiBatchSize,
   });
 
   factory AppSettings.defaults() => AppSettings(
@@ -128,6 +144,12 @@ class AppSettings {
             .toList(),
         pinnedTabs: kDefaultPinnedTabs,
         fullScreenMode: false,
+        fmgeDate: '2026-06-28',
+        step1Date: '2026-06-15',
+        wakeTime: '06:00',
+        sleepTime: '23:00',
+        dailyFAGoal: 20,
+        ankiBatchSize: 50,
       );
 
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
@@ -153,6 +175,12 @@ class AppSettings {
             ? List<String>.from(j['pinnedTabs'] as List)
             : null,
         fullScreenMode: j['fullScreenMode'] as bool?,
+        fmgeDate: j['fmgeDate'] as String?,
+        step1Date: j['step1Date'] as String?,
+        wakeTime: j['wakeTime'] as String?,
+        sleepTime: j['sleepTime'] as String?,
+        dailyFAGoal: j['dailyFAGoal'] as int?,
+        ankiBatchSize: j['ankiBatchSize'] as int?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -170,6 +198,12 @@ class AppSettings {
               menuConfiguration!.map((m) => m.toJson()).toList(),
         if (pinnedTabs != null) 'pinnedTabs': pinnedTabs,
         if (fullScreenMode != null) 'fullScreenMode': fullScreenMode,
+        if (fmgeDate != null) 'fmgeDate': fmgeDate,
+        if (step1Date != null) 'step1Date': step1Date,
+        if (wakeTime != null) 'wakeTime': wakeTime,
+        if (sleepTime != null) 'sleepTime': sleepTime,
+        if (dailyFAGoal != null) 'dailyFAGoal': dailyFAGoal,
+        if (ankiBatchSize != null) 'ankiBatchSize': ankiBatchSize,
       };
 
   AppSettings copyWith({
@@ -185,6 +219,12 @@ class AppSettings {
     List<MenuItemConfig>? menuConfiguration,
     List<String>? pinnedTabs,
     bool? fullScreenMode,
+    String? fmgeDate,
+    String? step1Date,
+    String? wakeTime,
+    String? sleepTime,
+    int? dailyFAGoal,
+    int? ankiBatchSize,
   }) =>
       AppSettings(
         darkMode: darkMode ?? this.darkMode,
@@ -199,5 +239,11 @@ class AppSettings {
         menuConfiguration: menuConfiguration ?? this.menuConfiguration,
         pinnedTabs: pinnedTabs ?? this.pinnedTabs,
         fullScreenMode: fullScreenMode ?? this.fullScreenMode,
+        fmgeDate: fmgeDate ?? this.fmgeDate,
+        step1Date: step1Date ?? this.step1Date,
+        wakeTime: wakeTime ?? this.wakeTime,
+        sleepTime: sleepTime ?? this.sleepTime,
+        dailyFAGoal: dailyFAGoal ?? this.dailyFAGoal,
+        ankiBatchSize: ankiBatchSize ?? this.ankiBatchSize,
       );
 }

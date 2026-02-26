@@ -6,6 +6,7 @@
 // =============================================================
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import 'package:focusflow_mobile/providers/settings_provider.dart';
@@ -28,9 +29,271 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          // ═══════════════════════════════════════════════════════
+          // EXAM DATES
+          // ═══════════════════════════════════════════════════════
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child: Text('Exam Dates',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurfaceVariant,
+                )),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            child: Column(
+              children: [
+                ListTile(
+                  title: const Text('FMGE'),
+                  subtitle: Text(_formatDateLabel(sp.fmgeDate)),
+                  trailing: const Icon(Icons.edit_calendar_rounded),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.tryParse(sp.fmgeDate) ?? DateTime(2026, 6, 28),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime(2028),
+                    );
+                    if (picked != null) {
+                      sp.setFmgeDate(DateFormat('yyyy-MM-dd').format(picked));
+                    }
+                  },
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  title: const Text('USMLE Step 1'),
+                  subtitle: Text(_formatDateLabel(sp.step1Date)),
+                  trailing: const Icon(Icons.edit_calendar_rounded),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.tryParse(sp.step1Date) ?? DateTime(2026, 6, 15),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime(2028),
+                    );
+                    if (picked != null) {
+                      sp.setStep1Date(DateFormat('yyyy-MM-dd').format(picked));
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // ═══════════════════════════════════════════════════════
+          // DAILY GOALS
+          // ═══════════════════════════════════════════════════════
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child: Text('Daily Goals',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurfaceVariant,
+                )),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            child: Column(
+              children: [
+                ListTile(
+                  title: const Text('FA Pages / Day'),
+                  trailing: Chip(
+                    label: Text('${sp.dailyFAGoal} pages',
+                        style: TextStyle(color: cs.onPrimaryContainer)),
+                    backgroundColor: cs.primaryContainer,
+                  ),
+                  onTap: () => _showSliderDialog(
+                    context: context,
+                    title: 'FA Pages / Day',
+                    currentValue: sp.dailyFAGoal.toDouble(),
+                    min: 5,
+                    max: 60,
+                    divisions: 11,
+                    suffix: 'pages',
+                    onConfirm: (val) => sp.setDailyFAGoal(val.round()),
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  title: const Text('Anki Cards / Day'),
+                  trailing: Chip(
+                    label: Text('${sp.ankiBatchSize} cards',
+                        style: TextStyle(color: cs.onPrimaryContainer)),
+                    backgroundColor: cs.primaryContainer,
+                  ),
+                  onTap: () => _showSliderDialog(
+                    context: context,
+                    title: 'Anki Cards / Day',
+                    currentValue: sp.ankiBatchSize.toDouble(),
+                    min: 10,
+                    max: 200,
+                    divisions: 19,
+                    suffix: 'cards',
+                    onConfirm: (val) => sp.setAnkiBatchSize(val.round()),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // ═══════════════════════════════════════════════════════
+          // DAILY SCHEDULE
+          // ═══════════════════════════════════════════════════════
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child: Text('Daily Schedule',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurfaceVariant,
+                )),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            child: Column(
+              children: [
+                ListTile(
+                  title: const Text('Wake Time'),
+                  subtitle: Text(_formatTimeLabel(sp.wakeTime)),
+                  trailing: const Icon(Icons.wb_sunny_rounded, color: Colors.amber),
+                  onTap: () async {
+                    final parts = sp.wakeTime.split(':');
+                    final initial = TimeOfDay(
+                      hour: int.tryParse(parts[0]) ?? 6,
+                      minute: int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0,
+                    );
+                    final picked = await showTimePicker(context: context, initialTime: initial);
+                    if (picked != null) {
+                      sp.setWakeTime('${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}');
+                    }
+                  },
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  title: const Text('Sleep Time'),
+                  subtitle: Text(_formatTimeLabel(sp.sleepTime)),
+                  trailing: const Icon(Icons.bedtime_rounded, color: Colors.indigo),
+                  onTap: () async {
+                    final parts = sp.sleepTime.split(':');
+                    final initial = TimeOfDay(
+                      hour: int.tryParse(parts[0]) ?? 23,
+                      minute: int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0,
+                    );
+                    final picked = await showTimePicker(context: context, initialTime: initial);
+                    if (picked != null) {
+                      sp.setSleepTime('${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}');
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // ═══════════════════════════════════════════════════════
+          // BOTTOM NAV PINS
+          // ═══════════════════════════════════════════════════════
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child: Text('Navigation',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurfaceVariant,
+                )),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text('Pinned Tabs',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          )),
+                      const Spacer(),
+                      Text('Max 4 tabs',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: cs.onSurface.withValues(alpha: 0.4),
+                          )),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: sp.pinnedTabs.map((id) {
+                      final label = kPinnableScreenLabels[id] ?? id;
+                      return FilterChip(
+                        label: Text(label,
+                            style: TextStyle(color: cs.onPrimaryContainer)),
+                        selected: true,
+                        selectedColor: cs.primaryContainer,
+                        onSelected: (_) {
+                          if (sp.pinnedTabs.length > 1) {
+                            final updated = sp.pinnedTabs.where((t) => t != id).toList();
+                            sp.setPinnedTabs(updated);
+                          }
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add tab'),
+                    onPressed: sp.pinnedTabs.length >= 4
+                        ? null
+                        : () {
+                            final unpinned = kPinnableScreenLabels.entries
+                                .where((e) => !sp.pinnedTabs.contains(e.key))
+                                .toList();
+                            showModalBottomSheet(
+                              context: context,
+                              enableDrag: false,
+                              useSafeArea: true,
+                              builder: (_) => ListView(
+                                shrinkWrap: true,
+                                children: unpinned.map((e) {
+                                  return ListTile(
+                                    title: Text(e.value),
+                                    onTap: () {
+                                      sp.setPinnedTabs([...sp.pinnedTabs, e.key]);
+                                      Navigator.pop(context);
+                                    },
+                                  );
+                                }).toList(),
+                              ),
+                            );
+                          },
+                  ),
+                  const SizedBox(height: 8),
+                  Text('Tap a chip to unpin · Changes apply on restart',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: cs.onSurface.withValues(alpha: 0.35),
+                      )),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // =============================================================
           // APPEARANCE
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          // =============================================================
           _SectionHeader(title: 'Appearance'),
           const SizedBox(height: 8),
 
@@ -290,6 +553,75 @@ class SettingsScreen extends StatelessWidget {
         content: Text('$action coming soon'),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // ── G10 helpers ─────────────────────────────────────────────────
+
+  String _formatDateLabel(String yyyyMMdd) {
+    final dt = DateTime.tryParse(yyyyMMdd);
+    if (dt == null) return yyyyMMdd;
+    return DateFormat('d MMM yyyy').format(dt);
+  }
+
+  String _formatTimeLabel(String hhMM) {
+    final parts = hhMM.split(':');
+    final h = int.tryParse(parts[0]) ?? 0;
+    final m = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
+    final tod = TimeOfDay(hour: h, minute: m);
+    final suffix = tod.period == DayPeriod.am ? 'AM' : 'PM';
+    final hour12 = tod.hourOfPeriod == 0 ? 12 : tod.hourOfPeriod;
+    return '$hour12:${m.toString().padLeft(2, '0')} $suffix';
+  }
+
+  void _showSliderDialog({
+    required BuildContext context,
+    required String title,
+    required double currentValue,
+    required double min,
+    required double max,
+    required int divisions,
+    required String suffix,
+    required ValueChanged<double> onConfirm,
+  }) {
+    double val = currentValue;
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: Text(title),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('${val.round()} $suffix',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      )),
+              Slider(
+                value: val,
+                min: min,
+                max: max,
+                divisions: divisions,
+                label: '${val.round()}',
+                onChanged: (v) => setState(() => val = v),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                onConfirm(val);
+                Navigator.pop(ctx);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
       ),
     );
   }
