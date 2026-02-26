@@ -3,7 +3,10 @@
 // One ChangeNotifier holding lists for every data domain.
 // =============================================================
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:focusflow_mobile/services/backup_service.dart';
 import 'package:focusflow_mobile/services/database_service.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
@@ -303,6 +306,7 @@ class AppProvider extends ChangeNotifier {
     final idx = dayPlans.indexWhere((p) => p.date == plan.date);
     if (idx >= 0) { dayPlans[idx] = plan; } else { dayPlans.add(plan); }
     notifyListeners();
+    unawaited(_triggerBackup());
   }
 
   Future<void> deleteDayPlan(String date) async {
@@ -354,6 +358,7 @@ class AppProvider extends ChangeNotifier {
     final idx = timeLogs.indexWhere((e) => e.id == entry.id);
     if (idx >= 0) { timeLogs[idx] = entry; } else { timeLogs.add(entry); }
     notifyListeners();
+    unawaited(_triggerBackup());
   }
 
   Future<void> deleteTimeLog(String id) async {
@@ -504,6 +509,7 @@ class AppProvider extends ChangeNotifier {
     final idx = revisionItems.indexWhere((e) => e.id == item.id);
     if (idx >= 0) { revisionItems[idx] = item; } else { revisionItems.add(item); }
     notifyListeners();
+    unawaited(_triggerBackup());
   }
 
   Future<void> deleteRevisionItem(String id) async {
@@ -548,6 +554,7 @@ class AppProvider extends ChangeNotifier {
       }
     }
     if (count > 0) notifyListeners();
+    unawaited(_triggerBackup());
     return count;
   }
 
@@ -566,6 +573,7 @@ class AppProvider extends ChangeNotifier {
     final idx = sketchyItems.indexWhere((i) => i.id == item.id);
     if (idx >= 0) { sketchyItems[idx] = item; } else { sketchyItems.add(item); }
     notifyListeners();
+    unawaited(_triggerBackup());
   }
 
   Future<void> updateSketchyStatus(String id, String status) async {
@@ -583,6 +591,7 @@ class AppProvider extends ChangeNotifier {
     final idx = pathomaItems.indexWhere((i) => i.id == item.id);
     if (idx >= 0) { pathomaItems[idx] = item; } else { pathomaItems.add(item); }
     notifyListeners();
+    unawaited(_triggerBackup());
   }
 
   Future<void> updatePathomaStatus(String id, String status) async {
@@ -599,6 +608,7 @@ class AppProvider extends ChangeNotifier {
     await _db.insertUWorldSession(session.toJson());
     uWorldSessions.add(session);
     notifyListeners();
+    unawaited(_triggerBackup());
   }
 
   Future<void> deleteUWorldSession(String id) async {
@@ -753,6 +763,110 @@ class AppProvider extends ChangeNotifier {
       final dateStr = DateFormat('yyyy-MM-dd').format(d);
       return timeLogs.any((l) => l.date == dateStr);
     });
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // BACKUP
+  // ═══════════════════════════════════════════════════════════════
+
+  /// Fire-and-forget backup after every write.
+  Future<void> _triggerBackup() async {
+    final data = BackupService.buildBackupData(this);
+    await BackupService.saveBackup(data);
+  }
+
+  /// Restore all backed-up domains from a JSON map.
+  Future<void> restoreFromBackup(Map<String, dynamic> data) async {
+    // Clear everything first
+    await _db.clearAllData();
+    knowledgeBase.clear();
+    dayPlans.clear();
+    studyPlan.clear();
+    fmgeEntries.clear();
+    timeLogs.clear();
+    dailyTrackers.clear();
+    studyEntries.clear();
+    studyMaterials.clear();
+    mentorMessages.clear();
+    history.clear();
+    revisionItems.clear();
+    faPages.clear();
+    sketchyItems.clear();
+    pathomaItems.clear();
+    uWorldSessions.clear();
+
+    // Re-insert each domain from the backup map
+    if (data['faPages'] != null) {
+      final pages = (data['faPages'] as List)
+          .map((e) => FAPage.fromJson(e as Map<String, dynamic>))
+          .toList();
+      for (final p in pages) {
+        await _db.upsertFAPage(p.toJson());
+      }
+      faPages = pages;
+    }
+
+    if (data['sketchyItems'] != null) {
+      final items = (data['sketchyItems'] as List)
+          .map((e) => SketchyItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+      for (final i in items) {
+        await _db.upsertSketchyItem(i.toJson());
+      }
+      sketchyItems = items;
+    }
+
+    if (data['pathomaItems'] != null) {
+      final items = (data['pathomaItems'] as List)
+          .map((e) => PathomaItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+      for (final i in items) {
+        await _db.upsertPathomaItem(i.toJson());
+      }
+      pathomaItems = items;
+    }
+
+    if (data['uWorldSessions'] != null) {
+      final items = (data['uWorldSessions'] as List)
+          .map((e) => UWorldSession.fromJson(e as Map<String, dynamic>))
+          .toList();
+      for (final s in items) {
+        await _db.insertUWorldSession(s.toJson());
+      }
+      uWorldSessions = items;
+    }
+
+    if (data['timeLogs'] != null) {
+      final items = (data['timeLogs'] as List)
+          .map((e) => TimeLogEntry.fromJson(e as Map<String, dynamic>))
+          .toList();
+      for (final t in items) {
+        await _db.upsertTimeLog(t.toJson());
+      }
+      timeLogs = items;
+    }
+
+    if (data['revisionItems'] != null) {
+      final items = (data['revisionItems'] as List)
+          .map((e) => RevisionItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+      for (final r in items) {
+        await _db.upsertRevisionItem(r.toJson());
+      }
+      revisionItems = items;
+    }
+
+    if (data['dayPlans'] != null) {
+      final items = (data['dayPlans'] as List)
+          .map((e) => DayPlan.fromJson(e as Map<String, dynamic>))
+          .toList();
+      for (final d in items) {
+        await _db.upsertDayPlan(d.toJson());
+      }
+      dayPlans = items;
+    }
+
+    notifyListeners();
   }
 
   // ═══════════════════════════════════════════════════════════════

@@ -9,8 +9,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/models/app_settings.dart';
+import 'package:focusflow_mobile/services/backup_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/widgets/app_scaffold.dart';
 import 'package:focusflow_mobile/screens/settings/theme_picker_card.dart';
@@ -475,35 +477,124 @@ class SettingsScreen extends StatelessWidget {
           _MenuReorderSection(sp: sp),
           const SizedBox(height: 20),
 
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          // DATA
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          _SectionHeader(title: 'Data'),
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          // BACKUP & RESTORE
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          _SectionHeader(title: 'Backup & Restore'),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _ActionButton(
-                  icon: Icons.backup_rounded,
-                  label: 'Backup Now',
-                  color: cs.primary,
-                  onTap: () => _showPlaceholder(context, 'Backup'),
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            child: Column(
+              children: [
+                // Row 1 — Last Backup
+                ListTile(
+                  leading: Icon(Icons.history_rounded, color: cs.primary),
+                  title: const Text('Last Backup'),
+                  subtitle: FutureBuilder<DateTime?>(
+                    future: BackupService.lastBackupTime(),
+                    builder: (context, snap) {
+                      if (snap.connectionState == ConnectionState.waiting) {
+                        return const Text('Checking…');
+                      }
+                      final dt = snap.data;
+                      if (dt == null) return const Text('No backup yet');
+                      final now = DateTime.now();
+                      final isToday = dt.year == now.year &&
+                          dt.month == now.month &&
+                          dt.day == now.day;
+                      final formatted = isToday
+                          ? 'Today at ${DateFormat.jm().format(dt)}'
+                          : '${DateFormat('MMM d').format(dt)} at ${DateFormat.jm().format(dt)}';
+                      return Text(formatted);
+                    },
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _ActionButton(
-                  icon: Icons.restore_rounded,
-                  label: 'Restore',
-                  color: cs.secondary,
-                  onTap: () => _showPlaceholder(context, 'Restore'),
+                const Divider(height: 1),
+                // Row 2 — Backup Now
+                ListTile(
+                  leading: const Icon(Icons.backup_rounded, color: Colors.green),
+                  title: const Text('Backup Now'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () async {
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (_) => const Center(child: CircularProgressIndicator()),
+                    );
+                    final app = context.read<AppProvider>();
+                    await BackupService.saveBackup(
+                        BackupService.buildBackupData(app));
+                    if (context.mounted) Navigator.pop(context);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('✅ Backup saved successfully'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                      // Refresh to update Last Backup row
+                      (context as Element).markNeedsBuild();
+                    }
+                  },
                 ),
-              ),
-            ],
+                const Divider(height: 1),
+                // Row 3 — Restore from Backup
+                ListTile(
+                  leading: const Icon(Icons.restore_rounded, color: Colors.orange),
+                  title: const Text('Restore from Backup'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('⚠️ Restore Backup?'),
+                        content: const Text(
+                          'This will overwrite all current data with the '
+                          'last saved backup.\n\nThis cannot be undone.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Cancel'),
+                          ),
+                          FilledButton(
+                            onPressed: () async {
+                              Navigator.pop(ctx);
+                              final data = await BackupService.loadBackup();
+                              if (!context.mounted) return;
+                              if (data == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('No backup file found'),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                                return;
+                              }
+                              final app = context.read<AppProvider>();
+                              await app.restoreFromBackup(data);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('✅ Data restored from backup'),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            },
+                            child: const Text('Restore'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 20),
 
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // ABOUT
           // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           _SectionHeader(title: 'About'),
@@ -545,16 +636,6 @@ class SettingsScreen extends StatelessWidget {
           '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
       onPicked(formatted);
     }
-  }
-
-  void _showPlaceholder(BuildContext context, String action) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$action coming soon'),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
   }
 
   // ── G10 helpers ─────────────────────────────────────────────────
@@ -774,48 +855,7 @@ class _TimeTile extends StatelessWidget {
   }
 }
 
-class _ActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
 
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: cs.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: cs.onSurface.withValues(alpha: 0.06)),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, size: 24, color: color),
-            const SizedBox(height: 6),
-            Text(label,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                )),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _DetailRow extends StatelessWidget {
   final String label;
