@@ -7,13 +7,15 @@
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
+import 'package:focusflow_mobile/models/sketchy_video.dart';
+import 'package:focusflow_mobile/models/pathoma_chapter.dart';
 
 class DatabaseService {
   DatabaseService._();
   static final DatabaseService instance = DatabaseService._();
 
   static const _dbName = 'focusflow.db';
-  static const _dbVersion = 2;
+  static const _dbVersion = 3;
 
   Database? _database;
 
@@ -55,6 +57,9 @@ class DatabaseService {
   static const tSketchyItems = 'sketchy_items';
   static const tPathomaItems = 'pathoma_items';
   static const tUworldSessions = 'uworld_sessions';
+  static const tSketchyMicroVideos = 'sketchy_micro_videos';
+  static const tSketchyPharmVideos = 'sketchy_pharm_videos';
+  static const tPathomaChapters = 'pathoma_chapters';
 
   Future<void> _onCreate(Database db, int version) async {
     // Knowledge Base — pageNumber is the primary key
@@ -210,6 +215,9 @@ class DatabaseService {
 
     // ── G5 Tracker tables ──────────────────────────────────────
     await _createG5Tables(db);
+
+    // ── G6 Tracker tables (Sketchy Micro/Pharm, Pathoma) ──────
+    await _createG6Tables(db);
   }
 
   /// Create G5 tracker tables — called from both _onCreate and _onUpgrade.
@@ -243,9 +251,44 @@ class DatabaseService {
     ''');
   }
 
+  /// Create G6 tracker tables — Sketchy Micro/Pharm videos + Pathoma chapters.
+  Future<void> _createG6Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tSketchyMicroVideos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category TEXT NOT NULL,
+        subcategory TEXT NOT NULL,
+        title TEXT NOT NULL,
+        watched INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tSketchyPharmVideos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category TEXT NOT NULL,
+        subcategory TEXT NOT NULL,
+        title TEXT NOT NULL,
+        watched INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tPathomaChapters (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chapter INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        watched INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+  }
+
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await _createG5Tables(db);
+    }
+    if (oldVersion < 3) {
+      await _createG6Tables(db);
     }
   }
 
@@ -646,6 +689,93 @@ class DatabaseService {
       deleteById(tUworldSessions, 'id', id);
 
   // ═══════════════════════════════════════════════════════════════
+  // SKETCHY MICRO VIDEOS (G6)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> seedSketchyMicro(List<SketchyVideo> videos) async {
+    final db = await database;
+    final count = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM $tSketchyMicroVideos'),
+    );
+    if (count != null && count > 0) return;
+    final batch = db.batch();
+    for (final v in videos) {
+      batch.insert(tSketchyMicroVideos, v.toMap()..remove('id'));
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<SketchyVideo>> getSketchyMicroVideos() async {
+    final db = await database;
+    final rows = await db.query(tSketchyMicroVideos, orderBy: 'id ASC');
+    return rows.map(SketchyVideo.fromMap).toList();
+  }
+
+  Future<void> toggleSketchyMicro(int id, bool watched) async {
+    final db = await database;
+    await db.update(tSketchyMicroVideos, {'watched': watched ? 1 : 0},
+        where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // SKETCHY PHARM VIDEOS (G6)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> seedSketchyPharm(List<SketchyVideo> videos) async {
+    final db = await database;
+    final count = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM $tSketchyPharmVideos'),
+    );
+    if (count != null && count > 0) return;
+    final batch = db.batch();
+    for (final v in videos) {
+      batch.insert(tSketchyPharmVideos, v.toMap()..remove('id'));
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<SketchyVideo>> getSketchyPharmVideos() async {
+    final db = await database;
+    final rows = await db.query(tSketchyPharmVideos, orderBy: 'id ASC');
+    return rows.map(SketchyVideo.fromMap).toList();
+  }
+
+  Future<void> toggleSketchyPharm(int id, bool watched) async {
+    final db = await database;
+    await db.update(tSketchyPharmVideos, {'watched': watched ? 1 : 0},
+        where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // PATHOMA CHAPTERS (G6)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> seedPathoma(List<PathomaChapter> chapters) async {
+    final db = await database;
+    final count = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM $tPathomaChapters'),
+    );
+    if (count != null && count > 0) return;
+    final batch = db.batch();
+    for (final c in chapters) {
+      batch.insert(tPathomaChapters, c.toMap()..remove('id'));
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<PathomaChapter>> getPathomaChapters() async {
+    final db = await database;
+    final rows = await db.query(tPathomaChapters, orderBy: 'chapter ASC');
+    return rows.map(PathomaChapter.fromMap).toList();
+  }
+
+  Future<void> togglePathoma(int id, bool watched) async {
+    final db = await database;
+    await db.update(tPathomaChapters, {'watched': watched ? 1 : 0},
+        where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // BULK OPERATIONS (for backup restore)
   // ═══════════════════════════════════════════════════════════════
 
@@ -659,6 +789,7 @@ class DatabaseService {
         tMentorMessages, tMentorMemory, tAiSettings, tUserProfile,
         tSettings, tHistory, tRevisionSettings, tRevisionItems,
         tFaPages, tSketchyItems, tPathomaItems, tUworldSessions,
+        tSketchyMicroVideos, tSketchyPharmVideos, tPathomaChapters,
       ]) {
         await txn.delete(table);
       }

@@ -26,6 +26,8 @@ import 'package:focusflow_mobile/models/revision_item.dart';
 import 'package:focusflow_mobile/models/fa_page.dart';
 import 'package:focusflow_mobile/models/sketchy_item.dart';
 import 'package:focusflow_mobile/models/pathoma_item.dart';
+import 'package:focusflow_mobile/models/sketchy_video.dart';
+import 'package:focusflow_mobile/models/pathoma_chapter.dart';
 import 'package:focusflow_mobile/models/uworld_session.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 
@@ -125,6 +127,9 @@ class AppProvider extends ChangeNotifier {
   List<SketchyItem> sketchyItems = [];
   List<PathomaItem> pathomaItems = [];
   List<UWorldSession> uWorldSessions = [];
+  List<SketchyVideo> sketchyMicroVideos = [];
+  List<SketchyVideo> sketchyPharmVideos = [];
+  List<PathomaChapter> pathomaChapters = [];
 
   MentorMemory? mentorMemory;
   AISettings? aiSettings;
@@ -189,6 +194,11 @@ class AppProvider extends ChangeNotifier {
     uWorldSessions = (await _db.getAllUWorldSessions())
         .map((j) => UWorldSession.fromJson(j))
         .toList();
+
+    // G6 tracker data
+    sketchyMicroVideos = await _db.getSketchyMicroVideos();
+    sketchyPharmVideos = await _db.getSketchyPharmVideos();
+    pathomaChapters = await _db.getPathomaChapters();
 
     // Singletons
     final memJson = await _db.getMentorMemory();
@@ -601,6 +611,48 @@ class AppProvider extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════════
+  // SKETCHY MICRO VIDEOS (G6)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> toggleSketchyMicroWatched(int id, bool watched) async {
+    await _db.toggleSketchyMicro(id, watched);
+    final idx = sketchyMicroVideos.indexWhere((v) => v.id == id);
+    if (idx >= 0) {
+      sketchyMicroVideos[idx] = sketchyMicroVideos[idx].copyWith(watched: watched);
+    }
+    notifyListeners();
+    unawaited(_triggerBackup());
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // SKETCHY PHARM VIDEOS (G6)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> toggleSketchyPharmWatched(int id, bool watched) async {
+    await _db.toggleSketchyPharm(id, watched);
+    final idx = sketchyPharmVideos.indexWhere((v) => v.id == id);
+    if (idx >= 0) {
+      sketchyPharmVideos[idx] = sketchyPharmVideos[idx].copyWith(watched: watched);
+    }
+    notifyListeners();
+    unawaited(_triggerBackup());
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // PATHOMA CHAPTERS (G6)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> togglePathomaChapterWatched(int id, bool watched) async {
+    await _db.togglePathoma(id, watched);
+    final idx = pathomaChapters.indexWhere((c) => c.id == id);
+    if (idx >= 0) {
+      pathomaChapters[idx] = pathomaChapters[idx].copyWith(watched: watched);
+    }
+    notifyListeners();
+    unawaited(_triggerBackup());
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // UWORLD SESSIONS (G5)
   // ═══════════════════════════════════════════════════════════════
 
@@ -892,6 +944,9 @@ class AppProvider extends ChangeNotifier {
     sketchyItems.clear();
     pathomaItems.clear();
     uWorldSessions.clear();
+    sketchyMicroVideos.clear();
+    sketchyPharmVideos.clear();
+    pathomaChapters.clear();
     mentorMemory = null;
     aiSettings = null;
     userProfile = null;

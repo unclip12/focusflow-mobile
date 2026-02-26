@@ -10,8 +10,7 @@ import 'package:intl/intl.dart';
 
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/fa_page.dart';
-import 'package:focusflow_mobile/models/sketchy_item.dart';
-import 'package:focusflow_mobile/models/pathoma_item.dart';
+import 'package:focusflow_mobile/models/sketchy_video.dart';
 import 'package:focusflow_mobile/models/uworld_session.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 
@@ -198,154 +197,173 @@ class _FATab extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// TAB 2 — Sketchy
+// TAB 2 — Sketchy (Micro + Pharm sub-tabs)
 // ═══════════════════════════════════════════════════════════════
 
 class _SketchyTab extends StatelessWidget {
   const _SketchyTab();
 
-  static const _statusCycle = ['unwatched', 'watched', 'mastered'];
-
-  String _nextStatus(String current) {
-    final idx = _statusCycle.indexOf(current);
-    return _statusCycle[(idx + 1) % _statusCycle.length];
-  }
-
-  Color _chipColor(String status, ColorScheme cs) {
-    switch (status) {
-      case 'watched':
-        return Colors.amber;
-      case 'mastered':
-        return Colors.green;
-      default:
-        return cs.outlineVariant;
-    }
-  }
-
-  String _chipLabel(String status) {
-    switch (status) {
-      case 'watched':
-        return 'Watched';
-      case 'mastered':
-        return 'Mastered';
-      default:
-        return 'Unwatched';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppProvider>(
-      builder: (context, app, _) {
-        if (app.sketchyItems.isEmpty) {
-          return const _EmptyPlaceholder(
-            icon: Icons.videocam_rounded,
-            text: 'Sketchy items will appear here.',
-          );
-        }
-
-        // Separate by type
-        final micro = app.sketchyItems
-            .where((i) => i.type == 'micro')
-            .toList();
-        final pharma = app.sketchyItems
-            .where((i) => i.type == 'pharma')
-            .toList();
-
-        return ListView(
-          padding: const EdgeInsets.only(bottom: 80),
-          children: [
-            if (micro.isNotEmpty)
-              _SketchySection(
-                title: 'Micro',
-                items: micro,
-                nextStatus: _nextStatus,
-                chipColor: _chipColor,
-                chipLabel: _chipLabel,
-              ),
-            if (pharma.isNotEmpty)
-              _SketchySection(
-                title: 'Pharma',
-                items: pharma,
-                nextStatus: _nextStatus,
-                chipColor: _chipColor,
-                chipLabel: _chipLabel,
-              ),
-          ],
-        );
-      },
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          TabBar(
+            tabs: const [
+              Tab(text: 'Micro'),
+              Tab(text: 'Pharm'),
+            ],
+            labelColor: Theme.of(context).colorScheme.primary,
+            unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
+            indicatorColor: Theme.of(context).colorScheme.primary,
+          ),
+          Expanded(
+            child: Consumer<AppProvider>(
+              builder: (context, app, _) {
+                return TabBarView(
+                  children: [
+                    _SketchyVideoList(
+                      videos: app.sketchyMicroVideos,
+                      onToggle: (id, watched) =>
+                          app.toggleSketchyMicroWatched(id, watched),
+                    ),
+                    _SketchyVideoList(
+                      videos: app.sketchyPharmVideos,
+                      onToggle: (id, watched) =>
+                          app.toggleSketchyPharmWatched(id, watched),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _SketchySection extends StatelessWidget {
-  final String title;
-  final List<SketchyItem> items;
-  final String Function(String) nextStatus;
-  final Color Function(String, ColorScheme) chipColor;
-  final String Function(String) chipLabel;
+class _SketchyVideoList extends StatelessWidget {
+  final List<SketchyVideo> videos;
+  final void Function(int id, bool watched) onToggle;
 
-  const _SketchySection({
-    required this.title,
-    required this.items,
-    required this.nextStatus,
-    required this.chipColor,
-    required this.chipLabel,
+  const _SketchyVideoList({
+    required this.videos,
+    required this.onToggle,
   });
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    // Group by category
-    final grouped = <String, List<SketchyItem>>{};
-    for (final item in items) {
-      grouped.putIfAbsent(item.category, () => []).add(item);
+    if (videos.isEmpty) {
+      return const _EmptyPlaceholder(
+        icon: Icons.videocam_rounded,
+        text: 'Sketchy items will appear here.',
+      );
     }
-    final categories = grouped.keys.toList()..sort();
+
+    final cs = Theme.of(context).colorScheme;
+    final watchedCount = videos.where((v) => v.watched).length;
+    final total = videos.length;
+    final progress = total > 0 ? watchedCount / total : 0.0;
+
+    // Group by category → subcategory
+    final grouped = <String, Map<String, List<SketchyVideo>>>{};
+    for (final v in videos) {
+      grouped
+          .putIfAbsent(v.category, () => {})
+          .putIfAbsent(v.subcategory, () => [])
+          .add(v);
+    }
+    final categories = grouped.keys.toList();
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Progress bar
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-          child: Text(
-            title,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: cs.primary,
-            ),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$watchedCount / $total watched',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 6,
+                  backgroundColor: cs.surfaceContainerHighest,
+                  valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+                ),
+              ),
+            ],
           ),
         ),
-        ...categories.map((cat) {
-          final catItems = grouped[cat]!;
-          return ExpansionTile(
-            title: Text(cat),
-            children: catItems.map((item) {
-              return ListTile(
-                dense: true,
-                title: Text(item.name),
-                trailing: ActionChip(
-                  label: Text(
-                    chipLabel(item.status),
-                    style: TextStyle(
-                      color: item.status == 'unwatched'
-                          ? cs.onSurfaceVariant
-                          : Colors.white,
-                      fontSize: 11,
+        // Grouped list
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: 80),
+            children: categories.map((cat) {
+              final subcategories = grouped[cat]!;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Text(
+                      cat,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: cs.primary,
+                      ),
                     ),
                   ),
-                  backgroundColor: chipColor(item.status, cs),
-                  onPressed: () {
-                    context
-                        .read<AppProvider>()
-                        .updateSketchyStatus(item.id, nextStatus(item.status));
-                  },
-                ),
+                  ...subcategories.entries.map((entry) {
+                    final subcat = entry.key;
+                    final items = entry.value;
+                    final subWatched =
+                        items.where((v) => v.watched).length;
+                    return ExpansionTile(
+                      title: Text(subcat),
+                      subtitle: Text(
+                        '$subWatched / ${items.length}',
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
+                      ),
+                      children: items.map((v) {
+                        return CheckboxListTile(
+                          dense: true,
+                          value: v.watched,
+                          onChanged: (val) {
+                            if (v.id != null) {
+                              onToggle(v.id!, val ?? false);
+                            }
+                          },
+                          title: Text(
+                            v.title,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          controlAffinity: ListTileControlAffinity.leading,
+                          activeColor: cs.primary,
+                        );
+                      }).toList(),
+                    );
+                  }),
+                ],
               );
             }).toList(),
-          );
-        }),
+          ),
+        ),
       ],
     );
   }
@@ -358,80 +376,83 @@ class _SketchySection extends StatelessWidget {
 class _PathomaTab extends StatelessWidget {
   const _PathomaTab();
 
-  static const _statusCycle = ['unwatched', 'watched', 'reviewed'];
-
-  String _nextStatus(String current) {
-    final idx = _statusCycle.indexOf(current);
-    return _statusCycle[(idx + 1) % _statusCycle.length];
-  }
-
-  Color _chipColor(String status, ColorScheme cs) {
-    switch (status) {
-      case 'watched':
-        return cs.primary;
-      case 'reviewed':
-        return Colors.green;
-      default:
-        return cs.outlineVariant;
-    }
-  }
-
-  String _chipLabel(String status) {
-    switch (status) {
-      case 'watched':
-        return 'Watched';
-      case 'reviewed':
-        return 'Reviewed';
-      default:
-        return 'Unwatched';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Consumer<AppProvider>(
       builder: (context, app, _) {
-        if (app.pathomaItems.isEmpty) {
+        // Use G6 pathomaChapters if available, fall back to old pathomaItems
+        final chapters = app.pathomaChapters;
+
+        if (chapters.isEmpty) {
           return const _EmptyPlaceholder(
             icon: Icons.biotech_rounded,
             text: 'Pathoma chapters will appear here.',
           );
         }
 
-        final sorted = List<PathomaItem>.from(app.pathomaItems)
-          ..sort((a, b) => a.chapter.compareTo(b.chapter));
+        final cs = Theme.of(context).colorScheme;
+        final watchedCount = chapters.where((c) => c.watched).length;
+        final total = chapters.length;
+        final progress = total > 0 ? watchedCount / total : 0.0;
 
-        return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 80),
-          itemCount: sorted.length,
-          itemBuilder: (context, i) {
-            final item = sorted[i];
-            final cs = Theme.of(context).colorScheme;
-
-            return ListTile(
-              title: Text('Ch ${item.chapter} — ${item.title}'),
-              trailing: ActionChip(
-                label: Text(
-                  _chipLabel(item.status),
-                  style: TextStyle(
-                    color: item.status == 'unwatched'
-                        ? cs.onSurfaceVariant
-                        : Colors.white,
-                    fontSize: 11,
+        return Column(
+          children: [
+            // Progress bar
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$watchedCount / $total watched',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurfaceVariant,
+                    ),
                   ),
-                ),
-                backgroundColor: _chipColor(item.status, cs),
-                onPressed: () {
-                  app.updatePathomaStatus(item.id, _nextStatus(item.status));
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 6,
+                      backgroundColor: cs.surfaceContainerHighest,
+                      valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Chapter list
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.only(bottom: 80),
+                itemCount: chapters.length,
+                itemBuilder: (context, i) {
+                  final ch = chapters[i];
+                  return CheckboxListTile(
+                    value: ch.watched,
+                    onChanged: (val) {
+                      if (ch.id != null) {
+                        app.togglePathomaChapterWatched(
+                            ch.id!, val ?? false);
+                      }
+                    },
+                    title: Text('Ch ${ch.chapter} — ${ch.title}'),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    activeColor: cs.primary,
+                  );
                 },
               ),
-            );
-          },
+            ),
+          ],
         );
       },
     );
   }
 }
+
 
 // ═══════════════════════════════════════════════════════════════
 // TAB 4 — UWorld
@@ -921,7 +942,7 @@ class _BulkMarkSheetState extends State<_BulkMarkSheet> {
           const SizedBox(height: 16),
           // Status dropdown
           DropdownButtonFormField<String>(
-            value: _selectedStatus,
+            initialValue: _selectedStatus,
             decoration: const InputDecoration(
               labelText: 'Mark as',
               border: OutlineInputBorder(),
