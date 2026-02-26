@@ -4,25 +4,13 @@ import 'package:provider/provider.dart';
 import 'app.dart';
 import 'providers/app_provider.dart';
 import 'providers/settings_provider.dart';
-import 'services/database_service.dart';
 import 'services/notification_service.dart';
-import 'services/seed_service.dart';
-import 'services/uworld_seed.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialise local notifications
+  // Only lightweight, truly necessary init before UI
   await NotificationService.instance.init();
-
-  // Initialise SQLite — creates all tables on first run
-  await DatabaseService.instance.database;
-
-  // Seed FA 2025 pages from bundled JSON on first launch
-  await SeedService.seedIfNeeded();
-
-  // Seed UWorld Data (V4)
-  await DatabaseService.instance.seedUWorld(uworldSeed);
 
   // Portrait-only layout
   await SystemChrome.setPreferredOrientations([
@@ -30,14 +18,15 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Create providers first
+  // Load providers (reads SharedPreferences — fast)
   final appProvider = AppProvider();
   final settingsProvider = SettingsProvider();
-  
-  // Load all persisted data BEFORE rendering any UI
   await appProvider.loadAll();
   await settingsProvider.loadSettings();
 
+  // ── UI is up immediately ──────────────────────────────────────
+  // All heavy work (DB init, seeding FA/Sketchy/Pathoma/UWorld)
+  // happens inside SplashScreen widget AFTER first frame renders.
   runApp(
     MultiProvider(
       providers: [

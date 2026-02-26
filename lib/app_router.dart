@@ -1,11 +1,13 @@
 // =============================================================
 // AppRouter — GoRouter with ShellRoute for bottom nav (G4)
 // /session stays outside shell (full-screen focus timer)
+// /splash is the true initial route — handles all heavy seeding
 // =============================================================
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:focusflow_mobile/widgets/main_shell.dart';
+import 'package:focusflow_mobile/screens/splash/splash_screen.dart';
 
 // ── Screen imports ──────────────────────────────────────────────
 import 'package:focusflow_mobile/screens/dashboard/dashboard_screen.dart';
@@ -24,6 +26,7 @@ import 'package:focusflow_mobile/screens/import/import_screen.dart';
 // ── Route names ─────────────────────────────────────────────────
 class Routes {
   Routes._();
+  static const splash        = 'splash';
   static const dashboard     = 'dashboard';
   static const todaysPlan    = 'todays-plan';
   static const timeLogger    = 'time-logger';
@@ -39,8 +42,15 @@ class Routes {
 
 // ── Router ──────────────────────────────────────────────────────
 final GoRouter appRouter = GoRouter(
-  initialLocation: '/dashboard',
+  initialLocation: '/splash',
   routes: [
+    // ── Splash: handles all DB + seed init, then auto-navigates ─
+    GoRoute(
+      path: '/splash',
+      name: Routes.splash,
+      builder: (context, state) => const SplashScreen(),
+    ),
+
     // ── Shell: 8 screens share the bottom nav ──────────────────
     ShellRoute(
       builder: (BuildContext context, GoRouterState state, Widget child) {
