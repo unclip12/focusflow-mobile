@@ -219,6 +219,9 @@ class DatabaseService {
 
     // ── G6 Tracker tables (Sketchy Micro/Pharm, Pathoma) ──────
     await _createG6Tables(db);
+
+    // ── V4 tables (UWorld topics) ─────────────────────────────
+    await _createV4Tables(db);
   }
 
   /// Create G5 tracker tables — called from both _onCreate and _onUpgrade.

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/services/database_service.dart';
 import 'package:focusflow_mobile/services/seed_service.dart';
 import 'package:focusflow_mobile/services/uworld_seed.dart';
@@ -64,6 +66,13 @@ class _SplashScreenState extends State<SplashScreen>
       // 6. Seed UWorld topics (skips if already seeded)
       _setStatus('Loading UWorld…');
       await DatabaseService.instance.seedUWorld(uworldSeed);
+
+      // 7. Reload all provider data so the app state is fully populated
+      _setStatus('Preparing app…');
+      if (mounted) {
+        final app = context.read<AppProvider>();
+        await app.loadAll();
+      }
 
       // Done — navigate to dashboard
       _setStatus('Ready!');

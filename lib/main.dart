@@ -21,7 +21,11 @@ void main() async {
   // Load providers (reads SharedPreferences — fast)
   final appProvider = AppProvider();
   final settingsProvider = SettingsProvider();
-  await appProvider.loadAll();
+  try {
+    await appProvider.loadAll();
+  } catch (e) {
+    debugPrint('loadAll failed — splash screen will handle DB init: $e');
+  }
   await settingsProvider.loadSettings();
 
   // ── UI is up immediately ──────────────────────────────────────
