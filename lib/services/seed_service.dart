@@ -14,7 +14,7 @@ import 'package:focusflow_mobile/services/sketchy_pharm_seed.dart';
 import 'package:focusflow_mobile/services/pathoma_seed.dart';
 
 class SeedService {
-  static const String _seededKey = 'fa_2025_seeded_v2'; // bumped for subtopics
+  static const String _seededKey = 'fa_2025_seeded_v3'; // v3: accurate topics from PDF
 
   /// Call once at app startup (before AppProvider.loadAll).
   /// Idempotent — safe to call every launch, only seeds if not already done.
@@ -24,6 +24,17 @@ class SeedService {
 
     // ── FA 2025 seed (pages + subtopics) ──────────────────────────
     if (prefs.getBool(_seededKey) != true) {
+      // Load existing pages to preserve user progress on re-seed
+      final existingPages = await db.getAllFAPages();
+      final existingData = <int, Map<String, dynamic>>{};
+      for (final row in existingPages) {
+        final data = jsonDecode(row['data'] as String) as Map<String, dynamic>;
+        final pn = data['pageNum'] as int?;
+        if (pn != null) {
+          existingData[pn] = data;
+        }
+      }
+
       final String raw = await rootBundle.loadString(
         'assets/data/fa_2025_seed.json',
       );
@@ -44,14 +55,24 @@ class SeedService {
           }
         }
 
-        // Seed the FA page with orderIndex
+        // Merge: new metadata (subject, system, title) + preserved progress
+        final existing = existingData[pageNum];
         final page = FAPage(
           pageNum: pageNum,
           subject: json['subject'] as String? ?? '',
           system: json['system'] as String? ?? '',
           title: title,
-          status: json['status'] as String? ?? 'unread',
+          status: existing?['status'] as String? ?? 'unread',
           orderIndex: orderIdx,
+          ankiDueDate: existing?['ankiDueDate'] as String?,
+          lastReviewed: existing?['lastReviewed'] as String?,
+          firstReadAt: existing?['firstReadAt'] as String?,
+          ankiDoneAt: existing?['ankiDoneAt'] as String?,
+          revisionCount: existing?['revisionCount'] as int? ?? 0,
+          lastRevisedAt: existing?['lastRevisedAt'] as String?,
+          revisionHistory: (existing?['revisionHistory'] as List?)
+                  ?.map((r) => FAPageRevision.fromJson(r as Map<String, dynamic>))
+                  .toList() ?? [],
         );
         await db.upsertFAPage(page.toJson());
 

@@ -12,3 +12,6 @@ android/captures/
 # iOS build outputs only (keep ios/ tracked)
 ios/Pods/
 ios/.symlinks/
+
+node_modules/
+scripts/
