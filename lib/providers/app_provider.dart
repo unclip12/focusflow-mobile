@@ -8,6 +8,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:focusflow_mobile/services/backup_service.dart';
 import 'package:focusflow_mobile/services/database_service.dart';
+import 'package:focusflow_mobile/services/srs_service.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
@@ -542,6 +543,32 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Advance a RevisionItem to the next SRS step.
+  /// If mastered (all steps done), the item is deleted.
+  Future<void> markRevisionItemDone(String revId) async {
+    final idx = revisionItems.indexWhere((r) => r.id == revId);
+    if (idx < 0) return;
+    final item = revisionItems[idx];
+    final mode = revisionSettings?.mode ?? 'strict';
+    final newIndex = item.currentRevisionIndex + 1;
+    if (SrsService.isMastered(revisionIndex: newIndex, mode: mode)) {
+      await deleteRevisionItem(revId);
+      return;
+    }
+    final now = DateTime.now();
+    final nextDate = SrsService.calculateNextRevisionDateString(
+      lastStudiedAt: now.toIso8601String(),
+      revisionIndex: newIndex,
+      mode: mode,
+    );
+    final updated = item.copyWith(
+      currentRevisionIndex: newIndex,
+      nextRevisionAt: nextDate ?? now.add(const Duration(days: 1)).toIso8601String(),
+      lastStudiedAt: now.toIso8601String(),
+    );
+    await upsertRevisionItem(updated);
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // FA PAGES (G5)
   // ═══════════════════════════════════════════════════════════════
@@ -569,6 +596,33 @@ class AppProvider extends ChangeNotifier {
           : page.ankiDoneAt,
     );
     await upsertFAPage(updated);
+
+    // Create revision item for direct page reads (not from subtopic flow)
+    if (status == 'read' || status == 'anki_done') {
+      final revId = 'fa-page-$pageNum';
+      final exists = revisionItems.any((r) => r.id == revId);
+      if (!exists) {
+        final mode = revisionSettings?.mode ?? 'strict';
+        final nextDate = SrsService.calculateNextRevisionDateString(
+          lastStudiedAt: now,
+          revisionIndex: 0,
+          mode: mode,
+        );
+        final revItem = RevisionItem(
+          id: revId,
+          type: 'PAGE',
+          source: 'FA',
+          pageNumber: pageNum.toString(),
+          title: updated.title,
+          parentTitle: updated.subject,
+          nextRevisionAt: nextDate ?? DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
+          currentRevisionIndex: 0,
+          lastStudiedAt: now,
+          totalSteps: SrsService.totalSteps(mode),
+        );
+        await upsertRevisionItem(revItem);
+      }
+    }
   }
 
   /// Bulk-update FA pages in range [from..to] to the given status.
@@ -717,16 +771,24 @@ class AppProvider extends ChangeNotifier {
     final exists = revisionItems.any((r) => r.id == revId);
     if (exists) return;
 
+    final mode = revisionSettings?.mode ?? 'strict';
+    final now = DateTime.now().toIso8601String();
+    final nextDate = SrsService.calculateNextRevisionDateString(
+      lastStudiedAt: now,
+      revisionIndex: 0,
+      mode: mode,
+    );
     final revItem = RevisionItem(
       id: revId,
       type: 'SUBTOPIC',
+      source: 'FA',
       pageNumber: sub.pageNum.toString(),
       title: sub.name,
       parentTitle: '${page.subject} p.${sub.pageNum}',
-      nextRevisionAt: DateTime.now()
-          .add(const Duration(days: 1))
-          .toIso8601String(),
+      nextRevisionAt: nextDate ?? DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
       currentRevisionIndex: 0,
+      lastStudiedAt: now,
+      totalSteps: SrsService.totalSteps(mode),
     );
     await upsertRevisionItem(revItem);
   }
@@ -761,16 +823,24 @@ class AppProvider extends ChangeNotifier {
 
         // Create page-level R0 revision
         final pageRevId = 'fa-page-$pageNum';
+        final mode = revisionSettings?.mode ?? 'strict';
+        final nowStr = DateTime.now().toIso8601String();
+        final nextDate = SrsService.calculateNextRevisionDateString(
+          lastStudiedAt: nowStr,
+          revisionIndex: 0,
+          mode: mode,
+        );
         final pageRev = RevisionItem(
           id: pageRevId,
           type: 'PAGE',
+          source: 'FA',
           pageNumber: pageNum.toString(),
           title: updated.title,
           parentTitle: updated.subject,
-          nextRevisionAt: DateTime.now()
-              .add(const Duration(days: 1))
-              .toIso8601String(),
+          nextRevisionAt: nextDate ?? DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
           currentRevisionIndex: 0,
+          lastStudiedAt: nowStr,
+          totalSteps: SrsService.totalSteps(mode),
         );
         await upsertRevisionItem(pageRev);
 
@@ -824,6 +894,28 @@ class AppProvider extends ChangeNotifier {
     final idx = sketchyMicroVideos.indexWhere((v) => v.id == id);
     if (idx >= 0) {
       sketchyMicroVideos[idx] = sketchyMicroVideos[idx].copyWith(watched: watched);
+      // Create revision item when watched
+      if (watched) {
+        final video = sketchyMicroVideos[idx];
+        final revId = 'sketchy-micro-$id';
+        final exists = revisionItems.any((r) => r.id == revId);
+        if (!exists) {
+          final mode = revisionSettings?.mode ?? 'strict';
+          final now = DateTime.now().toIso8601String();
+          final nextDate = SrsService.calculateNextRevisionDateString(
+            lastStudiedAt: now, revisionIndex: 0, mode: mode,
+          );
+          final revItem = RevisionItem(
+            id: revId, type: 'VIDEO', source: 'SKETCHY_MICRO',
+            pageNumber: '', title: video.title,
+            parentTitle: '${video.category} › ${video.subcategory}',
+            nextRevisionAt: nextDate ?? DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
+            currentRevisionIndex: 0, lastStudiedAt: now,
+            totalSteps: SrsService.totalSteps(mode),
+          );
+          await upsertRevisionItem(revItem);
+        }
+      }
     }
     notifyListeners();
     unawaited(_triggerBackup());
@@ -838,6 +930,28 @@ class AppProvider extends ChangeNotifier {
     final idx = sketchyPharmVideos.indexWhere((v) => v.id == id);
     if (idx >= 0) {
       sketchyPharmVideos[idx] = sketchyPharmVideos[idx].copyWith(watched: watched);
+      // Create revision item when watched
+      if (watched) {
+        final video = sketchyPharmVideos[idx];
+        final revId = 'sketchy-pharm-$id';
+        final exists = revisionItems.any((r) => r.id == revId);
+        if (!exists) {
+          final mode = revisionSettings?.mode ?? 'strict';
+          final now = DateTime.now().toIso8601String();
+          final nextDate = SrsService.calculateNextRevisionDateString(
+            lastStudiedAt: now, revisionIndex: 0, mode: mode,
+          );
+          final revItem = RevisionItem(
+            id: revId, type: 'VIDEO', source: 'SKETCHY_PHARM',
+            pageNumber: '', title: video.title,
+            parentTitle: '${video.category} › ${video.subcategory}',
+            nextRevisionAt: nextDate ?? DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
+            currentRevisionIndex: 0, lastStudiedAt: now,
+            totalSteps: SrsService.totalSteps(mode),
+          );
+          await upsertRevisionItem(revItem);
+        }
+      }
     }
     notifyListeners();
     unawaited(_triggerBackup());
@@ -852,6 +966,28 @@ class AppProvider extends ChangeNotifier {
     final idx = pathomaChapters.indexWhere((c) => c.id == id);
     if (idx >= 0) {
       pathomaChapters[idx] = pathomaChapters[idx].copyWith(watched: watched);
+      // Create revision item when watched
+      if (watched) {
+        final ch = pathomaChapters[idx];
+        final revId = 'pathoma-ch-$id';
+        final exists = revisionItems.any((r) => r.id == revId);
+        if (!exists) {
+          final mode = revisionSettings?.mode ?? 'strict';
+          final now = DateTime.now().toIso8601String();
+          final nextDate = SrsService.calculateNextRevisionDateString(
+            lastStudiedAt: now, revisionIndex: 0, mode: mode,
+          );
+          final revItem = RevisionItem(
+            id: revId, type: 'CHAPTER', source: 'PATHOMA',
+            pageNumber: 'Ch ${ch.chapter}', title: ch.title,
+            parentTitle: 'Pathoma Ch ${ch.chapter}',
+            nextRevisionAt: nextDate ?? DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
+            currentRevisionIndex: 0, lastStudiedAt: now,
+            totalSteps: SrsService.totalSteps(mode),
+          );
+          await upsertRevisionItem(revItem);
+        }
+      }
     }
     notifyListeners();
     unawaited(_triggerBackup());
@@ -864,6 +1000,30 @@ class AppProvider extends ChangeNotifier {
   Future<void> addUWorldSession(UWorldSession session) async {
     await _db.insertUWorldSession(session.toJson());
     uWorldSessions.add(session);
+
+    // Create revision item for wrong questions
+    final wrong = session.done - session.correct;
+    if (wrong > 0) {
+      final revId = 'uw-${session.id}';
+      final exists = revisionItems.any((r) => r.id == revId);
+      if (!exists) {
+        final mode = revisionSettings?.mode ?? 'strict';
+        final now = DateTime.now().toIso8601String();
+        final nextDate = SrsService.calculateNextRevisionDateString(
+          lastStudiedAt: now, revisionIndex: 0, mode: mode,
+        );
+        final revItem = RevisionItem(
+          id: revId, type: 'UWORLD_Q', source: 'UWORLD',
+          pageNumber: '', title: '$wrong wrong Q${wrong > 1 ? 's' : ''} — ${session.subject}',
+          parentTitle: 'UWorld ${session.date}',
+          nextRevisionAt: nextDate ?? DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
+          currentRevisionIndex: 0, lastStudiedAt: now,
+          totalSteps: SrsService.totalSteps(mode),
+        );
+        await upsertRevisionItem(revItem);
+      }
+    }
+
     notifyListeners();
     unawaited(_triggerBackup());
   }

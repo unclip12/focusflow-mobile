@@ -654,11 +654,34 @@ class SettingsScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _DetailRow('App', 'FocusFlow'),
-                _DetailRow('Version', '1.0.0'),
-                _DetailRow('Build', '1'),
-                const SizedBox(height: 4),
+                _DetailRow('Version', 'v1.5.0'),
+                _DetailRow('Build Date', '2026-02-28'),
+                const Divider(height: 16),
                 Text(
-                  'Built with â¤ï¸ for FMGE prep',
+                  "What's New in v1.5.0",
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: cs.primary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                _ChangelogItem('Revision Hub connected to all resources'),
+                _ChangelogItem('Sketchy/Pathoma/UWorld → revision tracking'),
+                _ChangelogItem('UWorld wrong-question auto-revision'),
+                _ChangelogItem('SRS scheduling (strict: 12 steps)'),
+                _ChangelogItem('Source filter chips in Revision Hub'),
+                _ChangelogItem('Version system in Settings'),
+                const SizedBox(height: 8),
+                Text(
+                  'Previous: v1.4.0 — Streak credits & day boundary',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: cs.onSurface.withValues(alpha: 0.35),
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Built with ❤️ for FMGE prep',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: cs.onSurface.withValues(alpha: 0.3),
                   ),
@@ -1072,6 +1095,44 @@ class _MenuReorderSectionState extends State<_MenuReorderSection> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+// ── Changelog bullet item ──────────────────────────────────────
+class _ChangelogItem extends StatelessWidget {
+  final String text;
+  const _ChangelogItem(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 5, right: 6),
+            child: Container(
+              width: 4, height: 4,
+              decoration: BoxDecoration(
+                color: cs.primary.withValues(alpha: 0.5),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontSize: 11,
+                color: cs.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

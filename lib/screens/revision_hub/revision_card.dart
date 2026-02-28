@@ -1,28 +1,25 @@
 // =============================================================
-// RevisionCard — card for a single KB entry in Revision Hub
-// Shows pageNumber, topic, subject chip, days until due,
-// SRS step indicator, Mark Revised button, View button
+// UnifiedRevisionCard — card for any revision item in the hub
+// Shows source badge, title, subject, revision step, due info,
+// Mark Revised button
 // =============================================================
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:focusflow_mobile/models/knowledge_base.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/services/srs_service.dart';
-import 'package:focusflow_mobile/app_router.dart';
-import 'package:focusflow_mobile/utils/text_sanitizer.dart';
+import 'revision_hub_screen.dart';
 
-class RevisionCard extends StatefulWidget {
-  final KnowledgeBaseEntry entry;
+class UnifiedRevisionCard extends StatefulWidget {
+  final RevisionDisplayItem item;
 
-  const RevisionCard({super.key, required this.entry});
+  const UnifiedRevisionCard({super.key, required this.item});
 
   @override
-  State<RevisionCard> createState() => _RevisionCardState();
+  State<UnifiedRevisionCard> createState() => _UnifiedRevisionCardState();
 }
 
-class _RevisionCardState extends State<RevisionCard> {
+class _UnifiedRevisionCardState extends State<UnifiedRevisionCard> {
   bool _saving = false;
 
   Future<void> _markRevised() async {
@@ -31,21 +28,29 @@ class _RevisionCardState extends State<RevisionCard> {
 
     try {
       final app = context.read<AppProvider>();
-      final mode = app.revisionSettings?.mode ?? 'strict';
-      final newIndex =
-          (widget.entry.currentRevisionIndex + 1).clamp(0, 11);
-      final nextDate = SrsService.calculateNextRevisionDateString(
-        lastStudiedAt: DateTime.now().toIso8601String(),
-        revisionIndex: newIndex,
-        mode: mode,
-      );
-      final updated = widget.entry.copyWith(
-        currentRevisionIndex: newIndex,
-        lastStudiedAt: DateTime.now().toIso8601String(),
-        nextRevisionAt: nextDate,
-        revisionCount: widget.entry.revisionCount + 1,
-      );
-      await app.upsertKBEntry(updated);
+      if (widget.item.isKBEntry) {
+        // KB entry — advance using the old KB SRS flow
+        final kbEntry = app.knowledgeBase.firstWhere(
+          (e) => 'kb-${e.pageNumber}' == widget.item.id,
+        );
+        final mode = app.revisionSettings?.mode ?? 'strict';
+        final newIndex = (kbEntry.currentRevisionIndex + 1).clamp(0, 11);
+        final nextDate = SrsService.calculateNextRevisionDateString(
+          lastStudiedAt: DateTime.now().toIso8601String(),
+          revisionIndex: newIndex,
+          mode: mode,
+        );
+        final updated = kbEntry.copyWith(
+          currentRevisionIndex: newIndex,
+          lastStudiedAt: DateTime.now().toIso8601String(),
+          nextRevisionAt: nextDate,
+          revisionCount: kbEntry.revisionCount + 1,
+        );
+        await app.upsertKBEntry(updated);
+      } else {
+        // RevisionItem — use new markRevisionItemDone
+        await app.markRevisionItemDone(widget.item.id);
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -53,141 +58,97 @@ class _RevisionCardState extends State<RevisionCard> {
 
   @override
   Widget build(BuildContext context) {
-    final entry = widget.entry;
+    final item = widget.item;
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-
-    // Sanitize display text
-    final displayTitle = TextSanitizer.clean(entry.title);
-    final displayPage  = TextSanitizer.clean(entry.pageNumber);
-
-    // Calculate days until due
-    final nextRev = entry.nextRevisionAt != null
-        ? DateTime.tryParse(entry.nextRevisionAt!)
-        : null;
-    final now = DateTime.now();
-    final daysUntilDue = nextRev != null
-        ? nextRev.difference(now).inDays
-        : 999;
-
-    // Due color
-    final Color dueColor;
-    final String dueLabel;
-    if (daysUntilDue < 0) {
-      dueColor = const Color(0xFFEF4444); // overdue - red
-      dueLabel = '${-daysUntilDue}d overdue';
-    } else if (daysUntilDue == 0) {
-      dueColor = const Color(0xFFF59E0B); // today - amber
-      dueLabel = 'Due today';
-    } else {
-      dueColor = const Color(0xFF10B981); // upcoming - green
-      dueLabel = 'In ${daysUntilDue}d';
-    }
+    final due = item.dueInfo;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: cs.onSurface.withValues(alpha: 0.06)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Left color indicator
-          Container(
-            width: 4,
-            height: 48,
-            decoration: BoxDecoration(
-              color: dueColor,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 12),
-
-          // Content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Page number + topic
-                Text(
-                  displayPage.isNotEmpty
-                      ? 'Page $displayPage \u2014 $displayTitle'
-                      : displayTitle,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+          // ── Row 1: Source badge + Title ──────────────────────
+          Row(
+            children: [
+              // Source icon badge
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: item.sourceColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const SizedBox(height: 4),
-                Row(
+                child: Icon(item.sourceIcon, size: 16, color: item.sourceColor),
+              ),
+              const SizedBox(width: 10),
+
+              // Title + parent
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Subject chip
-                    if (entry.subject.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: cs.primary.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          entry.subject,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: cs.primary,
-                          ),
-                        ),
-                      ),
-                    const SizedBox(width: 8),
-                    // Due label
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: dueColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        dueLabel,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: dueColor,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // SRS step indicator
                     Text(
-                      'Step ${entry.currentRevisionIndex} / 11',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                        color: cs.onSurface.withValues(alpha: 0.4),
+                      item.pageNumber.isNotEmpty
+                          ? '${item.pageNumber} — ${item.title}'
+                          : item.title,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
+                    if (item.parentTitle.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          item.parentTitle,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.onSurface.withValues(alpha: 0.5),
+                            fontSize: 11,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
 
-          const SizedBox(width: 8),
+          const SizedBox(height: 10),
 
-          // Action buttons (stacked vertically)
-          Column(
-            mainAxisSize: MainAxisSize.min,
+          // ── Row 2: Chips (source, due status, revision step) ─
+          Row(
             children: [
-              // Mark Revised
+              // Source chip
+              _chip(item.sourceLabel, item.sourceColor, cs),
+              const SizedBox(width: 6),
+
+              // Due status chip
+              _chip(due.label, due.color, cs),
+              const SizedBox(width: 6),
+
+              // Revision step
+              _chip(
+                'R${item.currentRevisionIndex} of ${item.totalSteps}',
+                cs.onSurface.withValues(alpha: 0.5),
+                cs,
+              ),
+
+              const Spacer(),
+
+              // Mark Revised button
               FilledButton.tonal(
                 onPressed: _saving ? null : _markRevised,
                 style: FilledButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   textStyle: const TextStyle(
@@ -201,31 +162,74 @@ class _RevisionCardState extends State<RevisionCard> {
                         height: 14,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Mark Revised \u2713'),
-              ),
-              const SizedBox(height: 4),
-              // View
-              TextButton(
-                onPressed: () => context.pushNamed(
-                  Routes.knowledgeBase,
-                  extra: entry,
-                ),
-                style: TextButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  textStyle: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                child: const Text('View'),
+                    : const Text('Revised ✓'),
               ),
             ],
           ),
+
+          // ── Row 3: Due time detail ─────────────────────────
+          if (due.timeDetail.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(
+                children: [
+                  Icon(Icons.schedule_rounded,
+                      size: 12, color: cs.onSurface.withValues(alpha: 0.35)),
+                  const SizedBox(width: 4),
+                  Text(
+                    due.timeDetail,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: cs.onSurface.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  if (item.lastStudiedAt != null) ...[
+                    const SizedBox(width: 12),
+                    Icon(Icons.history_rounded,
+                        size: 12, color: cs.onSurface.withValues(alpha: 0.35)),
+                    const SizedBox(width: 4),
+                    Text(
+                      _formatLastStudied(item.lastStudiedAt!),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: cs.onSurface.withValues(alpha: 0.4),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  Widget _chip(String label, Color color, ColorScheme cs) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  String _formatLastStudied(String iso) {
+    final dt = DateTime.tryParse(iso);
+    if (dt == null) return '';
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inDays == 0) return 'Studied today';
+    if (diff.inDays == 1) return 'Studied yesterday';
+    if (diff.inDays < 7) return 'Studied ${diff.inDays}d ago';
+    return 'Studied ${(diff.inDays / 7).floor()}w ago';
   }
 }
