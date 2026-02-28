@@ -201,8 +201,58 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 20),
 
           // ═══════════════════════════════════════════════════════
-          // BOTTOM NAV PINS
+          // STREAK & DAY BOUNDARY
           // ═══════════════════════════════════════════════════════
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child: Text('Streak & Day Boundary',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurfaceVariant,
+                )),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            child: Column(
+              children: [
+                ListTile(
+                  leading: Icon(Icons.schedule_rounded, color: cs.primary),
+                  title: const Text('Day Start Time'),
+                  subtitle: Text(
+                    '${sp.dayStartHour == 0 ? 12 : sp.dayStartHour > 12 ? sp.dayStartHour - 12 : sp.dayStartHour}:00 ${sp.dayStartHour < 12 ? 'AM' : 'PM'}',
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => _showSliderDialog(
+                    context: context,
+                    title: 'Day Start Hour',
+                    currentValue: sp.dayStartHour.toDouble(),
+                    min: 0,
+                    max: 12,
+                    divisions: 12,
+                    suffix: 'AM',
+                    onConfirm: (val) => sp.setDayStartHour(val.round()),
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.auto_awesome_rounded, color: Colors.amber),
+                  title: const Text('Auto Use Credits'),
+                  subtitle: const Text(
+                    'Auto-redeem credit points to save streak',
+                  ),
+                  trailing: Switch.adaptive(
+                    value: sp.streakAutoCredit,
+                    activeTrackColor: cs.primary,
+                    onChanged: (v) => sp.setStreakAutoCredit(v),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          // BOTTOM NAV PINS
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
             child: Text('Navigation',

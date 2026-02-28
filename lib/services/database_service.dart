@@ -64,6 +64,7 @@ class DatabaseService {
   static const tPathomaChapters = 'pathoma_chapters';
   static const tUworldTopics = 'uworld_topics';
   static const tFaSubtopics = 'fa_subtopics';
+  static const tStreakData = 'streak_data';
 
   Future<void> _onCreate(Database db, int version) async {
     // Knowledge Base — pageNumber is the primary key
@@ -228,6 +229,14 @@ class DatabaseService {
 
     // ── V5 tables (FA subtopics) ──────────────────────────────
     await _createV5Tables(db);
+
+    // ── Streak Data singleton ──────────────────────────────────
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tStreakData (
+        id TEXT PRIMARY KEY DEFAULT 'singleton',
+        data TEXT NOT NULL
+      )
+    ''');
   }
 
   /// Create G5 tracker tables — called from both _onCreate and _onUpgrade.
@@ -339,6 +348,13 @@ class DatabaseService {
     if (oldVersion < 5) {
       await _createV5Tables(db);
     }
+    // Streak data table — always ensure it exists
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tStreakData (
+        id TEXT PRIMARY KEY DEFAULT 'singleton',
+        data TEXT NOT NULL
+      )
+    ''');
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -640,6 +656,12 @@ class DatabaseService {
       _upsertSingleton(tRevisionSettings, json);
   Future<Map<String, dynamic>?> getRevisionSettings() =>
       _getSingleton(tRevisionSettings);
+
+  // Streak Data
+  Future<void> saveStreakData(Map<String, dynamic> json) =>
+      _upsertSingleton(tStreakData, json);
+  Future<Map<String, dynamic>?> getStreakData() =>
+      _getSingleton(tStreakData);
 
   // ═══════════════════════════════════════════════════════════════
   // HISTORY
@@ -988,6 +1010,7 @@ class DatabaseService {
         tSettings, tHistory, tRevisionSettings, tRevisionItems,
         tFaPages, tSketchyItems, tPathomaItems, tUworldSessions, tUworldTopics,
         tSketchyMicroVideos, tSketchyPharmVideos, tPathomaChapters, tFaSubtopics,
+        tStreakData,
       ]) {
         await txn.delete(table);
       }

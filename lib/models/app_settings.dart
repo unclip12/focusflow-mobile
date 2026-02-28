@@ -109,6 +109,10 @@ class AppSettings {
   final int? dailyFAGoal;
   final int? ankiBatchSize;
 
+  // Streak system
+  final int? dayStartHour;      // hour (0-23) when study day starts (default 5 = 5 AM)
+  final bool? streakAutoCredit;  // auto-deduct credits on missed target
+
   const AppSettings({
     required this.darkMode,
     this.themeId,
@@ -128,6 +132,8 @@ class AppSettings {
     this.sleepTime,
     this.dailyFAGoal,
     this.ankiBatchSize,
+    this.dayStartHour,
+    this.streakAutoCredit,
   });
 
   factory AppSettings.defaults() => AppSettings(
@@ -148,8 +154,10 @@ class AppSettings {
         step1Date: '2026-06-15',
         wakeTime: '06:00',
         sleepTime: '23:00',
-        dailyFAGoal: 20,
+        dailyFAGoal: 10,
         ankiBatchSize: 50,
+        dayStartHour: 5,
+        streakAutoCredit: false,
       );
 
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
@@ -181,6 +189,8 @@ class AppSettings {
         sleepTime: j['sleepTime'] as String?,
         dailyFAGoal: j['dailyFAGoal'] as int?,
         ankiBatchSize: j['ankiBatchSize'] as int?,
+        dayStartHour: j['dayStartHour'] as int?,
+        streakAutoCredit: j['streakAutoCredit'] as bool?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -204,6 +214,8 @@ class AppSettings {
         if (sleepTime != null) 'sleepTime': sleepTime,
         if (dailyFAGoal != null) 'dailyFAGoal': dailyFAGoal,
         if (ankiBatchSize != null) 'ankiBatchSize': ankiBatchSize,
+        if (dayStartHour != null) 'dayStartHour': dayStartHour,
+        if (streakAutoCredit != null) 'streakAutoCredit': streakAutoCredit,
       };
 
   AppSettings copyWith({
@@ -225,6 +237,8 @@ class AppSettings {
     String? sleepTime,
     int? dailyFAGoal,
     int? ankiBatchSize,
+    int? dayStartHour,
+    bool? streakAutoCredit,
   }) =>
       AppSettings(
         darkMode: darkMode ?? this.darkMode,
@@ -245,5 +259,7 @@ class AppSettings {
         sleepTime: sleepTime ?? this.sleepTime,
         dailyFAGoal: dailyFAGoal ?? this.dailyFAGoal,
         ankiBatchSize: ankiBatchSize ?? this.ankiBatchSize,
+        dayStartHour: dayStartHour ?? this.dayStartHour,
+        streakAutoCredit: streakAutoCredit ?? this.streakAutoCredit,
       );
 }

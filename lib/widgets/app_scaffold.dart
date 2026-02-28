@@ -4,7 +4,7 @@
 // =============================================================
 
 import 'package:flutter/material.dart';
-import 'package:focusflow_mobile/widgets/nav_overlay.dart';
+
 
 /// Base scaffold for all FocusFlow screens.
 ///
@@ -34,11 +34,6 @@ class AppScaffold extends StatefulWidget {
 }
 
 class _AppScaffoldState extends State<AppScaffold> {
-  bool _navOpen = false;
-
-  void _toggleNav() => setState(() => _navOpen = !_navOpen);
-  void _closeNav() => setState(() => _navOpen = false);
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -47,58 +42,45 @@ class _AppScaffoldState extends State<AppScaffold> {
     return Scaffold(
       resizeToAvoidBottomInset: true,
       floatingActionButton: widget.floatingActionButton,
-      body: Stack(
+      body: Column(
         children: [
-          // ── Main content ──────────────────────────────────────
-          Column(
-            children: [
-              // Safe area top + header
-              Container(
-                color: cs.surface,
-                child: SafeArea(
-                  bottom: false,
-                  child: _Header(
-                    screenName: widget.screenName,
-                    streakCount: widget.streakCount,
-                    onMenuTap: _toggleNav,
-                    actions: widget.actions,
-                  ),
-                ),
+          // Safe area top + header
+          Container(
+            color: cs.surface,
+            child: SafeArea(
+              bottom: false,
+              child: _Header(
+                screenName: widget.screenName,
+                streakCount: widget.streakCount,
+                actions: widget.actions,
               ),
-              // Body — animated page transition
-              Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  switchInCurve: Curves.easeInOut,
-                  switchOutCurve: Curves.easeInOut,
-                  transitionBuilder: (child, animation) {
-                    final slide = Tween<Offset>(
-                      begin: const Offset(0, 0.03),
-                      end: Offset.zero,
-                    ).animate(animation);
-                    return FadeTransition(
-                      opacity: animation,
-                      child: SlideTransition(
-                        position: slide,
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: KeyedSubtree(
-                    key: ValueKey(widget.screenName),
-                    child: widget.body,
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          // ── Nav overlay (on top) ─────────────────────────────
-          if (_navOpen)
-            NavOverlay(
-              currentScreenName: widget.screenName,
-              onClose: _closeNav,
             ),
+          ),
+          // Body — animated page transition
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              switchInCurve: Curves.easeInOut,
+              switchOutCurve: Curves.easeInOut,
+              transitionBuilder: (child, animation) {
+                final slide = Tween<Offset>(
+                  begin: const Offset(0, 0.03),
+                  end: Offset.zero,
+                ).animate(animation);
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: slide,
+                    child: child,
+                  ),
+                );
+              },
+              child: KeyedSubtree(
+                key: ValueKey(widget.screenName),
+                child: widget.body,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -109,13 +91,11 @@ class _AppScaffoldState extends State<AppScaffold> {
 class _Header extends StatelessWidget {
   final String screenName;
   final int streakCount;
-  final VoidCallback onMenuTap;
   final List<Widget>? actions;
 
   const _Header({
     required this.screenName,
     required this.streakCount,
-    required this.onMenuTap,
     this.actions,
   });
 
@@ -127,22 +107,12 @@ class _Header extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          // ── Screen name (tappable) ───────────────────────────
-          GestureDetector(
-            onTap: onMenuTap,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.menu_rounded, size: 20, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  screenName,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+          // ── Screen name ──────────────────────────────────────
+          Text(
+            screenName,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w700,
             ),
           ),
 
@@ -161,7 +131,7 @@ class _Header extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('🔥', style: TextStyle(fontSize: 14)),
+                Icon(Icons.local_fire_department_rounded, size: 16, color: Colors.deepOrange),
                 const SizedBox(width: 4),
                 Text(
                   '$streakCount',

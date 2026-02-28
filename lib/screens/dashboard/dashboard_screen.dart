@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/models/fa_page.dart';
+import 'package:focusflow_mobile/models/revision_item.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart' as du;
 
 class DashboardScreen extends StatelessWidget {
@@ -102,7 +103,8 @@ class _DashboardBody extends StatelessWidget {
     final sp = context.watch<SettingsProvider>();
     final cs = Theme.of(context).colorScheme;
 
-    final todayStr = du.AppDateUtils.todayKey();
+    final dayStartHour = sp.dayStartHour;
+    final todayStr = du.AppDateUtils.effectiveDateKey(DateTime.now(), dayStartHour);
     final now = DateTime.now();
 
     // ── Exam dates (from Settings) ──────────────────────────────
@@ -113,39 +115,43 @@ class _DashboardBody extends StatelessWidget {
     final step1Days = step1Date.difference(today).inDays;
 
     // ── Study time calculations ─────────────────────────────────
-    final todayLogs = app.timeLogs.where((l) => l.date == todayStr).toList();
-    final studyMinutesToday =
-        todayLogs.fold<int>(0, (sum, l) => sum + l.durationMinutes);
+    // Today: timeLogs + studyEntries on effective date
+    int studyMinutesToday = 0;
+    for (final l in app.timeLogs) {
+      if (l.date == todayStr) studyMinutesToday += l.durationMinutes;
+    }
+    for (final e in app.studyEntries) {
+      if (e.date == todayStr) studyMinutesToday += (e.durationMinutes ?? 0);
+    }
 
-    // This week (Mon–today)
-    final weekday = now.weekday; // 1=Mon, 7=Sun
-    final monday = today.subtract(Duration(days: weekday - 1));
-    int weekMinutes = 0;
-    for (final log in app.timeLogs) {
-      final logDate = du.AppDateUtils.parseDate(log.date);
-      if (logDate != null &&
-          !logDate.isBefore(monday) &&
-          !logDate.isAfter(today)) {
-        weekMinutes += log.durationMinutes;
+    // Last 7 days (rolling window)
+    int last7DaysMinutes = 0;
+    final sevenAgo = today.subtract(const Duration(days: 6));
+    for (final l in app.timeLogs) {
+      final d = du.AppDateUtils.parseDate(l.date);
+      if (d != null && !d.isBefore(sevenAgo) && !d.isAfter(today)) {
+        last7DaysMinutes += l.durationMinutes;
       }
     }
-    final weekHours = weekMinutes ~/ 60;
-
-    // ── Streak ──────────────────────────────────────────────────
-    final logDates = <String>{};
-    for (final log in app.timeLogs) {
-      logDates.add(log.date);
-    }
-    int streak = 0;
-    for (int i = 0; i < 365; i++) {
-      final d = today.subtract(Duration(days: i));
-      final dateStr = DateFormat('yyyy-MM-dd').format(d);
-      if (logDates.contains(dateStr)) {
-        streak++;
-      } else {
-        if (i == 0) continue; // today might not have a log yet
-        break;
+    for (final e in app.studyEntries) {
+      final d = du.AppDateUtils.parseDate(e.date);
+      if (d != null && !d.isBefore(sevenAgo) && !d.isAfter(today)) {
+        last7DaysMinutes += (e.durationMinutes ?? 0);
       }
+    }
+
+    // ── Streak (from AppProvider streakData) ─────────────────────
+    final streak = app.streakData.currentStreak;
+    final creditBalance = app.streakData.creditBalance;
+    final dailyGoal = sp.dailyFAGoal;
+    final todayPagesRead = app.getTodayPagesRead(dayStartHour);
+    final pagesRemaining = (dailyGoal - todayPagesRead).clamp(0, dailyGoal);
+    final streakDeadline = app.getStreakDeadline(dayStartHour);
+    final streakAtRisk = pagesRemaining > 0 && streakDeadline != null;
+    Duration? timeUntilDeadline;
+    if (streakDeadline != null) {
+      timeUntilDeadline = streakDeadline.difference(now);
+      if (timeUntilDeadline.isNegative) timeUntilDeadline = Duration.zero;
     }
 
     // ── FA Progress ─────────────────────────────────────────────
@@ -161,16 +167,28 @@ class _DashboardBody extends StatelessWidget {
     final dueRevisions = app.revisionItems.where((r) {
       final due = DateTime.tryParse(r.nextRevisionAt);
       return due != null && !due.isAfter(todayEnd);
-    }).length;
+    }).toList();
+    final dueRevisionCount = dueRevisions.length;
 
-    // ── Activity heatmap (last 7 days) ──────────────────────────
+    // ── Activity heatmap (last 7 days) — include timeLogs + studyEntries ─
     final last7 = List.generate(7, (i) => today.subtract(Duration(days: 6 - i)));
+    final dayMinutes = <String, int>{};
+    for (final l in app.timeLogs) {
+      dayMinutes[l.date] = (dayMinutes[l.date] ?? 0) + l.durationMinutes;
+    }
+    for (final e in app.studyEntries) {
+      dayMinutes[e.date] = (dayMinutes[e.date] ?? 0) + (e.durationMinutes ?? 0);
+    }
 
-    // ── Subject breakdown ───────────────────────────────────────
+    // ── Subject breakdown — include studyEntries ─────────────────
     final subjectMinutes = <String, int>{};
     for (final log in app.timeLogs) {
       final key = log.activity.isNotEmpty ? log.activity : 'Other';
       subjectMinutes[key] = (subjectMinutes[key] ?? 0) + log.durationMinutes;
+    }
+    for (final e in app.studyEntries) {
+      final key = e.taskName.isNotEmpty ? e.taskName : 'Other';
+      subjectMinutes[key] = (subjectMinutes[key] ?? 0) + (e.durationMinutes ?? 0);
     }
     final sortedSubjects = subjectMinutes.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -190,6 +208,16 @@ class _DashboardBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 8),
+
+              // ── Streak at risk banner ─────────────────────────
+              if (streakAtRisk && streak > 0)
+                _StreakAtRiskBanner(
+                  pagesRemaining: pagesRemaining,
+                  timeRemaining: timeUntilDeadline ?? Duration.zero,
+                  dailyGoal: dailyGoal,
+                  todayRead: todayPagesRead,
+                ),
+              if (streakAtRisk && streak > 0) const SizedBox(height: 12),
 
               // ═══ SECTION 1: Exam Countdown ═══════════════════
               _sectionHeader(context, 'EXAM COUNTDOWN'),
@@ -233,19 +261,17 @@ class _DashboardBody extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: _MiniStatCard(
-                      label: 'This Week',
-                      value: '${weekHours}h',
+                      label: 'Last 7 Days',
+                      value: _formatHM(last7DaysMinutes),
                       icon: Icons.date_range_rounded,
                       color: cs.tertiary,
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: _MiniStatCard(
-                      label: 'Streak',
-                      value: '$streak days 🔥',
-                      icon: Icons.local_fire_department_rounded,
-                      color: Colors.deepOrange,
+                    child: _StreakStatCard(
+                      streak: streak,
+                      credits: creditBalance,
                     ),
                   ),
                 ],
@@ -260,6 +286,7 @@ class _DashboardBody extends StatelessWidget {
                 ankiDone: ankiDone,
                 unread: unread,
                 faPages: app.faPages,
+                dayStartHour: dayStartHour,
                 onNavigate: () => context.go('/tracker'),
               ),
               const SizedBox(height: 20),
@@ -268,7 +295,8 @@ class _DashboardBody extends StatelessWidget {
               _sectionHeader(context, 'REVISION QUEUE'),
               const SizedBox(height: 8),
               _RevisionCard(
-                dueCount: dueRevisions,
+                dueCount: dueRevisionCount,
+                dueItems: dueRevisions.take(3).toList(),
                 onNavigate: () => context.go('/revision'),
               ),
               const SizedBox(height: 20),
@@ -278,7 +306,7 @@ class _DashboardBody extends StatelessWidget {
               const SizedBox(height: 8),
               _ActivityHeatmap(
                 days: last7,
-                logDates: logDates,
+                dayMinutes: dayMinutes,
                 today: today,
               ),
               const SizedBox(height: 20),
@@ -449,6 +477,231 @@ class _MiniStatCard extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════
+// SECTION 2b: Streak Stat Card (animated fire + credit badge)
+// ══════════════════════════════════════════════════════════════════
+
+class _StreakStatCard extends StatefulWidget {
+  final int streak;
+  final int credits;
+
+  const _StreakStatCard({required this.streak, required this.credits});
+
+  @override
+  State<_StreakStatCard> createState() => _StreakStatCardState();
+}
+
+class _StreakStatCardState extends State<_StreakStatCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    if (widget.streak >= 10) _ctrl.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(_StreakStatCard old) {
+    super.didUpdateWidget(old);
+    if (widget.streak >= 10 && !_ctrl.isAnimating) {
+      _ctrl.repeat(reverse: true);
+    } else if (widget.streak < 10 && _ctrl.isAnimating) {
+      _ctrl.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    // Fire size & color intensity based on streak
+    double iconSize;
+    Color fireColor;
+    if (widget.streak >= 10) {
+      iconSize = 24;
+      fireColor = Colors.deepOrange;
+    } else if (widget.streak >= 4) {
+      iconSize = 22;
+      fireColor = Colors.orange;
+    } else {
+      iconSize = 18;
+      fireColor = Colors.orange.shade300;
+    }
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+        child: Column(
+          children: [
+            AnimatedBuilder(
+              animation: _ctrl,
+              builder: (_, child) {
+                final scale = widget.streak >= 10
+                    ? 1.0 + 0.15 * _ctrl.value
+                    : 1.0;
+                final glow = widget.streak >= 10
+                    ? _ctrl.value * 0.6
+                    : 0.0;
+                return Transform.scale(
+                  scale: scale,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: glow > 0
+                          ? [
+                              BoxShadow(
+                                color: fireColor.withValues(alpha: glow),
+                                blurRadius: 12,
+                                spreadRadius: 2,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Icon(
+                      Icons.local_fire_department_rounded,
+                      size: iconSize,
+                      color: fireColor,
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${widget.streak} days',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+            ),
+            const SizedBox(height: 2),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Streak',
+                  style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                ),
+                if (widget.credits > 0) ...[
+                  const SizedBox(width: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '${widget.credits}★',
+                      style: const TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.amber,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Streak At Risk Banner
+// ══════════════════════════════════════════════════════════════════
+
+class _StreakAtRiskBanner extends StatelessWidget {
+  final int pagesRemaining;
+  final Duration timeRemaining;
+  final int dailyGoal;
+  final int todayRead;
+
+  const _StreakAtRiskBanner({
+    required this.pagesRemaining,
+    required this.timeRemaining,
+    required this.dailyGoal,
+    required this.todayRead,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hours = timeRemaining.inHours;
+    final minutes = timeRemaining.inMinutes % 60;
+    final timeStr = hours > 0 ? '${hours}h ${minutes}m' : '${minutes}m';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.orange.shade700,
+            Colors.deepOrange.shade600,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Streak at risk!',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$pagesRemaining pages remaining · $timeStr left',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.9),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                // Progress bar for today's pages
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: todayRead / dailyGoal,
+                    minHeight: 4,
+                    backgroundColor: Colors.white.withValues(alpha: 0.3),
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
 // SECTION 3: FA Progress Card
 // ══════════════════════════════════════════════════════════════════
 
@@ -457,6 +710,7 @@ class _FAProgressCard extends StatelessWidget {
   final int ankiDone;
   final int unread;
   final List<FAPage> faPages;
+  final int dayStartHour;
   final VoidCallback onNavigate;
 
   const _FAProgressCard({
@@ -464,6 +718,7 @@ class _FAProgressCard extends StatelessWidget {
     required this.ankiDone,
     required this.unread,
     required this.faPages,
+    required this.dayStartHour,
     required this.onNavigate,
   });
 
@@ -645,10 +900,12 @@ class _FAProgressCard extends StatelessWidget {
 
 class _RevisionCard extends StatelessWidget {
   final int dueCount;
+  final List<RevisionItem> dueItems;
   final VoidCallback onNavigate;
 
   const _RevisionCard({
     required this.dueCount,
+    required this.dueItems,
     required this.onNavigate,
   });
 
@@ -686,13 +943,29 @@ class _RevisionCard extends StatelessWidget {
                     )
                   else
                     Text(
-                      '$dueCount pages due',
+                      '$dueCount items due',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
                         color: Colors.orange.shade700,
                       ),
                     ),
+                  // Show top 3 due items
+                  if (dueItems.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    ...dueItems.map((item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Text(
+                        '• ${item.title}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    )),
+                  ],
                 ],
               ),
             ),
@@ -718,12 +991,12 @@ class _RevisionCard extends StatelessWidget {
 
 class _ActivityHeatmap extends StatelessWidget {
   final List<DateTime> days;
-  final Set<String> logDates;
+  final Map<String, int> dayMinutes;
   final DateTime today;
 
   const _ActivityHeatmap({
     required this.days,
-    required this.logDates,
+    required this.dayMinutes,
     required this.today,
   });
 
@@ -741,11 +1014,17 @@ class _ActivityHeatmap extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: days.map((d) {
             final dateStr = DateFormat('yyyy-MM-dd').format(d);
-            final studied = logDates.contains(dateStr);
+            final minutes = dayMinutes[dateStr] ?? 0;
+            final studied = minutes > 0;
             final isToday = d.year == today.year &&
                 d.month == today.month &&
                 d.day == today.day;
             final dayLabel = _dayLabels[d.weekday - 1];
+
+            // Color intensity based on study minutes
+            final intensity = studied
+                ? (minutes / 120.0).clamp(0.3, 1.0)
+                : 0.0;
 
             return Column(
               children: [
@@ -764,7 +1043,7 @@ class _ActivityHeatmap extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: studied
-                        ? Colors.green.withValues(alpha: 0.15)
+                        ? Colors.green.withValues(alpha: intensity * 0.3)
                         : cs.surfaceContainerHighest,
                     border: isToday
                         ? Border.all(color: cs.primary, width: 2)
@@ -776,11 +1055,24 @@ class _ActivityHeatmap extends StatelessWidget {
                       height: 10,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: studied ? Colors.green : cs.outline.withValues(alpha: 0.3),
+                        color: studied
+                            ? Colors.green.withValues(alpha: intensity)
+                            : cs.outline.withValues(alpha: 0.3),
                       ),
                     ),
                   ),
                 ),
+                if (studied) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    _DashboardBody._formatHM(minutes),
+                    style: TextStyle(
+                      fontSize: 8,
+                      color: cs.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ],
             );
           }).toList(),

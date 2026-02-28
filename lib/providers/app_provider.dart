@@ -31,7 +31,9 @@ import 'package:focusflow_mobile/models/pathoma_chapter.dart';
 import 'package:focusflow_mobile/models/uworld_topic.dart';
 import 'package:focusflow_mobile/models/uworld_session.dart';
 import 'package:focusflow_mobile/models/fa_subtopic.dart';
+import 'package:focusflow_mobile/models/streak_data.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
+import 'package:focusflow_mobile/utils/date_utils.dart' as du;
 
 // ── AppNotification ───────────────────────────────────────────────
 enum AppNotificationType { reminder, achievement, revisionDue, streak }
@@ -139,6 +141,7 @@ class AppProvider extends ChangeNotifier {
   AISettings? aiSettings;
   UserProfile? userProfile;
   RevisionSettings? revisionSettings;
+  StreakData streakData = StreakData();
 
   // ── Initial load ──────────────────────────────────────────────
   Future<void> loadAll() async {
@@ -220,6 +223,9 @@ class AppProvider extends ChangeNotifier {
 
     final rsJson = await _db.getRevisionSettings();
     revisionSettings = rsJson != null ? RevisionSettings.fromJson(rsJson) : null;
+
+    final sdJson = await _db.getStreakData();
+    streakData = sdJson != null ? StreakData.fromJson(sdJson) : StreakData();
 
     // ── Seed sample notifications (in-memory only) ────────────────
     final now = DateTime.now();
@@ -550,9 +556,17 @@ class AppProvider extends ChangeNotifier {
   Future<void> updateFAPageStatus(int pageNum, String status) async {
     final idx = faPages.indexWhere((p) => p.pageNum == pageNum);
     if (idx < 0) return;
-    final updated = faPages[idx].copyWith(
+    final now = DateTime.now().toIso8601String();
+    final page = faPages[idx];
+    final updated = page.copyWith(
       status: status,
-      lastReviewed: DateTime.now().toIso8601String(),
+      lastReviewed: now,
+      firstReadAt: (status == 'read' || status == 'anki_done')
+          ? (page.firstReadAt ?? now)
+          : page.firstReadAt,
+      ankiDoneAt: status == 'anki_done'
+          ? (page.ankiDoneAt ?? now)
+          : page.ankiDoneAt,
     );
     await upsertFAPage(updated);
   }
@@ -1159,6 +1173,125 @@ class AppProvider extends ChangeNotifier {
     revisionSettings = null;
     _loaded = false;
     notifyListeners();
+  }
+  // ═══════════════════════════════════════════════════════════════
+  // STREAK SYSTEM
+  // ═══════════════════════════════════════════════════════════════
+
+  /// Count FA pages whose firstReadAt falls on the given effective date.
+  int getPagesReadOnDate(String dateKey, int dayStartHour) {
+    int count = 0;
+    for (final p in faPages) {
+      if (p.firstReadAt == null) continue;
+      final dt = DateTime.tryParse(p.firstReadAt!);
+      if (dt == null) continue;
+      final effKey = du.AppDateUtils.effectiveDateKey(dt, dayStartHour);
+      if (effKey == dateKey) count++;
+    }
+    // Also count subtopics whose firstReadAt falls on this date
+    for (final s in faSubtopics) {
+      if (s.firstReadAt == null) continue;
+      final dt = DateTime.tryParse(s.firstReadAt!);
+      if (dt == null) continue;
+      final effKey = du.AppDateUtils.effectiveDateKey(dt, dayStartHour);
+      if (effKey == dateKey) count++;
+    }
+    return count;
+  }
+
+  /// Count pages read today (effective date).
+  int getTodayPagesRead(int dayStartHour) {
+    final todayKey = du.AppDateUtils.effectiveDateKey(DateTime.now(), dayStartHour);
+    return getPagesReadOnDate(todayKey, dayStartHour);
+  }
+
+  /// Get the deadline DateTime for current streak (dayStart + 30h).
+  /// Returns null if streak is already validated for today.
+  DateTime? getStreakDeadline(int dayStartHour) {
+    final now = DateTime.now();
+    final todayKey = du.AppDateUtils.effectiveDateKey(now, dayStartHour);
+    if (streakData.lastStreakDate == todayKey) return null; // already validated
+    final todayDate = du.AppDateUtils.effectiveDate(now, dayStartHour);
+    // Deadline: day start + 30 hours
+    return DateTime(todayDate.year, todayDate.month, todayDate.day, dayStartHour)
+        .add(const Duration(hours: 30));
+  }
+
+  /// Compute and update streak based on FA pages read vs daily target.
+  /// Returns a status string: 'earned', 'at_risk', 'grace', 'broken', 'redeemed'.
+  Future<String> computeStreak(int dayStartHour, int dailyGoal) async {
+    final now = DateTime.now();
+    final todayKey = du.AppDateUtils.effectiveDateKey(now, dayStartHour);
+
+    // If already validated today, skip
+    if (streakData.lastStreakDate == todayKey) return 'earned';
+
+    final todayRead = getTodayPagesRead(dayStartHour);
+
+    if (todayRead >= dailyGoal) {
+      // Target met! Check if credits were used today
+      final usedCreditsToday = streakData.creditUsedDates.contains(todayKey);
+      final earnedCredits = usedCreditsToday ? 0 : todayRead;
+
+      streakData.currentStreak++;
+      streakData.creditBalance += earnedCredits;
+      streakData.lastStreakDate = todayKey;
+      if (streakData.currentStreak > streakData.longestStreak) {
+        streakData.longestStreak = streakData.currentStreak;
+      }
+      await _persistStreak();
+      return 'earned';
+    }
+
+    // Not yet met — check if within 30h window
+    final deadline = getStreakDeadline(dayStartHour);
+    if (deadline != null && now.isBefore(deadline)) {
+      // Still within window
+      final todayDate = du.AppDateUtils.effectiveDate(now, dayStartHour);
+      final dayEnd = DateTime(todayDate.year, todayDate.month, todayDate.day, dayStartHour)
+          .add(const Duration(hours: 24));
+      if (now.isBefore(dayEnd)) {
+        return 'at_risk'; // Within 24h
+      }
+      return 'grace'; // In 6h grace period
+    }
+
+    // Past 30h window — streak is broken unless credits cover it
+    return 'broken';
+  }
+
+  /// Redeem credits to save the streak for a missed day.
+  /// Returns true if successful, false if insufficient credits.
+  Future<bool> redeemCreditsForStreak(int dayStartHour, int dailyGoal) async {
+    final todayKey = du.AppDateUtils.effectiveDateKey(DateTime.now(), dayStartHour);
+    final todayRead = getTodayPagesRead(dayStartHour);
+    final missedPages = dailyGoal - todayRead;
+    if (missedPages <= 0) return true; // Target already met
+
+    final cost = missedPages * 5;
+    if (streakData.creditBalance < cost) return false; // Not enough credits
+
+    streakData.creditBalance -= cost;
+    streakData.currentStreak++;
+    streakData.lastStreakDate = todayKey;
+    streakData.creditUsedDates = [...streakData.creditUsedDates, todayKey];
+    if (streakData.currentStreak > streakData.longestStreak) {
+      streakData.longestStreak = streakData.currentStreak;
+    }
+    await _persistStreak();
+    return true;
+  }
+
+  /// Break the streak (user chose not to redeem or insufficient credits).
+  Future<void> breakStreak() async {
+    streakData.currentStreak = 0;
+    await _persistStreak();
+  }
+
+  Future<void> _persistStreak() async {
+    await _db.saveStreakData(streakData.toJson());
+    notifyListeners();
+    unawaited(_triggerBackup());
   }
 }
 

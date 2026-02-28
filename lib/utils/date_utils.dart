@@ -16,18 +16,28 @@ class AppDateUtils {
   static final DateFormat _time12      = DateFormat('h:mm a');
   static final DateFormat _isoDateTime = DateFormat("yyyy-MM-dd'T'HH:mm:ss");
 
-  // ── Core: adjusted date (4 AM boundary) ───────────────────────
-  // If current time < 04:00, treat it as the previous calendar day.
-  // This matches web app's getAdjustedDate() exactly.
-  static DateTime getAdjustedDate([DateTime? now]) {
+  // ── Core: adjusted date (configurable day-boundary) ─────────
+  // If current time < dayStartHour, treat it as the previous calendar day.
+  static DateTime getAdjustedDate([DateTime? now, int dayStartHour = 4]) {
     final t = now ?? DateTime.now();
     final day = DateTime(t.year, t.month, t.day);
-    return (t.hour < 4) ? day.subtract(const Duration(days: 1)) : day;
+    return (t.hour < dayStartHour) ? day.subtract(const Duration(days: 1)) : day;
   }
 
   /// Returns ISO key for today (adjusted), e.g. '2026-02-23'
-  static String todayKey([DateTime? now]) =>
-      _isoDate.format(getAdjustedDate(now));
+  static String todayKey([DateTime? now, int dayStartHour = 4]) =>
+      _isoDate.format(getAdjustedDate(now, dayStartHour));
+
+  /// Returns the "effective study day" for any timestamp using a custom start hour.
+  /// Study before dayStartHour counts toward the previous day.
+  static DateTime effectiveDate(DateTime dt, int dayStartHour) {
+    final day = DateTime(dt.year, dt.month, dt.day);
+    return (dt.hour < dayStartHour) ? day.subtract(const Duration(days: 1)) : day;
+  }
+
+  /// Returns ISO key for the effective date, e.g. '2026-02-23'
+  static String effectiveDateKey(DateTime dt, int dayStartHour) =>
+      _isoDate.format(effectiveDate(dt, dayStartHour));
 
   // ── Formatters ────────────────────────────────────────────────
   static String formatDate(DateTime d) => _isoDate.format(d);

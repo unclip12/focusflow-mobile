@@ -39,8 +39,10 @@ class SettingsProvider extends ChangeNotifier {
   String get step1Date     => _settings.step1Date     ?? '2026-06-15';
   String get wakeTime      => _settings.wakeTime      ?? '06:00';
   String get sleepTime     => _settings.sleepTime     ?? '23:00';
-  int    get dailyFAGoal   => _settings.dailyFAGoal   ?? 20;
+  int    get dailyFAGoal   => _settings.dailyFAGoal   ?? 10;
   int    get ankiBatchSize => _settings.ankiBatchSize ?? 50;
+  int    get dayStartHour  => _settings.dayStartHour  ?? 5;
+  bool   get streakAutoCredit => _settings.streakAutoCredit ?? false;
 
   Future<void> setFmgeDate(String date) async {
     _settings = _settings.copyWith(fmgeDate: date);
@@ -69,6 +71,16 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<void> setAnkiBatchSize(int cards) async {
     _settings = _settings.copyWith(ankiBatchSize: cards);
+    await _persist();
+  }
+
+  Future<void> setDayStartHour(int hour) async {
+    _settings = _settings.copyWith(dayStartHour: hour);
+    await _persist();
+  }
+
+  Future<void> setStreakAutoCredit(bool value) async {
+    _settings = _settings.copyWith(streakAutoCredit: value);
     await _persist();
   }
 
