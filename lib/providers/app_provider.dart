@@ -30,6 +30,7 @@ import 'package:focusflow_mobile/models/sketchy_video.dart';
 import 'package:focusflow_mobile/models/pathoma_chapter.dart';
 import 'package:focusflow_mobile/models/uworld_topic.dart';
 import 'package:focusflow_mobile/models/uworld_session.dart';
+import 'package:focusflow_mobile/models/fa_subtopic.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 
 // ── AppNotification ───────────────────────────────────────────────
@@ -132,6 +133,7 @@ class AppProvider extends ChangeNotifier {
   List<SketchyVideo> sketchyPharmVideos = [];
   List<PathomaChapter> pathomaChapters = [];
   List<UWorldTopic> uworldTopics = [];
+  List<FASubtopic> faSubtopics = [];
 
   MentorMemory? mentorMemory;
   AISettings? aiSettings;
@@ -202,6 +204,9 @@ class AppProvider extends ChangeNotifier {
     sketchyPharmVideos = await _db.getSketchyPharmVideos();
     pathomaChapters = await _db.getPathomaChapters();
     uworldTopics = await _db.getUWorldTopics();
+
+    // V5 subtopics
+    faSubtopics = await _db.getAllFASubtopics();
 
     // Singletons
     final memJson = await _db.getMentorMemory();
@@ -575,6 +580,189 @@ class AppProvider extends ChangeNotifier {
     await _db.deleteFAPage(pageNum);
     faPages.removeWhere((p) => p.pageNum == pageNum);
     notifyListeners();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // FA SUBTOPICS (v5)
+  // ═══════════════════════════════════════════════════════════════
+
+  /// Get subtopics for a specific page
+  List<FASubtopic> getSubtopicsForPage(int pageNum) =>
+      faSubtopics.where((s) => s.pageNum == pageNum).toList();
+
+  /// Calculate subtopic completion percentage for a page
+  double getPageCompletionPercent(int pageNum) {
+    final subs = getSubtopicsForPage(pageNum);
+    if (subs.isEmpty) return 0;
+    final done = subs.where((s) => s.status != 'unread').length;
+    return done / subs.length;
+  }
+
+  /// Mark a subtopic as read
+  Future<void> markSubtopicRead(int subtopicId) async {
+    final idx = faSubtopics.indexWhere((s) => s.id == subtopicId);
+    if (idx < 0) return;
+    final now = DateTime.now().toIso8601String();
+    final sub = faSubtopics[idx];
+    final updated = sub.copyWith(
+      status: 'read',
+      firstReadAt: sub.firstReadAt ?? now,
+    );
+    await _db.updateFASubtopicStatus(
+      subtopicId,
+      status: 'read',
+      firstReadAt: updated.firstReadAt,
+    );
+    faSubtopics[idx] = updated;
+
+    // Create a revision item for this subtopic
+    await _createSubtopicRevision(updated);
+
+    notifyListeners();
+    await _checkPageCompletion(updated.pageNum);
+    unawaited(_triggerBackup());
+  }
+
+  /// Mark multiple subtopics as read at once
+  Future<void> markSubtopicsRead(List<int> subtopicIds) async {
+    final now = DateTime.now().toIso8601String();
+    int? pageNum;
+    for (final id in subtopicIds) {
+      final idx = faSubtopics.indexWhere((s) => s.id == id);
+      if (idx < 0) continue;
+      pageNum = faSubtopics[idx].pageNum;
+      final sub = faSubtopics[idx];
+      final updated = sub.copyWith(
+        status: 'read',
+        firstReadAt: sub.firstReadAt ?? now,
+      );
+      await _db.updateFASubtopicStatus(
+        id,
+        status: 'read',
+        firstReadAt: updated.firstReadAt,
+      );
+      faSubtopics[idx] = updated;
+
+      // Create a revision item for each newly read subtopic
+      await _createSubtopicRevision(updated);
+    }
+    notifyListeners();
+    if (pageNum != null) {
+      await _checkPageCompletion(pageNum);
+    }
+    unawaited(_triggerBackup());
+  }
+
+  /// Mark a subtopic as anki_done
+  Future<void> markSubtopicAnkiDone(int subtopicId) async {
+    final idx = faSubtopics.indexWhere((s) => s.id == subtopicId);
+    if (idx < 0) return;
+    final now = DateTime.now().toIso8601String();
+    final updated = faSubtopics[idx].copyWith(
+      status: 'anki_done',
+      ankiDoneAt: now,
+    );
+    await _db.updateFASubtopicStatus(
+      subtopicId,
+      status: 'anki_done',
+      ankiDoneAt: now,
+    );
+    faSubtopics[idx] = updated;
+    notifyListeners();
+    unawaited(_triggerBackup());
+  }
+
+  /// Reset a subtopic to unread
+  Future<void> resetSubtopic(int subtopicId) async {
+    final idx = faSubtopics.indexWhere((s) => s.id == subtopicId);
+    if (idx < 0) return;
+    await _db.resetFASubtopic(subtopicId);
+    faSubtopics[idx] = FASubtopic(
+      id: faSubtopics[idx].id,
+      pageNum: faSubtopics[idx].pageNum,
+      name: faSubtopics[idx].name,
+    );
+    notifyListeners();
+  }
+
+  /// Create a revision item for a subtopic that was just read
+  Future<void> _createSubtopicRevision(FASubtopic sub) async {
+    // Find parent page for context
+    final page = faPages.firstWhere(
+      (p) => p.pageNum == sub.pageNum,
+      orElse: () => FAPage(
+        pageNum: sub.pageNum,
+        subject: '',
+        system: '',
+        title: '',
+        status: 'unread',
+      ),
+    );
+    final revId = 'fa-sub-${sub.pageNum}-${sub.id}';
+    // Only create if doesn't exist yet
+    final exists = revisionItems.any((r) => r.id == revId);
+    if (exists) return;
+
+    final revItem = RevisionItem(
+      id: revId,
+      type: 'SUBTOPIC',
+      pageNumber: sub.pageNum.toString(),
+      title: sub.name,
+      parentTitle: '${page.subject} p.${sub.pageNum}',
+      nextRevisionAt: DateTime.now()
+          .add(const Duration(days: 1))
+          .toIso8601String(),
+      currentRevisionIndex: 0,
+    );
+    await upsertRevisionItem(revItem);
+  }
+
+  /// Auto-promote page when all subtopics are read/done
+  Future<void> _checkPageCompletion(int pageNum) async {
+    final subs = getSubtopicsForPage(pageNum);
+    if (subs.isEmpty) return;
+    final allRead = subs.every((s) => s.status == 'read' || s.status == 'anki_done');
+    if (allRead) {
+      final pageIdx = faPages.indexWhere((p) => p.pageNum == pageNum);
+      if (pageIdx >= 0 && faPages[pageIdx].status == 'unread') {
+        final now = DateTime.now().toIso8601String();
+        final updated = faPages[pageIdx].copyWith(
+          status: 'read',
+          firstReadAt: faPages[pageIdx].firstReadAt ?? now,
+          lastReviewed: now,
+        );
+        await _db.upsertFAPage(updated.toJson());
+        faPages[pageIdx] = updated;
+
+        // Cancel all subtopic-level revisions for this page
+        final subRevIds = revisionItems
+            .where((r) =>
+                r.type == 'SUBTOPIC' &&
+                r.pageNumber == pageNum.toString())
+            .map((r) => r.id)
+            .toList();
+        for (final rid in subRevIds) {
+          await deleteRevisionItem(rid);
+        }
+
+        // Create page-level R0 revision
+        final pageRevId = 'fa-page-$pageNum';
+        final pageRev = RevisionItem(
+          id: pageRevId,
+          type: 'PAGE',
+          pageNumber: pageNum.toString(),
+          title: updated.title,
+          parentTitle: updated.subject,
+          nextRevisionAt: DateTime.now()
+              .add(const Duration(days: 1))
+              .toIso8601String(),
+          currentRevisionIndex: 0,
+        );
+        await upsertRevisionItem(pageRev);
+
+        notifyListeners();
+      }
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════

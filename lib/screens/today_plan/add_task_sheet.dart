@@ -181,6 +181,19 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   }
 
   Future<void> _save() async {
+    // ── Validation: FA Pages requires page number ──────────────
+    if (_exam == ExamType.usmle && _usmleType == UsmleTaskType.faPages) {
+      if (_pageCtrl.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter a page number for FA Pages'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+    }
+
     final app = context.read<AppProvider>();
     final batches = _focusBatches;
     final title = _taskTitle;

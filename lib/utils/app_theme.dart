@@ -129,6 +129,13 @@ const _themes = <_ThemeDef>[
     darkBg: Color(0xFF12131E),
     darkSurface: Color(0xFF1C1E2C),
   ),
+  _ThemeDef(
+    id: 'milky', name: 'Liquid Glass',
+    lightBg: Color(0xFFF5F1EB),
+    lightSurface: Color(0xFFFFFDF8),
+    darkBg: Color(0xFF1A1918),
+    darkSurface: Color(0xFF262422),
+  ),
 ];
 
 // ── Font Size Scale ─────────────────────────────────────────────
@@ -224,13 +231,13 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         color: surface,
-        elevation: isDark ? 0 : 1,
+        elevation: isDark ? 0 : 2,
         shadowColor: isDark
             ? Colors.transparent
-            : Colors.black.withValues(alpha: 0.07),
+            : accent.withValues(alpha: 0.08),
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(radius),
+          borderRadius: BorderRadius.circular(radius + 4),
           side: isDark
               ? BorderSide(color: border, width: 0.5)
               : BorderSide.none,

@@ -10,12 +10,14 @@ import 'package:path/path.dart' as p;
 import 'package:focusflow_mobile/models/sketchy_video.dart';
 import 'package:focusflow_mobile/models/uworld_topic.dart';
 import 'package:focusflow_mobile/models/pathoma_chapter.dart';
+import 'package:focusflow_mobile/models/fa_subtopic.dart';
+
 class DatabaseService {
   DatabaseService._();
   static final DatabaseService instance = DatabaseService._();
 
   static const _dbName = 'focusflow.db';
-  static const _dbVersion = 4;
+  static const _dbVersion = 5;
 
   Database? _database;
 
@@ -61,6 +63,7 @@ class DatabaseService {
   static const tSketchyPharmVideos = 'sketchy_pharm_videos';
   static const tPathomaChapters = 'pathoma_chapters';
   static const tUworldTopics = 'uworld_topics';
+  static const tFaSubtopics = 'fa_subtopics';
 
   Future<void> _onCreate(Database db, int version) async {
     // Knowledge Base — pageNumber is the primary key
@@ -222,6 +225,9 @@ class DatabaseService {
 
     // ── V4 tables (UWorld topics) ─────────────────────────────
     await _createV4Tables(db);
+
+    // ── V5 tables (FA subtopics) ──────────────────────────────
+    await _createV5Tables(db);
   }
 
   /// Create G5 tracker tables — called from both _onCreate and _onUpgrade.
@@ -301,6 +307,25 @@ class DatabaseService {
     ''');
   }
 
+  /// Create FA subtopics table (Version 5).
+  Future<void> _createV5Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tFaSubtopics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pageNum INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'unread',
+        firstReadAt TEXT,
+        ankiDoneAt TEXT,
+        revisionCount INTEGER NOT NULL DEFAULT 0,
+        lastRevisedAt TEXT,
+        revisionHistory TEXT
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_fa_subtopics_page ON $tFaSubtopics(pageNum)');
+  }
+
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await _createG5Tables(db);
@@ -310,6 +335,9 @@ class DatabaseService {
     }
     if (oldVersion < 4) {
       await _createV4Tables(db);
+    }
+    if (oldVersion < 5) {
+      await _createV5Tables(db);
     }
   }
 
@@ -830,6 +858,122 @@ class DatabaseService {
   }
 
   // ═══════════════════════════════════════════════════════════════
+  // FA SUBTOPICS (v5)
+  // ═══════════════════════════════════════════════════════════════
+
+  /// Seed subtopics for a page (idempotent - skips if page already has subtopics)
+  Future<void> seedFASubtopics(int pageNum, List<FASubtopic> subtopics) async {
+    final db = await database;
+    final existing = Sqflite.firstIntValue(
+      await db.rawQuery(
+        'SELECT COUNT(*) FROM $tFaSubtopics WHERE pageNum = ?',
+        [pageNum],
+      ),
+    );
+    if (existing != null && existing > 0) return;
+    final batch = db.batch();
+    for (final st in subtopics) {
+      batch.insert(tFaSubtopics, {
+        'pageNum': st.pageNum,
+        'name': st.name,
+        'status': st.status,
+        'firstReadAt': st.firstReadAt,
+        'ankiDoneAt': st.ankiDoneAt,
+        'revisionCount': st.revisionCount,
+        'lastRevisedAt': st.lastRevisedAt,
+        'revisionHistory': jsonEncode(
+          st.revisionHistory.map((r) => r.toJson()).toList(),
+        ),
+      });
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// Get all subtopics for a specific page
+  Future<List<FASubtopic>> getFASubtopicsByPage(int pageNum) async {
+    final db = await database;
+    final rows = await db.query(
+      tFaSubtopics,
+      where: 'pageNum = ?',
+      whereArgs: [pageNum],
+      orderBy: 'id ASC',
+    );
+    return rows.map(_mapRowToSubtopic).toList();
+  }
+
+  /// Get all subtopics across all pages
+  Future<List<FASubtopic>> getAllFASubtopics() async {
+    final db = await database;
+    final rows = await db.query(tFaSubtopics, orderBy: 'pageNum ASC, id ASC');
+    return rows.map(_mapRowToSubtopic).toList();
+  }
+
+  /// Update a subtopic's status and timestamps
+  Future<void> updateFASubtopicStatus(
+    int id, {
+    required String status,
+    String? firstReadAt,
+    String? ankiDoneAt,
+    int? revisionCount,
+    String? lastRevisedAt,
+    List<FASubtopicRevision>? revisionHistory,
+  }) async {
+    final db = await database;
+    final update = <String, dynamic>{'status': status};
+    if (firstReadAt != null) update['firstReadAt'] = firstReadAt;
+    if (ankiDoneAt != null) update['ankiDoneAt'] = ankiDoneAt;
+    if (revisionCount != null) update['revisionCount'] = revisionCount;
+    if (lastRevisedAt != null) update['lastRevisedAt'] = lastRevisedAt;
+    if (revisionHistory != null) {
+      update['revisionHistory'] =
+          jsonEncode(revisionHistory.map((r) => r.toJson()).toList());
+    }
+    await db.update(tFaSubtopics, update, where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Reset a subtopic to unread
+  Future<void> resetFASubtopic(int id) async {
+    final db = await database;
+    await db.update(
+      tFaSubtopics,
+      {
+        'status': 'unread',
+        'firstReadAt': null,
+        'ankiDoneAt': null,
+        'revisionCount': 0,
+        'lastRevisedAt': null,
+        'revisionHistory': '[]',
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  FASubtopic _mapRowToSubtopic(Map<String, dynamic> row) {
+    final historyJson = row['revisionHistory'] as String?;
+    List<FASubtopicRevision> history = [];
+    if (historyJson != null && historyJson.isNotEmpty) {
+      try {
+        final list = jsonDecode(historyJson) as List;
+        history = list
+            .map((r) => FASubtopicRevision.fromJson(r as Map<String, dynamic>))
+            .toList();
+      } catch (_) {}
+    }
+    return FASubtopic(
+      id: row['id'] as int?,
+      pageNum: row['pageNum'] as int,
+      name: row['name'] as String? ?? '',
+      status: row['status'] as String? ?? 'unread',
+      firstReadAt: row['firstReadAt'] as String?,
+      ankiDoneAt: row['ankiDoneAt'] as String?,
+      revisionCount: row['revisionCount'] as int? ?? 0,
+      lastRevisedAt: row['lastRevisedAt'] as String?,
+      revisionHistory: history,
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // BULK OPERATIONS (for backup restore)
   // ═══════════════════════════════════════════════════════════════
 
@@ -843,7 +987,7 @@ class DatabaseService {
         tMentorMessages, tMentorMemory, tAiSettings, tUserProfile,
         tSettings, tHistory, tRevisionSettings, tRevisionItems,
         tFaPages, tSketchyItems, tPathomaItems, tUworldSessions, tUworldTopics,
-        tSketchyMicroVideos, tSketchyPharmVideos, tPathomaChapters,
+        tSketchyMicroVideos, tSketchyPharmVideos, tPathomaChapters, tFaSubtopics,
       ]) {
         await txn.delete(table);
       }

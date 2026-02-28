@@ -18,6 +18,7 @@ import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/widgets/app_scaffold.dart';
 import 'block_card.dart';
 import 'add_task_sheet.dart';
+import 'quick_study_sheet.dart';
 import 'package:focusflow_mobile/screens/session/session_screen.dart';
 
 class TodayPlanScreen extends StatefulWidget {
@@ -227,6 +228,35 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
               if (isOverflow)
                 _OverflowWarning(
                   overflowMinutes: plannedMinutes - availableMinutes,
+                ),
+
+              // ── Quick Study button (today only) ────────────────────
+              if (_isToday)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(
+                                top: Radius.circular(20)),
+                          ),
+                          builder: (_) => const QuickStudySheet(),
+                        );
+                      },
+                      icon: const Icon(Icons.timer_rounded, size: 18),
+                      label: const Text('Start Studying'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
                 ),
 
               // ── Block list or empty ─────────────────────────────────

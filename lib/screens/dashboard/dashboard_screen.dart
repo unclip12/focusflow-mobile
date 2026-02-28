@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
+import 'package:focusflow_mobile/models/fa_page.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart' as du;
 
 class DashboardScreen extends StatelessWidget {
@@ -258,6 +259,7 @@ class _DashboardBody extends StatelessWidget {
                 readPages: readPages,
                 ankiDone: ankiDone,
                 unread: unread,
+                faPages: app.faPages,
                 onNavigate: () => context.go('/tracker'),
               ),
               const SizedBox(height: 20),
@@ -454,19 +456,59 @@ class _FAProgressCard extends StatelessWidget {
   final int readPages;
   final int ankiDone;
   final int unread;
+  final List<FAPage> faPages;
   final VoidCallback onNavigate;
 
   const _FAProgressCard({
     required this.readPages,
     required this.ankiDone,
     required this.unread,
+    required this.faPages,
     required this.onNavigate,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final progress = readPages / 676;
+    final totalPages = faPages.isNotEmpty ? faPages.length : 676;
+    final progress = readPages / totalPages;
+
+    // Calculate averages from firstReadAt timestamps
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // Overall avg: pages with firstReadAt / days since first read
+    final readDates = faPages
+        .where((p) => p.firstReadAt != null)
+        .map((p) => DateTime.tryParse(p.firstReadAt!))
+        .whereType<DateTime>()
+        .toList();
+    double overallAvg = 0;
+    if (readDates.isNotEmpty) {
+      readDates.sort();
+      final firstReadDay = DateTime(
+          readDates.first.year, readDates.first.month, readDates.first.day);
+      final daysSinceFirst = today.difference(firstReadDay).inDays;
+      if (daysSinceFirst > 0) {
+        overallAvg = readPages / daysSinceFirst;
+      }
+    }
+
+    // 7-day rolling avg
+    final sevenDaysAgo = today.subtract(const Duration(days: 7));
+    final last7Pages = readDates.where((d) => d.isAfter(sevenDaysAgo)).length;
+    final weeklyAvg = last7Pages / 7.0;
+
+    // ETA
+    final remaining = totalPages - readPages;
+    String eta = '--';
+    if (weeklyAvg > 0 && remaining > 0) {
+      final daysNeeded = (remaining / weeklyAvg).ceil();
+      final etaDate = today.add(Duration(days: daysNeeded));
+      eta = '${etaDate.day}/${etaDate.month}/${etaDate.year}';
+    } else if (remaining <= 0) {
+      eta = 'Done! 🎉';
+    }
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -505,7 +547,7 @@ class _FAProgressCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              '$readPages / 676 pages read',
+              '$readPages / $totalPages pages read',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -540,9 +582,59 @@ class _FAProgressCard extends StatelessWidget {
                 ),
               ],
             ),
+            const Divider(height: 20),
+            // Avg metrics row
+            Row(
+              children: [
+                Expanded(
+                  child: _metricTile(
+                    cs,
+                    '📈 Overall Avg',
+                    '${overallAvg.toStringAsFixed(1)} pg/day',
+                  ),
+                ),
+                Expanded(
+                  child: _metricTile(
+                    cs,
+                    '📅 7-Day Avg',
+                    '${weeklyAvg.toStringAsFixed(1)} pg/day',
+                  ),
+                ),
+                Expanded(
+                  child: _metricTile(
+                    cs,
+                    '🎯 ETA',
+                    eta,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _metricTile(ColorScheme cs, String label, String value) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            color: cs.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: cs.onSurface,
+          ),
+        ),
+      ],
     );
   }
 }

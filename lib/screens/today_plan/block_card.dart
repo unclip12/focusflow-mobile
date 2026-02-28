@@ -6,6 +6,7 @@
 //             TweenAnimationBuilder for strike-through.
 // =============================================================
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
@@ -34,6 +35,8 @@ class _BlockCardState extends State<BlockCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _scaleController;
   late Animation<double> _scaleAnim;
+  Timer? _elapsedTimer;
+  int _elapsedSeconds = 0;
 
   @override
   void initState() {
@@ -49,10 +52,51 @@ class _BlockCardState extends State<BlockCard>
       parent: _scaleController,
       curve: Curves.easeInOut,
     ));
+    _startElapsedTimerIfNeeded();
+  }
+
+  @override
+  void didUpdateWidget(covariant BlockCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.block.status != widget.block.status) {
+      _startElapsedTimerIfNeeded();
+    }
+  }
+
+  void _startElapsedTimerIfNeeded() {
+    _elapsedTimer?.cancel();
+    _elapsedTimer = null;
+    if (widget.block.status == BlockStatus.inProgress &&
+        widget.block.actualStartTime != null) {
+      _updateElapsed();
+      _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        _updateElapsed();
+      });
+    }
+  }
+
+  void _updateElapsed() {
+    final startTime = DateTime.tryParse(widget.block.actualStartTime ?? '');
+    if (startTime != null && mounted) {
+      setState(() {
+        _elapsedSeconds = DateTime.now().difference(startTime).inSeconds;
+      });
+    }
+  }
+
+  String _formatElapsed(int totalSeconds) {
+    final h = totalSeconds ~/ 3600;
+    final m = (totalSeconds % 3600) ~/ 60;
+    final s = totalSeconds % 60;
+    if (h > 0) {
+      return '${h}h ${m.toString().padLeft(2, '0')}m ${s.toString().padLeft(2, '0')}s';
+    }
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
   @override
   void dispose() {
+    _elapsedTimer?.cancel();
     _scaleController.dispose();
     super.dispose();
   }
@@ -260,6 +304,40 @@ class _BlockCardState extends State<BlockCard>
                         ),
                       ),
                     ],
+                  ),
+                ],
+
+                // ── Inline timer for active blocks ──────────────────
+                if (block.status == BlockStatus.inProgress &&
+                    _elapsedSeconds > 0) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3B82F6).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: const Color(0xFF3B82F6).withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.timer_rounded,
+                            size: 16, color: Color(0xFF3B82F6)),
+                        const SizedBox(width: 6),
+                        Text(
+                          _formatElapsed(_elapsedSeconds),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF3B82F6),
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ],
