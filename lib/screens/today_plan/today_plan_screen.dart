@@ -16,13 +16,14 @@ import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/widgets/app_scaffold.dart';
-import 'block_card.dart';
 import 'add_task_sheet.dart';
-import 'quick_study_sheet.dart';
 import 'activity_selector.dart';
 import 'todo_tab.dart';
 import 'buying_tab.dart';
 import 'routines_tab.dart';
+import 'flow_control_bar.dart';
+import 'flow_activity_card.dart';
+import 'package:focusflow_mobile/models/daily_flow.dart';
 import 'package:focusflow_mobile/screens/session/session_screen.dart';
 
 class TodayPlanScreen extends StatefulWidget {
@@ -349,10 +350,10 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
 }
 
 // ══════════════════════════════════════════════════════════════════
-// ALL TAB CONTENT — existing block timeline extracted into a widget
+// ALL TAB CONTENT — Flow-based with segmented views
 // ══════════════════════════════════════════════════════════════════
 
-class _AllTabContent extends StatelessWidget {
+class _AllTabContent extends StatefulWidget {
   final DayPlan? plan;
   final List<Block> realBlocks;
   final List<Block> displayBlocks;
@@ -380,121 +381,393 @@ class _AllTabContent extends StatelessWidget {
   });
 
   @override
+  State<_AllTabContent> createState() => _AllTabContentState();
+}
+
+class _AllTabContentState extends State<_AllTabContent> {
+  int _segmentIndex = 0;
+  static const _segments = ['Full Day Plan', 'Resume', 'Upcoming', 'Completed'];
+
+  @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final app = context.watch<AppProvider>();
+    final flow = app.getDailyFlow(widget.dateKey);
+
+    final allActivities = flow?.activities ?? [];
+    final resumeActivities = allActivities
+        .where((a) => a.isActive || a.isPaused)
+        .toList();
+    final upcomingActivities = allActivities
+        .where((a) => a.isNotStarted)
+        .toList();
+    final completedActivities = allActivities
+        .where((a) => a.isDone || a.isSkipped)
+        .toList();
+
+    // Also gather to-dos and buying items for the full day plan
+    final todos = app.getTodoItemsForDate(widget.dateKey);
+    final buyingItems = app.getBuyingItemsForDate(widget.dateKey);
+
     return Column(
       children: [
-        // ── Plan summary bar ────────────────────────────────────
-        if (plan != null)
-          _PlanSummaryBar(plan: plan!, blocks: realBlocks),
+        // ── Flow control bar ────────────────────────────────────
+        FlowControlBar(dateKey: widget.dateKey, flow: flow),
 
-        // ── Available time banner (today only) ──────────────────
-        if (isToday)
-          _AvailableTimeBanner(
-            plannedMinutes: plannedMinutes,
-            availableMinutes: availableMinutes,
-          ),
+        // ── Segment selector ────────────────────────────────────
+        Container(
+          height: 34,
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: _segments.length,
+            itemBuilder: (ctx, i) {
+              final selected = _segmentIndex == i;
+              // Count badges
+              int? badge;
+              if (i == 1) badge = resumeActivities.length;
+              if (i == 2) badge = upcomingActivities.length;
+              if (i == 3) badge = completedActivities.length;
 
-        // ── Overflow warning ────────────────────────────────────
-        if (isOverflow)
-          _OverflowWarning(
-            overflowMinutes: plannedMinutes - availableMinutes,
-          ),
-
-        // ── Quick Study button (today only) ────────────────────
-        if (isToday)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    shape: const RoundedRectangleBorder(
-                      borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(20)),
+              return Padding(
+                padding: EdgeInsets.only(right: i < 3 ? 6 : 0),
+                child: GestureDetector(
+                  onTap: () => setState(() => _segmentIndex = i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? cs.primary.withValues(alpha: 0.12)
+                          : cs.surfaceContainerHighest.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(8),
+                      border: selected
+                          ? Border.all(
+                              color: cs.primary.withValues(alpha: 0.3))
+                          : null,
                     ),
-                    builder: (_) => const QuickStudySheet(),
-                  );
-                },
-                icon: const Icon(Icons.timer_rounded, size: 18),
-                label: const Text('Start Studying'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    alignment: Alignment.center,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _segments[i],
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight:
+                                selected ? FontWeight.w700 : FontWeight.w500,
+                            color: selected
+                                ? cs.primary
+                                : cs.onSurface.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        if (badge != null && badge > 0) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? cs.primary.withValues(alpha: 0.15)
+                                  : cs.onSurface.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '$badge',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: selected
+                                    ? cs.primary
+                                    : cs.onSurface.withValues(alpha: 0.4),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
+        ),
+        const SizedBox(height: 8),
 
-        // ── Block list or empty ─────────────────────────────────
+        // ── Segment content ─────────────────────────────────────
         Expanded(
-          child: displayBlocks.isEmpty
-              ? _EmptyState(hasNoPlan: plan == null)
-              : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                  itemCount: displayBlocks.length,
-                  itemBuilder: (context, i) {
-                    final b = displayBlocks[i];
-
-                    // Prayer blocks → distinct card
-                    if (b.isVirtual == true && b.id.startsWith('prayer_')) {
-                      return _PrayerBlockCard(block: b);
-                    }
-
-                    final canSwipe =
-                        b.status != BlockStatus.done &&
-                        b.status != BlockStatus.skipped;
-
-                    final card = BlockCard(
-                      block: b,
-                      dayPlan: plan!,
-                      onStart: () => onStartBlock(b),
-                      onSkip: () => onSkipBlock(b),
-                    );
-
-                    if (!canSwipe) return card;
-
-                    return Dismissible(
-                      key: ValueKey('dismiss-${b.id}'),
-                      direction: DismissDirection.endToStart,
-                      confirmDismiss: (_) async {
-                        onCompleteBlock(b);
-                        return false;
-                      },
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.only(right: 24),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.check_circle_rounded,
-                                color: Colors.white, size: 22),
-                            SizedBox(width: 6),
-                            Text('Complete',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 14,
-                                )),
-                          ],
-                        ),
-                      ),
-                      child: card,
-                    );
-                  },
-                ),
+          child: _buildSegmentContent(
+            context, app, flow, allActivities,
+            resumeActivities, upcomingActivities, completedActivities,
+            todos, buyingItems,
+          ),
         ),
       ],
     );
   }
+
+  Widget _buildSegmentContent(
+    BuildContext context,
+    AppProvider app,
+    DailyFlow? flow,
+    List<FlowActivity> allActivities,
+    List<FlowActivity> resumeActivities,
+    List<FlowActivity> upcomingActivities,
+    List<FlowActivity> completedActivities,
+    List<dynamic> todos,
+    List<dynamic> buyingItems,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+
+    switch (_segmentIndex) {
+      case 0: // Full Day Plan — everything
+        return _buildFullDayPlan(
+          context, app, flow, allActivities, todos, buyingItems,
+        );
+      case 1: // Resume
+        if (resumeActivities.isEmpty) {
+          return _emptySegment(cs, 'No active items', Icons.play_circle_outline_rounded);
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: resumeActivities.length,
+          itemBuilder: (ctx, i) => FlowActivityCard(
+            activity: resumeActivities[i],
+            index: allActivities.indexOf(resumeActivities[i]),
+            onComplete: () => app.completeFlowActivity(
+                widget.dateKey, resumeActivities[i].id),
+          ),
+        );
+      case 2: // Upcoming
+        if (upcomingActivities.isEmpty) {
+          return _emptySegment(cs, 'Nothing upcoming', Icons.upcoming_rounded);
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: upcomingActivities.length,
+          itemBuilder: (ctx, i) => FlowActivityCard(
+            activity: upcomingActivities[i],
+            index: allActivities.indexOf(upcomingActivities[i]),
+          ),
+        );
+      case 3: // Completed
+        if (completedActivities.isEmpty) {
+          return _emptySegment(cs, 'Nothing completed yet', Icons.check_circle_outline_rounded);
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: completedActivities.length,
+          itemBuilder: (ctx, i) => FlowActivityCard(
+            activity: completedActivities[i],
+            index: allActivities.indexOf(completedActivities[i]),
+            onUndo: () => app.undoFlowActivity(
+                widget.dateKey, completedActivities[i].id),
+          ),
+        );
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildFullDayPlan(
+    BuildContext context,
+    AppProvider app,
+    DailyFlow? flow,
+    List<FlowActivity> allActivities,
+    List<dynamic> todos,
+    List<dynamic> buyingItems,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+
+    if (allActivities.isEmpty && todos.isEmpty && buyingItems.isEmpty &&
+        widget.displayBlocks.isEmpty) {
+      return _EmptyState(hasNoPlan: widget.plan == null);
+    }
+
+    // Build unified list items
+    final items = <_FullDayItem>[];
+
+    // Flow activities (reorderable)
+    for (int i = 0; i < allActivities.length; i++) {
+      items.add(_FullDayItem(type: 'flow', flowActivity: allActivities[i], index: i));
+    }
+
+    // Study blocks (non-flow, existing blocks)
+    for (final b in widget.realBlocks) {
+      items.add(_FullDayItem(type: 'block', block: b));
+    }
+
+    // To-dos
+    for (final t in todos) {
+      items.add(_FullDayItem(type: 'todo', todoTitle: t.title, todoDone: t.done));
+    }
+
+    // Buying items
+    for (final b in buyingItems) {
+      items.add(_FullDayItem(type: 'buying', buyingTitle: b.name, buyingDone: b.bought));
+    }
+
+    return ReorderableListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+      itemCount: items.length,
+      onReorder: (oldIdx, newIdx) {
+        // Only reorder flow activities
+        if (oldIdx < allActivities.length && newIdx <= allActivities.length) {
+          app.reorderFlowActivities(widget.dateKey, oldIdx, newIdx);
+        }
+      },
+      proxyDecorator: (child, index, animation) {
+        return AnimatedBuilder(
+          animation: animation,
+          builder: (ctx, child) => Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(14),
+            color: Colors.transparent,
+            child: child,
+          ),
+          child: child,
+        );
+      },
+      itemBuilder: (ctx, i) {
+        final item = items[i];
+
+        if (item.type == 'flow') {
+          return KeyedSubtree(
+            key: ValueKey('flow-${item.flowActivity!.id}'),
+            child: FlowActivityCard(
+              activity: item.flowActivity!,
+              index: item.index ?? i,
+              onComplete: item.flowActivity!.isActive || item.flowActivity!.isPaused
+                  ? () => app.completeFlowActivity(widget.dateKey, item.flowActivity!.id)
+                  : null,
+              onUndo: item.flowActivity!.isDone
+                  ? () => app.undoFlowActivity(widget.dateKey, item.flowActivity!.id)
+                  : null,
+            ),
+          );
+        }
+
+        if (item.type == 'block') {
+          final b = item.block!;
+          return KeyedSubtree(
+            key: ValueKey('block-${b.id}'),
+            child: Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              color: cs.surfaceContainerHighest.withValues(alpha: 0.3),
+              child: ListTile(
+                dense: true,
+                leading: Icon(Icons.book_rounded, size: 20,
+                    color: cs.primary.withValues(alpha: 0.6)),
+                title: Text(b.title.isNotEmpty ? b.title : 'Study Block',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                subtitle: Text(
+                  '${b.plannedStartTime} – ${b.plannedEndTime} • ${b.plannedDurationMinutes}m',
+                  style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.4)),
+                ),
+                trailing: b.status == BlockStatus.done
+                    ? const Icon(Icons.check_circle_rounded, size: 18, color: Color(0xFF10B981))
+                    : null,
+              ),
+            ),
+          );
+        }
+
+        if (item.type == 'todo') {
+          return KeyedSubtree(
+            key: ValueKey('todo-$i'),
+            child: Card(
+              margin: const EdgeInsets.only(bottom: 6),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              color: cs.surfaceContainerHighest.withValues(alpha: 0.2),
+              child: ListTile(
+                dense: true,
+                leading: Icon(
+                  item.todoDone == true ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                  size: 18,
+                  color: item.todoDone == true ? const Color(0xFF10B981) : cs.onSurface.withValues(alpha: 0.3),
+                ),
+                title: Text(item.todoTitle ?? '',
+                    style: TextStyle(
+                      fontSize: 12,
+                      decoration: item.todoDone == true ? TextDecoration.lineThrough : null,
+                      color: item.todoDone == true ? cs.onSurface.withValues(alpha: 0.4) : cs.onSurface,
+                    )),
+              ),
+            ),
+          );
+        }
+
+        if (item.type == 'buying') {
+          return KeyedSubtree(
+            key: ValueKey('buying-$i'),
+            child: Card(
+              margin: const EdgeInsets.only(bottom: 6),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              color: cs.surfaceContainerHighest.withValues(alpha: 0.2),
+              child: ListTile(
+                dense: true,
+                leading: Icon(Icons.shopping_cart_outlined, size: 18,
+                    color: item.buyingDone == true ? const Color(0xFF10B981) : cs.onSurface.withValues(alpha: 0.3)),
+                title: Text(item.buyingTitle ?? '',
+                    style: TextStyle(
+                      fontSize: 12,
+                      decoration: item.buyingDone == true ? TextDecoration.lineThrough : null,
+                      color: item.buyingDone == true ? cs.onSurface.withValues(alpha: 0.4) : cs.onSurface,
+                    )),
+              ),
+            ),
+          );
+        }
+
+        return SizedBox.shrink(key: ValueKey('unknown-$i'));
+      },
+    );
+  }
+
+  Widget _emptySegment(ColorScheme cs, String msg, IconData icon) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 40, color: cs.primary.withValues(alpha: 0.2)),
+          const SizedBox(height: 8),
+          Text(msg,
+              style: TextStyle(
+                fontSize: 14,
+                color: cs.onSurface.withValues(alpha: 0.4),
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+class _FullDayItem {
+  final String type; // 'flow' | 'block' | 'todo' | 'buying'
+  final FlowActivity? flowActivity;
+  final Block? block;
+  final String? todoTitle;
+  final bool? todoDone;
+  final String? buyingTitle;
+  final bool? buyingDone;
+  final int? index;
+
+  const _FullDayItem({
+    required this.type,
+    this.flowActivity,
+    this.block,
+    this.todoTitle,
+    this.todoDone,
+    this.buyingTitle,
+    this.buyingDone,
+    this.index,
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════

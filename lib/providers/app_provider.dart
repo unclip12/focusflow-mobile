@@ -37,6 +37,7 @@ import 'package:focusflow_mobile/models/routine.dart';
 import 'package:focusflow_mobile/models/buying_item.dart';
 import 'package:focusflow_mobile/models/todo_item.dart';
 import 'package:focusflow_mobile/models/default_routine_order.dart';
+import 'package:focusflow_mobile/models/daily_flow.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart' as du;
 
@@ -146,6 +147,7 @@ class AppProvider extends ChangeNotifier {
   List<BuyingItem> buyingItems = [];
   List<TodoItem> todoItems = [];
   List<DefaultActivity> defaultActivities = [];
+  List<DailyFlow> dailyFlows = [];
 
   MentorMemory? mentorMemory;
   AISettings? aiSettings;
@@ -238,6 +240,11 @@ class AppProvider extends ChangeNotifier {
         .map((j) => DefaultActivity.fromJson(j))
         .toList();
     defaultActivities.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+    // V7: Daily Flows
+    dailyFlows = (await _db.getAllDailyFlows())
+        .map((j) => DailyFlow.fromJson(j))
+        .toList();
 
     // Singletons
     final memJson = await _db.getMentorMemory();
@@ -648,6 +655,292 @@ class AppProvider extends ChangeNotifier {
     defaultActivities = List.from(activities);
     defaultActivities.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     notifyListeners();
+  }
+
+  // ═════════════════════════════════════════════════════════════════
+  // DAILY FLOWS (V7)
+  // ═════════════════════════════════════════════════════════════════
+
+  DailyFlow? getDailyFlow(String date) {
+    try { return dailyFlows.firstWhere((f) => f.date == date); }
+    catch (_) { return null; }
+  }
+
+  Future<void> upsertDailyFlow(DailyFlow flow) async {
+    await _db.upsertDailyFlow(flow.toJson());
+    final idx = dailyFlows.indexWhere((f) => f.date == flow.date);
+    if (idx >= 0) { dailyFlows[idx] = flow; } else { dailyFlows.add(flow); }
+    notifyListeners();
+  }
+
+  Future<void> deleteDailyFlow(String date) async {
+    await _db.deleteDailyFlow(date);
+    dailyFlows.removeWhere((f) => f.date == date);
+    notifyListeners();
+  }
+
+  /// Initialize a daily flow for a date by cloning the default activity chain.
+  /// If a flow already exists for the date, it is returned as-is.
+  Future<DailyFlow> initializeDailyFlow(String date) async {
+    final existing = getDailyFlow(date);
+    if (existing != null) return existing;
+
+    final activities = defaultActivities.map((da) {
+      return FlowActivity(
+        id: _uuid.v4(),
+        label: da.displayLabel,
+        icon: da.displayIcon,
+        activityType: da.type.value,
+        routineId: da.routineId,
+        linkedTaskIds: da.linkedTaskIds,
+        sortOrder: da.sortOrder,
+      );
+    }).toList();
+
+    final flow = DailyFlow(date: date, activities: activities);
+    await upsertDailyFlow(flow);
+    return flow;
+  }
+
+  /// Start the daily flow.
+  Future<void> startFlow(String date) async {
+    var flow = getDailyFlow(date);
+    if (flow == null) flow = await initializeDailyFlow(date);
+
+    final now = DateTime.now().toIso8601String();
+    final activities = List<FlowActivity>.from(flow.activities);
+
+    // Find the first pending activity and mark it as IN_PROGRESS
+    for (int i = 0; i < activities.length; i++) {
+      if (activities[i].isNotStarted) {
+        activities[i] = activities[i].copyWith(
+          status: 'IN_PROGRESS',
+          startedAt: now,
+        );
+        break;
+      }
+    }
+
+    final updated = flow.copyWith(
+      status: 'ACTIVE',
+      activities: activities,
+      startedAt: flow.startedAt ?? now,
+    );
+    await upsertDailyFlow(updated);
+  }
+
+  /// Pause the flow with an optional duration.
+  Future<void> pauseFlow(String date, {Duration? pauseDuration}) async {
+    final flow = getDailyFlow(date);
+    if (flow == null) return;
+
+    String? pausedUntil;
+    if (pauseDuration != null) {
+      pausedUntil = DateTime.now().add(pauseDuration).toIso8601String();
+    }
+
+    // Pause the currently active activity
+    final activities = List<FlowActivity>.from(flow.activities);
+    for (int i = 0; i < activities.length; i++) {
+      if (activities[i].isActive) {
+        activities[i] = activities[i].copyWith(
+          status: 'PAUSED',
+          pausedUntil: pausedUntil,
+        );
+        break;
+      }
+    }
+
+    await upsertDailyFlow(flow.copyWith(
+      status: 'PAUSED',
+      activities: activities,
+    ));
+  }
+
+  /// Stop the flow with an optional reminder time.
+  Future<void> stopFlow(String date, {DateTime? remindAt}) async {
+    final flow = getDailyFlow(date);
+    if (flow == null) return;
+
+    // Pause any active activity
+    final activities = List<FlowActivity>.from(flow.activities);
+    for (int i = 0; i < activities.length; i++) {
+      if (activities[i].isActive) {
+        activities[i] = activities[i].copyWith(status: 'PAUSED');
+        break;
+      }
+    }
+
+    await upsertDailyFlow(flow.copyWith(
+      status: 'STOPPED',
+      activities: activities,
+      stoppedAt: DateTime.now().toIso8601String(),
+      resumeReminderAt: remindAt?.toIso8601String(),
+    ));
+  }
+
+  /// Resume the flow from the next pending activity.
+  Future<void> resumeFlow(String date) async {
+    final flow = getDailyFlow(date);
+    if (flow == null) return;
+
+    final now = DateTime.now().toIso8601String();
+    final activities = List<FlowActivity>.from(flow.activities);
+
+    // Find the first paused or not-started activity and start it
+    for (int i = 0; i < activities.length; i++) {
+      if (activities[i].isPaused || activities[i].isNotStarted) {
+        activities[i] = activities[i].copyWith(
+          status: 'IN_PROGRESS',
+          startedAt: activities[i].startedAt ?? now,
+        );
+        break;
+      }
+    }
+
+    await upsertDailyFlow(flow.copyWith(
+      status: 'ACTIVE',
+      activities: activities,
+    ));
+  }
+
+  /// Mark a flow activity as completed.
+  Future<void> completeFlowActivity(String date, String activityId) async {
+    final flow = getDailyFlow(date);
+    if (flow == null) return;
+
+    final now = DateTime.now();
+    final activities = List<FlowActivity>.from(flow.activities);
+    final idx = activities.indexWhere((a) => a.id == activityId);
+    if (idx < 0) return;
+
+    final activity = activities[idx];
+    final startTime = activity.startedAt != null
+        ? DateTime.tryParse(activity.startedAt!)
+        : null;
+    final duration = startTime != null
+        ? now.difference(startTime).inSeconds
+        : null;
+
+    activities[idx] = activity.copyWith(
+      status: 'DONE',
+      completedAt: now.toIso8601String(),
+      durationSeconds: duration,
+    );
+
+    // Auto-start the next pending activity
+    bool foundNext = false;
+    for (int i = 0; i < activities.length; i++) {
+      if (activities[i].isNotStarted) {
+        activities[i] = activities[i].copyWith(
+          status: 'IN_PROGRESS',
+          startedAt: now.toIso8601String(),
+        );
+        foundNext = true;
+        break;
+      }
+    }
+
+    // Check if all completed
+    final allDone = activities.every((a) => a.isDone || a.isSkipped);
+    await upsertDailyFlow(flow.copyWith(
+      activities: activities,
+      status: allDone ? 'COMPLETED' : (foundNext ? 'ACTIVE' : 'COMPLETED'),
+    ));
+  }
+
+  /// Undo a completed activity — moves it back to NOT_STARTED.
+  Future<void> undoFlowActivity(String date, String activityId) async {
+    final flow = getDailyFlow(date);
+    if (flow == null) return;
+
+    final activities = List<FlowActivity>.from(flow.activities);
+    final idx = activities.indexWhere((a) => a.id == activityId);
+    if (idx < 0) return;
+
+    activities[idx] = FlowActivity(
+      id: activities[idx].id,
+      label: activities[idx].label,
+      icon: activities[idx].icon,
+      activityType: activities[idx].activityType,
+      routineId: activities[idx].routineId,
+      linkedTaskIds: activities[idx].linkedTaskIds,
+      sortOrder: activities[idx].sortOrder,
+      status: 'NOT_STARTED',
+    );
+
+    await upsertDailyFlow(flow.copyWith(
+      activities: activities,
+      status: 'ACTIVE',
+    ));
+  }
+
+  /// Reorder flow activities.
+  Future<void> reorderFlowActivities(String date, int oldIdx, int newIdx) async {
+    final flow = getDailyFlow(date);
+    if (flow == null) return;
+
+    final activities = List<FlowActivity>.from(flow.activities);
+    if (newIdx > oldIdx) newIdx--;
+    final item = activities.removeAt(oldIdx);
+    activities.insert(newIdx, item);
+
+    // Re-index sortOrder
+    for (int i = 0; i < activities.length; i++) {
+      activities[i] = activities[i].copyWith(sortOrder: i);
+    }
+
+    await upsertDailyFlow(flow.copyWith(activities: activities));
+  }
+
+  /// Add a new activity to a daily flow.
+  Future<void> addFlowActivity(String date, FlowActivity activity) async {
+    var flow = getDailyFlow(date);
+    if (flow == null) flow = await initializeDailyFlow(date);
+
+    final activities = List<FlowActivity>.from(flow.activities);
+    activities.add(activity.copyWith(sortOrder: activities.length));
+    await upsertDailyFlow(flow.copyWith(activities: activities));
+  }
+
+  /// Remove an activity from a daily flow.
+  Future<void> removeFlowActivity(String date, String activityId) async {
+    final flow = getDailyFlow(date);
+    if (flow == null) return;
+
+    final activities = List<FlowActivity>.from(flow.activities)
+      ..removeWhere((a) => a.id == activityId);
+    await upsertDailyFlow(flow.copyWith(activities: activities));
+  }
+
+  // ═════════════════════════════════════════════════════════════════
+  // PRAYER ROUTINE SEEDING
+  // ═════════════════════════════════════════════════════════════════
+
+  /// Seed default prayer routines if they don't already exist.
+  Future<void> seedPrayerRoutines() async {
+    const prayerNames = ['Fajr', 'Zuhr', 'Asr', 'Maghrib', 'Isha'];
+    final existingNames = routines.map((r) => r.name).toSet();
+
+    for (final name in prayerNames) {
+      if (existingNames.contains(name)) continue;
+
+      final routine = Routine(
+        id: 'prayer_${name.toLowerCase()}',
+        name: name,
+        icon: '🕌',
+        color: 0xFF059669,
+        steps: [
+          RoutineStep(id: '${name.toLowerCase()}_wudu', title: 'Wudu (Ablution)', estimatedMinutes: 5, sortOrder: 0),
+          RoutineStep(id: '${name.toLowerCase()}_walk', title: 'Walk to Mosque', estimatedMinutes: 5, sortOrder: 1),
+          RoutineStep(id: '${name.toLowerCase()}_pray', title: '$name Prayer', estimatedMinutes: 10, sortOrder: 2),
+          RoutineStep(id: '${name.toLowerCase()}_tasbeeh', title: 'Tasbeeh & Dhikr', estimatedMinutes: 5, sortOrder: 3),
+          RoutineStep(id: '${name.toLowerCase()}_dua', title: 'Dua & Quran Reading', estimatedMinutes: 5, sortOrder: 4),
+        ],
+        createdAt: DateTime.now().toIso8601String(),
+      );
+      await upsertRoutine(routine);
+    }
   }
 
   /// Get the highest completed FA page number

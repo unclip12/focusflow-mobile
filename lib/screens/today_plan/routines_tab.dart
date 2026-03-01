@@ -20,6 +20,10 @@ class RoutinesTab extends StatelessWidget {
     final routines = app.routines;
     final todayLogs = app.getRoutineLogsForDate(dateKey);
 
+    // Split into prayer & custom
+    final prayerRoutines = routines.where((r) => r.id.startsWith('prayer_')).toList();
+    final customRoutines = routines.where((r) => !r.id.startsWith('prayer_')).toList();
+
     return Column(
       children: [
         // ── Header ────────────────────────────────────────────
@@ -84,20 +88,104 @@ class RoutinesTab extends StatelessWidget {
                     ],
                   ),
                 )
-              : ListView.builder(
+              : ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  itemCount: routines.length,
-                  itemBuilder: (context, i) {
-                    final r = routines[i];
-                    final wasRun = todayLogs.any((l) => l.routineId == r.id && l.completed);
-                    return _RoutineCard(
-                      routine: r,
-                      wasRunToday: wasRun,
-                      onStart: () => _startRoutine(context, r),
-                      onEdit: () => _showEditor(context, r),
-                      onDelete: () => _deleteRoutine(context, r),
-                    );
-                  },
+                  children: [
+                    // ── Prayer Routines Section ──
+                    if (prayerRoutines.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8, top: 4),
+                        child: Row(
+                          children: [
+                            const Text('🕌', style: TextStyle(fontSize: 16)),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Prayer Routines',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: cs.onSurface.withValues(alpha: 0.7),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF059669).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '${prayerRoutines.length}',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF059669),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ...prayerRoutines.map((r) {
+                        final wasRun = todayLogs.any((l) => l.routineId == r.id && l.completed);
+                        return _RoutineCard(
+                          routine: r,
+                          wasRunToday: wasRun,
+                          onStart: () => _startRoutine(context, r),
+                          onEdit: () => _showEditor(context, r),
+                          onDelete: () => _deleteRoutine(context, r),
+                        );
+                      }),
+                      const SizedBox(height: 12),
+                    ],
+
+                    // ── Custom Routines Section ──
+                    if (customRoutines.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            const Text('🔄', style: TextStyle(fontSize: 16)),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Custom Routines',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: cs.onSurface.withValues(alpha: 0.7),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: cs.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '${customRoutines.length}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: cs.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ...customRoutines.map((r) {
+                        final wasRun = todayLogs.any((l) => l.routineId == r.id && l.completed);
+                        return _RoutineCard(
+                          routine: r,
+                          wasRunToday: wasRun,
+                          onStart: () => _startRoutine(context, r),
+                          onEdit: () => _showEditor(context, r),
+                          onDelete: () => _deleteRoutine(context, r),
+                        );
+                      }),
+                    ],
+                  ],
                 ),
         ),
       ],

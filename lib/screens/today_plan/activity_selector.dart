@@ -175,6 +175,11 @@ class DefaultChainRunner {
       case ActivityType.eveningRoutine:
       case ActivityType.lunch:
       case ActivityType.custom:
+      case ActivityType.fajrPrayer:
+      case ActivityType.zuhrPrayer:
+      case ActivityType.asrPrayer:
+      case ActivityType.maghribPrayer:
+      case ActivityType.ishaPrayer:
         // Try to find linked routine
         if (activity.routineId != null) {
           final routine = app.routines.firstWhere(

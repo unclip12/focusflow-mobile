@@ -23,6 +23,7 @@ void main() async {
   final settingsProvider = SettingsProvider();
   try {
     await appProvider.loadAll();
+    await appProvider.seedPrayerRoutines();
   } catch (e) {
     debugPrint('loadAll failed — splash screen will handle DB init: $e');
   }

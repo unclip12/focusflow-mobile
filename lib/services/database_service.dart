@@ -17,7 +17,7 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._();
 
   static const _dbName = 'focusflow.db';
-  static const _dbVersion = 6;
+  static const _dbVersion = 7;
 
   Database? _database;
 
@@ -70,6 +70,7 @@ class DatabaseService {
   static const tBuyingItems = 'buying_items';
   static const tTodoItems = 'todo_items';
   static const tDefaultRoutineOrder = 'default_routine_order';
+  static const tDailyFlows = 'daily_flows';
 
   Future<void> _onCreate(Database db, int version) async {
     // Knowledge Base — pageNumber is the primary key
@@ -245,6 +246,9 @@ class DatabaseService {
 
     // ── V6 tables (Routines, Buying, Todos, Default Order) ────
     await _createV6Tables(db);
+
+    // ── V7 tables (Daily Flows) ───────────────────────────────
+    await _createV7Tables(db);
   }
 
   /// Create G5 tracker tables — called from both _onCreate and _onUpgrade.
@@ -358,6 +362,9 @@ class DatabaseService {
     }
     if (oldVersion < 6) {
       await _createV6Tables(db);
+    }
+    if (oldVersion < 7) {
+      await _createV7Tables(db);
     }
     // Streak data table — always ensure it exists
     await db.execute('''
@@ -1059,6 +1066,16 @@ class DatabaseService {
     ''');
   }
 
+  /// Create V7 tables — Daily Flows.
+  Future<void> _createV7Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tDailyFlows (
+        date TEXT PRIMARY KEY,
+        data TEXT NOT NULL
+      )
+    ''');
+  }
+
   // ── ROUTINES ──────────────────────────────────────────────────
 
   Future<void> upsertRoutine(Map<String, dynamic> json) =>
@@ -1131,6 +1148,20 @@ class DatabaseService {
   Future<int> deleteAllDefaultActivities() =>
       deleteAll(tDefaultRoutineOrder);
 
+  // ── DAILY FLOWS (V7) ──────────────────────────────────────────
+
+  Future<void> upsertDailyFlow(Map<String, dynamic> json) =>
+      upsert(tDailyFlows, 'date', json['date'] ?? '', json);
+
+  Future<Map<String, dynamic>?> getDailyFlow(String date) =>
+      getById(tDailyFlows, 'date', date);
+
+  Future<List<Map<String, dynamic>>> getAllDailyFlows() =>
+      getAll(tDailyFlows);
+
+  Future<int> deleteDailyFlow(String date) =>
+      deleteById(tDailyFlows, 'date', date);
+
   // ═══════════════════════════════════════════════════════════════
   // BULK OPERATIONS (for backup restore)
   // ═══════════════════════════════════════════════════════════════
@@ -1147,7 +1178,7 @@ class DatabaseService {
         tFaPages, tSketchyItems, tPathomaItems, tUworldSessions, tUworldTopics,
         tSketchyMicroVideos, tSketchyPharmVideos, tPathomaChapters, tFaSubtopics,
         tStreakData, tRoutines, tRoutineLogs, tBuyingItems, tTodoItems,
-        tDefaultRoutineOrder,
+        tDefaultRoutineOrder, tDailyFlows,
       ]) {
         await txn.delete(table);
       }
