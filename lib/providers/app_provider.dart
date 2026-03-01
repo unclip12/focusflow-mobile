@@ -11,6 +11,7 @@ import 'package:focusflow_mobile/services/database_service.dart';
 import 'package:focusflow_mobile/services/srs_service.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:focusflow_mobile/models/knowledge_base.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
@@ -149,6 +150,8 @@ class AppProvider extends ChangeNotifier {
   List<DefaultActivity> defaultActivities = [];
   List<DailyFlow> dailyFlows = [];
 
+  String faViewMode = 'cards';
+
   MentorMemory? mentorMemory;
   AISettings? aiSettings;
   UserProfile? userProfile;
@@ -261,6 +264,9 @@ class AppProvider extends ChangeNotifier {
 
     final sdJson = await _db.getStreakData();
     streakData = sdJson != null ? StreakData.fromJson(sdJson) : StreakData();
+
+    final prefs = await SharedPreferences.getInstance();
+    faViewMode = prefs.getString('faViewMode') ?? 'cards';
 
     // ── Seed sample notifications (in-memory only) ────────────────
     final now = DateTime.now();
@@ -1332,6 +1338,20 @@ class AppProvider extends ChangeNotifier {
         count++;
       }
     }
+
+    // Also mark subtopics of these pages
+    for (final sub in faSubtopics) {
+      if (sub.pageNum >= from && sub.pageNum <= to && sub.status != status) {
+        if (status == 'read') {
+          await markSubtopicRead(sub.id!);
+        } else if (status == 'anki_done') {
+          await markSubtopicAnkiDone(sub.id!);
+        } else if (status == 'unread') {
+          await resetSubtopic(sub.id!);
+        }
+      }
+    }
+
     return count;
   }
 
@@ -1538,6 +1558,14 @@ class AppProvider extends ChangeNotifier {
         notifyListeners();
       }
     }
+  }
+
+  /// Save FA View Mode to SharedPreferences
+  Future<void> saveFAViewMode(String mode) async {
+    faViewMode = mode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('faViewMode', mode);
+    notifyListeners();
   }
 
   // ═══════════════════════════════════════════════════════════════

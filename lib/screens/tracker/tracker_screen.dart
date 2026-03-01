@@ -223,11 +223,7 @@ class _FATab extends StatefulWidget {
   State<_FATab> createState() => _FATabState();
 }
 
-enum _FAViewMode { pages, topics, cards }
-
 class _FATabState extends State<_FATab> {
-  _FAViewMode _viewMode = _FAViewMode.pages;
-
   @override
   Widget build(BuildContext context) {
     return Consumer<AppProvider>(
@@ -286,27 +282,26 @@ class _FATabState extends State<_FATab> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  SegmentedButton<_FAViewMode>(
+                  SegmentedButton<String>(
                     segments: const [
                       ButtonSegment(
-                        value: _FAViewMode.pages,
+                        value: 'pages',
                         icon: Icon(Icons.grid_view_rounded, size: 16),
                         label: Text('Pages', style: TextStyle(fontSize: 10)),
                       ),
                       ButtonSegment(
-                        value: _FAViewMode.topics,
+                        value: 'topics',
                         icon: Icon(Icons.list_rounded, size: 16),
                         label: Text('Topics', style: TextStyle(fontSize: 10)),
                       ),
                       ButtonSegment(
-                        value: _FAViewMode.cards,
+                        value: 'cards',
                         icon: Icon(Icons.view_agenda_rounded, size: 16),
                         label: Text('Cards', style: TextStyle(fontSize: 10)),
                       ),
                     ],
-                    selected: {_viewMode},
-                    onSelectionChanged: (v) =>
-                        setState(() => _viewMode = v.first),
+                    selected: {app.faViewMode},
+                    onSelectionChanged: (v) => app.saveFAViewMode(v.first),
                     style: SegmentedButton.styleFrom(
                       visualDensity: VisualDensity.compact,
                     ),
@@ -317,9 +312,9 @@ class _FATabState extends State<_FATab> {
 
             // ── Content ────────────────────────────────────────
             Expanded(
-              child: _viewMode == _FAViewMode.topics
+              child: app.faViewMode == 'topics'
                   ? _SubtopicListView(app: app)
-                  : _viewMode == _FAViewMode.cards
+                  : app.faViewMode == 'cards'
                       ? _FACardView(
                           app: app,
                           sorted: sorted,
