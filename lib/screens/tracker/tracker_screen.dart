@@ -303,7 +303,7 @@ class _LiquidFillPageBox extends StatelessWidget {
       boxBg = Colors.red.shade700;
     }
 
-    final boxSize = 56.0;
+    const boxSize = 56.0;
 
     return GestureDetector(
       onTap: () => _showSubtopicPicker(context),
@@ -1701,7 +1701,7 @@ class _BulkMarkSheetState extends State<_BulkMarkSheet> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            value: _selectedStatus,
+            initialValue: _selectedStatus,
             decoration: const InputDecoration(
               labelText: 'Mark as',
               border: OutlineInputBorder(),

@@ -219,7 +219,9 @@ class DefaultChainRunner {
           useSafeArea: false,
           builder: (_) => ShoppingFlowOverlay(dateKey: dateKey),
         ).then((_) {
-          start(context, chain, dateKey, startIndex: startIndex + 1);
+          if (context.mounted) {
+            start(context, chain, dateKey, startIndex: startIndex + 1);
+          }
         });
         break;
       case ActivityType.sleep:

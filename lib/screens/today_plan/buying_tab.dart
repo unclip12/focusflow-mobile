@@ -312,7 +312,7 @@ class _AddBuyingSheetState extends State<_AddBuyingSheet> {
               SizedBox(
                 width: 100,
                 child: DropdownButtonFormField<String>(
-                  value: _unit,
+                  initialValue: _unit,
                   decoration: InputDecoration(
                     labelText: 'Unit',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

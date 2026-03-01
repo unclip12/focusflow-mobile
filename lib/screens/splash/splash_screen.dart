@@ -130,7 +130,7 @@ class _SplashScreenState extends State<SplashScreen>
               Text(
                 'Study smarter. Score higher.',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
               const SizedBox(height: 48),
@@ -138,7 +138,7 @@ class _SplashScreenState extends State<SplashScreen>
                 width: 200,
                 child: LinearProgressIndicator(
                   backgroundColor:
-                      theme.colorScheme.primary.withOpacity(0.15),
+                      theme.colorScheme.primary.withValues(alpha: 0.15),
                   color: theme.colorScheme.primary,
                   minHeight: 3,
                 ),
@@ -147,7 +147,7 @@ class _SplashScreenState extends State<SplashScreen>
               Text(
                 _status,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.5),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
               ),
             ],

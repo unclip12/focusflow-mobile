@@ -705,7 +705,7 @@ class AppProvider extends ChangeNotifier {
   /// Start the daily flow.
   Future<void> startFlow(String date) async {
     var flow = getDailyFlow(date);
-    if (flow == null) flow = await initializeDailyFlow(date);
+    flow ??= await initializeDailyFlow(date);
 
     final now = DateTime.now().toIso8601String();
     final activities = List<FlowActivity>.from(flow.activities);
@@ -896,7 +896,7 @@ class AppProvider extends ChangeNotifier {
   /// Add a new activity to a daily flow.
   Future<void> addFlowActivity(String date, FlowActivity activity) async {
     var flow = getDailyFlow(date);
-    if (flow == null) flow = await initializeDailyFlow(date);
+    flow ??= await initializeDailyFlow(date);
 
     final activities = List<FlowActivity>.from(flow.activities);
     activities.add(activity.copyWith(sortOrder: activities.length));

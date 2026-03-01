@@ -441,7 +441,7 @@ class _AddKBEntrySheetState extends State<_AddKBEntrySheet> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _subject,
+              initialValue: _subject,
               decoration: InputDecoration(
                 labelText: 'Subject',
                 border: OutlineInputBorder(
@@ -454,7 +454,7 @@ class _AddKBEntrySheetState extends State<_AddKBEntrySheet> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _system,
+              initialValue: _system,
               decoration: InputDecoration(
                 labelText: 'System',
                 border: OutlineInputBorder(
