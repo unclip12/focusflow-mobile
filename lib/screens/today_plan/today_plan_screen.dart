@@ -15,7 +15,6 @@ import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
-import 'package:focusflow_mobile/widgets/app_scaffold.dart';
 import 'add_task_sheet.dart';
 import 'activity_selector.dart';
 import 'todo_tab.dart';
@@ -25,6 +24,7 @@ import 'flow_control_bar.dart';
 import 'flow_activity_card.dart';
 import 'package:focusflow_mobile/models/daily_flow.dart';
 import 'package:focusflow_mobile/screens/session/session_screen.dart';
+import 'track_now_screen.dart';
 
 class TodayPlanScreen extends StatefulWidget {
   const TodayPlanScreen({super.key});
@@ -205,101 +205,166 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
       }
     }
 
-    return AppScaffold(
-      screenName: "Today's Plan",
-      streakCount: streak,
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              // ── Date navigation ─────────────────────────────────────
-              _DateHeader(
-                date: _selectedDate,
-                isToday: _isToday,
-                onPrev: _prevDay,
-                onNext: _nextDay,
-                onDateTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _selectedDate,
-                    firstDate: DateTime(2024),
-                    lastDate: DateTime(2027),
-                  );
-                  if (picked != null) setState(() => _selectedDate = picked);
+    final activeTrackNow = app.getActiveTrackNow(_dateKey);
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      body: SafeArea(
+        bottom: false,
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                // ── Active Track Now Banner (if running) ─────────────
+                if (activeTrackNow != null && activeTrackNow.startedAt != null)
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => TrackNowScreen(
+                            dateKey: _dateKey,
+                            existingActivityId: activeTrackNow.id,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.timer_outlined, color: Color(0xFFEF4444), size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Tracking: ${activeTrackNow.label}',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFEF4444),
+                              ),
+                            ),
+                          ),
+                          const Icon(Icons.open_in_full_rounded, color: Color(0xFFEF4444), size: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                // ── NestedScrollView for scrollable header ───────────
+                Expanded(
+                  child: NestedScrollView(
+                    headerSliverBuilder: (context, _) => [
+                      SliverToBoxAdapter(
+                        child: Column(
+                          children: [
+                            // ── Date navigation & Track Now button ───
+                            _DateHeader(
+                              date: _selectedDate,
+                              isToday: _isToday,
+                              streakCount: streak,
+                              onPrev: _prevDay,
+                              onNext: _nextDay,
+                              onDateTap: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: _selectedDate,
+                                  firstDate: DateTime(2024),
+                                  lastDate: DateTime(2027),
+                                );
+                                if (picked != null) setState(() => _selectedDate = picked);
+                              },
+                              onTrackNow: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => TrackNowScreen(dateKey: _dateKey),
+                                  ),
+                                );
+                              },
+                            ),
+
+                            // ── Activity Selector (all dates) ─────────
+                            ActivitySelector(dateKey: _dateKey),
+                          ],
+                        ),
+                      ),
+                      // ── Tab bar (Pinned) ────────────────────────────
+                      SliverPersistentHeader(
+                        pinned: true,
+                        delegate: _SliverAppBarDelegate(
+                          Container(
+                            color: Theme.of(context).colorScheme.surface,
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 16),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: TabBar(
+                                controller: _tabCtrl,
+                                labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                unselectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                indicatorSize: TabBarIndicatorSize.tab,
+                                dividerColor: Colors.transparent,
+                                indicator: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                tabs: const [
+                                  Tab(text: 'All', height: 36),
+                                  Tab(text: 'To-Do', height: 36),
+                                  Tab(text: 'Buying', height: 36),
+                                  Tab(text: 'Routines', height: 36),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    body: TabBarView(
+                      controller: _tabCtrl,
+                      children: [
+                        // ═ ALL TAB ═ (existing block timeline)
+                        _AllTabContent(
+                          plan: plan,
+                          realBlocks: realBlocks,
+                          displayBlocks: displayBlocks,
+                          plannedMinutes: plannedMinutes,
+                          availableMinutes: availableMinutes,
+                          isToday: _isToday,
+                          isOverflow: isOverflow,
+                          dateKey: _dateKey,
+                          onCompleteBlock: (b) => _completeBlock(app, plan!, b),
+                          onStartBlock: (b) => _startBlock(app, plan!, b),
+                          onSkipBlock: (b) => _skipBlock(app, plan!, b),
+                        ),
+
+                        // ═ TO-DO TAB ═
+                        TodoTab(dateKey: _dateKey),
+
+                        // ═ BUYING TAB ═
+                        BuyingTab(dateKey: _dateKey),
+
+                        // ═ ROUTINES TAB ═
+                        RoutinesTab(dateKey: _dateKey),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            // ── Celebration overlay ──────────────────────────────────
+            if (_completedBlockId != null)
+              _CelebrationOverlay(
+                onComplete: () {
+                  if (mounted) setState(() => _completedBlockId = null);
                 },
               ),
-
-              // ── Activity Selector (all dates) ───────────────────────
-              ActivitySelector(dateKey: _dateKey),
-
-              // ── Tab bar ──────────────────────────────────────────────
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: TabBar(
-                  controller: _tabCtrl,
-                  labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                  unselectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  dividerColor: Colors.transparent,
-                  indicator: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  tabs: const [
-                    Tab(text: 'All', height: 36),
-                    Tab(text: 'To-Do', height: 36),
-                    Tab(text: 'Buying', height: 36),
-                    Tab(text: 'Routines', height: 36),
-                  ],
-                ),
-              ),
-
-              // ── Tab content ──────────────────────────────────────────
-              Expanded(
-                child: TabBarView(
-                  controller: _tabCtrl,
-                  children: [
-                    // ═ ALL TAB ═ (existing block timeline)
-                    _AllTabContent(
-                      plan: plan,
-                      realBlocks: realBlocks,
-                      displayBlocks: displayBlocks,
-                      plannedMinutes: plannedMinutes,
-                      availableMinutes: availableMinutes,
-                      isToday: _isToday,
-                      isOverflow: isOverflow,
-                      dateKey: _dateKey,
-                      onCompleteBlock: (b) => _completeBlock(app, plan!, b),
-                      onStartBlock: (b) => _startBlock(app, plan!, b),
-                      onSkipBlock: (b) => _skipBlock(app, plan!, b),
-                    ),
-
-                    // ═ TO-DO TAB ═
-                    TodoTab(dateKey: _dateKey),
-
-                    // ═ BUYING TAB ═
-                    BuyingTab(dateKey: _dateKey),
-
-                    // ═ ROUTINES TAB ═
-                    RoutinesTab(dateKey: _dateKey),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          // ── Celebration overlay ──────────────────────────────────
-          if (_completedBlockId != null)
-            _CelebrationOverlay(
-              onComplete: () {
-                if (mounted) setState(() => _completedBlockId = null);
-              },
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -566,19 +631,193 @@ class _AllTabContentState extends State<_AllTabContent> {
         if (completedActivities.isEmpty) {
           return _emptySegment(cs, 'Nothing completed yet', Icons.check_circle_outline_rounded);
         }
-        return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: completedActivities.length,
-          itemBuilder: (ctx, i) => FlowActivityCard(
-            activity: completedActivities[i],
-            index: allActivities.indexOf(completedActivities[i]),
-            onUndo: () => app.undoFlowActivity(
-                widget.dateKey, completedActivities[i].id),
-          ),
-        );
+        return _buildCompletedTab(context, app, completedActivities, allActivities);
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  // ── Completed Tab (Grouped by Time of Day) ──────────────────────────
+  Widget _buildCompletedTab(
+    BuildContext context,
+    AppProvider app,
+    List<FlowActivity> completed,
+    List<FlowActivity> allActivities,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+
+    // Groups
+    final morning = <FlowActivity>[];
+    final afternoon = <FlowActivity>[];
+    final evening = <FlowActivity>[];
+    final night = <FlowActivity>[];
+
+    int totalSeconds = 0;
+    final categorySeconds = <String, int>{};
+
+    for (final a in completed) {
+      if (a.durationSeconds != null) {
+        totalSeconds += a.durationSeconds!;
+        final cat = a.category ?? 'Other';
+        categorySeconds[cat] = (categorySeconds[cat] ?? 0) + a.durationSeconds!;
+      }
+
+      if (a.completedAt == null) {
+        morning.add(a); // fallback
+        continue;
+      }
+
+      final date = DateTime.tryParse(a.completedAt!);
+      if (date == null) {
+        morning.add(a);
+        continue;
+      }
+
+      final hour = date.hour;
+      if (hour >= 5 && hour < 12) {
+        morning.add(a);
+      } else if (hour >= 12 && hour < 17) {
+        afternoon.add(a);
+      } else if (hour >= 17 && hour < 21) {
+        evening.add(a);
+      } else {
+        night.add(a);
+      }
+    }
+
+    Widget buildGroup(String title, IconData icon, List<FlowActivity> activities) {
+      if (activities.isEmpty) return const SizedBox.shrink();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8, top: 16),
+            child: Row(
+              children: [
+                Icon(icon, size: 16, color: cs.onSurface.withValues(alpha: 0.5)),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...activities.map((a) => FlowActivityCard(
+            activity: a,
+            index: allActivities.indexOf(a),
+            onUndo: () => app.undoFlowActivity(widget.dateKey, a.id),
+          )),
+        ],
+      );
+    }
+
+    String fmtHrMin(int totalSec) {
+      final h = totalSec ~/ 3600;
+      final m = (totalSec % 3600) ~/ 60;
+      if (h > 0) return '${h}h ${m}m';
+      return '${m}m';
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      children: [
+        buildGroup('Morning (5 AM - 12 PM)', Icons.wb_twilight_rounded, morning),
+        buildGroup('Afternoon (12 PM - 5 PM)', Icons.wb_sunny_rounded, afternoon),
+        buildGroup('Evening (5 PM - 9 PM)', Icons.nights_stay_rounded, evening),
+        buildGroup('Night (9 PM - 5 AM)', Icons.bedtime_rounded, night),
+
+        const SizedBox(height: 24),
+        // Total Summary Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: cs.primary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: cs.primary.withValues(alpha: 0.15)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: cs.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.insights_rounded, size: 16, color: cs.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Total Hours Today',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    fmtHrMin(totalSeconds),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: cs.primary,
+                    ),
+                  ),
+                ],
+              ),
+              if (categorySeconds.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: categorySeconds.entries.map((e) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            e.key,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: cs.onSurface.withValues(alpha: 0.7),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            fmtHrMin(e.value),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: cs.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildFullDayPlan(
@@ -1037,20 +1276,43 @@ class _Particle {
   });
 }
 
+// ── Sliver Persistent Header Delegate ─────────────────────────
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  _SliverAppBarDelegate(this._child);
+  final Widget _child;
+
+  @override
+  double get minExtent => 44.0;
+  @override
+  double get maxExtent => 44.0;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return _child;
+  }
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) => false;
+}
+
 // ── Date header ─────────────────────────────────────────────────
 class _DateHeader extends StatelessWidget {
   final DateTime date;
   final bool isToday;
+  final int streakCount;
   final VoidCallback onPrev;
   final VoidCallback onNext;
   final VoidCallback onDateTap;
+  final VoidCallback onTrackNow;
 
   const _DateHeader({
     required this.date,
     required this.isToday,
+    required this.streakCount,
     required this.onPrev,
     required this.onNext,
     required this.onDateTap,
+    required this.onTrackNow,
   });
 
   @override
@@ -1071,15 +1333,34 @@ class _DateHeader extends StatelessWidget {
             child: GestureDetector(
               onTap: onDateTap,
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text(
-                    isToday
-                        ? 'Today'
-                        : DateFormat('EEEE').format(date),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: isToday ? cs.primary : cs.onSurface,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        isToday
+                            ? 'Today'
+                            : DateFormat('EEEE').format(date),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: isToday ? cs.primary : cs.onSurface,
+                        ),
+                      ),
+                      if (streakCount > 0) ...[
+                        const SizedBox(width: 6),
+                        Icon(Icons.local_fire_department_rounded, size: 14, color: Colors.deepOrange),
+                        const SizedBox(width: 2),
+                        Text(
+                          '$streakCount',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.deepOrange,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   Text(
                     DateFormat('d MMMM yyyy').format(date),
@@ -1096,6 +1377,24 @@ class _DateHeader extends StatelessWidget {
             icon: const Icon(Icons.chevron_right_rounded),
             onPressed: onNext,
             color: cs.onSurface.withValues(alpha: 0.6),
+          ),
+          // ── Track Now Button ────────────────────────────
+          FilledButton.icon(
+            onPressed: onTrackNow,
+            icon: const Icon(Icons.play_arrow_rounded, size: 16),
+            label: const Text('Track Now'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),

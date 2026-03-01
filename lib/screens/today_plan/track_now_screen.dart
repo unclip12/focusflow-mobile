@@ -4,16 +4,13 @@
 // Minimizable — timer continues in provider when user leaves.
 // =============================================================
 
-import 'dart:async';
-import 'dart:math';
-
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'dart:async';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/daily_flow.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
-import 'package:focusflow_mobile/utils/constants.dart';
 import 'add_task_sheet.dart';
 
 // ── Category data ──────────────────────────────────────────────
@@ -68,9 +65,6 @@ class _TrackNowScreenState extends State<TrackNowScreen> {
   // Timer state
   int _elapsed = 0;
   Timer? _tickTimer;
-
-  // Linked tasks added during tracking
-  final List<String> _linkedTaskDescriptions = [];
 
   @override
   void initState() {
