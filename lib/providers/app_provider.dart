@@ -1313,6 +1313,11 @@ class AppProvider extends ChangeNotifier {
         );
         await upsertRevisionItem(revItem);
       }
+    } else if (status == 'unread') {
+      final revId = 'fa-page-$pageNum';
+      if (revisionItems.any((r) => r.id == revId)) {
+        await deleteRevisionItem(revId);
+      }
     }
   }
 
@@ -1320,18 +1325,13 @@ class AppProvider extends ChangeNotifier {
   /// Returns the count of pages actually updated.
   Future<int> bulkMarkFAPages(int from, int to, String status) async {
     int count = 0;
-    final now = DateTime.now().toIso8601String();
     for (int i = 0; i < faPages.length; i++) {
       final p = faPages[i];
       if (p.pageNum >= from && p.pageNum <= to && p.status != status) {
-        final updated = p.copyWith(status: status, lastReviewed: now);
-        await _db.upsertFAPage(updated.toJson());
-        faPages[i] = updated;
+        await updateFAPageStatus(p.pageNum, status);
         count++;
       }
     }
-    if (count > 0) notifyListeners();
-    unawaited(_triggerBackup());
     return count;
   }
 

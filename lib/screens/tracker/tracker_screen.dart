@@ -1860,7 +1860,7 @@ class _BulkMarkSheetState extends State<_BulkMarkSheet> {
     if (!mounted) return;
     Navigator.of(context).pop();
 
-    final statusLabel = _selectedStatus == 'read' ? 'Read' : 'Anki Done';
+    final statusLabel = _selectedStatus == 'read' ? 'Read' : (_selectedStatus == 'anki_done' ? 'Anki Done' : 'Unread');
     if (count >= 10) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1985,6 +1985,7 @@ class _BulkMarkSheetState extends State<_BulkMarkSheet> {
             items: const [
               DropdownMenuItem(value: 'read', child: Text('Read')),
               DropdownMenuItem(value: 'anki_done', child: Text('Anki Done')),
+              DropdownMenuItem(value: 'unread', child: Text('Unread (Reset)')),
             ],
             onChanged: (v) {
               if (v != null) setState(() => _selectedStatus = v);
