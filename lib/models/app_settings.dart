@@ -113,6 +113,9 @@ class AppSettings {
   final int? dayStartHour;      // hour (0-23) when study day starts (default 5 = 5 AM)
   final bool? streakAutoCredit;  // auto-deduct credits on missed target
 
+  // Study plan start date — auto-set on first FA page read, editable in settings
+  final String? studyPlanStartDate; // ISO8601 date (yyyy-MM-dd)
+
   const AppSettings({
     required this.darkMode,
     this.themeId,
@@ -134,6 +137,7 @@ class AppSettings {
     this.ankiBatchSize,
     this.dayStartHour,
     this.streakAutoCredit,
+    this.studyPlanStartDate,
   });
 
   factory AppSettings.defaults() => AppSettings(
@@ -158,6 +162,7 @@ class AppSettings {
         ankiBatchSize: 50,
         dayStartHour: 5,
         streakAutoCredit: false,
+        studyPlanStartDate: null,
       );
 
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
@@ -191,6 +196,7 @@ class AppSettings {
         ankiBatchSize: j['ankiBatchSize'] as int?,
         dayStartHour: j['dayStartHour'] as int?,
         streakAutoCredit: j['streakAutoCredit'] as bool?,
+        studyPlanStartDate: j['studyPlanStartDate'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -216,6 +222,7 @@ class AppSettings {
         if (ankiBatchSize != null) 'ankiBatchSize': ankiBatchSize,
         if (dayStartHour != null) 'dayStartHour': dayStartHour,
         if (streakAutoCredit != null) 'streakAutoCredit': streakAutoCredit,
+        if (studyPlanStartDate != null) 'studyPlanStartDate': studyPlanStartDate,
       };
 
   AppSettings copyWith({
@@ -239,6 +246,7 @@ class AppSettings {
     int? ankiBatchSize,
     int? dayStartHour,
     bool? streakAutoCredit,
+    String? studyPlanStartDate,
   }) =>
       AppSettings(
         darkMode: darkMode ?? this.darkMode,
@@ -261,5 +269,6 @@ class AppSettings {
         ankiBatchSize: ankiBatchSize ?? this.ankiBatchSize,
         dayStartHour: dayStartHour ?? this.dayStartHour,
         streakAutoCredit: streakAutoCredit ?? this.streakAutoCredit,
+        studyPlanStartDate: studyPlanStartDate ?? this.studyPlanStartDate,
       );
 }

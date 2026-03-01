@@ -272,35 +272,44 @@ enum RevisionMode {
   fast,
   balanced,
   deep,
-  strict;
+  strict,
+  aggressive;
 
   String get value {
     switch (this) {
-      case RevisionMode.fast:     return 'fast';
-      case RevisionMode.balanced: return 'balanced';
-      case RevisionMode.deep:     return 'deep';
-      case RevisionMode.strict:   return 'strict';
+      case RevisionMode.fast:       return 'fast';
+      case RevisionMode.balanced:   return 'balanced';
+      case RevisionMode.deep:       return 'deep';
+      case RevisionMode.strict:     return 'strict';
+      case RevisionMode.aggressive: return 'aggressive';
     }
   }
 
   static RevisionMode fromString(String s) {
     switch (s) {
-      case 'fast':     return RevisionMode.fast;
-      case 'balanced': return RevisionMode.balanced;
-      case 'deep':     return RevisionMode.deep;
-      case 'strict':   return RevisionMode.strict;
-      default:         return RevisionMode.strict;
+      case 'fast':       return RevisionMode.fast;
+      case 'balanced':   return RevisionMode.balanced;
+      case 'deep':       return RevisionMode.deep;
+      case 'strict':     return RevisionMode.strict;
+      case 'aggressive': return RevisionMode.aggressive;
+      default:           return RevisionMode.strict;
     }
   }
 }
 
 // ── SRS Schedules (hours) ─────────────────────────────────────
 const Map<String, List<int>> kRevisionSchedules = {
-  'fast':     [24, 72, 168, 360, 720],
-  'balanced': [4, 24, 48, 120, 240, 480, 960],
-  'deep':     [4, 24, 72, 168, 336, 720, 1440],
-  'strict':   [8, 24, 72, 168, 336, 504, 720, 1080, 1440, 2160, 2880, 4320],
+  'fast':       [24, 72, 168, 360, 720],
+  'balanced':   [4, 24, 48, 120, 240, 480, 960],
+  'deep':       [4, 24, 72, 168, 336, 720, 1440],
+  'strict':     [8, 24, 72, 168, 336, 504, 720, 1080, 1440, 2160, 2880, 4320],
+  // 10 revisions in 30 days — fits 700 pages in 100 total days
+  // R1: 1h, R2: 8h, R3: 1d, R4: 2d, R5: 4d, R6: 7d, R7: 12d, R8: 18d, R9: 24d, R10: 30d
+  'aggressive': [1, 8, 24, 48, 96, 168, 288, 432, 576, 720],
 };
+
+// ── Daily FA page study target ────────────────────────────────
+const int kDailyPageTarget = 10;
 
 // ── Block Durations (minutes) ─────────────────────────────────
 const List<int> kBlockDurations = [30, 40, 45, 50];

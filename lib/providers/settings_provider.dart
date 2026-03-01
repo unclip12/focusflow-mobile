@@ -84,6 +84,22 @@ class SettingsProvider extends ChangeNotifier {
     await _persist();
   }
 
+  // ── Study Plan Start Date ─────────────────────────────────────
+  String? get studyPlanStartDate => _settings.studyPlanStartDate;
+
+  Future<void> setStudyPlanStartDate(String date) async {
+    _settings = _settings.copyWith(studyPlanStartDate: date);
+    await _persist();
+  }
+
+  /// Auto-initialise study plan start date if not already set.
+  Future<void> ensureStudyPlanStartDate() async {
+    if (_settings.studyPlanStartDate == null) {
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      await setStudyPlanStartDate(today);
+    }
+  }
+
   // ── Load from storage ─────────────────────────────────────────
   Future<void> loadSettings() async {
     final json = await DatabaseService.instance.getSettings();

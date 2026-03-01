@@ -1,13 +1,8 @@
-// =============================================================
-// StudyFlowScreen — Full-screen study session with auto-continue
-// Shows FA page subtopics, timer, Anki prompts every 4 pages,
-// motivational messages, and progress tracking.
-// =============================================================
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
+import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
 
 class StudyFlowScreen extends StatefulWidget {
@@ -53,9 +48,12 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
   void initState() {
     super.initState();
     final app = context.read<AppProvider>();
-    _currentPage = app.getLastCompletedFAPage() + 1;
-    // Default target: 10 pages per day
-    _targetPages = 10;
+    final settingsProvider = context.read<SettingsProvider>();
+    // Gap-aware: find first unread page in book order
+    _currentPage = app.getNextContinuePage();
+    _targetPages = settingsProvider.dailyFAGoal;
+    // Auto-set study plan start date on first study session
+    settingsProvider.ensureStudyPlanStartDate();
   }
 
   @override
@@ -119,8 +117,16 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
   }
 
   void _moveToNextPage() {
+    // Gap-aware: skip already-read pages
+    final app = context.read<AppProvider>();
+    int next = _currentPage + 1;
+    while (true) {
+      final match = app.faPages.where((p) => p.pageNum == next).toList();
+      if (match.isEmpty || match.first.status == 'unread') break;
+      next++;
+    }
     setState(() {
-      _currentPage++;
+      _currentPage = next;
       _pageElapsed = 0;
     });
   }

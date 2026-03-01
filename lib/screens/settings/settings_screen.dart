@@ -647,6 +647,66 @@ class SettingsScreen extends StatelessWidget {
           // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // ABOUT
           // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          // ── STUDY PLAN ─────────────────────────────────────────
+          _SectionHeader(title: 'Study Plan'),
+          const SizedBox(height: 8),
+          _SectionCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today_rounded,
+                        size: 18, color: cs.primary),
+                    const SizedBox(width: 8),
+                    Text('Plan Start Date',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        )),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () async {
+                        final current = sp.studyPlanStartDate;
+                        final initial = current != null
+                            ? DateTime.tryParse(current) ?? DateTime.now()
+                            : DateTime.now();
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: initial,
+                          firstDate: DateTime(2025),
+                          lastDate: DateTime(2028),
+                        );
+                        if (picked != null) {
+                          sp.setStudyPlanStartDate(
+                              picked.toIso8601String().substring(0, 10));
+                        }
+                      },
+                      child: Text(
+                        sp.studyPlanStartDate != null
+                            ? _formatDateLabel(sp.studyPlanStartDate!)
+                            : 'Not set (auto)',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: sp.studyPlanStartDate != null
+                              ? cs.primary
+                              : cs.onSurface.withValues(alpha: 0.4),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Auto-set on first study. SRS: Aggressive — 10 revisions / 30 days per page',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: cs.onSurface.withValues(alpha: 0.35),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
           _SectionHeader(title: 'About'),
           const SizedBox(height: 8),
           _SectionCard(

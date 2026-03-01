@@ -987,6 +987,36 @@ class AppProvider extends ChangeNotifier {
     return maxPage;
   }
 
+  /// Gap-aware: find the first unread FA page in book order.
+  /// Respects gaps — e.g. if 33-34 read, 35 unread, 36-37 read → returns 35.
+  /// After 35, returns 38 (since 36-37 already read).
+  int getNextContinuePage() {
+    if (faPages.isEmpty) return 33; // FA 2025 starts at page 33
+    final sorted = List<FAPage>.from(faPages)
+      ..sort((a, b) => a.pageNum.compareTo(b.pageNum));
+    for (final p in sorted) {
+      if (p.status == 'unread') return p.pageNum;
+    }
+    // All pages read — return the page after the last one
+    return sorted.last.pageNum + 1;
+  }
+
+  /// Get ordered list of unread pages for today's study target.
+  /// Returns up to [count] unread pages in book order, gap-aware.
+  List<int> getTodayTargetPages({int count = 10}) {
+    if (faPages.isEmpty) return [];
+    final sorted = List<FAPage>.from(faPages)
+      ..sort((a, b) => a.pageNum.compareTo(b.pageNum));
+    final result = <int>[];
+    for (final p in sorted) {
+      if (p.status == 'unread') {
+        result.add(p.pageNum);
+        if (result.length >= count) break;
+      }
+    }
+    return result;
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // HISTORY
   // ═══════════════════════════════════════════════════════════════

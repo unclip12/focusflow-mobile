@@ -8,6 +8,7 @@ import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/routine.dart';
 import 'routine_runner_screen.dart';
 import 'routine_editor_sheet.dart';
+import 'study_session_picker.dart';
 
 class RoutinesTab extends StatelessWidget {
   final String dateKey;
@@ -91,6 +92,10 @@ class RoutinesTab extends StatelessWidget {
               : ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   children: [
+                    // ── Study Session Card ────────────
+                    _StudySessionCard(dateKey: dateKey),
+                    const SizedBox(height: 12),
+
                     // ── Prayer Routines Section ──
                     if (prayerRoutines.isNotEmpty) ...[
                       Padding(
@@ -344,6 +349,93 @@ class _RoutineCard extends StatelessWidget {
                 icon: Icon(Icons.more_vert_rounded, size: 20,
                     color: cs.onSurface.withValues(alpha: 0.3)),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Study Session Card ──────────────────────────────────────────
+class _StudySessionCard extends StatelessWidget {
+  final String dateKey;
+  const _StudySessionCard({required this.dateKey});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final app = context.watch<AppProvider>();
+    final nextPage = app.getNextContinuePage();
+    final totalRead = app.faPages.where((p) => p.status != 'unread').length;
+    final totalPages = app.faPages.length;
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => StudySessionPicker(dateKey: dateKey),
+          );
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                const Color(0xFF6366F1).withValues(alpha: 0.08),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: const Color(0xFF8B5CF6).withValues(alpha: 0.2),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48, height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.school_rounded,
+                    color: Color(0xFF8B5CF6), size: 26),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Start Study Session',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Next: Page $nextPage · $totalRead/$totalPages done',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_rounded,
+                  color: Color(0xFF8B5CF6), size: 22),
             ],
           ),
         ),
