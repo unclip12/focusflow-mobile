@@ -8,10 +8,12 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/default_routine_order.dart';
+import 'package:intl/intl.dart';
 import 'task_linker_sheet.dart';
 
 class DefaultOrderSheet extends StatefulWidget {
-  const DefaultOrderSheet({super.key});
+  final String dateKey;
+  const DefaultOrderSheet({super.key, required this.dateKey});
 
   @override
   State<DefaultOrderSheet> createState() => _DefaultOrderSheetState();
@@ -345,17 +347,19 @@ class _DefaultOrderSheetState extends State<DefaultOrderSheet> {
               children: [
                 const Icon(Icons.tune_rounded, size: 20),
                 const SizedBox(width: 8),
-                Text(
-                  'Default Activity Chain',
-                  style: TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface,
+                Expanded(
+                  child: Text(
+                    'Activity Template',
+                    style: TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface,
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 4),
             Text(
-              'Drag to reorder. Tap any activity to rename or link tasks.',
+              'Your everyday routine template. Drag to reorder, tap to edit.',
               style: TextStyle(
                 fontSize: 12, color: cs.onSurface.withValues(alpha: 0.5),
               ),
@@ -467,13 +471,14 @@ class _DefaultOrderSheetState extends State<DefaultOrderSheet> {
 
             const SizedBox(height: 8),
 
+            // Add Activity + Save Template row
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: _addActivity,
                     icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('Add Activity'),
+                    label: const Text('Add'),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
@@ -492,10 +497,66 @@ class _DefaultOrderSheetState extends State<DefaultOrderSheet> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w700)),
+                    child: const Text('Save Template', style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 8),
+
+            // Plan for date buttons
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: cs.primary.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: cs.primary.withValues(alpha: 0.12)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Plan this template for…',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: cs.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _PlanChip(
+                          label: '📅 Today',
+                          color: const Color(0xFF10B981),
+                          onTap: () => _planForDate(context, widget.dateKey),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _PlanChip(
+                          label: '🗓️ Tomorrow',
+                          color: const Color(0xFF3B82F6),
+                          onTap: () {
+                            final tomorrow = DateTime.now().add(const Duration(days: 1));
+                            final key = '${tomorrow.year}-${tomorrow.month.toString().padLeft(2, '0')}-${tomorrow.day.toString().padLeft(2, '0')}';
+                            _planForDate(context, key);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _PlanChip(
+                          label: '📆 Pick Date',
+                          color: const Color(0xFF8B5CF6),
+                          onTap: () => _pickDateAndPlan(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
           ],
@@ -576,6 +637,40 @@ class _DefaultOrderSheetState extends State<DefaultOrderSheet> {
       ),
     );
   }
+
+  void _planForDate(BuildContext context, String dateKey) {
+    // Save template first (inline, without popping)
+    final updated = _activities.asMap().entries.map((e) =>
+        e.value.copyWith(sortOrder: e.key)).toList();
+    final app = context.read<AppProvider>();
+    app.saveDefaultActivities(updated);
+
+    // Clone template to the target date
+    app.planFlowFromTemplate(dateKey).then((_) {
+      if (context.mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Flow planned for $dateKey ✅'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    });
+  }
+
+  void _pickDateAndPlan(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2027),
+    );
+    if (picked != null && context.mounted) {
+      final key = DateFormat('yyyy-MM-dd').format(picked);
+      _planForDate(context, key);
+    }
+  }
 }
 
 class _AddOptionTile extends StatelessWidget {
@@ -612,6 +707,44 @@ class _AddOptionTile extends StatelessWidget {
       onTap: onTap,
       dense: true,
       visualDensity: VisualDensity.compact,
+    );
+  }
+}
+
+class _PlanChip extends StatelessWidget {
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _PlanChip({
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: color.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

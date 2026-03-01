@@ -69,10 +69,10 @@ class ActivitySelector extends StatelessWidget {
             child: Row(
               children: [
                 _ActivityChip(
-                  emoji: '⚡',
-                  label: 'Default',
+                  emoji: '📋',
+                  label: 'Template',
                   color: const Color(0xFF6366F1),
-                  onTap: () => _startDefault(context),
+                  onTap: () => _openDefaultOrder(context),
                 ),
                 const SizedBox(width: 8),
                 _ActivityChip(
@@ -103,14 +103,7 @@ class ActivitySelector extends StatelessWidget {
     );
   }
 
-  void _startDefault(BuildContext context) {
-    final app = context.read<AppProvider>();
-    if (app.defaultActivities.isEmpty) {
-      _openDefaultOrder(context);
-      return;
-    }
-    DefaultChainRunner.start(context, app.defaultActivities, dateKey);
-  }
+
 
   void _pickRoutine(BuildContext context) {
     final app = context.read<AppProvider>();
@@ -153,7 +146,7 @@ class ActivitySelector extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => const DefaultOrderSheet(),
+      builder: (_) => DefaultOrderSheet(dateKey: dateKey),
     );
   }
 }

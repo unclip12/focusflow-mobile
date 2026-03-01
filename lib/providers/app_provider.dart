@@ -913,6 +913,39 @@ class AppProvider extends ChangeNotifier {
     await upsertDailyFlow(flow.copyWith(activities: activities));
   }
 
+  /// Plan a flow for a specific date by cloning the current template.
+  /// Unlike [initializeDailyFlow], this always replaces any existing flow.
+  Future<DailyFlow> planFlowFromTemplate(String date) async {
+    final activities = defaultActivities.map((da) {
+      return FlowActivity(
+        id: _uuid.v4(),
+        label: da.displayLabel,
+        icon: da.displayIcon,
+        activityType: da.type.value,
+        routineId: da.routineId,
+        linkedTaskIds: da.linkedTaskIds,
+        sortOrder: da.sortOrder,
+      );
+    }).toList();
+
+    final flow = DailyFlow(date: date, activities: activities);
+    await upsertDailyFlow(flow);
+    return flow;
+  }
+
+  /// Update an existing flow activity (e.g. rename it).
+  Future<void> updateFlowActivity(String date, FlowActivity updated) async {
+    final flow = getDailyFlow(date);
+    if (flow == null) return;
+
+    final activities = List<FlowActivity>.from(flow.activities);
+    final idx = activities.indexWhere((a) => a.id == updated.id);
+    if (idx >= 0) {
+      activities[idx] = updated;
+      await upsertDailyFlow(flow.copyWith(activities: activities));
+    }
+  }
+
   // ═════════════════════════════════════════════════════════════════
   // PRAYER ROUTINE SEEDING
   // ═════════════════════════════════════════════════════════════════

@@ -227,9 +227,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                 },
               ),
 
-              // ── Activity Selector (today only) ───────────────────────
-              if (_isToday)
-                ActivitySelector(dateKey: _dateKey),
+              // ── Activity Selector (all dates) ───────────────────────
+              ActivitySelector(dateKey: _dateKey),
 
               // ── Tab bar ──────────────────────────────────────────────
               Container(
@@ -581,7 +580,7 @@ class _AllTabContentState extends State<_AllTabContent> {
 
     if (allActivities.isEmpty && todos.isEmpty && buyingItems.isEmpty &&
         widget.displayBlocks.isEmpty) {
-      return _EmptyState(hasNoPlan: widget.plan == null);
+      return _EmptyState(hasNoPlan: widget.plan == null, dateKey: widget.dateKey);
     }
 
     // Build unified list items
@@ -590,6 +589,11 @@ class _AllTabContentState extends State<_AllTabContent> {
     // Flow activities (reorderable)
     for (int i = 0; i < allActivities.length; i++) {
       items.add(_FullDayItem(type: 'flow', flowActivity: allActivities[i], index: i));
+    }
+
+    // Add activity button (only if flow exists)
+    if (allActivities.isNotEmpty) {
+      items.add(const _FullDayItem(type: 'addButton'));
     }
 
     // Study blocks (non-flow, existing blocks)
@@ -634,15 +638,30 @@ class _AllTabContentState extends State<_AllTabContent> {
         if (item.type == 'flow') {
           return KeyedSubtree(
             key: ValueKey('flow-${item.flowActivity!.id}'),
-            child: FlowActivityCard(
-              activity: item.flowActivity!,
-              index: item.index ?? i,
-              onComplete: item.flowActivity!.isActive || item.flowActivity!.isPaused
-                  ? () => app.completeFlowActivity(widget.dateKey, item.flowActivity!.id)
-                  : null,
-              onUndo: item.flowActivity!.isDone
-                  ? () => app.undoFlowActivity(widget.dateKey, item.flowActivity!.id)
-                  : null,
+            child: Dismissible(
+              key: ValueKey('dismiss-${item.flowActivity!.id}'),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                alignment: Alignment.centerRight,
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(right: 20),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+              ),
+              onDismissed: (_) => app.removeFlowActivity(widget.dateKey, item.flowActivity!.id),
+              child: FlowActivityCard(
+                activity: item.flowActivity!,
+                index: item.index ?? i,
+                onComplete: item.flowActivity!.isActive || item.flowActivity!.isPaused
+                    ? () => app.completeFlowActivity(widget.dateKey, item.flowActivity!.id)
+                    : null,
+                onUndo: item.flowActivity!.isDone
+                    ? () => app.undoFlowActivity(widget.dateKey, item.flowActivity!.id)
+                    : null,
+              ),
             ),
           );
         }
@@ -725,8 +744,97 @@ class _AllTabContentState extends State<_AllTabContent> {
           );
         }
 
+        if (item.type == 'addButton') {
+          return KeyedSubtree(
+            key: const ValueKey('add-activity-btn'),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(14),
+                child: InkWell(
+                  onTap: () => _showAddActivityDialog(context, app),
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: cs.primary.withValues(alpha: 0.2),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add_rounded, size: 18, color: cs.primary.withValues(alpha: 0.5)),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Add Activity',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: cs.primary.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
         return SizedBox.shrink(key: ValueKey('unknown-$i'));
       },
+    );
+  }
+
+  void _showAddActivityDialog(BuildContext context, AppProvider app) {
+    final nameCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Activity'),
+        content: TextField(
+          controller: nameCtrl,
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: 'Activity name...',
+            filled: true,
+            fillColor: Theme.of(ctx).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final name = nameCtrl.text.trim();
+              if (name.isEmpty) return;
+              app.addFlowActivity(
+                widget.dateKey,
+                FlowActivity(
+                  id: DateTime.now().microsecondsSinceEpoch.toString(),
+                  label: name,
+                  icon: '⚡',
+                  activityType: 'CUSTOM',
+                  sortOrder: 999,
+                ),
+              );
+              Navigator.pop(ctx);
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -749,7 +857,7 @@ class _AllTabContentState extends State<_AllTabContent> {
 }
 
 class _FullDayItem {
-  final String type; // 'flow' | 'block' | 'todo' | 'buying'
+  final String type; // 'flow' | 'block' | 'todo' | 'buying' | 'addButton'
   final FlowActivity? flowActivity;
   final Block? block;
   final String? todoTitle;
@@ -985,13 +1093,15 @@ class _DateHeader extends StatelessWidget {
 // ── Empty state ─────────────────────────────────────────────────
 class _EmptyState extends StatelessWidget {
   final bool hasNoPlan;
+  final String dateKey;
 
-  const _EmptyState({required this.hasNoPlan});
+  const _EmptyState({required this.hasNoPlan, required this.dateKey});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final app = context.read<AppProvider>();
 
     return Center(
       child: Padding(
@@ -1016,12 +1126,26 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               hasNoPlan
-                  ? 'Generate a plan to get started'
+                  ? 'Plan from your template or add activities'
                   : 'Add blocks to your plan',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: cs.onSurface.withValues(alpha: 0.35),
               ),
             ),
+            if (hasNoPlan && app.defaultActivities.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: () => app.planFlowFromTemplate(dateKey),
+                icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                label: const Text('Plan from Template'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
