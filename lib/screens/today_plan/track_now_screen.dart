@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/daily_flow.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
+import 'package:focusflow_mobile/services/notification_service.dart';
 import 'add_task_sheet.dart';
 
 // ── Category data ──────────────────────────────────────────────
@@ -166,6 +167,13 @@ class _TrackNowScreenState extends State<TrackNowScreen> {
     );
 
     _tickTimer?.cancel();
+
+    // Fire notification: session complete
+    unawaited(NotificationService.instance.showFocusTimerDone(
+      activityName: _nameCtrl.text.trim().isNotEmpty
+          ? _nameCtrl.text.trim()
+          : 'Activity',
+    ));
 
     if (mounted) {
       final dur = Duration(seconds: _elapsed);

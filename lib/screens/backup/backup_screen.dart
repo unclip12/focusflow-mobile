@@ -1,8 +1,7 @@
 ﻿// =============================================================
-// BackupScreen â€” AppScaffold, Auto Backup, Manual Backup,
-// Restore, Backup History.
-// Android rules: resizeToAvoidBottomInset: true (via AppScaffold),
-//                enableDrag: false, useSafeArea: true on sheets.
+// BackupScreen — Auto Backup, Export, Restore, History
+// Auto-backup setting & history persisted in SharedPreferences
+// Restore is wired to AppProvider.restoreFromBackup()
 // =============================================================
 
 import 'dart:convert';
@@ -15,11 +14,18 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:focusflow_mobile/providers/app_provider.dart';
+import 'package:focusflow_mobile/services/backup_service.dart';
 import 'package:focusflow_mobile/widgets/app_scaffold.dart';
 import 'package:focusflow_mobile/screens/backup/backup_history_card.dart';
 import 'package:focusflow_mobile/screens/backup/restore_confirm_dialog.dart';
+
+// ── SharedPrefs keys ────────────────────────────────────────────
+const _kAutoBackup = 'backup_auto';
+const _kFrequency  = 'backup_frequency';
+const _kHistory    = 'backup_history'; // JSON list of {date,size}
 
 class BackupScreen extends StatefulWidget {
   const BackupScreen({super.key});
@@ -29,35 +35,57 @@ class BackupScreen extends StatefulWidget {
 }
 
 class _BackupScreenState extends State<BackupScreen> {
-  bool _autoBackup = false;
-  String _backupFrequency = 'Weekly';
-  bool _exporting = false;
-  bool _restoring = false;
+  bool _autoBackup      = false;
+  String _backupFrequency = 'Daily';
+  bool _exporting       = false;
+  bool _restoring       = false;
+  bool _prefsLoaded     = false;
 
-  // Simulated backup history
-  final List<_BackupEntry> _history = [
-    _BackupEntry(date: '2026-02-24 11:30', size: '2.4 MB'),
-    _BackupEntry(date: '2026-02-23 08:15', size: '2.3 MB'),
-    _BackupEntry(date: '2026-02-20 14:45', size: '2.1 MB'),
-  ];
+  final List<_BackupEntry> _history = [];
 
-  // â”€â”€ Export backup as JSON â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  @override
+  void initState() {
+    super.initState();
+    _loadPrefs();
+  }
+
+  // ── Load persisted settings & history ──────────────────────────
+  Future<void> _loadPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rawHistory = prefs.getStringList(_kHistory) ?? [];
+    final entries = rawHistory.map((s) {
+      final m = jsonDecode(s) as Map<String, dynamic>;
+      return _BackupEntry(date: m['date'] as String, size: m['size'] as String);
+    }).toList();
+
+    if (!mounted) return;
+    setState(() {
+      _autoBackup       = prefs.getBool(_kAutoBackup) ?? false;
+      _backupFrequency  = prefs.getString(_kFrequency) ?? 'Daily';
+      _history.addAll(entries);
+      _prefsLoaded      = true;
+    });
+  }
+
+  // ── Persist settings & history ─────────────────────────────────
+  Future<void> _savePrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kAutoBackup, _autoBackup);
+    await prefs.setString(_kFrequency, _backupFrequency);
+    final rawHistory = _history
+        .map((e) => jsonEncode({'date': e.date, 'size': e.size}))
+        .toList();
+    await prefs.setStringList(_kHistory, rawHistory);
+  }
+
+  // ── Export backup as JSON ──────────────────────────────────────
   Future<void> _exportBackup() async {
     setState(() => _exporting = true);
     HapticFeedback.lightImpact();
 
     try {
       final ap = context.read<AppProvider>();
-
-      // Build export JSON from provider data
-      final data = <String, dynamic>{
-        'exportedAt': DateTime.now().toIso8601String(),
-        'timeLogs': ap.timeLogs.map((t) => t.toJson()).toList(),
-        'dayPlans': ap.dayPlans.map((p) => p.toJson()).toList(),
-        'knowledgeBase': ap.knowledgeBase.map((e) => e.toJson()).toList(),
-        'fmgeEntries': ap.fmgeEntries.map((e) => e.toJson()).toList(),
-        'studyPlan': ap.studyPlan.map((s) => s.toJson()).toList(),
-      };
+      final data = BackupService.buildBackupData(ap);
       final json = jsonEncode(data);
 
       final dir = await getApplicationDocumentsDirectory();
@@ -71,18 +99,16 @@ class _BackupScreenState extends State<BackupScreen> {
           subject: 'FocusFlow Backup $timestamp',
         );
 
-        // Add to history
         final sizeKb = (json.length / 1024).toStringAsFixed(1);
+        final entry = _BackupEntry(
+          date: DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now()),
+          size: '$sizeKb KB',
+        );
         setState(() {
-          _history.insert(
-              0,
-              _BackupEntry(
-                date: DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now()),
-                size: '$sizeKb KB',
-              ));
+          _history.insert(0, entry);
           if (_history.length > 5) _history.removeLast();
         });
-
+        await _savePrefs();
         _showSnack('Backup exported successfully');
       }
     } catch (e) {
@@ -92,7 +118,27 @@ class _BackupScreenState extends State<BackupScreen> {
     }
   }
 
-  // â”€â”€ Restore from JSON file â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Quick internal save (auto-backup) ─────────────────────────
+  Future<void> _runAutoBackup() async {
+    try {
+      final ap = context.read<AppProvider>();
+      final data = BackupService.buildBackupData(ap);
+      await BackupService.saveBackup(data);
+
+      final sizeKb = (jsonEncode(data).length / 1024).toStringAsFixed(1);
+      final entry = _BackupEntry(
+        date: DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now()),
+        size: '$sizeKb KB (auto)',
+      );
+      setState(() {
+        _history.insert(0, entry);
+        if (_history.length > 5) _history.removeLast();
+      });
+      await _savePrefs();
+    } catch (_) {}
+  }
+
+  // ── Restore from JSON file ─────────────────────────────────────
   Future<void> _pickAndRestore() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -113,14 +159,14 @@ class _BackupScreenState extends State<BackupScreen> {
 
     try {
       final file = File(path);
-      await file.readAsString(); // Validate file is readable
+      final contents = await file.readAsString();
+      final data = jsonDecode(contents) as Map<String, dynamic>;
 
-      if (mounted) {
-        // Restore is a placeholder â€” AppProvider.restoreFromBackup
-        // will be wired when that method is added.
-        // For now, just show success.
-        _showSnack('Data restored successfully');
-      }
+      if (!mounted) return;
+      final app = context.read<AppProvider>();
+      await app.restoreFromBackup(data);
+
+      if (mounted) _showSnack('✅ Data restored successfully');
     } catch (e) {
       if (mounted) _showSnack('Restore failed: $e');
     } finally {
@@ -132,7 +178,7 @@ class _BackupScreenState extends State<BackupScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg),
       behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(seconds: 3),
     ));
   }
 
@@ -142,14 +188,21 @@ class _BackupScreenState extends State<BackupScreen> {
     final cs = theme.colorScheme;
     final frequencies = ['Daily', 'Weekly', 'Manual'];
 
+    if (!_prefsLoaded) {
+      return AppScaffold(
+        screenName: 'Backup & Restore',
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return AppScaffold(
       screenName: 'Backup & Restore',
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          // ════════════════════════════════════════════════════════
           // AUTO BACKUP
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          // ════════════════════════════════════════════════════════
           _sectionLabel('Auto Backup', theme, cs),
           const SizedBox(height: 8),
           Container(
@@ -179,10 +232,10 @@ class _BackupScreenState extends State<BackupScreen> {
                               )),
                           Text(
                             _autoBackup
-                                ? 'Last: today at 11:30 AM'
+                                ? 'Saves to device storage — $_backupFrequency'
                                 : 'Disabled',
                             style: theme.textTheme.labelSmall?.copyWith(
-                              color: cs.onSurface.withValues(alpha: 0.35),
+                              color: cs.onSurface.withValues(alpha: 0.45),
                             ),
                           ),
                         ],
@@ -190,9 +243,17 @@ class _BackupScreenState extends State<BackupScreen> {
                     ),
                     Switch.adaptive(
                       value: _autoBackup,
-                      onChanged: (v) {
+                      onChanged: (v) async {
                         HapticFeedback.selectionClick();
                         setState(() => _autoBackup = v);
+                        await _savePrefs();
+                        if (v) {
+                          // Run a backup immediately when enabled
+                          await _runAutoBackup();
+                          if (mounted) {
+                            _showSnack('Auto backup enabled — first backup saved');
+                          }
+                        }
                       },
                     ),
                   ],
@@ -204,14 +265,14 @@ class _BackupScreenState extends State<BackupScreen> {
                       final selected = _backupFrequency == f;
                       return Expanded(
                         child: GestureDetector(
-                          onTap: () =>
-                              setState(() => _backupFrequency = f),
+                          onTap: () async {
+                            setState(() => _backupFrequency = f);
+                            await _savePrefs();
+                          },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
-                            margin: const EdgeInsets.symmetric(
-                                horizontal: 3),
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 10),
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
                             decoration: BoxDecoration(
                               color: selected
                                   ? cs.primary.withValues(alpha: 0.15)
@@ -220,19 +281,16 @@ class _BackupScreenState extends State<BackupScreen> {
                               border: Border.all(
                                 color: selected
                                     ? cs.primary.withValues(alpha: 0.4)
-                                    : cs.onSurface
-                                        .withValues(alpha: 0.08),
+                                    : cs.onSurface.withValues(alpha: 0.08),
                               ),
                             ),
                             child: Center(
                               child: Text(
                                 f,
-                                style: theme.textTheme.labelSmall
-                                    ?.copyWith(
+                                style: theme.textTheme.labelSmall?.copyWith(
                                   color: selected
                                       ? cs.primary
-                                      : cs.onSurface
-                                          .withValues(alpha: 0.5),
+                                      : cs.onSurface.withValues(alpha: 0.5),
                                   fontWeight: selected
                                       ? FontWeight.w700
                                       : FontWeight.w500,
@@ -250,14 +308,13 @@ class _BackupScreenState extends State<BackupScreen> {
           ),
           const SizedBox(height: 20),
 
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          // ════════════════════════════════════════════════════════
           // MANUAL BACKUP / RESTORE
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          // ════════════════════════════════════════════════════════
           _sectionLabel('Manual', theme, cs),
           const SizedBox(height: 8),
           Row(
             children: [
-              // Export button
               Expanded(
                 child: _ActionButton(
                   icon: Icons.upload_file_rounded,
@@ -268,7 +325,6 @@ class _BackupScreenState extends State<BackupScreen> {
                 ),
               ),
               const SizedBox(width: 10),
-              // Restore button
               Expanded(
                 child: _ActionButton(
                   icon: Icons.download_rounded,
@@ -282,15 +338,14 @@ class _BackupScreenState extends State<BackupScreen> {
           ),
           const SizedBox(height: 20),
 
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          // ════════════════════════════════════════════════════════
           // BACKUP HISTORY
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          // ════════════════════════════════════════════════════════
           _sectionLabel('Backup History', theme, cs),
           const SizedBox(height: 8),
           if (_history.isEmpty)
             Container(
-              padding: const EdgeInsets.symmetric(
-                  vertical: 24, horizontal: 16),
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
               decoration: _cardDecor(cs),
               child: Center(
                 child: Text(
@@ -310,13 +365,14 @@ class _BackupScreenState extends State<BackupScreen> {
                 size: item.size,
                 onRestore: () {
                   RestoreConfirmDialog.show(context, () {
-                    _showSnack('Restored from ${item.date}');
+                    _showSnack('Use "Restore" button to load a saved backup file');
                   });
                 },
                 onDelete: () {
                   HapticFeedback.lightImpact();
                   setState(() => _history.removeAt(idx));
-                  _showSnack('Backup deleted');
+                  _savePrefs();
+                  _showSnack('Backup entry removed');
                 },
               );
             }),
@@ -327,9 +383,9 @@ class _BackupScreenState extends State<BackupScreen> {
   }
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ─────────────────────────────────────────────────────────────────
 // LOCAL MODELS + HELPERS
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ─────────────────────────────────────────────────────────────────
 
 class _BackupEntry {
   final String date;
@@ -355,7 +411,7 @@ Widget _sectionLabel(String label, ThemeData theme, ColorScheme cs) {
   );
 }
 
-// â”€â”€ Action button with loading state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Action button with loading state ──────────────────────────────
 class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -390,8 +446,7 @@ class _ActionButton extends StatelessWidget {
               SizedBox(
                 width: 22,
                 height: 22,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: color),
+                child: CircularProgressIndicator(strokeWidth: 2, color: color),
               )
             else
               Icon(icon, size: 24, color: color),

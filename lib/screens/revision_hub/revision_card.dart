@@ -127,28 +127,28 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard> {
           // ── Row 2: Chips (source, due status, revision step) ─
           Row(
             children: [
-              // Source chip
-              _chip(item.sourceLabel, item.sourceColor, cs),
-              const SizedBox(width: 6),
-
-              // Due status chip
-              _chip(due.label, due.color, cs),
-              const SizedBox(width: 6),
-
-              // Revision step
-              _chip(
-                'R${item.currentRevisionIndex} of ${item.totalSteps}',
-                cs.onSurface.withValues(alpha: 0.5),
-                cs,
+              // Chips — wrapped so they shrink on narrow screens
+              Flexible(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    _chip(item.sourceLabel, item.sourceColor, cs),
+                    _chip(due.label, due.color, cs),
+                    _chip(
+                      'R${item.currentRevisionIndex}/${item.totalSteps}',
+                      cs.onSurface.withValues(alpha: 0.5),
+                      cs,
+                    ),
+                  ],
+                ),
               ),
-
-              const Spacer(),
-
+              const SizedBox(width: 8),
               // Mark Revised button
               FilledButton.tonal(
                 onPressed: _saving ? null : _markRevised,
                 style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   textStyle: const TextStyle(

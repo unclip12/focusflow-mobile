@@ -409,12 +409,14 @@ class _PageGridView extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: pages.map((page) {
-                  return _LiquidFillPageBox(
-                    page: page,
-                    app: app,
-                    selectionMode: selectionMode,
-                    isSelected: selectedItems.contains('fa:${page.pageNum}'),
-                    onToggleSelect: () => onToggleSelect('fa:${page.pageNum}'),
+                  return RepaintBoundary(
+                    child: _LiquidFillPageBox(
+                      page: page,
+                      app: app,
+                      selectionMode: selectionMode,
+                      isSelected: selectedItems.contains('fa:${page.pageNum}'),
+                      onToggleSelect: () => onToggleSelect('fa:${page.pageNum}'),
+                    ),
                   );
                 }).toList(),
               ),

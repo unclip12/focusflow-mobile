@@ -9,8 +9,9 @@ import 'services/notification_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Only lightweight, truly necessary init before UI
+  // Initialise notifications and request permission
   await NotificationService.instance.init();
+  await NotificationService.instance.requestPermission();
 
   // Portrait-only layout
   await SystemChrome.setPreferredOrientations([
@@ -29,6 +30,9 @@ void main() async {
   }
   await settingsProvider.loadSettings();
 
+  // Schedule persistent daily notifications after data is ready
+  _scheduleStartupNotifications(appProvider);
+
   // ── UI is up immediately ──────────────────────────────────────
   // All heavy work (DB init, seeding FA/Sketchy/Pathoma/UWorld)
   // happens inside SplashScreen widget AFTER first frame renders.
@@ -42,3 +46,24 @@ void main() async {
     ),
   );
 }
+
+/// Schedule all recurring daily notifications (fire-and-forget).
+void _scheduleStartupNotifications(AppProvider app) {
+  final ns = NotificationService.instance;
+  final revisionCount = app.revisionItems
+      .where((r) {
+        final dt = DateTime.tryParse(r.nextRevisionAt);
+        if (dt == null) return false;
+        return dt.isBefore(DateTime.now().add(const Duration(days: 1)));
+      })
+      .length;
+
+  // Daily 8 AM morning summary
+  ns.scheduleMorningSummary(dueCount: revisionCount);
+
+  // Daily 8 AM revision reminder (only if there are items due)
+  if (revisionCount > 0) {
+    ns.scheduleDailyRevisionReminder(revisionCount: revisionCount);
+  }
+}
+

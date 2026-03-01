@@ -1329,29 +1329,121 @@ class AppProvider extends ChangeNotifier {
 
   /// Bulk-update FA pages in range [from..to] to the given status.
   /// Returns the count of pages actually updated.
+  /// PERFORMANCE: All DB writes are batched. notifyListeners() fires only once at the end.
+  /// REVISION FIX: Creates one PAGE-level revision item per page — not per-subtopic.
   Future<int> bulkMarkFAPages(int from, int to, String status) async {
     int count = 0;
+    final now = DateTime.now().toIso8601String();
+    final mode = revisionSettings?.mode ?? 'strict';
+
+    // ── Step 1: Update FA pages in range ──────────────────────────
     for (int i = 0; i < faPages.length; i++) {
       final p = faPages[i];
       if (p.pageNum >= from && p.pageNum <= to && p.status != status) {
-        await updateFAPageStatus(p.pageNum, status);
+        final updated = p.copyWith(
+          status: status,
+          lastReviewed: now,
+          firstReadAt: (status == 'read' || status == 'anki_done')
+              ? (p.firstReadAt ?? now)
+              : p.firstReadAt,
+          ankiDoneAt: status == 'anki_done'
+              ? (p.ankiDoneAt ?? now)
+              : p.ankiDoneAt,
+        );
+        // DB write — no notifyListeners here
+        await _db.upsertFAPage(updated.toJson());
+        faPages[i] = updated;
         count++;
-      }
-    }
 
-    // Also mark subtopics of these pages
-    for (final sub in faSubtopics) {
-      if (sub.pageNum >= from && sub.pageNum <= to && sub.status != status) {
-        if (status == 'read') {
-          await markSubtopicRead(sub.id!);
-        } else if (status == 'anki_done') {
-          await markSubtopicAnkiDone(sub.id!);
+        // ── Create ONE page-level revision item ───────────────────
+        if (status == 'read' || status == 'anki_done') {
+          final revId = 'fa-page-${p.pageNum}';
+          // Remove any stale subtopic revisions for this page
+          final staleIds = revisionItems
+              .where((r) =>
+                  r.type == 'SUBTOPIC' &&
+                  r.source == 'FA' &&
+                  r.pageNumber == p.pageNum.toString())
+              .map((r) => r.id)
+              .toList();
+          for (final sid in staleIds) {
+            await _db.deleteRevisionItem(sid);
+            revisionItems.removeWhere((r) => r.id == sid);
+          }
+
+          // Create page revision if not already there
+          if (!revisionItems.any((r) => r.id == revId)) {
+            final nextDate = SrsService.calculateNextRevisionDateString(
+              lastStudiedAt: now,
+              revisionIndex: 0,
+              mode: mode,
+            );
+            final revItem = RevisionItem(
+              id: revId,
+              type: 'PAGE',
+              source: 'FA',
+              pageNumber: p.pageNum.toString(),
+              title: updated.title,
+              parentTitle: updated.subject,
+              nextRevisionAt: nextDate ??
+                  DateTime.now()
+                      .add(const Duration(hours: 8))
+                      .toIso8601String(),
+              currentRevisionIndex: 0,
+              lastStudiedAt: now,
+              totalSteps: SrsService.totalSteps(mode),
+            );
+            await _db.upsertRevisionItem(revItem.toJson());
+            revisionItems.add(revItem);
+          }
         } else if (status == 'unread') {
-          await resetSubtopic(sub.id!);
+          // Remove page revision
+          final revId = 'fa-page-${p.pageNum}';
+          if (revisionItems.any((r) => r.id == revId)) {
+            await _db.deleteRevisionItem(revId);
+            revisionItems.removeWhere((r) => r.id == revId);
+          }
         }
       }
     }
 
+    // ── Step 2: Update subtopics silently (no per-subtopic revisions) ─
+    for (int i = 0; i < faSubtopics.length; i++) {
+      final sub = faSubtopics[i];
+      if (sub.pageNum >= from && sub.pageNum <= to && sub.status != status) {
+        if (status == 'read') {
+          final updated = sub.copyWith(
+            status: 'read',
+            firstReadAt: sub.firstReadAt ?? now,
+          );
+          await _db.updateFASubtopicStatus(
+            sub.id!,
+            status: 'read',
+            firstReadAt: updated.firstReadAt,
+          );
+          faSubtopics[i] = updated;
+        } else if (status == 'anki_done') {
+          final updated = sub.copyWith(status: 'anki_done', ankiDoneAt: now);
+          await _db.updateFASubtopicStatus(
+            sub.id!,
+            status: 'anki_done',
+            ankiDoneAt: now,
+          );
+          faSubtopics[i] = updated;
+        } else if (status == 'unread') {
+          await _db.resetFASubtopic(sub.id!);
+          faSubtopics[i] = FASubtopic(
+            id: sub.id,
+            pageNum: sub.pageNum,
+            name: sub.name,
+          );
+        }
+      }
+    }
+
+    // ── Step 3: One single rebuild ────────────────────────────────
+    notifyListeners();
+    unawaited(_triggerBackup());
     return count;
   }
 
