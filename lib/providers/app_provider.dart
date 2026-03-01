@@ -33,6 +33,10 @@ import 'package:focusflow_mobile/models/uworld_topic.dart';
 import 'package:focusflow_mobile/models/uworld_session.dart';
 import 'package:focusflow_mobile/models/fa_subtopic.dart';
 import 'package:focusflow_mobile/models/streak_data.dart';
+import 'package:focusflow_mobile/models/routine.dart';
+import 'package:focusflow_mobile/models/buying_item.dart';
+import 'package:focusflow_mobile/models/todo_item.dart';
+import 'package:focusflow_mobile/models/default_routine_order.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart' as du;
 
@@ -137,6 +141,11 @@ class AppProvider extends ChangeNotifier {
   List<PathomaChapter> pathomaChapters = [];
   List<UWorldTopic> uworldTopics = [];
   List<FASubtopic> faSubtopics = [];
+  List<Routine> routines = [];
+  List<RoutineLog> routineLogs = [];
+  List<BuyingItem> buyingItems = [];
+  List<TodoItem> todoItems = [];
+  List<DefaultActivity> defaultActivities = [];
 
   MentorMemory? mentorMemory;
   AISettings? aiSettings;
@@ -211,6 +220,24 @@ class AppProvider extends ChangeNotifier {
 
     // V5 subtopics
     faSubtopics = await _db.getAllFASubtopics();
+
+    // V6: Routines, Buying, To-Do, Default Order
+    routines = (await _db.getAllRoutines())
+        .map((j) => Routine.fromJson(j))
+        .toList();
+    routineLogs = (await _db.getAllRoutineLogs())
+        .map((j) => RoutineLog.fromJson(j))
+        .toList();
+    buyingItems = (await _db.getAllBuyingItems())
+        .map((j) => BuyingItem.fromJson(j))
+        .toList();
+    todoItems = (await _db.getAllTodoItems())
+        .map((j) => TodoItem.fromJson(j))
+        .toList();
+    defaultActivities = (await _db.getAllDefaultActivities())
+        .map((j) => DefaultActivity.fromJson(j))
+        .toList();
+    defaultActivities.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
     // Singletons
     final memJson = await _db.getMentorMemory();
@@ -513,6 +540,125 @@ class AppProvider extends ChangeNotifier {
     revisionSettings = s;
     await _db.saveRevisionSettings(s.toJson());
     notifyListeners();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // ROUTINES (V6)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> upsertRoutine(Routine routine) async {
+    await _db.upsertRoutine(routine.toJson());
+    final idx = routines.indexWhere((r) => r.id == routine.id);
+    if (idx >= 0) { routines[idx] = routine; } else { routines.add(routine); }
+    notifyListeners();
+  }
+
+  Future<void> deleteRoutine(String id) async {
+    await _db.deleteRoutine(id);
+    routines.removeWhere((r) => r.id == id);
+    notifyListeners();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // ROUTINE LOGS (V6)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> upsertRoutineLog(RoutineLog log) async {
+    await _db.upsertRoutineLog(log.toJson());
+    final idx = routineLogs.indexWhere((l) => l.id == log.id);
+    if (idx >= 0) { routineLogs[idx] = log; } else { routineLogs.add(log); }
+    notifyListeners();
+  }
+
+  Future<void> deleteRoutineLog(String id) async {
+    await _db.deleteRoutineLog(id);
+    routineLogs.removeWhere((l) => l.id == id);
+    notifyListeners();
+  }
+
+  List<RoutineLog> getRoutineLogsForDate(String date) =>
+      routineLogs.where((l) => l.date == date).toList();
+
+  // ═══════════════════════════════════════════════════════════════
+  // BUYING ITEMS (V6)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> upsertBuyingItem(BuyingItem item) async {
+    await _db.upsertBuyingItem(item.toJson());
+    final idx = buyingItems.indexWhere((i) => i.id == item.id);
+    if (idx >= 0) { buyingItems[idx] = item; } else { buyingItems.add(item); }
+    notifyListeners();
+  }
+
+  Future<void> deleteBuyingItem(String id) async {
+    await _db.deleteBuyingItem(id);
+    buyingItems.removeWhere((i) => i.id == id);
+    notifyListeners();
+  }
+
+  List<BuyingItem> getBuyingItemsForDate(String date) =>
+      buyingItems.where((i) => i.date == date).toList();
+
+  // ═══════════════════════════════════════════════════════════════
+  // TODO ITEMS (V6)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> upsertTodoItem(TodoItem item) async {
+    await _db.upsertTodoItem(item.toJson());
+    final idx = todoItems.indexWhere((i) => i.id == item.id);
+    if (idx >= 0) { todoItems[idx] = item; } else { todoItems.add(item); }
+    notifyListeners();
+  }
+
+  Future<void> deleteTodoItem(String id) async {
+    await _db.deleteTodoItem(id);
+    todoItems.removeWhere((i) => i.id == id);
+    notifyListeners();
+  }
+
+  List<TodoItem> getTodoItemsForDate(String date) =>
+      todoItems.where((i) => i.date == date).toList();
+
+  List<TodoItem> getTodosByCategory(String date, String category) =>
+      todoItems.where((i) => i.date == date && i.category == category).toList();
+
+  // ═══════════════════════════════════════════════════════════════
+  // DEFAULT ROUTINE ORDER (V6)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> upsertDefaultActivity(DefaultActivity activity) async {
+    await _db.upsertDefaultActivity(activity.toJson());
+    final idx = defaultActivities.indexWhere((a) => a.id == activity.id);
+    if (idx >= 0) { defaultActivities[idx] = activity; } else { defaultActivities.add(activity); }
+    defaultActivities.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    notifyListeners();
+  }
+
+  Future<void> deleteDefaultActivity(String id) async {
+    await _db.deleteDefaultActivity(id);
+    defaultActivities.removeWhere((a) => a.id == id);
+    notifyListeners();
+  }
+
+  Future<void> saveDefaultActivities(List<DefaultActivity> activities) async {
+    await _db.deleteAllDefaultActivities();
+    for (final a in activities) {
+      await _db.upsertDefaultActivity(a.toJson());
+    }
+    defaultActivities = List.from(activities);
+    defaultActivities.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    notifyListeners();
+  }
+
+  /// Get the highest completed FA page number
+  int getLastCompletedFAPage() {
+    int maxPage = 0;
+    for (final p in faPages) {
+      if ((p.status == 'read' || p.status == 'anki_done') && p.pageNum > maxPage) {
+        maxPage = p.pageNum;
+      }
+    }
+    return maxPage;
   }
 
   // ═══════════════════════════════════════════════════════════════

@@ -17,7 +17,7 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._();
 
   static const _dbName = 'focusflow.db';
-  static const _dbVersion = 5;
+  static const _dbVersion = 6;
 
   Database? _database;
 
@@ -65,6 +65,11 @@ class DatabaseService {
   static const tUworldTopics = 'uworld_topics';
   static const tFaSubtopics = 'fa_subtopics';
   static const tStreakData = 'streak_data';
+  static const tRoutines = 'routines';
+  static const tRoutineLogs = 'routine_logs';
+  static const tBuyingItems = 'buying_items';
+  static const tTodoItems = 'todo_items';
+  static const tDefaultRoutineOrder = 'default_routine_order';
 
   Future<void> _onCreate(Database db, int version) async {
     // Knowledge Base — pageNumber is the primary key
@@ -237,6 +242,9 @@ class DatabaseService {
         data TEXT NOT NULL
       )
     ''');
+
+    // ── V6 tables (Routines, Buying, Todos, Default Order) ────
+    await _createV6Tables(db);
   }
 
   /// Create G5 tracker tables — called from both _onCreate and _onUpgrade.
@@ -347,6 +355,9 @@ class DatabaseService {
     }
     if (oldVersion < 5) {
       await _createV5Tables(db);
+    }
+    if (oldVersion < 6) {
+      await _createV6Tables(db);
     }
     // Streak data table — always ensure it exists
     await db.execute('''
@@ -996,6 +1007,131 @@ class DatabaseService {
   }
 
   // ═══════════════════════════════════════════════════════════════
+  // V6 TABLES: Routines, Buying Items, To-Do Items, Default Order
+  // ═══════════════════════════════════════════════════════════════
+
+  /// Create V6 tables for Today's Plan overhaul.
+  Future<void> _createV6Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tRoutines (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tRoutineLogs (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        routineId TEXT,
+        date TEXT
+      )
+    ''');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_routine_logs_date ON $tRoutineLogs(date)');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tBuyingItems (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        date TEXT
+      )
+    ''');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_buying_items_date ON $tBuyingItems(date)');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tTodoItems (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        date TEXT,
+        category TEXT
+      )
+    ''');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_todo_items_date ON $tTodoItems(date)');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tDefaultRoutineOrder (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL
+      )
+    ''');
+  }
+
+  // ── ROUTINES ──────────────────────────────────────────────────
+
+  Future<void> upsertRoutine(Map<String, dynamic> json) =>
+      upsert(tRoutines, 'id', json['id'] ?? '', json);
+
+  Future<List<Map<String, dynamic>>> getAllRoutines() => getAll(tRoutines);
+
+  Future<int> deleteRoutine(String id) =>
+      deleteById(tRoutines, 'id', id);
+
+  // ── ROUTINE LOGS ──────────────────────────────────────────────
+
+  Future<void> upsertRoutineLog(Map<String, dynamic> json) => upsert(
+        tRoutineLogs, 'id', json['id'] ?? '', json,
+        indexColumns: {'routineId': json['routineId'], 'date': json['date']},
+      );
+
+  Future<List<Map<String, dynamic>>> getRoutineLogsByDate(String date) =>
+      getWhere(tRoutineLogs, 'date', date);
+
+  Future<List<Map<String, dynamic>>> getAllRoutineLogs() =>
+      getAll(tRoutineLogs);
+
+  Future<int> deleteRoutineLog(String id) =>
+      deleteById(tRoutineLogs, 'id', id);
+
+  // ── BUYING ITEMS ──────────────────────────────────────────────
+
+  Future<void> upsertBuyingItem(Map<String, dynamic> json) => upsert(
+        tBuyingItems, 'id', json['id'] ?? '', json,
+        indexColumns: {'date': json['date']},
+      );
+
+  Future<List<Map<String, dynamic>>> getBuyingItemsByDate(String date) =>
+      getWhere(tBuyingItems, 'date', date);
+
+  Future<List<Map<String, dynamic>>> getAllBuyingItems() =>
+      getAll(tBuyingItems);
+
+  Future<int> deleteBuyingItem(String id) =>
+      deleteById(tBuyingItems, 'id', id);
+
+  // ── TODO ITEMS ────────────────────────────────────────────────
+
+  Future<void> upsertTodoItem(Map<String, dynamic> json) => upsert(
+        tTodoItems, 'id', json['id'] ?? '', json,
+        indexColumns: {'date': json['date'], 'category': json['category']},
+      );
+
+  Future<List<Map<String, dynamic>>> getTodoItemsByDate(String date) =>
+      getWhere(tTodoItems, 'date', date);
+
+  Future<List<Map<String, dynamic>>> getAllTodoItems() =>
+      getAll(tTodoItems);
+
+  Future<int> deleteTodoItem(String id) =>
+      deleteById(tTodoItems, 'id', id);
+
+  // ── DEFAULT ROUTINE ORDER ─────────────────────────────────────
+
+  Future<void> upsertDefaultActivity(Map<String, dynamic> json) =>
+      upsert(tDefaultRoutineOrder, 'id', json['id'] ?? '', json);
+
+  Future<List<Map<String, dynamic>>> getAllDefaultActivities() =>
+      getAll(tDefaultRoutineOrder);
+
+  Future<int> deleteDefaultActivity(String id) =>
+      deleteById(tDefaultRoutineOrder, 'id', id);
+
+  Future<int> deleteAllDefaultActivities() =>
+      deleteAll(tDefaultRoutineOrder);
+
+  // ═══════════════════════════════════════════════════════════════
   // BULK OPERATIONS (for backup restore)
   // ═══════════════════════════════════════════════════════════════
 
@@ -1010,7 +1146,8 @@ class DatabaseService {
         tSettings, tHistory, tRevisionSettings, tRevisionItems,
         tFaPages, tSketchyItems, tPathomaItems, tUworldSessions, tUworldTopics,
         tSketchyMicroVideos, tSketchyPharmVideos, tPathomaChapters, tFaSubtopics,
-        tStreakData,
+        tStreakData, tRoutines, tRoutineLogs, tBuyingItems, tTodoItems,
+        tDefaultRoutineOrder,
       ]) {
         await txn.delete(table);
       }

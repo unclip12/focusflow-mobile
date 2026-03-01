@@ -19,6 +19,10 @@ import 'package:focusflow_mobile/widgets/app_scaffold.dart';
 import 'block_card.dart';
 import 'add_task_sheet.dart';
 import 'quick_study_sheet.dart';
+import 'activity_selector.dart';
+import 'todo_tab.dart';
+import 'buying_tab.dart';
+import 'routines_tab.dart';
 import 'package:focusflow_mobile/screens/session/session_screen.dart';
 
 class TodayPlanScreen extends StatefulWidget {
@@ -28,9 +32,11 @@ class TodayPlanScreen extends StatefulWidget {
   State<TodayPlanScreen> createState() => _TodayPlanScreenState();
 }
 
-class _TodayPlanScreenState extends State<TodayPlanScreen> {
+class _TodayPlanScreenState extends State<TodayPlanScreen>
+    with SingleTickerProviderStateMixin {
   late DateTime _selectedDate;
   String? _completedBlockId; // triggers celebration
+  late TabController _tabCtrl;
 
   // ── Prayer times — Vijayawada (block = leave 10 min before prayer → +20 min)
   // Format: (name, blockStartH, blockStartM, blockEndH, blockEndM, prayerH, prayerM)
@@ -98,10 +104,17 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
   void initState() {
     super.initState();
     _selectedDate = AppDateUtils.getAdjustedDate();
+    _tabCtrl = TabController(length: 4, vsync: this);
     // Schedule prayer notifications for today on launch
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _schedulePrayerNotifications();
     });
+  }
+
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    super.dispose();
   }
 
   String get _dateKey => AppDateUtils.formatDate(_selectedDate);
@@ -213,116 +226,66 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
                 },
               ),
 
-              // ── Plan summary bar ────────────────────────────────────
-              if (plan != null)
-                _PlanSummaryBar(plan: plan, blocks: realBlocks),
-
-              // ── Available time banner (today only) ──────────────────
+              // ── Activity Selector (today only) ───────────────────────
               if (_isToday)
-                _AvailableTimeBanner(
-                  plannedMinutes: plannedMinutes,
-                  availableMinutes: availableMinutes,
-                ),
+                ActivitySelector(dateKey: _dateKey),
 
-              // ── Overflow warning ────────────────────────────────────
-              if (isOverflow)
-                _OverflowWarning(
-                  overflowMinutes: plannedMinutes - availableMinutes,
+              // ── Tab bar ──────────────────────────────────────────────
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-
-              // ── Quick Study button (today only) ────────────────────
-              if (_isToday)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.vertical(
-                                top: Radius.circular(20)),
-                          ),
-                          builder: (_) => const QuickStudySheet(),
-                        );
-                      },
-                      icon: const Icon(Icons.timer_rounded, size: 18),
-                      label: const Text('Start Studying'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
+                child: TabBar(
+                  controller: _tabCtrl,
+                  labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  unselectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  dividerColor: Colors.transparent,
+                  indicator: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
+                  tabs: const [
+                    Tab(text: 'All', height: 36),
+                    Tab(text: 'To-Do', height: 36),
+                    Tab(text: 'Buying', height: 36),
+                    Tab(text: 'Routines', height: 36),
+                  ],
                 ),
+              ),
 
-              // ── Block list or empty ─────────────────────────────────
+              // ── Tab content ──────────────────────────────────────────
               Expanded(
-                child: displayBlocks.isEmpty
-                    ? _EmptyState(
-                        hasNoPlan: plan == null,
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                        itemCount: displayBlocks.length,
-                        itemBuilder: (context, i) {
-                          final b = displayBlocks[i];
+                child: TabBarView(
+                  controller: _tabCtrl,
+                  children: [
+                    // ═ ALL TAB ═ (existing block timeline)
+                    _AllTabContent(
+                      plan: plan,
+                      realBlocks: realBlocks,
+                      displayBlocks: displayBlocks,
+                      plannedMinutes: plannedMinutes,
+                      availableMinutes: availableMinutes,
+                      isToday: _isToday,
+                      isOverflow: isOverflow,
+                      dateKey: _dateKey,
+                      onCompleteBlock: (b) => _completeBlock(app, plan!, b),
+                      onStartBlock: (b) => _startBlock(app, plan!, b),
+                      onSkipBlock: (b) => _skipBlock(app, plan!, b),
+                    ),
 
-                          // Prayer blocks → distinct card
-                          if (b.isVirtual == true && b.id.startsWith('prayer_')) {
-                            return _PrayerBlockCard(block: b);
-                          }
+                    // ═ TO-DO TAB ═
+                    TodoTab(dateKey: _dateKey),
 
-                          final canSwipe =
-                              b.status != BlockStatus.done &&
-                              b.status != BlockStatus.skipped;
+                    // ═ BUYING TAB ═
+                    BuyingTab(dateKey: _dateKey),
 
-                          final card = BlockCard(
-                            block: b,
-                            dayPlan: plan!,
-                            onStart: () => _startBlock(app, plan, b),
-                            onSkip: () => _skipBlock(app, plan, b),
-                          );
-
-                          if (!canSwipe) return card;
-
-                          return Dismissible(
-                            key: ValueKey('dismiss-${b.id}'),
-                            direction: DismissDirection.endToStart,
-                            confirmDismiss: (_) async {
-                              _completeBlock(app, plan, b);
-                              return false; // don't actually remove
-                            },
-                            background: Container(
-                              alignment: Alignment.centerRight,
-                              margin: const EdgeInsets.only(bottom: 12),
-                              padding: const EdgeInsets.only(right: 24),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF10B981),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.check_circle_rounded,
-                                      color: Colors.white, size: 22),
-                                  SizedBox(width: 6),
-                                  Text('Complete',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 14,
-                                      )),
-                                ],
-                              ),
-                            ),
-                            child: card,
-                          );
-                        },
-                      ),
+                    // ═ ROUTINES TAB ═
+                    RoutinesTab(dateKey: _dateKey),
+                  ],
+                ),
               ),
             ],
           ),
@@ -382,6 +345,155 @@ class _TodayPlanScreenState extends State<TodayPlanScreen> {
       blocks[idx] = blocks[idx].copyWith(status: BlockStatus.skipped);
     }
     app.upsertDayPlan(plan.copyWith(blocks: blocks));
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ALL TAB CONTENT — existing block timeline extracted into a widget
+// ══════════════════════════════════════════════════════════════════
+
+class _AllTabContent extends StatelessWidget {
+  final DayPlan? plan;
+  final List<Block> realBlocks;
+  final List<Block> displayBlocks;
+  final int plannedMinutes;
+  final int availableMinutes;
+  final bool isToday;
+  final bool isOverflow;
+  final String dateKey;
+  final ValueChanged<Block> onCompleteBlock;
+  final ValueChanged<Block> onStartBlock;
+  final ValueChanged<Block> onSkipBlock;
+
+  const _AllTabContent({
+    required this.plan,
+    required this.realBlocks,
+    required this.displayBlocks,
+    required this.plannedMinutes,
+    required this.availableMinutes,
+    required this.isToday,
+    required this.isOverflow,
+    required this.dateKey,
+    required this.onCompleteBlock,
+    required this.onStartBlock,
+    required this.onSkipBlock,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // ── Plan summary bar ────────────────────────────────────
+        if (plan != null)
+          _PlanSummaryBar(plan: plan!, blocks: realBlocks),
+
+        // ── Available time banner (today only) ──────────────────
+        if (isToday)
+          _AvailableTimeBanner(
+            plannedMinutes: plannedMinutes,
+            availableMinutes: availableMinutes,
+          ),
+
+        // ── Overflow warning ────────────────────────────────────
+        if (isOverflow)
+          _OverflowWarning(
+            overflowMinutes: plannedMinutes - availableMinutes,
+          ),
+
+        // ── Quick Study button (today only) ────────────────────
+        if (isToday)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(20)),
+                    ),
+                    builder: (_) => const QuickStudySheet(),
+                  );
+                },
+                icon: const Icon(Icons.timer_rounded, size: 18),
+                label: const Text('Start Studying'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ),
+
+        // ── Block list or empty ─────────────────────────────────
+        Expanded(
+          child: displayBlocks.isEmpty
+              ? _EmptyState(hasNoPlan: plan == null)
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  itemCount: displayBlocks.length,
+                  itemBuilder: (context, i) {
+                    final b = displayBlocks[i];
+
+                    // Prayer blocks → distinct card
+                    if (b.isVirtual == true && b.id.startsWith('prayer_')) {
+                      return _PrayerBlockCard(block: b);
+                    }
+
+                    final canSwipe =
+                        b.status != BlockStatus.done &&
+                        b.status != BlockStatus.skipped;
+
+                    final card = BlockCard(
+                      block: b,
+                      dayPlan: plan!,
+                      onStart: () => onStartBlock(b),
+                      onSkip: () => onSkipBlock(b),
+                    );
+
+                    if (!canSwipe) return card;
+
+                    return Dismissible(
+                      key: ValueKey('dismiss-${b.id}'),
+                      direction: DismissDirection.endToStart,
+                      confirmDismiss: (_) async {
+                        onCompleteBlock(b);
+                        return false;
+                      },
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.only(right: 24),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle_rounded,
+                                color: Colors.white, size: 22),
+                            SizedBox(width: 6),
+                            Text('Complete',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                )),
+                          ],
+                        ),
+                      ),
+                      child: card,
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
   }
 }
 
