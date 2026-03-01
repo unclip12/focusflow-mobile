@@ -1013,9 +1013,11 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     required List<String> items,
     required void Function(String?) onChanged,
   }) {
+    // Guard: only pass value if it actually exists in items to avoid assertion error
+    final safeValue = (value != null && items.contains(value)) ? value : null;
     return DropdownButtonFormField<String>(
       // ignore: deprecated_member_use
-      value: value,
+      value: safeValue,
       decoration: InputDecoration(
         labelText: label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

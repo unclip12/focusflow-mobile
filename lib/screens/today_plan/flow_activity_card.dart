@@ -4,6 +4,7 @@
 // =============================================================
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:focusflow_mobile/models/daily_flow.dart';
 
 class FlowActivityCard extends StatelessWidget {
@@ -161,12 +162,39 @@ class FlowActivityCard extends StatelessWidget {
                                 size: 12,
                                 color: const Color(0xFF10B981).withValues(alpha: 0.7)),
                             const SizedBox(width: 4),
-                            Text(
-                              durationStr,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFF10B981).withValues(alpha: 0.8),
+                            Expanded(
+                              child: Text(
+                                '${_timeRange(activity)}$durationStr',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.8),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    // Notes (if any)
+                    if (activity.notes != null && activity.notes!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Row(
+                          children: [
+                            Icon(Icons.sticky_note_2_outlined,
+                                size: 12,
+                                color: cs.onSurface.withValues(alpha: 0.3)),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                activity.notes!,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: cs.onSurface.withValues(alpha: 0.5),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -225,5 +253,22 @@ class FlowActivityCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Format "2:30 PM – 3:45 PM • " from startedAt/completedAt
+  static String _timeRange(FlowActivity a) {
+    if (a.startedAt == null) return '';
+    try {
+      final start = DateTime.parse(a.startedAt!);
+      final fmt = DateFormat('h:mm a');
+      final startStr = fmt.format(start);
+      if (a.completedAt != null) {
+        final end = DateTime.parse(a.completedAt!);
+        return '$startStr – ${fmt.format(end)} • ';
+      }
+      return '$startStr – ? • ';
+    } catch (_) {
+      return '';
+    }
   }
 }

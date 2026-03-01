@@ -16,6 +16,8 @@ class FlowActivity {
   final String? completedAt;
   final int? durationSeconds;
   final String? pausedUntil; // ISO 8601 — pause timer target
+  final String? notes;       // User notes (Track Now)
+  final String? category;    // Activity category (Track Now)
 
   const FlowActivity({
     required this.id,
@@ -30,6 +32,8 @@ class FlowActivity {
     this.completedAt,
     this.durationSeconds,
     this.pausedUntil,
+    this.notes,
+    this.category,
   });
 
   factory FlowActivity.fromJson(Map<String, dynamic> j) => FlowActivity(
@@ -47,6 +51,8 @@ class FlowActivity {
         completedAt: j['completedAt'],
         durationSeconds: j['durationSeconds'],
         pausedUntil: j['pausedUntil'],
+        notes: j['notes'],
+        category: j['category'],
       );
 
   Map<String, dynamic> toJson() => {
@@ -62,6 +68,8 @@ class FlowActivity {
         if (completedAt != null) 'completedAt': completedAt,
         if (durationSeconds != null) 'durationSeconds': durationSeconds,
         if (pausedUntil != null) 'pausedUntil': pausedUntil,
+        if (notes != null) 'notes': notes,
+        if (category != null) 'category': category,
       };
 
   FlowActivity copyWith({
@@ -77,6 +85,8 @@ class FlowActivity {
     String? completedAt,
     int? durationSeconds,
     String? pausedUntil,
+    String? notes,
+    String? category,
   }) =>
       FlowActivity(
         id: id ?? this.id,
@@ -91,6 +101,8 @@ class FlowActivity {
         completedAt: completedAt ?? this.completedAt,
         durationSeconds: durationSeconds ?? this.durationSeconds,
         pausedUntil: pausedUntil ?? this.pausedUntil,
+        notes: notes ?? this.notes,
+        category: category ?? this.category,
       );
 
   bool get isDone => status == 'DONE';

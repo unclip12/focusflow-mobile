@@ -946,6 +946,94 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  // ── TRACK NOW (ad-hoc activity tracking) ──────────────────────
+
+  /// Start tracking a spontaneous activity (e.g. "Cooking").
+  /// Creates a new FlowActivity with IN_PROGRESS status.
+  Future<FlowActivity> startTrackNow(
+    String date, {
+    required String label,
+    String? category,
+  }) async {
+    final now = DateTime.now().toIso8601String();
+    final activity = FlowActivity(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      label: label,
+      icon: _categoryIcon(category),
+      activityType: 'TRACK_NOW',
+      sortOrder: 999,
+      status: 'IN_PROGRESS',
+      startedAt: now,
+      category: category,
+    );
+    await addFlowActivity(date, activity.copyWith(status: 'IN_PROGRESS', startedAt: now));
+    return activity;
+  }
+
+  /// Stop the Track Now timer and mark activity as DONE.
+  Future<void> stopTrackNow(
+    String date,
+    String activityId, {
+    String? notes,
+    List<String>? linkedTaskIds,
+  }) async {
+    final flow = getDailyFlow(date);
+    if (flow == null) return;
+
+    final now = DateTime.now();
+    final activities = List<FlowActivity>.from(flow.activities);
+    final idx = activities.indexWhere((a) => a.id == activityId);
+    if (idx < 0) return;
+
+    final activity = activities[idx];
+    final startTime = activity.startedAt != null
+        ? DateTime.tryParse(activity.startedAt!)
+        : null;
+    final duration = startTime != null
+        ? now.difference(startTime).inSeconds
+        : null;
+
+    activities[idx] = activity.copyWith(
+      status: 'DONE',
+      completedAt: now.toIso8601String(),
+      durationSeconds: duration,
+      notes: notes,
+      linkedTaskIds: linkedTaskIds ?? activity.linkedTaskIds,
+    );
+
+    await upsertDailyFlow(flow.copyWith(activities: activities));
+  }
+
+  /// Get the currently active Track Now activity (if any).
+  FlowActivity? getActiveTrackNow(String date) {
+    final flow = getDailyFlow(date);
+    if (flow == null) return null;
+    try {
+      return flow.activities.firstWhere(
+        (a) => a.activityType == 'TRACK_NOW' && a.isActive,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Icon helper for Track Now categories.
+  static String _categoryIcon(String? category) {
+    switch (category?.toLowerCase()) {
+      case 'cooking': return '🍳';
+      case 'cleaning': return '🧹';
+      case 'exercise': return '💪';
+      case 'study': return '📚';
+      case 'prayer': return '🕌';
+      case 'shopping': return '🛒';
+      case 'eating': return '🍽️';
+      case 'rest': return '😴';
+      case 'travel': return '🚗';
+      case 'work': return '💼';
+      default: return '⏱️';
+    }
+  }
+
   // ═════════════════════════════════════════════════════════════════
   // PRAYER ROUTINE SEEDING
   // ═════════════════════════════════════════════════════════════════

@@ -4,12 +4,17 @@
 // =============================================================
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
+import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/models/fa_page.dart';
 import 'package:focusflow_mobile/models/fa_subtopic.dart';
+import 'package:focusflow_mobile/models/pathoma_chapter.dart';
 import 'package:focusflow_mobile/models/sketchy_video.dart';
 import 'package:focusflow_mobile/models/uworld_topic.dart';
+import 'package:focusflow_mobile/utils/constants.dart';
 
 class TrackerScreen extends StatefulWidget {
   const TrackerScreen({super.key});
@@ -21,6 +26,28 @@ class TrackerScreen extends StatefulWidget {
 class _TrackerScreenState extends State<TrackerScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+
+  // ── Selection mode state ──────────────────────────────────
+  bool _selectionMode = false;
+  final Set<String> _selectedItems = {}; // e.g. 'fa:45', 'sketchy:12'
+
+  void _toggleSelection(String key) {
+    setState(() {
+      if (_selectedItems.contains(key)) {
+        _selectedItems.remove(key);
+        if (_selectedItems.isEmpty) _selectionMode = false;
+      } else {
+        _selectedItems.add(key);
+      }
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _selectionMode = false;
+      _selectedItems.clear();
+    });
+  }
 
   @override
   void initState() {
@@ -43,7 +70,29 @@ class _TrackerScreenState extends State<TrackerScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tracker'),
+        title: Text(_selectionMode
+            ? '${_selectedItems.length} selected'
+            : 'Tracker'),
+        leading: _selectionMode
+            ? IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: _exitSelectionMode,
+              )
+            : null,
+        actions: [
+          if (!_selectionMode)
+            IconButton(
+              icon: const Icon(Icons.checklist_rounded),
+              tooltip: 'Select items',
+              onPressed: () => setState(() => _selectionMode = true),
+            ),
+          if (_selectionMode && _selectedItems.isNotEmpty)
+            TextButton.icon(
+              onPressed: () => setState(() => _selectedItems.clear()),
+              icon: const Icon(Icons.deselect_rounded, size: 18),
+              label: const Text('Clear'),
+            ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -57,16 +106,86 @@ class _TrackerScreenState extends State<TrackerScreen>
           indicatorColor: cs.primary,
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: const [
-          _FATab(),
-          _SketchyTab(),
-          _PathomaTab(),
-          _UWorldTab(),
+      body: Column(
+        children: [
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _FATab(
+                  selectionMode: _selectionMode,
+                  selectedItems: _selectedItems,
+                  onToggleSelect: _toggleSelection,
+                ),
+                _SketchyTab(
+                  selectionMode: _selectionMode,
+                  selectedItems: _selectedItems,
+                  onToggleSelect: _toggleSelection,
+                ),
+                _PathomaTab(
+                  selectionMode: _selectionMode,
+                  selectedItems: _selectedItems,
+                  onToggleSelect: _toggleSelection,
+                ),
+                _UWorldTab(
+                  selectionMode: _selectionMode,
+                  selectedItems: _selectedItems,
+                  onToggleSelect: _toggleSelection,
+                ),
+              ],
+            ),
+          ),
+          // ── Bottom selection bar ────────────────────────────
+          if (_selectionMode && _selectedItems.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHigh,
+                border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3))),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle_rounded, size: 20, color: cs.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${_selectedItems.length} item${_selectedItems.length == 1 ? '' : 's'} selected',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                    ),
+                    FilledButton.icon(
+                      onPressed: () {
+                        showModalBottomSheet<void>(
+                          context: context,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                          ),
+                          builder: (_) => _AddToTaskSheet(
+                            selectedItems: Set<String>.from(_selectedItems),
+                            onDone: _exitSelectionMode,
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.add_task_rounded, size: 18),
+                      label: const Text('Add to Task'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
-      floatingActionButton: _tabController.index == 0
+      floatingActionButton: !_selectionMode && _tabController.index == 0
           ? FloatingActionButton(
               onPressed: () {
                 showModalBottomSheet<void>(
@@ -91,14 +210,23 @@ class _TrackerScreenState extends State<TrackerScreen>
 // ═══════════════════════════════════════════════════════════════
 
 class _FATab extends StatefulWidget {
-  const _FATab();
+  final bool selectionMode;
+  final Set<String> selectedItems;
+  final void Function(String key) onToggleSelect;
+  const _FATab({
+    required this.selectionMode,
+    required this.selectedItems,
+    required this.onToggleSelect,
+  });
 
   @override
   State<_FATab> createState() => _FATabState();
 }
 
+enum _FAViewMode { pages, topics, cards }
+
 class _FATabState extends State<_FATab> {
-  bool _showSubtopicView = false;
+  _FAViewMode _viewMode = _FAViewMode.pages;
 
   @override
   Widget build(BuildContext context) {
@@ -158,22 +286,27 @@ class _FATabState extends State<_FATab> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  SegmentedButton<bool>(
+                  SegmentedButton<_FAViewMode>(
                     segments: const [
                       ButtonSegment(
-                        value: false,
+                        value: _FAViewMode.pages,
                         icon: Icon(Icons.grid_view_rounded, size: 16),
-                        label: Text('Pages', style: TextStyle(fontSize: 11)),
+                        label: Text('Pages', style: TextStyle(fontSize: 10)),
                       ),
                       ButtonSegment(
-                        value: true,
+                        value: _FAViewMode.topics,
                         icon: Icon(Icons.list_rounded, size: 16),
-                        label: Text('Topics', style: TextStyle(fontSize: 11)),
+                        label: Text('Topics', style: TextStyle(fontSize: 10)),
+                      ),
+                      ButtonSegment(
+                        value: _FAViewMode.cards,
+                        icon: Icon(Icons.view_agenda_rounded, size: 16),
+                        label: Text('Cards', style: TextStyle(fontSize: 10)),
                       ),
                     ],
-                    selected: {_showSubtopicView},
+                    selected: {_viewMode},
                     onSelectionChanged: (v) =>
-                        setState(() => _showSubtopicView = v.first),
+                        setState(() => _viewMode = v.first),
                     style: SegmentedButton.styleFrom(
                       visualDensity: VisualDensity.compact,
                     ),
@@ -184,9 +317,23 @@ class _FATabState extends State<_FATab> {
 
             // ── Content ────────────────────────────────────────
             Expanded(
-              child: _showSubtopicView
+              child: _viewMode == _FAViewMode.topics
                   ? _SubtopicListView(app: app)
-                  : _PageGridView(app: app, sorted: sorted),
+                  : _viewMode == _FAViewMode.cards
+                      ? _FACardView(
+                          app: app,
+                          sorted: sorted,
+                          selectionMode: widget.selectionMode,
+                          selectedItems: widget.selectedItems,
+                          onToggleSelect: widget.onToggleSelect,
+                        )
+                      : _PageGridView(
+                          app: app,
+                          sorted: sorted,
+                          selectionMode: widget.selectionMode,
+                          selectedItems: widget.selectedItems,
+                          onToggleSelect: widget.onToggleSelect,
+                        ),
             ),
           ],
         );
@@ -199,7 +346,16 @@ class _FATabState extends State<_FATab> {
 class _PageGridView extends StatelessWidget {
   final AppProvider app;
   final List<FAPage> sorted;
-  const _PageGridView({required this.app, required this.sorted});
+  final bool selectionMode;
+  final Set<String> selectedItems;
+  final void Function(String key) onToggleSelect;
+  const _PageGridView({
+    required this.app,
+    required this.sorted,
+    required this.selectionMode,
+    required this.selectedItems,
+    required this.onToggleSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -261,6 +417,9 @@ class _PageGridView extends StatelessWidget {
                   return _LiquidFillPageBox(
                     page: page,
                     app: app,
+                    selectionMode: selectionMode,
+                    isSelected: selectedItems.contains('fa:${page.pageNum}'),
+                    onToggleSelect: () => onToggleSelect('fa:${page.pageNum}'),
                   );
                 }).toList(),
               ),
@@ -276,7 +435,16 @@ class _PageGridView extends StatelessWidget {
 class _LiquidFillPageBox extends StatelessWidget {
   final FAPage page;
   final AppProvider app;
-  const _LiquidFillPageBox({required this.page, required this.app});
+  final bool selectionMode;
+  final bool isSelected;
+  final VoidCallback onToggleSelect;
+  const _LiquidFillPageBox({
+    required this.page,
+    required this.app,
+    required this.selectionMode,
+    required this.isSelected,
+    required this.onToggleSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -306,8 +474,8 @@ class _LiquidFillPageBox extends StatelessWidget {
     const boxSize = 56.0;
 
     return GestureDetector(
-      onTap: () => _showSubtopicPicker(context),
-      onLongPress: () => _showDetailPopup(context),
+      onTap: selectionMode ? onToggleSelect : () => _showSubtopicPicker(context),
+      onLongPress: selectionMode ? null : () => _showDetailPopup(context),
       child: SizedBox(
         width: boxSize,
         height: boxSize,
@@ -415,6 +583,27 @@ class _LiquidFillPageBox extends StatelessWidget {
                 right: 2,
                 child: Icon(Icons.check_circle_rounded,
                     size: 14, color: Colors.white.withValues(alpha: 0.9)),
+              ),
+            // Selection overlay
+            if (selectionMode)
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? cs.primary.withValues(alpha: 0.25)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    border: isSelected
+                        ? Border.all(color: cs.primary, width: 2.5)
+                        : null,
+                  ),
+                  child: isSelected
+                      ? const Center(
+                          child: Icon(Icons.check_circle_rounded,
+                              size: 22, color: Colors.white),
+                        )
+                      : null,
+                ),
               ),
           ],
         ),
@@ -860,7 +1049,14 @@ class _SubtopicListView extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════
 
 class _SketchyTab extends StatelessWidget {
-  const _SketchyTab();
+  final bool selectionMode;
+  final Set<String> selectedItems;
+  final void Function(String key) onToggleSelect;
+  const _SketchyTab({
+    required this.selectionMode,
+    required this.selectedItems,
+    required this.onToggleSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -886,11 +1082,17 @@ class _SketchyTab extends StatelessWidget {
                       videos: app.sketchyMicroVideos,
                       onToggle: (id, watched) =>
                           app.toggleSketchyMicroWatched(id, watched),
+                      selectionMode: selectionMode,
+                      selectedItems: selectedItems,
+                      onToggleSelect: onToggleSelect,
                     ),
                     _SketchyVideoList(
                       videos: app.sketchyPharmVideos,
                       onToggle: (id, watched) =>
                           app.toggleSketchyPharmWatched(id, watched),
+                      selectionMode: selectionMode,
+                      selectedItems: selectedItems,
+                      onToggleSelect: onToggleSelect,
                     ),
                   ],
                 );
@@ -906,10 +1108,16 @@ class _SketchyTab extends StatelessWidget {
 class _SketchyVideoList extends StatelessWidget {
   final List<SketchyVideo> videos;
   final void Function(int id, bool watched) onToggle;
+  final bool selectionMode;
+  final Set<String> selectedItems;
+  final void Function(String key) onToggleSelect;
 
   const _SketchyVideoList({
     required this.videos,
     required this.onToggle,
+    required this.selectionMode,
+    required this.selectedItems,
+    required this.onToggleSelect,
   });
 
   @override
@@ -1000,6 +1208,25 @@ class _SketchyVideoList extends StatelessWidget {
                         ),
                       ),
                       children: items.map((v) {
+                        final key = 'sketchy:${v.id}';
+                        final isSelected = selectedItems.contains(key);
+                        if (selectionMode) {
+                          return CheckboxListTile(
+                            dense: true,
+                            value: isSelected,
+                            onChanged: (_) => onToggleSelect(key),
+                            title: Text(
+                              v.title,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                            subtitle: v.watched
+                                ? Text('Watched ✓',
+                                    style: TextStyle(fontSize: 10, color: cs.primary))
+                                : null,
+                            controlAffinity: ListTileControlAffinity.leading,
+                            activeColor: cs.primary,
+                          );
+                        }
                         return CheckboxListTile(
                           dense: true,
                           value: v.watched,
@@ -1034,7 +1261,14 @@ class _SketchyVideoList extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════
 
 class _PathomaTab extends StatelessWidget {
-  const _PathomaTab();
+  final bool selectionMode;
+  final Set<String> selectedItems;
+  final void Function(String key) onToggleSelect;
+  const _PathomaTab({
+    required this.selectionMode,
+    required this.selectedItems,
+    required this.onToggleSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1088,6 +1322,23 @@ class _PathomaTab extends StatelessWidget {
                 itemCount: chapters.length,
                 itemBuilder: (context, i) {
                   final ch = chapters[i];
+                  final key = 'pathoma:${ch.id}';
+                  final isSelected = selectedItems.contains(key);
+
+                  if (selectionMode) {
+                    return CheckboxListTile(
+                      value: isSelected,
+                      onChanged: (_) => onToggleSelect(key),
+                      title: Text('Ch ${ch.chapter} — ${ch.title}'),
+                      subtitle: ch.watched
+                          ? Text('Watched ✓',
+                              style: TextStyle(fontSize: 10, color: cs.primary))
+                          : null,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      activeColor: cs.primary,
+                    );
+                  }
+
                   return CheckboxListTile(
                     value: ch.watched,
                     onChanged: (val) {
@@ -1116,7 +1367,14 @@ class _PathomaTab extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════
 
 class _UWorldTab extends StatelessWidget {
-  const _UWorldTab();
+  final bool selectionMode;
+  final Set<String> selectedItems;
+  final void Function(String key) onToggleSelect;
+  const _UWorldTab({
+    required this.selectionMode,
+    required this.selectedItems,
+    required this.onToggleSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1240,6 +1498,23 @@ class _UWorldTab extends StatelessWidget {
                       final subProgress = sub.totalQuestions > 0 
                           ? sub.doneQuestions / sub.totalQuestions 
                           : 0.0;
+                      final key = 'uworld:${sub.id}';
+                      final isUwSelected = selectedItems.contains(key);
+
+                      if (selectionMode) {
+                        return CheckboxListTile(
+                          dense: true,
+                          value: isUwSelected,
+                          onChanged: (_) => onToggleSelect(key),
+                          title: Text(sub.subtopic, style: const TextStyle(fontSize: 13)),
+                          subtitle: Text(
+                            '${sub.doneQuestions}/${sub.totalQuestions} done · $subPct%',
+                            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                          ),
+                          controlAffinity: ListTileControlAffinity.leading,
+                          activeColor: cs.primary,
+                        );
+                      }
                           
                       return ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
@@ -1734,6 +2009,548 @@ class _BulkMarkSheetState extends State<_BulkMarkSheet> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Add to Task — schedule selected items from tracker
+// ═══════════════════════════════════════════════════════════════
+
+class _AddToTaskSheet extends StatelessWidget {
+  final Set<String> selectedItems;
+  final VoidCallback onDone;
+  const _AddToTaskSheet({required this.selectedItems, required this.onDone});
+
+  static const _uuid = Uuid();
+
+  String _dateKey(DateTime dt) => DateFormat('yyyy-MM-dd').format(dt);
+
+  Future<void> _addToDate(BuildContext context, String dateKey) async {
+    final app = context.read<AppProvider>();
+    final existing = app.getDayPlan(dateKey);
+    final existingBlocks = List<Block>.from(existing?.blocks ?? []);
+    final newBlocks = <Block>[];
+
+    for (final key in selectedItems) {
+      final parts = key.split(':');
+      if (parts.length < 2) continue;
+      final type = parts[0];
+      final id = parts.sublist(1).join(':');
+
+      BlockType blockType;
+      String title;
+
+      switch (type) {
+        case 'fa':
+          blockType = BlockType.revisionFa;
+          final pageNum = int.tryParse(id);
+          if (pageNum != null) {
+            final page = app.faPages.cast<FAPage?>().firstWhere(
+              (p) => p!.pageNum == pageNum,
+              orElse: () => null,
+            );
+            title = page != null
+                ? 'FA Page $pageNum — ${page.title}'
+                : 'FA Page $pageNum';
+          } else {
+            title = 'FA Page $id';
+          }
+          break;
+        case 'sketchy':
+          blockType = BlockType.video;
+          final videoId = int.tryParse(id);
+          SketchyVideo? video;
+          if (videoId != null) {
+            final allVideos = [...app.sketchyMicroVideos, ...app.sketchyPharmVideos];
+            video = allVideos.cast<SketchyVideo?>().firstWhere(
+              (v) => v!.id == videoId,
+              orElse: () => null,
+            );
+          }
+          title = video != null ? 'Sketchy: ${video.title}' : 'Sketchy Video';
+          break;
+        case 'pathoma':
+          blockType = BlockType.video;
+          final chId = int.tryParse(id);
+          PathomaChapter? ch;
+          if (chId != null) {
+            ch = app.pathomaChapters.cast<PathomaChapter?>().firstWhere(
+              (c) => c!.id == chId,
+              orElse: () => null,
+            );
+          }
+          title = ch != null
+              ? 'Pathoma Ch${ch.chapter}: ${ch.title}'
+              : 'Pathoma Chapter';
+          break;
+        case 'uworld':
+          blockType = BlockType.qbank;
+          final uwId = int.tryParse(id);
+          UWorldTopic? topic;
+          if (uwId != null) {
+            topic = app.uworldTopics.cast<UWorldTopic?>().firstWhere(
+              (t) => t!.id == uwId,
+              orElse: () => null,
+            );
+          }
+          title = topic != null
+              ? 'UWorld: ${topic.subtopic}'
+              : 'UWorld Questions';
+          break;
+        default:
+          blockType = BlockType.other;
+          title = 'Study Task';
+      }
+
+      newBlocks.add(Block(
+        id: _uuid.v4(),
+        index: existingBlocks.length + newBlocks.length,
+        date: dateKey,
+        plannedStartTime: '00:00',
+        plannedEndTime: '00:00',
+        type: blockType,
+        title: title,
+        plannedDurationMinutes: 0,
+        status: BlockStatus.notStarted,
+      ));
+    }
+
+    final allBlocks = [...existingBlocks, ...newBlocks];
+    final plan = existing?.copyWith(blocks: allBlocks) ?? DayPlan(
+      date: dateKey,
+      faPages: const [],
+      faPagesCount: 0,
+      videos: const [],
+      notesFromUser: '',
+      notesFromAI: '',
+      attachments: const [],
+      breaks: const [],
+      blocks: allBlocks,
+      totalStudyMinutesPlanned: 0,
+      totalBreakMinutes: 0,
+    );
+
+    await app.upsertDayPlan(plan);
+
+    if (context.mounted) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${newBlocks.length} task${newBlocks.length == 1 ? '' : 's'} added to $dateKey',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      onDone();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final now = DateTime.now();
+    final todayKey = _dateKey(now);
+    final tomorrowKey = _dateKey(now.add(const Duration(days: 1)));
+
+    // Count items by type
+    int faCount = 0, sketchyCount = 0, pathomaCount = 0, uworldCount = 0;
+    for (final key in selectedItems) {
+      if (key.startsWith('fa:')) faCount++;
+      else if (key.startsWith('sketchy:')) sketchyCount++;
+      else if (key.startsWith('pathoma:')) pathomaCount++;
+      else if (key.startsWith('uworld:')) uworldCount++;
+    }
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          20, 16, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Center(
+            child: Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: cs.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Add ${selectedItems.length} item${selectedItems.length == 1 ? '' : 's'} to plan',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: cs.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Summary chips
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            alignment: WrapAlignment.center,
+            children: [
+              if (faCount > 0)
+                Chip(
+                  avatar: const Icon(Icons.menu_book_rounded, size: 16),
+                  label: Text('$faCount FA page${faCount > 1 ? 's' : ''}'),
+                  visualDensity: VisualDensity.compact,
+                ),
+              if (sketchyCount > 0)
+                Chip(
+                  avatar: const Icon(Icons.play_circle_rounded, size: 16),
+                  label: Text('$sketchyCount Sketchy'),
+                  visualDensity: VisualDensity.compact,
+                ),
+              if (pathomaCount > 0)
+                Chip(
+                  avatar: const Icon(Icons.biotech_rounded, size: 16),
+                  label: Text('$pathomaCount Pathoma'),
+                  visualDensity: VisualDensity.compact,
+                ),
+              if (uworldCount > 0)
+                Chip(
+                  avatar: const Icon(Icons.quiz_rounded, size: 16),
+                  label: Text('$uworldCount UWorld'),
+                  visualDensity: VisualDensity.compact,
+                ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          // Action buttons
+          Row(
+            children: [
+              Expanded(
+                child: _scheduleButton(
+                  context: context,
+                  icon: Icons.today_rounded,
+                  label: 'Today',
+                  sublabel: todayKey,
+                  color: const Color(0xFF10B981),
+                  onTap: () => _addToDate(context, todayKey),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _scheduleButton(
+                  context: context,
+                  icon: Icons.upcoming_rounded,
+                  label: 'Tomorrow',
+                  sublabel: tomorrowKey,
+                  color: const Color(0xFF6366F1),
+                  onTap: () => _addToDate(context, tomorrowKey),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: now.add(const Duration(days: 2)),
+                  firstDate: now,
+                  lastDate: now.add(const Duration(days: 365)),
+                );
+                if (picked != null && context.mounted) {
+                  await _addToDate(context, _dateKey(picked));
+                }
+              },
+              icon: const Icon(Icons.calendar_month_rounded, size: 18),
+              label: const Text('Pick a Date'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _scheduleButton({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required String sublabel,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: color.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withValues(alpha: 0.2)),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, size: 28, color: color),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: cs.onSurface,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                sublabel,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FA Card View — detailed cards with topic info
+// ═══════════════════════════════════════════════════════════════
+
+class _FACardView extends StatelessWidget {
+  final AppProvider app;
+  final List<FAPage> sorted;
+  final bool selectionMode;
+  final Set<String> selectedItems;
+  final void Function(String key) onToggleSelect;
+
+  const _FACardView({
+    required this.app,
+    required this.sorted,
+    required this.selectionMode,
+    required this.selectedItems,
+    required this.onToggleSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Group by subject
+    final groupOrder = <String>[];
+    final grouped = <String, List<FAPage>>{};
+    for (final p in sorted) {
+      if (!grouped.containsKey(p.subject)) {
+        groupOrder.add(p.subject);
+        grouped[p.subject] = [];
+      }
+      grouped[p.subject]!.add(p);
+    }
+
+    final cs = Theme.of(context).colorScheme;
+
+    return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 80),
+      itemCount: groupOrder.length,
+      itemBuilder: (context, i) {
+        final subject = groupOrder[i];
+        final pages = grouped[subject]!;
+        final readCount = pages.where((p) => p.status != 'unread').length;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      subject,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: cs.primary,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '$readCount/${pages.length}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ...pages.map((page) {
+              final percent = app.getPageCompletionPercent(page.pageNum);
+              final isFullyRead = page.status != 'unread';
+              final isAnkiDone = page.status == 'anki_done';
+              final subtopics = app.getSubtopicsForPage(page.pageNum);
+              final readSubs = subtopics.where((s) => s.status != 'unread').length;
+              final key = 'fa:${page.pageNum}';
+              final isSelected = selectedItems.contains(key);
+
+              Color statusColor;
+              String statusLabel;
+              if (isAnkiDone) {
+                statusColor = Colors.purple;
+                statusLabel = 'Anki Done';
+              } else if (isFullyRead || percent >= 1.0) {
+                statusColor = Colors.green;
+                statusLabel = 'Read';
+              } else if (percent > 0) {
+                statusColor = Colors.orange;
+                statusLabel = '${(percent * 100).round()}%';
+              } else {
+                statusColor = Colors.red.shade700;
+                statusLabel = 'Unread';
+              }
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                child: Material(
+                  color: isSelected
+                      ? cs.primary.withValues(alpha: 0.08)
+                      : cs.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(14),
+                  child: InkWell(
+                    onTap: selectionMode
+                        ? () => onToggleSelect(key)
+                        : null,
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isSelected
+                              ? cs.primary
+                              : cs.outlineVariant.withValues(alpha: 0.2),
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          if (selectionMode) ...[
+                            Icon(
+                              isSelected
+                                  ? Icons.check_circle_rounded
+                                  : Icons.radio_button_unchecked_rounded,
+                              color: isSelected ? cs.primary : cs.onSurfaceVariant,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 12),
+                          ],
+                          // Page number badge
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                  color: statusColor.withValues(alpha: 0.3)),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${page.pageNum}',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: statusColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Details
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  page.title,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: cs.onSurface,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  '${page.system} · $readSubs/${subtopics.length} subtopics',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Status badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              statusLabel,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: statusColor,
+                              ),
+                            ),
+                          ),
+                          if (page.revisionCount > 0) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: cs.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'R${page.revisionCount}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: cs.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ],
+        );
+      },
     );
   }
 }
