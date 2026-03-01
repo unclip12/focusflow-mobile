@@ -1701,7 +1701,8 @@ class _BulkMarkSheetState extends State<_BulkMarkSheet> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            initialValue: _selectedStatus,
+            // ignore: deprecated_member_use
+            value: _selectedStatus,
             decoration: const InputDecoration(
               labelText: 'Mark as',
               border: OutlineInputBorder(),

@@ -194,7 +194,8 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
             const SizedBox(height: 16),
 
             DropdownButtonFormField<TimeLogCategory>(
-              initialValue: _category,
+              // ignore: deprecated_member_use
+              value: _category,
               decoration: InputDecoration(
                 labelText: 'Category',
                 border: OutlineInputBorder(

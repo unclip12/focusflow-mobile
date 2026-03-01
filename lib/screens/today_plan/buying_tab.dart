@@ -312,7 +312,8 @@ class _AddBuyingSheetState extends State<_AddBuyingSheet> {
               SizedBox(
                 width: 100,
                 child: DropdownButtonFormField<String>(
-                  initialValue: _unit,
+                  // ignore: deprecated_member_use
+                  value: _unit,
                   decoration: InputDecoration(
                     labelText: 'Unit',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

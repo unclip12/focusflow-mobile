@@ -821,7 +821,8 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     required void Function(String?) onChanged,
   }) {
     return DropdownButtonFormField<String>(
-      initialValue: value,
+      // ignore: deprecated_member_use
+      value: value,
       decoration: InputDecoration(
         labelText: label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
