@@ -87,8 +87,57 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
 
+  // ── Tracker integration state ─────────────────────────────
+  bool _isRevision = false;
+  Map<String, dynamic>? _trackerInfo; // looked-up tracker data
+
+  @override
+  void initState() {
+    super.initState();
+    _pageCtrl.addListener(_onPageNumberChanged);
+  }
+
+  void _onPageNumberChanged() {
+    final text = _pageCtrl.text.trim();
+    if (text.isEmpty) {
+      if (_trackerInfo != null) setState(() => _trackerInfo = null);
+      return;
+    }
+    final pageNum = int.tryParse(text.split('-').first.trim());
+    if (pageNum == null) return;
+    final app = context.read<AppProvider>();
+    final pageIdx = app.faPages.indexWhere((p) => p.pageNum == pageNum);
+    if (pageIdx < 0) {
+      setState(() => _trackerInfo = null);
+      return;
+    }
+    final page = app.faPages[pageIdx];
+    final subtopics = app.getSubtopicsForPage(pageNum);
+    final readSubs = subtopics.where((s) => s.status != 'unread').length;
+    final alreadyStudied = page.status != 'unread';
+    setState(() {
+      _trackerInfo = {
+        'pageNum': pageNum,
+        'subject': page.subject,
+        'system': page.system,
+        'title': page.title,
+        'status': page.status,
+        'revisionCount': page.revisionCount,
+        'lastRevisedAt': page.lastRevisedAt,
+        'firstReadAt': page.firstReadAt,
+        'subtopics': subtopics,
+        'readCount': readSubs,
+        'totalSubs': subtopics.length,
+      };
+      _isRevision = alreadyStudied;
+      // Auto-fill system if empty
+      _selectedSystem ??= page.system;
+    });
+  }
+
   @override
   void dispose() {
+    _pageCtrl.removeListener(_onPageNumberChanged);
     _pageCtrl.dispose();
     _topicCtrl.dispose();
     _titleCtrl.dispose();
@@ -433,34 +482,30 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   }) {
     return Padding(
       padding: const EdgeInsets.only(top: 8, bottom: 24),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: chips.entries.map((e) {
-            final isSelected = e.key == selected;
-            return Padding(
-              padding: const EdgeInsets.only(right: 10),
-              child: ActionChip(
-                avatar: Icon(e.value.icon, size: 18,
-                    color: isSelected ? cs.onPrimary : cs.primary),
-                label: Text(e.value.label),
-                backgroundColor: isSelected ? cs.primary : cs.surface,
-                labelStyle: TextStyle(
-                  color: isSelected ? cs.onPrimary : cs.onSurface,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
-                side: BorderSide(
-                  color: isSelected ? cs.primary : cs.outline.withValues(alpha: 0.3),
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                onPressed: () => onSelect(e.key),
-              ),
-            );
-          }).toList(),
-        ),
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: chips.entries.map((e) {
+          final isSelected = e.key == selected;
+          return ActionChip(
+            avatar: Icon(e.value.icon, size: 18,
+                color: isSelected ? cs.onPrimary : cs.primary),
+            label: Text(e.value.label),
+            backgroundColor: isSelected ? cs.primary : cs.surface,
+            labelStyle: TextStyle(
+              color: isSelected ? cs.onPrimary : cs.onSurface,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+            side: BorderSide(
+              color: isSelected ? cs.primary : cs.outline.withValues(alpha: 0.3),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            onPressed: () => onSelect(e.key),
+          );
+        }).toList(),
       ),
     );
   }
@@ -546,6 +591,13 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     final app = context.read<AppProvider>();
     return [
       _field(label: 'Page number(s)', hint: 'e.g. 45 or 45-48', controller: _pageCtrl),
+
+      // ── Tracker info card (auto-populated) ──────────────────
+      if (_trackerInfo != null) ...[
+        const SizedBox(height: 12),
+        _buildTrackerInfoCard(cs),
+      ],
+
       const SizedBox(height: 12),
       _dropdown(
         label: 'System',
@@ -566,6 +618,33 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       if (_studyMode == 'specific') ...[
         const SizedBox(height: 12),
         Builder(builder: (_) {
+          // Use tracker subtopics if available, else fallback to KB
+          if (_trackerInfo != null) {
+            final subtopics = _trackerInfo!['subtopics'] as List;
+            if (subtopics.isNotEmpty) {
+              return Wrap(
+                spacing: 6, runSpacing: 6,
+                children: subtopics.map((s) {
+                  final name = s.name as String;
+                  final alreadyRead = s.status != 'unread';
+                  return FilterChip(
+                    label: Text(name, style: TextStyle(
+                      fontSize: 12,
+                      decoration: alreadyRead ? TextDecoration.lineThrough : null,
+                    )),
+                    selected: _selectedSubtopics.contains(name),
+                    onSelected: (sel) => setState(() {
+                      sel ? _selectedSubtopics.add(name) : _selectedSubtopics.remove(name);
+                    }),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    avatar: alreadyRead
+                        ? const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF10B981))
+                        : null,
+                  );
+                }).toList(),
+              );
+            }
+          }
           final page = _pageCtrl.text.trim();
           final kbEntry = app.knowledgeBase.cast<KnowledgeBaseEntry?>().firstWhere(
             (e) => e!.pageNumber == page,
@@ -590,6 +669,120 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         }),
       ],
     ];
+  }
+
+  /// Tracker info card showing data pulled from the FA tracker
+  Widget _buildTrackerInfoCard(ColorScheme cs) {
+    final info = _trackerInfo!;
+    final status = info['status'] as String;
+    final revCount = info['revisionCount'] as int;
+    final readCount = info['readCount'] as int;
+    final totalSubs = info['totalSubs'] as int;
+    final title = info['title'] as String;
+    final subject = info['subject'] as String;
+    final system = info['system'] as String;
+    final lastRevisedAt = info['lastRevisedAt'] as String?;
+
+    final isStudied = status != 'unread';
+    final statusLabel = isStudied ? '✅ Already Studied' : '📖 Not Yet Studied';
+    final modeLabel = _isRevision ? 'Revision' : 'First Study';
+    final modeColor = _isRevision ? const Color(0xFFF59E0B) : const Color(0xFF10B981);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: modeColor.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: modeColor.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.info_outline_rounded, size: 16, color: modeColor),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Page ${info['pageNum']} — $title',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: cs.onSurface),
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text('$subject • $system', style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.5))),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              _infoPill(statusLabel, isStudied ? const Color(0xFF10B981) : const Color(0xFF6366F1)),
+              _infoPill('$readCount/$totalSubs subtopics', cs.primary),
+              if (revCount > 0)
+                _infoPill('R$revCount revision${revCount > 1 ? 's' : ''}', const Color(0xFF8B5CF6)),
+              if (lastRevisedAt != null)
+                _infoPill('Last: ${_shortDate(lastRevisedAt)}', cs.onSurface.withValues(alpha: 0.5)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Study / Revise toggle
+          Row(
+            children: [
+              Text('Mode: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: cs.onSurface.withValues(alpha: 0.6))),
+              GestureDetector(
+                onTap: () => setState(() => _isRevision = !_isRevision),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: modeColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: modeColor.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _isRevision ? Icons.replay_rounded : Icons.menu_book_rounded,
+                        size: 14, color: modeColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        modeLabel,
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: modeColor),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(Icons.swap_horiz_rounded, size: 14, color: modeColor.withValues(alpha: 0.5)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoPill(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(text, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color)),
+    );
+  }
+
+  String _shortDate(String iso) {
+    try {
+      final dt = DateTime.parse(iso);
+      return '${dt.day}/${dt.month}';
+    } catch (_) {
+      return iso;
+    }
   }
 
   List<Widget> _buildVideoFields(ColorScheme cs, {required bool isUsmle}) {

@@ -187,6 +187,7 @@ class BlockTaskMeta {
   final int? slideEnd;
   final String? logStart; // HH:mm
   final String? logEnd;
+  final bool? isRevision;
 
   const BlockTaskMeta({
     this.pageNumber,
@@ -204,6 +205,7 @@ class BlockTaskMeta {
     this.slideEnd,
     this.logStart,
     this.logEnd,
+    this.isRevision,
   });
 
   factory BlockTaskMeta.fromJson(Map<String, dynamic> j) => BlockTaskMeta(
@@ -224,6 +226,7 @@ class BlockTaskMeta {
         slideEnd: j['slideEnd'],
         logStart: j['logStart'],
         logEnd: j['logEnd'],
+        isRevision: j['isRevision'],
       );
 
   Map<String, dynamic> toJson() => {
@@ -242,6 +245,7 @@ class BlockTaskMeta {
         if (slideEnd != null) 'slideEnd': slideEnd,
         if (logStart != null) 'logStart': logStart,
         if (logEnd != null) 'logEnd': logEnd,
+        if (isRevision != null) 'isRevision': isRevision,
       };
 
   BlockTaskMeta copyWith({
@@ -260,6 +264,7 @@ class BlockTaskMeta {
     int? slideEnd,
     String? logStart,
     String? logEnd,
+    bool? isRevision,
   }) =>
       BlockTaskMeta(
         pageNumber: pageNumber ?? this.pageNumber,
@@ -277,6 +282,7 @@ class BlockTaskMeta {
         slideEnd: slideEnd ?? this.slideEnd,
         logStart: logStart ?? this.logStart,
         logEnd: logEnd ?? this.logEnd,
+        isRevision: isRevision ?? this.isRevision,
       );
 }
 

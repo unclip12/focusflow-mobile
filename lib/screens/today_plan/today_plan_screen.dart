@@ -141,6 +141,19 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     }
     app.upsertDayPlan(plan.copyWith(blocks: blocks));
 
+    // Update tracker & revision hub for each task in the block
+    final tasks = block.tasks ?? [];
+    for (final task in tasks) {
+      app.completeStudyTask(task);
+    }
+    // Also handle block-level FA pages if no explicit tasks
+    if (tasks.isEmpty && block.type == BlockType.revisionFa) {
+      final pages = block.relatedFaPages ?? [];
+      for (final p in pages) {
+        app.updateFAPageStatus(p, 'read');
+      }
+    }
+
     // Trigger celebration
     setState(() => _completedBlockId = block.id);
   }
@@ -195,17 +208,6 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     return AppScaffold(
       screenName: "Today's Plan",
       streakCount: streak,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            backgroundColor: Colors.transparent,
-            builder: (_) => AddTaskSheet(dateKey: _dateKey),
-          );
-        },
-        child: const Icon(Icons.add_rounded),
-      ),
       body: Stack(
         children: [
           Column(
@@ -411,7 +413,18 @@ class _AllTabContentState extends State<_AllTabContent> {
     return Column(
       children: [
         // ── Flow control bar ────────────────────────────────────
-        FlowControlBar(dateKey: widget.dateKey, flow: flow),
+        FlowControlBar(
+          dateKey: widget.dateKey,
+          flow: flow,
+          onAddTask: () {
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (_) => AddTaskSheet(dateKey: widget.dateKey),
+            );
+          },
+        ),
 
         // ── Segment selector ────────────────────────────────────
         Container(

@@ -12,11 +12,13 @@ import 'package:focusflow_mobile/services/notification_service.dart';
 class FlowControlBar extends StatelessWidget {
   final String dateKey;
   final DailyFlow? flow;
+  final VoidCallback? onAddTask;
 
   const FlowControlBar({
     super.key,
     required this.dateKey,
     required this.flow,
+    this.onAddTask,
   });
 
   @override
@@ -27,22 +29,41 @@ class FlowControlBar extends StatelessWidget {
     if (flow == null || flow!.activities.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: () async {
-              await app.initializeDailyFlow(dateKey);
-              await app.startFlow(dateKey);
-            },
-            icon: const Icon(Icons.play_arrow_rounded, size: 20),
-            label: const Text('Start Flow'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+        child: Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () async {
+                  await app.initializeDailyFlow(dateKey);
+                  await app.startFlow(dateKey);
+                },
+                icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                label: const Text('Start Flow'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
               ),
             ),
-          ),
+            if (onAddTask != null) ...[
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 48,
+                width: 48,
+                child: Material(
+                  color: cs.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                  child: InkWell(
+                    onTap: onAddTask,
+                    borderRadius: BorderRadius.circular(14),
+                    child: Icon(Icons.add_rounded, color: cs.primary, size: 22),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       );
     }
@@ -189,6 +210,19 @@ class FlowControlBar extends StatelessWidget {
                     icon: Icons.check_rounded,
                     label: 'Done',
                     color: const Color(0xFF10B981),
+                  ),
+                ),
+              ],
+              // Compact + button
+              if (onAddTask != null) ...[
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 40,
+                  child: _ActionBtn(
+                    onTap: onAddTask!,
+                    icon: Icons.add_rounded,
+                    label: '',
+                    color: cs.primary,
                   ),
                 ),
               ],

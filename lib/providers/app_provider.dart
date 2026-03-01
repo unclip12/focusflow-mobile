@@ -1072,6 +1072,107 @@ class AppProvider extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════════
+  // STUDY TASK COMPLETION → TRACKER + REVISION HUB
+  // ═══════════════════════════════════════════════════════════════
+
+  /// Called when a block task is completed from Today's Plan.
+  /// Updates the relevant tracker and creates/advances revision items.
+  Future<void> completeStudyTask(BlockTask task) async {
+    final meta = task.meta;
+    if (meta == null) return;
+
+    final isRev = meta.isRevision ?? false;
+
+    switch (task.type) {
+      case 'FA':
+      case 'REVISION':
+        // FA page task — mark page as read or advance revision
+        if (meta.pageNumber != null) {
+          final pageNum = meta.pageNumber!;
+          final pageIdx = faPages.indexWhere((p) => p.pageNum == pageNum);
+          if (pageIdx >= 0) {
+            if (isRev) {
+              // Advance existing revision item
+              final revId = 'fa-page-$pageNum';
+              final revIdx = revisionItems.indexWhere((r) => r.id == revId);
+              if (revIdx >= 0) {
+                await markRevisionItemDone(revId);
+              }
+              // Also bump the page revision count
+              final page = faPages[pageIdx];
+              final newRevCount = page.revisionCount + 1;
+              final now = DateTime.now().toIso8601String();
+              final updated = page.copyWith(
+                revisionCount: newRevCount,
+                lastRevisedAt: now,
+                lastReviewed: now,
+                revisionHistory: [
+                  ...page.revisionHistory,
+                  FAPageRevision(date: now, revisionNum: newRevCount),
+                ],
+              );
+              await upsertFAPage(updated);
+            } else {
+              // First study — mark as read (creates revision item via existing logic)
+              await updateFAPageStatus(pageNum, 'read');
+            }
+          }
+        }
+        break;
+
+      case 'VIDEO':
+        // Check if it's a Sketchy video
+        if (meta.topic != null) {
+          // Try Sketchy Micro
+          final microIdx = sketchyMicroVideos.indexWhere(
+            (v) => v.title.toLowerCase() == meta.topic!.toLowerCase(),
+          );
+          if (microIdx >= 0 && !sketchyMicroVideos[microIdx].watched) {
+            await toggleSketchyMicroWatched(sketchyMicroVideos[microIdx].id!, true);
+            break;
+          }
+          // Try Sketchy Pharm
+          final pharmIdx = sketchyPharmVideos.indexWhere(
+            (v) => v.title.toLowerCase() == meta.topic!.toLowerCase(),
+          );
+          if (pharmIdx >= 0 && !sketchyPharmVideos[pharmIdx].watched) {
+            await toggleSketchyPharmWatched(sketchyPharmVideos[pharmIdx].id!, true);
+            break;
+          }
+          // Try Pathoma
+          final pathomaIdx = pathomaChapters.indexWhere(
+            (v) => v.title.toLowerCase() == meta.topic!.toLowerCase(),
+          );
+          if (pathomaIdx >= 0 && !pathomaChapters[pathomaIdx].watched) {
+            await togglePathomaChapterWatched(pathomaChapters[pathomaIdx].id!, true);
+            break;
+          }
+        }
+        break;
+
+      case 'QBANK':
+        // UWorld progress update
+        if (meta.system != null && meta.count != null) {
+          final topicIdx = uworldTopics.indexWhere(
+            (t) => t.system.toLowerCase() == meta.system!.toLowerCase(),
+          );
+          if (topicIdx >= 0) {
+            final topic = uworldTopics[topicIdx];
+            await updateUWorldProgress(
+              topic.id!,
+              topic.doneQuestions + meta.count!,
+              topic.correctQuestions,
+            );
+          }
+        }
+        break;
+
+      default:
+        break;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // FA PAGES (G5)
   // ═══════════════════════════════════════════════════════════════
 
