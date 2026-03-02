@@ -90,9 +90,22 @@ class _TrackNowScreenState extends State<TrackNowScreen>
           }
         }
         WakelockPlus.enable();
-        _startTimer();
+        _resumeTimerState();
       }
     }
+  }
+
+  Future<void> _resumeTimerState() async {
+    final bgElapsed = await BackgroundTimerService.getElapsed();
+    if (bgElapsed != null && bgElapsed > _elapsed && mounted) {
+      setState(() {
+        _elapsed = bgElapsed;
+        if (_startedAt != null) {
+          _startedAt = DateTime.now().subtract(Duration(seconds: bgElapsed));
+        }
+      });
+    }
+    _startTimer();
   }
 
   FlowActivity? _findActivity(AppProvider app) {

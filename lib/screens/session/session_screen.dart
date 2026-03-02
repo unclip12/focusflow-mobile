@@ -50,6 +50,17 @@ class _SessionScreenState extends State<SessionScreen> {
     super.initState();
     _startedAt = DateTime.now();
     _currentQuote = kFocusQuotes[_rng.nextInt(kFocusQuotes.length)];
+    _initTimerState();
+  }
+
+  Future<void> _initTimerState() async {
+    final elapsed = await BackgroundTimerService.getElapsed();
+    if (elapsed != null && elapsed > 0 && mounted) {
+      setState(() {
+        _elapsedSeconds = elapsed;
+        _startedAt = DateTime.now().subtract(Duration(seconds: elapsed));
+      });
+    }
     _startTimers();
   }
 

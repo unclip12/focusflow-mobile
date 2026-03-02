@@ -67,6 +67,15 @@ class BackgroundTimerService {
       service.invoke('stopService');
     }
   }
+
+  static Future<int?> getElapsed() async {
+    final service = FlutterBackgroundService();
+    if (!await service.isRunning()) return null;
+    service.invoke('getElapsed');
+    final response = await service.on('elapsedResponse').first;
+    if (response == null) return null;
+    return response['elapsedSeconds'] as int?;
+  }
 }
 
 // Ensure this is a top-level function.
@@ -83,6 +92,10 @@ void onStart(ServiceInstance service) async {
       currentActivity = event['activityName'] ?? 'Focus Session';
       elapsed = event['elapsedSeconds'] ?? 0;
     }
+  });
+
+  service.on('getElapsed').listen((event) {
+    service.invoke('elapsedResponse', {'elapsedSeconds': elapsed});
   });
 
   service.on('stopService').listen((event) {
