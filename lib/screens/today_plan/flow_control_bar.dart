@@ -1,7 +1,9 @@
 // =============================================================
 // FlowControlBar — Start / Resume / Pause / Stop controls
+// Shows correct state: Start Flow when stopped/not started,
+// Resume when paused, Open Session when active.
+// Shows congratulations when all activities are done.
 // =============================================================
-
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -26,6 +28,7 @@ class FlowControlBar extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final app = context.read<AppProvider>();
 
+    // ── No flow or no activities → Show "Start Flow" ──────────
     if (flow == null || flow!.activities.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -65,7 +68,8 @@ class FlowControlBar extends StatelessWidget {
                   child: InkWell(
                     onTap: onAddTask,
                     borderRadius: BorderRadius.circular(14),
-                    child: Icon(Icons.add_rounded, color: cs.primary, size: 22),
+                    child:
+                        Icon(Icons.add_rounded, color: cs.primary, size: 22),
                   ),
                 ),
               ),
@@ -80,13 +84,90 @@ class FlowControlBar extends StatelessWidget {
     final total = f.totalCount;
     final progress = total > 0 ? completed / total : 0.0;
     final elapsed = Duration(seconds: f.totalElapsedSeconds);
-    final elapsedStr = '${elapsed.inHours}h ${elapsed.inMinutes.remainder(60)}m';
+    final elapsedStr =
+        '${elapsed.inHours}h ${elapsed.inMinutes.remainder(60)}m';
+    final allDone = completed == total && total > 0;
 
     // Navigate to full-screen session
     void openSession() {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => FlowSessionScreen(dateKey: dateKey),
+        ),
+      );
+    }
+
+    // ── All tasks completed → Congratulations ─────────────────
+    if (allDone) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF10B981), Color(0xFF059669)],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF10B981).withValues(alpha: 0.25),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                const Text('🎉',
+                    style: TextStyle(fontSize: 28)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'All Done for Today!',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        '$completed tasks completed • $elapsedStr',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onAddTask,
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Add Task'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.4)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       );
     }
@@ -124,11 +205,7 @@ class FlowControlBar extends StatelessWidget {
                         value: progress,
                         strokeWidth: 3.5,
                         backgroundColor: cs.primary.withValues(alpha: 0.1),
-                        valueColor: AlwaysStoppedAnimation(
-                          f.isCompleted
-                              ? const Color(0xFF10B981)
-                              : cs.primary,
-                        ),
+                        valueColor: AlwaysStoppedAnimation(cs.primary),
                       ),
                       Text(
                         '$completed/$total',
@@ -147,15 +224,11 @@ class FlowControlBar extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        f.isCompleted
-                            ? 'Flow Complete! 🎉'
-                            : f.isActive
-                                ? 'Flow Active'
-                                : f.isPaused
-                                    ? 'Flow Paused'
-                                    : f.isStopped
-                                        ? 'Flow Stopped'
-                                        : 'Ready to Start',
+                        f.isActive
+                            ? 'Flow Active'
+                            : f.isPaused
+                                ? 'Flow Paused'
+                                : 'Start Flow',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -163,7 +236,7 @@ class FlowControlBar extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '$elapsedStr elapsed',
+                        '$elapsedStr elapsed • $completed/$total done',
                         style: TextStyle(
                           fontSize: 11,
                           color: cs.onSurface.withValues(alpha: 0.5),
@@ -182,6 +255,7 @@ class FlowControlBar extends StatelessWidget {
             // Action buttons
             Row(
               children: [
+                // NOT_STARTED or STOPPED → "Start Flow"
                 if (f.isNotStarted || f.isStopped)
                   Expanded(
                     child: _ActionBtn(
@@ -190,10 +264,11 @@ class FlowControlBar extends StatelessWidget {
                         if (context.mounted) openSession();
                       },
                       icon: Icons.play_arrow_rounded,
-                      label: 'Start',
+                      label: 'Start Flow',
                       color: const Color(0xFF10B981),
                     ),
                   ),
+                // PAUSED → "Resume"
                 if (f.isPaused)
                   Expanded(
                     child: _ActionBtn(
@@ -206,6 +281,7 @@ class FlowControlBar extends StatelessWidget {
                       color: const Color(0xFF3B82F6),
                     ),
                   ),
+                // ACTIVE → "Open Session"
                 if (f.isActive)
                   Expanded(
                     child: _ActionBtn(
@@ -235,7 +311,6 @@ class FlowControlBar extends StatelessWidget {
       ),
     );
   }
-
 }
 
 class _ActionBtn extends StatelessWidget {
@@ -265,13 +340,15 @@ class _ActionBtn extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, size: 18, color: color),
-              const SizedBox(width: 4),
-              Text(label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: color,
-                  )),
+              if (label.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                Text(label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    )),
+              ],
             ],
           ),
         ),

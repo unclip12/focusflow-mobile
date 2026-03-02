@@ -601,32 +601,18 @@ class _AllTabContentState extends State<_AllTabContent> {
         return _buildFullDayPlan(
           context, app, flow, allActivities, todos, buyingItems,
         );
-      case 1: // Resume
+      case 1: // Resume — grouped by time of day
         if (resumeActivities.isEmpty) {
           return _emptySegment(cs, 'No active items', Icons.play_circle_outline_rounded);
         }
-        return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: resumeActivities.length,
-          itemBuilder: (ctx, i) => FlowActivityCard(
-            activity: resumeActivities[i],
-            index: allActivities.indexOf(resumeActivities[i]),
-            onComplete: () => app.completeFlowActivity(
-                widget.dateKey, resumeActivities[i].id),
-          ),
-        );
-      case 2: // Upcoming
+        return _buildGroupedList(context, app, resumeActivities, allActivities,
+          showComplete: true, showUndo: false);
+      case 2: // Upcoming — grouped by time of day
         if (upcomingActivities.isEmpty) {
           return _emptySegment(cs, 'Nothing upcoming', Icons.upcoming_rounded);
         }
-        return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: upcomingActivities.length,
-          itemBuilder: (ctx, i) => FlowActivityCard(
-            activity: upcomingActivities[i],
-            index: allActivities.indexOf(upcomingActivities[i]),
-          ),
-        );
+        return _buildGroupedList(context, app, upcomingActivities, allActivities,
+          showComplete: false, showUndo: false);
       case 3: // Completed
         if (completedActivities.isEmpty) {
           return _emptySegment(cs, 'Nothing completed yet', Icons.check_circle_outline_rounded);
@@ -635,6 +621,250 @@ class _AllTabContentState extends State<_AllTabContent> {
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  // ── Grouped list by time-of-day (for Resume / Upcoming) ──────
+  Widget _buildGroupedList(
+    BuildContext context,
+    AppProvider app,
+    List<FlowActivity> activities,
+    List<FlowActivity> allActivities, {
+    required bool showComplete,
+    required bool showUndo,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final groups = _groupByTimeOfDay(activities);
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      children: [
+        _timeGroup('Morning (5 AM – 12 PM)', Icons.wb_twilight_rounded,
+            groups['morning']!, allActivities, app, cs, showComplete, showUndo),
+        _timeGroup('Afternoon (12 PM – 5 PM)', Icons.wb_sunny_rounded,
+            groups['afternoon']!, allActivities, app, cs, showComplete, showUndo),
+        _timeGroup('Evening (5 PM – 9 PM)', Icons.nights_stay_rounded,
+            groups['evening']!, allActivities, app, cs, showComplete, showUndo),
+        _timeGroup('Night (9 PM – 5 AM)', Icons.bedtime_rounded,
+            groups['night']!, allActivities, app, cs, showComplete, showUndo),
+      ],
+    );
+  }
+
+  Widget _timeGroup(
+    String title,
+    IconData icon,
+    List<FlowActivity> activities,
+    List<FlowActivity> allActivities,
+    AppProvider app,
+    ColorScheme cs,
+    bool showComplete,
+    bool showUndo,
+  ) {
+    if (activities.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8, top: 16),
+          child: Row(
+            children: [
+              Icon(icon, size: 16, color: cs.onSurface.withValues(alpha: 0.5)),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: cs.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+            ],
+          ),
+        ),
+        ...activities.map((a) => Dismissible(
+          key: ValueKey('dismiss-${a.id}'),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            alignment: Alignment.centerRight,
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(right: 20),
+            decoration: BoxDecoration(
+              color: Colors.red.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+          ),
+          onDismissed: (_) => app.removeFlowActivity(widget.dateKey, a.id),
+          child: FlowActivityCard(
+            activity: a,
+            index: allActivities.indexOf(a),
+            onTap: () => _showEditTaskSheet(context, app, a),
+            onComplete: showComplete && (a.isActive || a.isPaused)
+                ? () => app.completeFlowActivity(widget.dateKey, a.id)
+                : null,
+            onUndo: showUndo && a.isDone
+                ? () => app.undoFlowActivity(widget.dateKey, a.id)
+                : null,
+          ),
+        )),
+      ],
+    );
+  }
+
+  Map<String, List<FlowActivity>> _groupByTimeOfDay(List<FlowActivity> activities) {
+    final morning = <FlowActivity>[];
+    final afternoon = <FlowActivity>[];
+    final evening = <FlowActivity>[];
+    final night = <FlowActivity>[];
+
+    for (final a in activities) {
+      final timeStr = a.startedAt ?? a.completedAt;
+      if (timeStr == null) {
+        morning.add(a); // default if no time data
+        continue;
+      }
+      final dt = DateTime.tryParse(timeStr);
+      if (dt == null) {
+        morning.add(a);
+        continue;
+      }
+      final hour = dt.hour;
+      if (hour >= 5 && hour < 12) {
+        morning.add(a);
+      } else if (hour >= 12 && hour < 17) {
+        afternoon.add(a);
+      } else if (hour >= 17 && hour < 21) {
+        evening.add(a);
+      } else {
+        night.add(a);
+      }
+    }
+    return {'morning': morning, 'afternoon': afternoon, 'evening': evening, 'night': night};
+  }
+
+  // ── Edit Task Bottom Sheet ──────────────────────────────────────
+  void _showEditTaskSheet(BuildContext context, AppProvider app, FlowActivity activity) {
+    final nameCtrl = TextEditingController(text: activity.label);
+    final cs = Theme.of(context).colorScheme;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          padding: EdgeInsets.fromLTRB(
+            20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          decoration: BoxDecoration(
+            color: Theme.of(ctx).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.onSurface.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('Edit Task', style: Theme.of(ctx).textTheme.titleMedium),
+              const SizedBox(height: 16),
+
+              // Name field
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Task Name',
+                  prefixIcon: const Icon(Icons.edit_rounded, size: 20),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Status info
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, size: 18,
+                        color: cs.onSurface.withValues(alpha: 0.5)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Status: ${activity.status} • '
+                        'Type: ${activity.activityType}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Action buttons
+              Row(
+                children: [
+                  // Delete button
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        app.removeFlowActivity(widget.dateKey, activity.id);
+                      },
+                      icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                      label: const Text('Delete'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: cs.error,
+                        side: BorderSide(color: cs.error.withValues(alpha: 0.3)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  // Save button
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        final newName = nameCtrl.text.trim();
+                        if (newName.isNotEmpty && newName != activity.label) {
+                          app.updateFlowActivity(
+                            widget.dateKey,
+                            activity.copyWith(label: newName),
+                          );
+                        }
+                        Navigator.pop(ctx);
+                      },
+                      icon: const Icon(Icons.check_rounded, size: 18),
+                      label: const Text('Save'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   // ── Completed Tab (Grouped by Time of Day) ──────────────────────────
@@ -835,12 +1065,14 @@ class _AllTabContentState extends State<_AllTabContent> {
       return _EmptyState(hasNoPlan: widget.plan == null, dateKey: widget.dateKey);
     }
 
-    // Build unified list items
+    // Build unified list items — pending first, completed at bottom
     final items = <_FullDayItem>[];
+    final pending = allActivities.where((a) => !a.isDone && !a.isSkipped).toList();
+    final done = allActivities.where((a) => a.isDone || a.isSkipped).toList();
 
-    // Flow activities (reorderable)
-    for (int i = 0; i < allActivities.length; i++) {
-      items.add(_FullDayItem(type: 'flow', flowActivity: allActivities[i], index: i));
+    // Pending flow activities first
+    for (int i = 0; i < pending.length; i++) {
+      items.add(_FullDayItem(type: 'flow', flowActivity: pending[i], index: allActivities.indexOf(pending[i])));
     }
 
     // Add activity button (only if flow exists)
@@ -861,6 +1093,11 @@ class _AllTabContentState extends State<_AllTabContent> {
     // Buying items
     for (final b in buyingItems) {
       items.add(_FullDayItem(type: 'buying', buyingTitle: b.name, buyingDone: b.bought));
+    }
+
+    // Completed flow activities at the bottom
+    for (int i = 0; i < done.length; i++) {
+      items.add(_FullDayItem(type: 'flow', flowActivity: done[i], index: allActivities.indexOf(done[i])));
     }
 
     return ReorderableListView.builder(
