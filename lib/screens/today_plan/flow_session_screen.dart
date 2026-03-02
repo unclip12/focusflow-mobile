@@ -14,6 +14,7 @@ import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/services/notification_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'add_task_sheet.dart';
 
 class FlowSessionScreen extends StatefulWidget {
@@ -24,7 +25,8 @@ class FlowSessionScreen extends StatefulWidget {
   State<FlowSessionScreen> createState() => _FlowSessionScreenState();
 }
 
-class _FlowSessionScreenState extends State<FlowSessionScreen> {
+class _FlowSessionScreenState extends State<FlowSessionScreen>
+    with WidgetsBindingObserver {
   // ── Timer state ──────────────────────────────────────────────
   late final DateTime _sessionStartedAt;
   int _activityElapsed = 0;
@@ -40,6 +42,7 @@ class _FlowSessionScreenState extends State<FlowSessionScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _sessionStartedAt = DateTime.now();
     _currentQuote = kFocusQuotes[_rng.nextInt(kFocusQuotes.length)];
 
@@ -58,6 +61,9 @@ class _FlowSessionScreenState extends State<FlowSessionScreen> {
       }
       _localPaused = flow.isPaused || flow.isStopped;
     }
+
+    // Keep screen on during active flow
+    WakelockPlus.enable();
 
     _startTimers();
   }
@@ -81,9 +87,31 @@ class _FlowSessionScreenState extends State<FlowSessionScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Recompute elapsed from startedAt when app resumes from background
+      final app = context.read<AppProvider>();
+      final flow = app.getDailyFlow(widget.dateKey);
+      if (flow != null) {
+        _totalElapsed = flow.totalElapsedSeconds;
+        final active = flow.nextPendingActivity;
+        if (active?.startedAt != null) {
+          final started = DateTime.tryParse(active!.startedAt!);
+          if (started != null) {
+            _activityElapsed = DateTime.now().difference(started).inSeconds;
+          }
+        }
+        if (mounted) setState(() {});
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tickTimer?.cancel();
     _quoteTimer?.cancel();
+    WakelockPlus.disable();
     super.dispose();
   }
 

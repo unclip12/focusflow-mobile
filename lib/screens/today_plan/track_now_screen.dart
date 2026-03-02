@@ -12,6 +12,7 @@ import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/daily_flow.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/services/notification_service.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'add_task_sheet.dart';
 
 // ── Category data ──────────────────────────────────────────────
@@ -55,7 +56,8 @@ class TrackNowScreen extends StatefulWidget {
   State<TrackNowScreen> createState() => _TrackNowScreenState();
 }
 
-class _TrackNowScreenState extends State<TrackNowScreen> {
+class _TrackNowScreenState extends State<TrackNowScreen>
+    with WidgetsBindingObserver {
   final _nameCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
   String? _selectedCategory;
@@ -70,6 +72,7 @@ class _TrackNowScreenState extends State<TrackNowScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // If resuming an existing activity
     if (widget.existingActivityId != null) {
       final app = context.read<AppProvider>();
@@ -86,6 +89,7 @@ class _TrackNowScreenState extends State<TrackNowScreen> {
             _elapsed = DateTime.now().difference(_startedAt!).inSeconds;
           }
         }
+        WakelockPlus.enable();
         _startTimer();
       }
     }
@@ -110,10 +114,22 @@ class _TrackNowScreenState extends State<TrackNowScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _isTracking && _startedAt != null) {
+      // Recompute elapsed from startedAt when app resumes from background
+      setState(() {
+        _elapsed = DateTime.now().difference(_startedAt!).inSeconds;
+      });
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tickTimer?.cancel();
     _nameCtrl.dispose();
     _notesCtrl.dispose();
+    WakelockPlus.disable();
     super.dispose();
   }
 
