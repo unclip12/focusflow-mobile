@@ -187,30 +187,30 @@ class AppTheme {
     const radius = 12.0;
 
     // Apple-like: thinner weights, tighter letter spacing, consistent sizing
-    final textTheme = GoogleFonts.interTextTheme(baseText).copyWith(
-      displayLarge:  GoogleFonts.inter(fontSize: 32 * scale, fontWeight: FontWeight.w700, letterSpacing: -0.5, color: primaryText),
-      displayMedium: GoogleFonts.inter(fontSize: 28 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.4, color: primaryText),
-      displaySmall:  GoogleFonts.inter(fontSize: 24 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.3, color: primaryText),
-      headlineLarge: GoogleFonts.inter(fontSize: 22 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.3, color: primaryText),
-      headlineMedium:GoogleFonts.inter(fontSize: 20 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.2, color: primaryText),
-      headlineSmall: GoogleFonts.inter(fontSize: 18 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.2, color: primaryText),
-      titleLarge:    GoogleFonts.inter(fontSize: 17 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.2, color: primaryText),
-      titleMedium:   GoogleFonts.inter(fontSize: 15 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.15, color: primaryText),
-      titleSmall:    GoogleFonts.inter(fontSize: 13 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.1, color: primaryText),
-      bodyLarge:     GoogleFonts.inter(fontSize: 15 * scale, fontWeight: FontWeight.w400, letterSpacing: -0.1, color: primaryText),
-      bodyMedium:    GoogleFonts.inter(fontSize: 13 * scale, fontWeight: FontWeight.w400, letterSpacing: -0.1, color: secondaryText),
-      bodySmall:     GoogleFonts.inter(fontSize: 12 * scale, fontWeight: FontWeight.w400, letterSpacing: 0, color: secondaryText),
-      labelLarge:    GoogleFonts.inter(fontSize: 13 * scale, fontWeight: FontWeight.w500, letterSpacing: -0.1, color: primaryText),
-      labelMedium:   GoogleFonts.inter(fontSize: 12 * scale, fontWeight: FontWeight.w500, letterSpacing: 0, color: primaryText),
-      labelSmall:    GoogleFonts.inter(fontSize: 11 * scale, fontWeight: FontWeight.w500, letterSpacing: 0.1, color: secondaryText),
-    );
+    final textTheme = baseText.copyWith(
+      displayLarge:  TextStyle(fontFamily: 'SF Pro Display', fontSize: 32 * scale, fontWeight: FontWeight.w700, letterSpacing: -0.5, color: primaryText),
+      displayMedium: TextStyle(fontFamily: 'SF Pro Display', fontSize: 28 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.4, color: primaryText),
+      displaySmall:  TextStyle(fontFamily: 'SF Pro Display', fontSize: 24 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.3, color: primaryText),
+      headlineLarge: TextStyle(fontFamily: 'SF Pro Display', fontSize: 22 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.3, color: primaryText),
+      headlineMedium:TextStyle(fontFamily: 'SF Pro Display', fontSize: 20 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.2, color: primaryText),
+      headlineSmall: TextStyle(fontFamily: 'SF Pro Display', fontSize: 18 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.2, color: primaryText),
+      titleLarge:    TextStyle(fontFamily: 'SF Pro Display', fontSize: 17 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.2, color: primaryText),
+      titleMedium:   TextStyle(fontFamily: 'SF Pro Display', fontSize: 15 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.15, color: primaryText),
+      titleSmall:    TextStyle(fontFamily: 'SF Pro Display', fontSize: 13 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.1, color: primaryText),
+      bodyLarge:     TextStyle(fontFamily: 'SF Pro Display', fontSize: 15 * scale, fontWeight: FontWeight.w400, letterSpacing: -0.1, color: primaryText),
+      bodyMedium:    TextStyle(fontFamily: 'SF Pro Display', fontSize: 13 * scale, fontWeight: FontWeight.w400, letterSpacing: -0.1, color: secondaryText),
+      bodySmall:     TextStyle(fontFamily: 'SF Pro Display', fontSize: 12 * scale, fontWeight: FontWeight.w400, letterSpacing: 0, color: secondaryText),
+      labelLarge:    TextStyle(fontFamily: 'SF Pro Display', fontSize: 13 * scale, fontWeight: FontWeight.w500, letterSpacing: -0.1, color: primaryText),
+      labelMedium:   TextStyle(fontFamily: 'SF Pro Display', fontSize: 12 * scale, fontWeight: FontWeight.w500, letterSpacing: 0, color: primaryText),
+      labelSmall:    TextStyle(fontFamily: 'SF Pro Display', fontSize: 11 * scale, fontWeight: FontWeight.w500, letterSpacing: 0.1, color: secondaryText),
+    ).apply(fontFamily: 'SF Pro Display'); // Ensures it cascades correctly.
 
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
       scaffoldBackgroundColor: bg,
-      // Ensure ad-hoc TextStyle() calls also use Inter
-      fontFamily: GoogleFonts.inter().fontFamily,
+      // Ensure ad-hoc TextStyle() calls also use SF Pro Display
+      fontFamily: 'SF Pro Display',
       colorScheme: ColorScheme(
         brightness: brightness,
         primary: accent,
@@ -227,8 +227,12 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: GoogleFonts.inter(letterSpacing: -0.3,
-          fontSize: 20 * scale, fontWeight: FontWeight.w700, color: primaryText,
+        titleTextStyle: TextStyle(
+          fontFamily: 'SF Pro Display',
+          letterSpacing: -0.3,
+          fontSize: 20 * scale,
+          fontWeight: FontWeight.w700,
+          color: primaryText,
         ),
         iconTheme: IconThemeData(color: primaryText),
       ),

@@ -61,6 +61,10 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard> {
     final cs = theme.colorScheme;
     final due = item.dueInfo;
 
+    // Constrain the maximum width of Wrap children to prevent overflow
+    // Typical padding: edge 16*2 + card 14*2 = 60. We use 80 to be safe.
+    final maxChildWidth = MediaQuery.of(context).size.width - 80;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -130,12 +134,13 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard> {
             runSpacing: 6,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              _chip(item.sourceLabel, item.sourceColor, cs),
-              _chip(due.label, due.color, cs),
+              _chip(item.sourceLabel, item.sourceColor, cs, maxChildWidth),
+              _chip(due.label, due.color, cs, maxChildWidth),
               _chip(
                 'R${item.currentRevisionIndex}/${item.totalSteps}',
                 cs.onSurface.withValues(alpha: 0.5),
                 cs,
+                maxChildWidth,
               ),
               // Mark Revised button inline
               SizedBox(
@@ -172,36 +177,18 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard> {
                 spacing: 12,
                 runSpacing: 4,
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.schedule_rounded,
-                          size: 12,
-                          color: cs.onSurface.withValues(alpha: 0.35)),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          due.timeDetail,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: cs.onSurface.withValues(alpha: 0.4),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (item.lastStudiedAt != null)
-                    Row(
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxChildWidth),
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.history_rounded,
+                        Icon(Icons.schedule_rounded,
                             size: 12,
                             color: cs.onSurface.withValues(alpha: 0.35)),
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
-                            _formatLastStudied(item.lastStudiedAt!),
+                            due.timeDetail,
                             style: TextStyle(
                               fontSize: 10,
                               color: cs.onSurface.withValues(alpha: 0.4),
@@ -211,6 +198,30 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard> {
                         ),
                       ],
                     ),
+                  ),
+                  if (item.lastStudiedAt != null)
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: maxChildWidth),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.history_rounded,
+                              size: 12,
+                              color: cs.onSurface.withValues(alpha: 0.35)),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              _formatLastStudied(item.lastStudiedAt!),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: cs.onSurface.withValues(alpha: 0.4),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -219,21 +230,24 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard> {
     );
   }
 
-  Widget _chip(String label, Color color, ColorScheme cs) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: color,
+  Widget _chip(String label, Color color, ColorScheme cs, double maxWidth) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(4),
         ),
-        overflow: TextOverflow.ellipsis,
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
     );
   }

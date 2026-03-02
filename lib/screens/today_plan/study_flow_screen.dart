@@ -376,8 +376,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
                           )),
                           const SizedBox(height: 2),
                           Text(_fmtTime(_pageElapsed), style: TextStyle(
-                            fontSize: 28, fontWeight: FontWeight.w700,
-                            fontFamily: 'monospace', color: const Color(0xFF8B5CF6),
+                            fontSize: 28, fontWeight: FontWeight.w700,color: const Color(0xFF8B5CF6),
                           )),
                         ],
                       ),
@@ -393,8 +392,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
                           )),
                           const SizedBox(height: 2),
                           Text(_fmtTime(_totalElapsed), style: TextStyle(
-                            fontSize: 28, fontWeight: FontWeight.w700,
-                            fontFamily: 'monospace', color: cs.onSurface.withValues(alpha: 0.6),
+                            fontSize: 28, fontWeight: FontWeight.w700, color: cs.onSurface.withValues(alpha: 0.6),
                           )),
                         ],
                       ),

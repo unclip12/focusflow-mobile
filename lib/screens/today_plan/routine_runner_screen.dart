@@ -336,7 +336,6 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
                             style: TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.w700,
-                              fontFamily: 'monospace',
                               color: cs.primary,
                             ),
                           ),
@@ -363,7 +362,6 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
                             style: TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.w700,
-                              fontFamily: 'monospace',
                               color: cs.onSurface.withValues(alpha: 0.6),
                             ),
                           ),
@@ -520,7 +518,6 @@ class _SummaryScreen extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            fontFamily: 'monospace',
                             color: e.skipped ? cs.error : cs.primary,
                           ),
                         ),

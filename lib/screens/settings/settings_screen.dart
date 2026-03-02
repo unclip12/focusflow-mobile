@@ -571,19 +571,32 @@ class SettingsScreen extends StatelessWidget {
                       barrierDismissible: false,
                       builder: (_) => const Center(child: CircularProgressIndicator()),
                     );
-                    final app = context.read<AppProvider>();
-                    await BackupService.saveBackup(
-                        BackupService.buildBackupData(app));
-                    if (context.mounted) Navigator.pop(context);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('✅ Backup saved successfully'),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                      // Refresh to update Last Backup row
-                      (context as Element).markNeedsBuild();
+                    try {
+                      final app = context.read<AppProvider>();
+                      final savedPath = await BackupService.saveBackup(
+                          BackupService.buildBackupData(app));
+                      if (context.mounted) Navigator.pop(context); // close dialog
+                      
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('✅ Backup saved to ${savedPath.split('/').last}'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        // Refresh to update Last Backup row
+                        (context as Element).markNeedsBuild();
+                      }
+                    } catch (e) {
+                      if (context.mounted) Navigator.pop(context); // close dialog
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('❌ Backup failed: $e'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
                     }
                   },
                 ),
@@ -609,27 +622,48 @@ class SettingsScreen extends StatelessWidget {
                           ),
                           FilledButton(
                             onPressed: () async {
-                              Navigator.pop(ctx);
-                              final data = await BackupService.loadBackup();
-                              if (!context.mounted) return;
-                              if (data == null) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('No backup file found'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                                return;
-                              }
-                              final app = context.read<AppProvider>();
-                              await app.restoreFromBackup(data);
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('✅ Data restored from backup'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
+                              Navigator.pop(ctx); // close alert
+                              
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (_) => const Center(child: CircularProgressIndicator()),
+                              );
+                              
+                              try {
+                                final data = await BackupService.loadBackup();
+                                if (!context.mounted) return;
+                                if (data == null) {
+                                  Navigator.pop(context); // close loader
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('No backup file found'),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                final app = context.read<AppProvider>();
+                                await app.restoreFromBackup(data);
+                                if (context.mounted) {
+                                  Navigator.pop(context); // close loader
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('✅ Data restored from backup'),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (context.mounted) Navigator.pop(context); // close loader
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('❌ Restore failed: $e'),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
                               }
                             },
                             child: const Text('Restore'),

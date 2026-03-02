@@ -8,22 +8,46 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
+
 import 'package:focusflow_mobile/providers/app_provider.dart';
 
 class BackupService {
   static const _fileName = 'focusflow_backup.json';
 
-  /// Returns the backup file path (app documents directory).
-  static Future<String> get _filePath async {
-    final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/$_fileName';
+  /// Returns the default or user-selected backup folder
+  static Future<String> getBackupFolder() async {
+    final prefs = await SharedPreferences.getInstance();
+    final folder = prefs.getString('backup_folder');
+    if (folder != null && folder.isNotEmpty) {
+      final dir = Directory(folder);
+      if (await dir.exists()) return folder;
+    }
+    // Default: Documents/FocusFlow
+    final docsDir = await getApplicationDocumentsDirectory();
+    final backupDir = Directory('${docsDir.path}/FocusFlow');
+    if (!await backupDir.exists()) {
+      await backupDir.create(recursive: true);
+    }
+    return backupDir.path;
   }
 
-  /// Save full app state to JSON file.
-  static Future<void> saveBackup(Map<String, dynamic> data) async {
-    final path = await _filePath;
-    final file = File(path);
+  /// Returns the static path for the old single-file backup logic.
+  static Future<String> get _filePath async {
+    final folder = await getBackupFolder();
+    return '$folder/$_fileName';
+  }
+
+  /// Save full app state to JSON file with timestamp.
+  /// Returns the exact file path where it was saved.
+  static Future<String> saveBackup(Map<String, dynamic> data) async {
+    final folder = await getBackupFolder();
+    final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+    final filePath = '$folder/focusflow_backup_$timestamp.json';
+    final file = File(filePath);
     await file.writeAsString(jsonEncode(data));
+    return filePath;
   }
 
   /// Load backup from JSON file — returns null if not found.

@@ -336,12 +336,11 @@ class _ImportScreenState extends State<ImportScreen> {
               controller: _jsonCtrl,
               minLines: 6,
               maxLines: 16,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+              style: const TextStyle(fontSize: 13),
               decoration: InputDecoration(
                 hintText:
                     '[\n  { "type": "mark_fa_pages_read", "from": 50, "to": 92 }\n]',
                 hintStyle: TextStyle(
-                  fontFamily: 'monospace',
                   fontSize: 13,
                   color: cs.onSurfaceVariant.withValues(alpha: 0.5),
                 ),

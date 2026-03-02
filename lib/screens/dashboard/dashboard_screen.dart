@@ -953,18 +953,22 @@ class _RevisionCard extends StatelessWidget {
                   // Show top 3 due items
                   if (dueItems.isNotEmpty) ...[
                     const SizedBox(height: 6),
-                    ...dueItems.map((item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 2),
-                      child: Text(
-                        '• ${item.title}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: cs.onSurfaceVariant,
+                    ...dueItems.map((item) {
+                      final displayStr =
+                          item.source == 'FA' ? 'Page ${item.pageNumber}' : item.title;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Text(
+                          '• $displayStr',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurfaceVariant,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    )),
+                      );
+                    }),
                   ],
                 ],
               ),
