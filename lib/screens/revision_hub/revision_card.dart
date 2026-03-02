@@ -1,7 +1,7 @@
 // =============================================================
 // UnifiedRevisionCard — card for any revision item in the hub
 // Shows source badge, title, subject, revision step, due info,
-// Mark Revised button
+// Mark Revised button.  ALL text constrained — no overflow.
 // =============================================================
 
 import 'package:flutter/material.dart';
@@ -29,7 +29,6 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard> {
     try {
       final app = context.read<AppProvider>();
       if (widget.item.isKBEntry) {
-        // KB entry — advance using the old KB SRS flow
         final kbEntry = app.knowledgeBase.firstWhere(
           (e) => 'kb-${e.pageNumber}' == widget.item.id,
         );
@@ -48,7 +47,6 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard> {
         );
         await app.upsertKBEntry(updated);
       } else {
-        // RevisionItem — use new markRevisionItemDone
         await app.markRevisionItemDone(widget.item.id);
       }
     } finally {
@@ -76,6 +74,7 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard> {
         children: [
           // ── Row 1: Source badge + Title ──────────────────────
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Source icon badge
               Container(
@@ -84,21 +83,21 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard> {
                   color: item.sourceColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(item.sourceIcon, size: 16, color: item.sourceColor),
+                child:
+                    Icon(item.sourceIcon, size: 16, color: item.sourceColor),
               ),
               const SizedBox(width: 10),
 
-              // Title + parent
+              // Title + parent — EXPANDED so it never overflows
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.pageNumber.isNotEmpty
-                          ? '${item.pageNumber} — ${item.title}'
-                          : item.title,
+                      item.displayTitle,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,
+                        fontSize: 13,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -124,78 +123,94 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard> {
 
           const SizedBox(height: 10),
 
-          // ── Row 2: Chips (source, due status, revision step) ─
-          Row(
+          // ── Row 2: Chips + Mark Revised ──────────────────────
+          // Use Wrap for all children to guarantee no overflow
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              // Chips — wrapped so they shrink on narrow screens
-              Flexible(
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: [
-                    _chip(item.sourceLabel, item.sourceColor, cs),
-                    _chip(due.label, due.color, cs),
-                    _chip(
-                      'R${item.currentRevisionIndex}/${item.totalSteps}',
-                      cs.onSurface.withValues(alpha: 0.5),
-                      cs,
-                    ),
-                  ],
-                ),
+              _chip(item.sourceLabel, item.sourceColor, cs),
+              _chip(due.label, due.color, cs),
+              _chip(
+                'R${item.currentRevisionIndex}/${item.totalSteps}',
+                cs.onSurface.withValues(alpha: 0.5),
+                cs,
               ),
-              const SizedBox(width: 8),
-              // Mark Revised button
-              FilledButton.tonal(
-                onPressed: _saving ? null : _markRevised,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  textStyle: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
+              // Mark Revised button inline
+              SizedBox(
+                height: 28,
+                child: FilledButton.tonal(
+                  onPressed: _saving ? null : _markRevised,
+                  style: FilledButton.styleFrom(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    textStyle: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
+                  child: _saving
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Revised ✓'),
                 ),
-                child: _saving
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Revised ✓'),
               ),
             ],
           ),
 
-          // ── Row 3: Due time detail ─────────────────────────
+          // ── Row 3: Due time detail (flexible, never overflows) ──
           if (due.timeDetail.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 6),
-              child: Row(
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 4,
                 children: [
-                  Icon(Icons.schedule_rounded,
-                      size: 12, color: cs.onSurface.withValues(alpha: 0.35)),
-                  const SizedBox(width: 4),
-                  Text(
-                    due.timeDetail,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: cs.onSurface.withValues(alpha: 0.4),
-                    ),
-                  ),
-                  if (item.lastStudiedAt != null) ...[
-                    const SizedBox(width: 12),
-                    Icon(Icons.history_rounded,
-                        size: 12, color: cs.onSurface.withValues(alpha: 0.35)),
-                    const SizedBox(width: 4),
-                    Text(
-                      _formatLastStudied(item.lastStudiedAt!),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: cs.onSurface.withValues(alpha: 0.4),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.schedule_rounded,
+                          size: 12,
+                          color: cs.onSurface.withValues(alpha: 0.35)),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          due.timeDetail,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: cs.onSurface.withValues(alpha: 0.4),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
+                    ],
+                  ),
+                  if (item.lastStudiedAt != null)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.history_rounded,
+                            size: 12,
+                            color: cs.onSurface.withValues(alpha: 0.35)),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            _formatLastStudied(item.lastStudiedAt!),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: cs.onSurface.withValues(alpha: 0.4),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
                 ],
               ),
             ),
@@ -218,6 +233,7 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard> {
           fontWeight: FontWeight.w600,
           color: color,
         ),
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }

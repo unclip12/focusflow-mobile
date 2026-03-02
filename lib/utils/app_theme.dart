@@ -186,28 +186,31 @@ class AppTheme {
 
     const radius = 12.0;
 
+    // Apple-like: thinner weights, tighter letter spacing, consistent sizing
     final textTheme = GoogleFonts.interTextTheme(baseText).copyWith(
-      displayLarge:  GoogleFonts.inter(fontSize: 32 * scale, fontWeight: FontWeight.w800, color: primaryText),
-      displayMedium: GoogleFonts.inter(fontSize: 28 * scale, fontWeight: FontWeight.w700, color: primaryText),
-      displaySmall:  GoogleFonts.inter(fontSize: 24 * scale, fontWeight: FontWeight.w700, color: primaryText),
-      headlineLarge: GoogleFonts.inter(fontSize: 22 * scale, fontWeight: FontWeight.w700, color: primaryText),
-      headlineMedium:GoogleFonts.inter(fontSize: 20 * scale, fontWeight: FontWeight.w600, color: primaryText),
-      headlineSmall: GoogleFonts.inter(fontSize: 18 * scale, fontWeight: FontWeight.w600, color: primaryText),
-      titleLarge:    GoogleFonts.inter(fontSize: 20 * scale, fontWeight: FontWeight.w600, color: primaryText),
-      titleMedium:   GoogleFonts.inter(fontSize: 16 * scale, fontWeight: FontWeight.w600, color: primaryText),
-      titleSmall:    GoogleFonts.inter(fontSize: 14 * scale, fontWeight: FontWeight.w600, color: primaryText),
-      bodyLarge:     GoogleFonts.inter(fontSize: 16 * scale, fontWeight: FontWeight.w400, color: primaryText),
-      bodyMedium:    GoogleFonts.inter(fontSize: 14 * scale, fontWeight: FontWeight.w400, color: secondaryText),
-      bodySmall:     GoogleFonts.inter(fontSize: 12 * scale, fontWeight: FontWeight.w400, color: secondaryText),
-      labelLarge:    GoogleFonts.inter(fontSize: 14 * scale, fontWeight: FontWeight.w600, color: primaryText),
-      labelMedium:   GoogleFonts.inter(fontSize: 12 * scale, fontWeight: FontWeight.w500, color: primaryText),
-      labelSmall:    GoogleFonts.inter(fontSize: 11 * scale, fontWeight: FontWeight.w500, color: secondaryText),
+      displayLarge:  GoogleFonts.inter(fontSize: 32 * scale, fontWeight: FontWeight.w700, letterSpacing: -0.5, color: primaryText),
+      displayMedium: GoogleFonts.inter(fontSize: 28 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.4, color: primaryText),
+      displaySmall:  GoogleFonts.inter(fontSize: 24 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.3, color: primaryText),
+      headlineLarge: GoogleFonts.inter(fontSize: 22 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.3, color: primaryText),
+      headlineMedium:GoogleFonts.inter(fontSize: 20 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.2, color: primaryText),
+      headlineSmall: GoogleFonts.inter(fontSize: 18 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.2, color: primaryText),
+      titleLarge:    GoogleFonts.inter(fontSize: 17 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.2, color: primaryText),
+      titleMedium:   GoogleFonts.inter(fontSize: 15 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.15, color: primaryText),
+      titleSmall:    GoogleFonts.inter(fontSize: 13 * scale, fontWeight: FontWeight.w600, letterSpacing: -0.1, color: primaryText),
+      bodyLarge:     GoogleFonts.inter(fontSize: 15 * scale, fontWeight: FontWeight.w400, letterSpacing: -0.1, color: primaryText),
+      bodyMedium:    GoogleFonts.inter(fontSize: 13 * scale, fontWeight: FontWeight.w400, letterSpacing: -0.1, color: secondaryText),
+      bodySmall:     GoogleFonts.inter(fontSize: 12 * scale, fontWeight: FontWeight.w400, letterSpacing: 0, color: secondaryText),
+      labelLarge:    GoogleFonts.inter(fontSize: 13 * scale, fontWeight: FontWeight.w500, letterSpacing: -0.1, color: primaryText),
+      labelMedium:   GoogleFonts.inter(fontSize: 12 * scale, fontWeight: FontWeight.w500, letterSpacing: 0, color: primaryText),
+      labelSmall:    GoogleFonts.inter(fontSize: 11 * scale, fontWeight: FontWeight.w500, letterSpacing: 0.1, color: secondaryText),
     );
 
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
       scaffoldBackgroundColor: bg,
+      // Ensure ad-hoc TextStyle() calls also use Inter
+      fontFamily: GoogleFonts.inter().fontFamily,
       colorScheme: ColorScheme(
         brightness: brightness,
         primary: accent,
@@ -224,7 +227,7 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: GoogleFonts.inter(
+        titleTextStyle: GoogleFonts.inter(letterSpacing: -0.3,
           fontSize: 20 * scale, fontWeight: FontWeight.w700, color: primaryText,
         ),
         iconTheme: IconThemeData(color: primaryText),

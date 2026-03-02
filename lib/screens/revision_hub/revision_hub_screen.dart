@@ -237,6 +237,22 @@ class RevisionDisplayItem {
     }
   }
 
+  /// Display title: FA shows page number, others show subtopic/title
+  String get displayTitle {
+    if (source == 'FA') {
+      // Always show page number for FA
+      if (pageNumber.isNotEmpty) {
+        return 'Pg $pageNumber — $title';
+      }
+      return title;
+    }
+    // For Sketchy, Pathoma, UWorld — show the item title (subtopic)
+    if (pageNumber.isNotEmpty && pageNumber != title) {
+      return '$pageNumber — $title';
+    }
+    return title;
+  }
+
   /// Source color
   Color get sourceColor {
     switch (source) {
