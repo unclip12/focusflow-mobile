@@ -29,7 +29,7 @@ class MainShell extends StatelessWidget {
     'time-logger':    Icons.timer_rounded,
     'analytics':      Icons.bar_chart_rounded,
     'settings':       Icons.settings_rounded,
-    'tracker':        Icons.track_changes_rounded,
+    'tracker':        Icons.local_library_rounded,
   };
 
   // Normalise /knowledge-base/:id → knowledge-base for tab highlight

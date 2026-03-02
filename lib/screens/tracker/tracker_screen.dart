@@ -72,7 +72,7 @@ class _TrackerScreenState extends State<TrackerScreen>
       appBar: AppBar(
         title: Text(_selectionMode
             ? '${_selectedItems.length} selected'
-            : 'Tracker'),
+            : 'Library'),
         leading: _selectionMode
             ? IconButton(
                 icon: const Icon(Icons.close_rounded),
