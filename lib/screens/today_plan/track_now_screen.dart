@@ -1,19 +1,15 @@
-// =============================================================
-// TrackNowScreen — Full-screen ad-hoc activity tracker
-// Timer, activity name, category, notes, add-task integration
-// Minimizable — timer continues in provider when user leaves.
-// =============================================================
-
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/daily_flow.dart';
+import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/services/notification_service.dart';
+import 'package:focusflow_mobile/services/background_timer_service.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import 'add_task_sheet.dart';
+import 'package:focusflow_mobile/screens/today_plan/add_task_sheet.dart';
 
 // ── Category data ──────────────────────────────────────────────
 class _Category {
@@ -65,6 +61,10 @@ class _TrackNowScreenState extends State<TrackNowScreen>
   String? _trackingActivityId;
   DateTime? _startedAt;
 
+  // Selected existing task to link to
+  String? _selectedTaskId;
+  String? _selectedTaskTitle;
+
   // Timer state
   int _elapsed = 0;
   Timer? _tickTimer;
@@ -111,6 +111,15 @@ class _TrackNowScreenState extends State<TrackNowScreen>
     _tickTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _elapsed++);
     });
+    
+    // Start background timer
+    final name = _selectedTaskTitle ?? _nameCtrl.text.trim();
+    if (name.isNotEmpty) {
+      BackgroundTimerService.start(
+        activityName: name,
+        elapsedSeconds: _elapsed,
+      );
+    }
   }
 
   @override
@@ -120,6 +129,12 @@ class _TrackNowScreenState extends State<TrackNowScreen>
       setState(() {
         _elapsed = DateTime.now().difference(_startedAt!).inSeconds;
       });
+      // Re-sync background service time in case it drifted
+      final name = _selectedTaskTitle ?? _nameCtrl.text.trim();
+      BackgroundTimerService.start(
+        activityName: name.isNotEmpty ? name : 'Session',
+        elapsedSeconds: _elapsed,
+      );
     }
   }
 
@@ -146,10 +161,10 @@ class _TrackNowScreenState extends State<TrackNowScreen>
   // ── Actions ──────────────────────────────────────────────────
 
   Future<void> _startTracking() async {
-    final name = _nameCtrl.text.trim();
+    final name = _selectedTaskTitle ?? _nameCtrl.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter what you are doing')),
+        const SnackBar(content: Text('Please enter or select what you are doing')),
       );
       return;
     }
@@ -161,6 +176,14 @@ class _TrackNowScreenState extends State<TrackNowScreen>
       label: name,
       category: _selectedCategory,
     );
+    
+    // Link to the selected task immediately upon start if applicable
+    if (_selectedTaskId != null) {
+      await app.updateFlowActivity(
+        widget.dateKey, 
+        activity.copyWith(linkedTaskIds: [_selectedTaskId!])
+      );
+    }
 
     setState(() {
       _isTracking = true;
@@ -176,19 +199,20 @@ class _TrackNowScreenState extends State<TrackNowScreen>
 
     HapticsService.heavy();
     final app = context.read<AppProvider>();
+    final name = _selectedTaskTitle ?? _nameCtrl.text.trim();
     await app.stopTrackNow(
       widget.dateKey,
       _trackingActivityId!,
       notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
+      linkedTaskIds: _selectedTaskId != null ? [_selectedTaskId!] : null,
     );
 
     _tickTimer?.cancel();
+    BackgroundTimerService.stop();
 
     // Fire notification: session complete
     unawaited(NotificationService.instance.showFocusTimerDone(
-      activityName: _nameCtrl.text.trim().isNotEmpty
-          ? _nameCtrl.text.trim()
-          : 'Activity',
+      activityName: name.isNotEmpty ? name : 'Activity',
     ));
 
     if (mounted) {
@@ -198,7 +222,7 @@ class _TrackNowScreenState extends State<TrackNowScreen>
           : '${dur.inMinutes}m ${dur.inSeconds.remainder(60)}s';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${_nameCtrl.text} tracked for $durStr ✅'),
+          content: Text('$name tracked for $durStr ✅'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -381,89 +405,258 @@ class _TrackNowScreenState extends State<TrackNowScreen>
           ),
           const SizedBox(height: 32),
 
-          // Activity name
-          Text('What are you doing?',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface.withValues(alpha: 0.7),
-              )),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _nameCtrl,
-            autofocus: true,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              hintText: 'e.g. Making Biryani',
-              filled: true,
-              fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            ),
-            style: const TextStyle(fontSize: 15),
-          ),
-          const SizedBox(height: 24),
+          // Activity Query / Inline Selection
+          _buildExistingTasksList(theme, cs),
 
-          // Category selector
-          Text('Category',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface.withValues(alpha: 0.7),
-              )),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _categories.map((c) {
-              final selected = _selectedCategory == c.name;
-              return GestureDetector(
-                onTap: () => setState(() => _selectedCategory =
-                    _selectedCategory == c.name ? null : c.name),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? c.color.withValues(alpha: 0.15)
-                        : cs.surfaceContainerHighest.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
+          const SizedBox(height: 24),
+          
+          if (_selectedTaskId == null) ...[
+            // Activity name (Custom Input)
+            Text('Or enter custom activity:',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: cs.onSurface.withValues(alpha: 0.7),
+                )),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _nameCtrl,
+              autofocus: _selectedTaskId == null,
+              textCapitalization: TextCapitalization.sentences,
+              onChanged: (val) {
+                if (val.isNotEmpty && _selectedTaskId != null) {
+                  setState(() {
+                    _selectedTaskId = null;
+                    _selectedTaskTitle = null;
+                  });
+                }
+              },
+              decoration: InputDecoration(
+                hintText: 'e.g. Making Biryani',
+                filled: true,
+                fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+              style: const TextStyle(fontSize: 15),
+            ),
+            const SizedBox(height: 24),
+
+            // Category selector (only for manual)
+            Text('Category',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: cs.onSurface.withValues(alpha: 0.7),
+                )),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _categories.map((c) {
+                final selected = _selectedCategory == c.name;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedCategory =
+                      _selectedCategory == c.name ? null : c.name),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
                       color: selected
-                          ? c.color.withValues(alpha: 0.5)
-                          : Colors.transparent,
-                      width: 1.5,
+                          ? c.color.withValues(alpha: 0.15)
+                          : cs.surfaceContainerHighest.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: selected
+                            ? c.color.withValues(alpha: 0.5)
+                            : Colors.transparent,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(c.emoji, style: const TextStyle(fontSize: 16)),
+                        const SizedBox(width: 6),
+                        Text(
+                          c.name,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight:
+                                selected ? FontWeight.w700 : FontWeight.w500,
+                            color: selected
+                                ? c.color
+                                : cs.onSurface.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(c.emoji, style: const TextStyle(fontSize: 16)),
-                      const SizedBox(width: 6),
-                      Text(
-                        c.name,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight:
-                              selected ? FontWeight.w700 : FontWeight.w500,
-                          color: selected
-                              ? c.color
-                              : cs.onSurface.withValues(alpha: 0.6),
-                        ),
-                      ),
-                    ],
-                  ),
+                );
+              }).toList(),
+            ),
+          ] else ...[
+             // Notice when existing task is selected
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: cs.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: cs.primary.withValues(alpha: 0.3)),
                 ),
-              );
-            }).toList(),
-          ),
+                child: Column(
+                  children: [
+                    Icon(Icons.check_circle_rounded, color: cs.primary, size: 28),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Ready to track:',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _selectedTaskTitle ?? '',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _buildExistingTasksList(ThemeData theme, ColorScheme cs) {
+    final app = context.watch<AppProvider>();
+    final flow = app.getDailyFlow(widget.dateKey);
+    final dayPlan = app.getDayPlan(widget.dateKey);
+
+    final linkableItems = <Map<String, dynamic>>[];
+
+    // Add today's flow activities that are not already track now
+    if (flow != null) {
+      for (final a in flow.activities) {
+        if (a.activityType == 'TRACK_NOW') continue;
+        linkableItems.add({
+          'id': a.id,
+          'title': a.label,
+          'subtitle': 'Today\'s Flow',
+          'icon': Icons.list_alt_rounded,
+          'color': cs.tertiary,
+        });
+      }
+    }
+
+    // Add today's plan blocks
+    if (dayPlan != null) {
+      final blocks = dayPlan.blocks ?? [];
+      final linkedBlockIds = flow?.activities
+          .expand((a) => a.linkedTaskIds)
+          .toSet() ?? {};
+          
+      for (final b in blocks) {
+        if (b.type == BlockType.breakBlock || b.isVirtual == true) continue;
+        if (linkedBlockIds.contains(b.id)) continue;
+        linkableItems.add({
+          'id': b.id,
+          'title': b.title,
+          'subtitle': 'Today\'s Plan',
+          'icon': Icons.calendar_today_rounded,
+          'color': const Color(0xFF6366F1),
+        });
+      }
+    }
+
+    if (linkableItems.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Select an existing task for today:',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: cs.onSurface.withValues(alpha: 0.7),
+            )),
+        const SizedBox(height: 12),
+        Container(
+          constraints: const BoxConstraints(maxHeight: 220),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHighest.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+          ),
+          child: ListView.separated(
+            shrinkWrap: true,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            itemCount: linkableItems.length,
+            separatorBuilder: (_, __) => Divider(
+              height: 1,
+              indent: 48,
+              color: cs.outlineVariant.withValues(alpha: 0.2),
+            ),
+            itemBuilder: (context, index) {
+              final item = linkableItems[index];
+              final isSelected = _selectedTaskId == item['id'];
+              return ListTile(
+                dense: true,
+                onTap: () {
+                  setState(() {
+                    if (isSelected) {
+                      _selectedTaskId = null;
+                      _selectedTaskTitle = null;
+                    } else {
+                      _selectedTaskId = item['id'];
+                      _selectedTaskTitle = item['title'];
+                      _nameCtrl.clear();
+                      _selectedCategory = null;
+                    }
+                  });
+                  HapticsService.light();
+                },
+                leading: Icon(
+                  item['icon'],
+                  color: item['color'],
+                  size: 20,
+                ),
+                title: Text(
+                  item['title'],
+                  style: TextStyle(
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    fontSize: 14,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  item['subtitle'],
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: cs.onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+                trailing: isSelected
+                    ? Icon(Icons.check_circle_rounded, color: cs.primary)
+                    : Icon(Icons.circle_outlined,
+                        color: cs.onSurface.withValues(alpha: 0.2)),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 

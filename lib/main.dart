@@ -5,6 +5,7 @@ import 'app.dart';
 import 'providers/app_provider.dart';
 import 'providers/settings_provider.dart';
 import 'services/notification_service.dart';
+import 'services/background_timer_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,6 +13,7 @@ void main() async {
   // Initialise notifications and request permission
   await NotificationService.instance.init();
   await NotificationService.instance.requestPermission();
+  await BackgroundTimerService.initialize();
 
   // Portrait-only layout
   await SystemChrome.setPreferredOrientations([

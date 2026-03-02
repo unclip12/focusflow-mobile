@@ -21,6 +21,8 @@ class FAPage {
   final String subject; // e.g. 'Biochemistry'
   final String system; // e.g. 'General'
   final String title; // e.g. 'Molecular Biology'
+  final String? customTitle; // User-defined title
+  final String? userDescription; // User-defined description
   final String status; // 'unread' | 'read' | 'anki_done'
   final String? ankiDueDate; // ISO8601 or null
   final String? lastReviewed; // ISO8601 or null
@@ -36,6 +38,8 @@ class FAPage {
     required this.subject,
     required this.system,
     required this.title,
+    this.customTitle,
+    this.userDescription,
     required this.status,
     this.ankiDueDate,
     this.lastReviewed,
@@ -52,6 +56,8 @@ class FAPage {
         subject: j['subject'] as String,
         system: j['system'] as String? ?? 'General',
         title: j['title'] as String? ?? '',
+        customTitle: j['customTitle'] as String?,
+        userDescription: j['userDescription'] as String?,
         status: j['status'] as String? ?? 'unread',
         ankiDueDate: j['ankiDueDate'] as String?,
         lastReviewed: j['lastReviewed'] as String?,
@@ -72,6 +78,8 @@ class FAPage {
         'subject': subject,
         'system': system,
         'title': title,
+        if (customTitle != null) 'customTitle': customTitle,
+        if (userDescription != null) 'userDescription': userDescription,
         'status': status,
         if (ankiDueDate != null) 'ankiDueDate': ankiDueDate,
         if (lastReviewed != null) 'lastReviewed': lastReviewed,
@@ -88,6 +96,8 @@ class FAPage {
     String? subject,
     String? system,
     String? title,
+    String? customTitle,
+    String? userDescription,
     String? status,
     String? ankiDueDate,
     String? lastReviewed,
@@ -103,6 +113,8 @@ class FAPage {
         subject: subject ?? this.subject,
         system: system ?? this.system,
         title: title ?? this.title,
+        customTitle: customTitle ?? this.customTitle,
+        userDescription: userDescription ?? this.userDescription,
         status: status ?? this.status,
         ankiDueDate: ankiDueDate ?? this.ankiDueDate,
         lastReviewed: lastReviewed ?? this.lastReviewed,

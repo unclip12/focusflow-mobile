@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/services/database_service.dart';
 import 'package:focusflow_mobile/services/seed_service.dart';
@@ -74,10 +75,15 @@ class _SplashScreenState extends State<SplashScreen>
         await app.loadAll();
       }
 
-      // Done — navigate to dashboard
+      // Done — navigate to dashboard or last active tab
       _setStatus('Ready!');
       await Future.delayed(const Duration(milliseconds: 300));
-      if (mounted) context.goNamed('dashboard');
+      if (mounted) {
+        final prefs = await SharedPreferences.getInstance();
+        final lastTab = prefs.getString('lastActiveTab') ?? 'dashboard';
+        if (!mounted) return;
+        context.go('/$lastTab');
+      }
     } catch (e) {
       _setStatus('Error: $e');
     }

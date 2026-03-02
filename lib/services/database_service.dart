@@ -17,7 +17,7 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._();
 
   static const _dbName = 'focusflow.db';
-  static const _dbVersion = 7;
+  static const _dbVersion = 8;
 
   Database? _database;
 
@@ -71,6 +71,7 @@ class DatabaseService {
   static const tTodoItems = 'todo_items';
   static const tDefaultRoutineOrder = 'default_routine_order';
   static const tDailyFlows = 'daily_flows';
+  static const tLibraryNotes = 'library_notes';
 
   Future<void> _onCreate(Database db, int version) async {
     // Knowledge Base — pageNumber is the primary key
@@ -249,6 +250,9 @@ class DatabaseService {
 
     // ── V7 tables (Daily Flows) ───────────────────────────────
     await _createV7Tables(db);
+
+    // ── V8 tables (Library Notes) ─────────────────────────────
+    await _createV8Tables(db);
   }
 
   /// Create G5 tracker tables — called from both _onCreate and _onUpgrade.
@@ -366,6 +370,9 @@ class DatabaseService {
     if (oldVersion < 7) {
       await _createV7Tables(db);
     }
+    if (oldVersion < 8) {
+      await _createV8Tables(db);
+    }
     // Streak data table — always ensure it exists
     await db.execute('''
       CREATE TABLE IF NOT EXISTS $tStreakData (
@@ -373,6 +380,21 @@ class DatabaseService {
         data TEXT NOT NULL
       )
     ''');
+  }
+
+  /// Create V8 tables (Library Notes).
+  Future<void> _createV8Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tLibraryNotes (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        itemId TEXT,
+        itemType TEXT,
+        createdAt TEXT
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_lib_notes_item ON $tLibraryNotes(itemId)');
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -463,6 +485,28 @@ class DatabaseService {
     final result = await db.rawQuery('SELECT COUNT(*) AS cnt FROM $table');
     return Sqflite.firstIntValue(result) ?? 0;
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // LIBRARY NOTES
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> upsertLibraryNote(Map<String, dynamic> json) => upsert(
+        tLibraryNotes,
+        'id',
+        json['id'] ?? '',
+        json,
+        indexColumns: {
+          'itemId': json['itemId'],
+          'itemType': json['itemType'],
+          'createdAt': json['createdAt'],
+        },
+      );
+
+  Future<List<Map<String, dynamic>>> getLibraryNotes(String itemId) =>
+      getWhere(tLibraryNotes, 'itemId', itemId);
+
+  Future<int> deleteLibraryNote(String id) =>
+      deleteById(tLibraryNotes, 'id', id);
 
   // ═══════════════════════════════════════════════════════════════
   // KNOWLEDGE BASE — pageNumber is primary key
@@ -732,6 +776,11 @@ class DatabaseService {
         tFaPages, 'pageNum', json['pageNum']?.toString() ?? '', json,
       );
 
+  Future<void> updateFAPage(Map<String, dynamic> json) async {
+    final db = await database;
+    await db.update(tFaPages, json, where: 'pageNum = ?', whereArgs: [json['pageNum']]);
+  }
+
   Future<int> deleteFAPage(int pageNum) =>
       deleteById(tFaPages, 'pageNum', pageNum.toString());
 
@@ -806,6 +855,11 @@ class DatabaseService {
         where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<void> updateSketchyMicroVideo(Map<String, dynamic> json) async {
+    final db = await database;
+    await db.update(tSketchyMicroVideos, json, where: 'id = ?', whereArgs: [json['id']]);
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // SKETCHY PHARM VIDEOS (G6)
   // ═══════════════════════════════════════════════════════════════
@@ -835,6 +889,11 @@ class DatabaseService {
         where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<void> updateSketchyPharmVideo(Map<String, dynamic> json) async {
+    final db = await database;
+    await db.update(tSketchyPharmVideos, json, where: 'id = ?', whereArgs: [json['id']]);
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // PATHOMA CHAPTERS (G6)
   // ═══════════════════════════════════════════════════════════════
@@ -862,6 +921,11 @@ class DatabaseService {
     final db = await database;
     await db.update(tPathomaChapters, {'watched': watched ? 1 : 0},
         where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> updatePathomaChapter(Map<String, dynamic> json) async {
+    final db = await database;
+    await db.update(tPathomaChapters, json, where: 'id = ?', whereArgs: [json['id']]);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -895,6 +959,11 @@ class DatabaseService {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  Future<void> updateUWorldTopic(Map<String, dynamic> json) async {
+    final db = await database;
+    await db.update('uworld_topics', json, where: 'id = ?', whereArgs: [json['id']]);
   }
 
   // ═══════════════════════════════════════════════════════════════

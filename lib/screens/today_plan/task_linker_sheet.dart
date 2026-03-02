@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/todo_item.dart';
+import 'package:focusflow_mobile/utils/constants.dart';
 
 class TaskLinkerSheet extends StatefulWidget {
   final String dateKey;
@@ -49,9 +50,50 @@ class _TaskLinkerSheetState extends State<TaskLinkerSheet> {
     final app = context.watch<AppProvider>();
     final allTodos = app.todoItems;
     final routines = app.routines;
+    final flow = app.getDailyFlow(widget.dateKey);
+    final dayPlan = app.getDayPlan(widget.dateKey);
 
     // Merge date-specific and all items for linking
     final linkableItems = <_LinkableItem>[];
+
+    // Add today's flow activities
+    if (flow != null) {
+      for (final a in flow.activities) {
+        if (a.activityType == 'TRACK_NOW') continue; // Don't link track now to track now
+        if (_search.isNotEmpty &&
+            !(a.label.toLowerCase().contains(_search.toLowerCase()))) continue;
+        linkableItems.add(_LinkableItem(
+          id: a.id,
+          title: a.label,
+          subtitle: 'Today\'s Flow',
+          icon: Icons.list_alt_rounded,
+          color: cs.tertiary,
+        ));
+      }
+    }
+
+    // Add today's day plan blocks that don't have a flow activity yet
+    if (dayPlan != null) {
+      final blocks = dayPlan.blocks ?? [];
+      final linkedBlockIds = flow?.activities
+          .expand((a) => a.linkedTaskIds)
+          .toSet() ?? {};
+          
+      for (final b in blocks) {
+        if (b.type == BlockType.breakBlock || b.isVirtual == true) continue;
+        if (linkedBlockIds.contains(b.id)) continue; // Already in flow
+        
+        if (_search.isNotEmpty &&
+            !(b.title.toLowerCase().contains(_search.toLowerCase()))) continue;
+        linkableItems.add(_LinkableItem(
+          id: b.id,
+          title: b.title,
+          subtitle: 'Today\'s Plan',
+          icon: Icons.calendar_today_rounded,
+          color: const Color(0xFF6366F1),
+        ));
+      }
+    }
 
     // Add todos
     for (final t in allTodos) {

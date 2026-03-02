@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 
@@ -38,8 +39,12 @@ class MainShell extends StatelessWidget {
     return path.split('/').first;
   }
 
-  void _navigateTo(BuildContext context, String routeId) {
-    context.go('/$routeId');
+  void _navigateTo(BuildContext context, String routeId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('lastActiveTab', routeId);
+    if (context.mounted) {
+      context.go('/$routeId');
+    }
   }
 
   void _showMoreSheet(BuildContext context, List<String> pinnedTabs) {

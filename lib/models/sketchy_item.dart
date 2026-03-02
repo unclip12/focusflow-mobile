@@ -3,6 +3,8 @@ class SketchyItem {
   final String name; // e.g. 'Staph aureus'
   final String type; // 'micro' | 'pharma'
   final String category; // e.g. 'Gram Positive' for micro, 'Antibiotics' for pharma
+  final String? customTitle;
+  final String? userDescription;
   final String status; // 'unwatched' | 'watched' | 'mastered'
 
   const SketchyItem({
@@ -10,6 +12,8 @@ class SketchyItem {
     required this.name,
     required this.type,
     required this.category,
+    this.customTitle,
+    this.userDescription,
     required this.status,
   });
 
@@ -18,6 +22,8 @@ class SketchyItem {
         name: j['name'] as String,
         type: j['type'] as String,
         category: j['category'] as String? ?? 'General',
+        customTitle: j['customTitle'] as String?,
+        userDescription: j['userDescription'] as String?,
         status: j['status'] as String? ?? 'unwatched',
       );
 
@@ -26,6 +32,8 @@ class SketchyItem {
         'name': name,
         'type': type,
         'category': category,
+        if (customTitle != null) 'customTitle': customTitle,
+        if (userDescription != null) 'userDescription': userDescription,
         'status': status,
       };
 
@@ -34,6 +42,8 @@ class SketchyItem {
     String? name,
     String? type,
     String? category,
+    String? customTitle,
+    String? userDescription,
     String? status,
   }) =>
       SketchyItem(
@@ -41,6 +51,8 @@ class SketchyItem {
         name: name ?? this.name,
         type: type ?? this.type,
         category: category ?? this.category,
+        customTitle: customTitle ?? this.customTitle,
+        userDescription: userDescription ?? this.userDescription,
         status: status ?? this.status,
       );
 }

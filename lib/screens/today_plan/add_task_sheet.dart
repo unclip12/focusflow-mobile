@@ -244,7 +244,75 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       }
     }
 
+    // ── Validation: Conflict check (7E) ─────────────────────────
+    if (_isRevision) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Already Studied'),
+          content: Text('You have already studied $_taskTitle.\nDid you mean to schedule this for Revision instead?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Add Anyway'),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+    }
+
+    if (!mounted) return;
     final app = context.read<AppProvider>();
+
+    // ── Validation: Unknown Item check (7H) ─────────────────────────
+    bool isKnown = true;
+    if (_exam == ExamType.usmle && _usmleType == UsmleTaskType.faPages) {
+      if (_trackerInfo == null) isKnown = false;
+    } else if (_exam == ExamType.usmle && _usmleType == UsmleTaskType.videoLecture) {
+      if (_selectedSource == 'Sketchy') {
+        final title = _topicCtrl.text.trim().toLowerCase();
+        isKnown = app.sketchyMicroVideos.any((v) => v.title.toLowerCase() == title) ||
+                  app.sketchyPharmVideos.any((v) => v.title.toLowerCase() == title);
+      } else if (_selectedSource == 'Pathoma') {
+        final title = _topicCtrl.text.trim().toLowerCase();
+        isKnown = app.pathomaChapters.any((c) => c.title.toLowerCase() == title);
+      }
+    }
+
+    if (!isKnown) {
+      final addLib = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Unknown Task'),
+          content: Text('The task "$_taskTitle" cannot be found in your Library.\nWould you like to add it to your Library for better tracking?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('No, just add to plan'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Yes, let me add it'),
+            ),
+          ],
+        ),
+      );
+      
+      if (addLib == true) {
+        if (!mounted) return;
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please use the Library tab to add custom items first.')),
+        );
+        return; 
+      }
+    }
+
     final batches = _focusBatches;
     final title = _taskTitle;
 

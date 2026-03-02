@@ -11,6 +11,7 @@
         "file_picker",
         "fl_chart",
         "flutter",
+        "flutter_background_service",
         "flutter_local_notifications",
         "flutter_slidable",
         "go_router",
@@ -57,6 +58,16 @@
         "stream_channel",
         "test_api",
         "vector_math"
+      ]
+    },
+    {
+      "name": "flutter_background_service",
+      "version": "5.1.0",
+      "dependencies": [
+        "flutter",
+        "flutter_background_service_android",
+        "flutter_background_service_ios",
+        "flutter_background_service_platform_interface"
       ]
     },
     {
@@ -361,6 +372,23 @@
         "stream_channel",
         "string_scanner",
         "term_glyph"
+      ]
+    },
+    {
+      "name": "flutter_background_service_platform_interface",
+      "version": "5.1.2",
+      "dependencies": [
+        "flutter",
+        "platform",
+        "plugin_platform_interface"
+      ]
+    },
+    {
+      "name": "flutter_background_service_ios",
+      "version": "5.0.3",
+      "dependencies": [
+        "flutter",
+        "flutter_background_service_platform_interface"
       ]
     },
     {
@@ -899,6 +927,11 @@
       ]
     },
     {
+      "name": "platform",
+      "version": "3.1.6",
+      "dependencies": []
+    },
+    {
       "name": "package_info_plus_platform_interface",
       "version": "3.2.1",
       "dependencies": [
@@ -964,11 +997,6 @@
         "file_selector_platform_interface",
         "flutter"
       ]
-    },
-    {
-      "name": "platform",
-      "version": "3.1.6",
-      "dependencies": []
     },
     {
       "name": "xdg_directories",
@@ -1066,6 +1094,14 @@
         "collection",
         "source_span",
         "string_scanner"
+      ]
+    },
+    {
+      "name": "flutter_background_service_android",
+      "version": "6.3.1",
+      "dependencies": [
+        "flutter",
+        "flutter_background_service_platform_interface"
       ]
     }
   ],

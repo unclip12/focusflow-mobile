@@ -3,6 +3,8 @@ class PathomaItem {
   final int chapter; // 1 to 19
   final String title; // e.g. 'Cell Injury'
   final String subject; // e.g. 'General Pathology'
+  final String? customTitle;
+  final String? userDescription;
   final String status; // 'unwatched' | 'watched' | 'reviewed'
 
   const PathomaItem({
@@ -10,6 +12,8 @@ class PathomaItem {
     required this.chapter,
     required this.title,
     required this.subject,
+    this.customTitle,
+    this.userDescription,
     required this.status,
   });
 
@@ -18,6 +22,8 @@ class PathomaItem {
         chapter: j['chapter'] as int,
         title: j['title'] as String,
         subject: j['subject'] as String? ?? 'General',
+        customTitle: j['customTitle'] as String?,
+        userDescription: j['userDescription'] as String?,
         status: j['status'] as String? ?? 'unwatched',
       );
 
@@ -26,6 +32,8 @@ class PathomaItem {
         'chapter': chapter,
         'title': title,
         'subject': subject,
+        if (customTitle != null) 'customTitle': customTitle,
+        if (userDescription != null) 'userDescription': userDescription,
         'status': status,
       };
 
@@ -34,6 +42,8 @@ class PathomaItem {
     int? chapter,
     String? title,
     String? subject,
+    String? customTitle,
+    String? userDescription,
     String? status,
   }) =>
       PathomaItem(
@@ -41,6 +51,8 @@ class PathomaItem {
         chapter: chapter ?? this.chapter,
         title: title ?? this.title,
         subject: subject ?? this.subject,
+        customTitle: customTitle ?? this.customTitle,
+        userDescription: userDescription ?? this.userDescription,
         status: status ?? this.status,
       );
 }

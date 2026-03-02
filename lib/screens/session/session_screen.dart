@@ -12,6 +12,7 @@ import 'package:intl/intl.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/screens/session/session_complete_sheet.dart';
+import 'package:focusflow_mobile/services/background_timer_service.dart';
 
 class SessionScreen extends StatefulWidget {
   final Block block;
@@ -58,6 +59,12 @@ class _SessionScreenState extends State<SessionScreen> {
         setState(() => _elapsedSeconds++);
       }
     });
+
+    BackgroundTimerService.start(
+      activityName: _block.title,
+      elapsedSeconds: _elapsedSeconds,
+    );
+
     _quoteTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       setState(
           () => _currentQuote = kFocusQuotes[_rng.nextInt(kFocusQuotes.length)]);
@@ -73,11 +80,20 @@ class _SessionScreenState extends State<SessionScreen> {
 
   void _togglePause() {
     setState(() => _isPaused = !_isPaused);
+    if (_isPaused) {
+      BackgroundTimerService.stop();
+    } else {
+      BackgroundTimerService.start(
+        activityName: _block.title,
+        elapsedSeconds: _elapsedSeconds,
+      );
+    }
   }
 
   void _endSession() {
     _tickTimer?.cancel();
     _quoteTimer?.cancel();
+    BackgroundTimerService.stop();
 
     showSessionCompleteSheet(
       context,
@@ -279,6 +295,7 @@ class _SessionScreenState extends State<SessionScreen> {
           ),
           TextButton(
             onPressed: () {
+              BackgroundTimerService.stop();
               Navigator.pop(ctx);
               Navigator.pop(context);
             },

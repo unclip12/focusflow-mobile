@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:focusflow_mobile/services/backup_service.dart';
 import 'package:focusflow_mobile/services/database_service.dart';
 import 'package:focusflow_mobile/services/srs_service.dart';
+import 'package:focusflow_mobile/services/background_timer_service.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,6 +27,7 @@ import 'package:focusflow_mobile/models/user_profile.dart';
 import 'package:focusflow_mobile/models/app_snapshot.dart';
 import 'package:focusflow_mobile/models/revision_item.dart';
 import 'package:focusflow_mobile/models/fa_page.dart';
+import 'package:focusflow_mobile/models/library_note.dart';
 import 'package:focusflow_mobile/models/sketchy_item.dart';
 import 'package:focusflow_mobile/models/pathoma_item.dart';
 import 'package:focusflow_mobile/models/sketchy_video.dart';
@@ -761,6 +763,7 @@ class AppProvider extends ChangeNotifier {
       status: 'PAUSED',
       activities: activities,
     ));
+    BackgroundTimerService.stop();
   }
 
   /// Stop the flow with an optional reminder time.
@@ -783,6 +786,7 @@ class AppProvider extends ChangeNotifier {
       stoppedAt: DateTime.now().toIso8601String(),
       resumeReminderAt: remindAt?.toIso8601String(),
     ));
+    BackgroundTimerService.stop();
   }
 
   /// Resume the flow from the next pending activity.
@@ -1008,6 +1012,7 @@ class AppProvider extends ChangeNotifier {
     );
 
     await upsertDailyFlow(flow.copyWith(activities: activities));
+    BackgroundTimerService.stop();
   }
 
   /// Get the currently active Track Now activity (if any).
@@ -1453,6 +1458,130 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> advanceFAPageRevision(int pageNum) async {
+    final idx = faPages.indexWhere((p) => p.pageNum == pageNum);
+    if (idx < 0) return;
+    final page = faPages[idx];
+    
+    String nextStatus;
+    if (page.status == 'unread') {
+      nextStatus = 'read';
+    } else if (page.status == 'read') {
+      nextStatus = 'anki_done';
+    } else {
+      nextStatus = 'anki_done';
+    }
+
+    final now = DateTime.now().toIso8601String();
+    final updated = page.copyWith(
+      status: nextStatus,
+      revisionCount: (page.status == 'anki_done') ? page.revisionCount + 1 : page.revisionCount,
+      lastReviewed: now,
+      firstReadAt: (nextStatus == 'read' && page.status == 'unread') ? now : page.firstReadAt,
+      ankiDoneAt: (nextStatus == 'anki_done' && page.status != 'anki_done') ? now : page.ankiDoneAt,
+    );
+    
+    await upsertFAPage(updated);
+    
+    if (nextStatus == 'read' || nextStatus == 'anki_done') {
+      final revId = 'fa-page-$pageNum';
+      final mode = revisionSettings?.mode ?? 'strict';
+      final nextDate = SrsService.calculateNextRevisionDateString(
+        lastStudiedAt: now,
+        revisionIndex: updated.revisionCount,
+        mode: mode,
+      );
+      
+      final existingRevIdx = revisionItems.indexWhere((r) => r.id == revId);
+      if (existingRevIdx >= 0) {
+        final existing = revisionItems[existingRevIdx];
+        final newRev = existing.copyWith(
+          currentRevisionIndex: updated.revisionCount,
+          lastStudiedAt: now,
+          nextRevisionAt: nextDate,
+        );
+        await _db.upsertRevisionItem(newRev.toJson());
+        revisionItems[existingRevIdx] = newRev;
+      } else {
+        final revItem = RevisionItem(
+          id: revId,
+          type: 'PAGE',
+          source: 'FA',
+          pageNumber: pageNum.toString(),
+          title: updated.title,
+          parentTitle: updated.subject,
+          nextRevisionAt: nextDate ?? DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
+          currentRevisionIndex: updated.revisionCount,
+          lastStudiedAt: now,
+          totalSteps: SrsService.totalSteps(mode),
+        );
+        await _db.upsertRevisionItem(revItem.toJson());
+        revisionItems.add(revItem);
+      }
+    }
+    notifyListeners();
+  }
+
+  Future<void> undoFAPage(int pageNum) async {
+    final idx = faPages.indexWhere((p) => p.pageNum == pageNum);
+    if (idx < 0) return;
+    final page = faPages[idx];
+    
+    String nextStatus = page.status;
+    int nextRevCount = page.revisionCount;
+    
+    if (page.revisionCount > 0) {
+      nextRevCount--;
+    } else if (page.status == 'anki_done') {
+      nextStatus = 'read';
+    } else if (page.status == 'read') {
+      nextStatus = 'unread';
+    }
+
+    final updated = page.copyWith(
+      status: nextStatus,
+      revisionCount: nextRevCount,
+    );
+    
+    await upsertFAPage(updated);
+    
+    if (nextStatus == 'unread') {
+      final revId = 'fa-page-$pageNum';
+      if (revisionItems.any((r) => r.id == revId)) {
+        await deleteRevisionItem(revId);
+      }
+    }
+    notifyListeners();
+  }
+
+  Future<void> resetFAPage(int pageNum) async {
+    final idx = faPages.indexWhere((p) => p.pageNum == pageNum);
+    if (idx < 0) return;
+    final page = faPages[idx];
+    
+    final updated = page.copyWith(
+      status: 'unread',
+      revisionCount: 0,
+      firstReadAt: null,
+      ankiDoneAt: null,
+      lastReviewed: null,
+    );
+    
+    // We update DB directly to nullify the fields properly since copyWith might ignore nulls depending on implementation
+    await _db.updateFAPage(updated.toJson()..addAll({
+      'first_read_at': null,
+      'anki_done_at': null,
+      'last_reviewed': null,
+    }));
+    faPages[idx] = updated;
+    
+    final revId = 'fa-page-$pageNum';
+    if (revisionItems.any((r) => r.id == revId)) {
+      await deleteRevisionItem(revId);
+    }
+    notifyListeners();
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // FA SUBTOPICS (v5)
   // ═══════════════════════════════════════════════════════════════
@@ -1544,7 +1673,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   /// Reset a subtopic to unread
-  Future<void> resetSubtopic(int subtopicId) async {
+  Future<void> resetFASubtopic(int subtopicId) async {
     final idx = faSubtopics.indexWhere((s) => s.id == subtopicId);
     if (idx < 0) return;
     await _db.resetFASubtopic(subtopicId);
@@ -1554,6 +1683,33 @@ class AppProvider extends ChangeNotifier {
       name: faSubtopics[idx].name,
     );
     notifyListeners();
+  }
+
+  Future<void> advanceFASubtopicRevision(int subtopicId) async {
+    final idx = faSubtopics.indexWhere((s) => s.id == subtopicId);
+    if (idx < 0) return;
+    final sub = faSubtopics[idx];
+    
+    if (sub.status == 'unread') {
+      await markSubtopicRead(subtopicId);
+    } else if (sub.status == 'read') {
+      await markSubtopicAnkiDone(subtopicId);
+    }
+  }
+
+  Future<void> undoFASubtopic(int subtopicId) async {
+    final idx = faSubtopics.indexWhere((s) => s.id == subtopicId);
+    if (idx < 0) return;
+    final sub = faSubtopics[idx];
+    
+    if (sub.status == 'anki_done') {
+      final updated = sub.copyWith(status: 'read');
+      await _db.updateFASubtopicStatus(subtopicId, status: 'read', firstReadAt: sub.firstReadAt);
+      faSubtopics[idx] = updated;
+      notifyListeners();
+    } else if (sub.status == 'read') {
+      await resetFASubtopic(subtopicId);
+    }
   }
 
   /// Create a revision item for a subtopic that was just read
@@ -1732,6 +1888,22 @@ class AppProvider extends ChangeNotifier {
     unawaited(_triggerBackup());
   }
 
+  Future<void> undoSketchyMicro(int id) async {
+    await toggleSketchyMicroWatched(id, false);
+    // Also remove revision tracking
+    final revId = 'sketchy-micro-$id';
+    if (revisionItems.any((r) => r.id == revId)) {
+      await deleteRevisionItem(revId);
+    }
+  }
+  Future<void> resetSketchyMicro(int id) async {
+    await toggleSketchyMicroWatched(id, false);
+    final revId = 'sketchy-micro-$id';
+    if (revisionItems.any((r) => r.id == revId)) {
+      await deleteRevisionItem(revId);
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // SKETCHY PHARM VIDEOS (G6)
   // ═══════════════════════════════════════════════════════════════
@@ -1768,6 +1940,21 @@ class AppProvider extends ChangeNotifier {
     unawaited(_triggerBackup());
   }
 
+  Future<void> undoSketchyPharm(int id) async {
+    await toggleSketchyPharmWatched(id, false);
+    final revId = 'sketchy-pharm-$id';
+    if (revisionItems.any((r) => r.id == revId)) {
+      await deleteRevisionItem(revId);
+    }
+  }
+  Future<void> resetSketchyPharm(int id) async {
+    await toggleSketchyPharmWatched(id, false);
+    final revId = 'sketchy-pharm-$id';
+    if (revisionItems.any((r) => r.id == revId)) {
+      await deleteRevisionItem(revId);
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // PATHOMA CHAPTERS (G6)
   // ═══════════════════════════════════════════════════════════════
@@ -1802,6 +1989,21 @@ class AppProvider extends ChangeNotifier {
     }
     notifyListeners();
     unawaited(_triggerBackup());
+  }
+
+  Future<void> undoPathomaChapter(int id) async {
+    await togglePathomaChapterWatched(id, false);
+    final revId = 'pathoma-ch-$id';
+    if (revisionItems.any((r) => r.id == revId)) {
+      await deleteRevisionItem(revId);
+    }
+  }
+  Future<void> resetPathomaChapter(int id) async {
+    await togglePathomaChapterWatched(id, false);
+    final revId = 'pathoma-ch-$id';
+    if (revisionItems.any((r) => r.id == revId)) {
+      await deleteRevisionItem(revId);
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -2263,6 +2465,71 @@ class AppProvider extends ChangeNotifier {
     await _db.saveStreakData(streakData.toJson());
     notifyListeners();
     unawaited(_triggerBackup());
+  }
+
+  // ═════════════════════════════════════════════════════════════════
+  // LIBRARY NOTES
+  // ═════════════════════════════════════════════════════════════════
+
+  Future<List<LibraryNote>> getLibraryNotes(String itemId) async {
+    final docs = await DatabaseService.instance.getLibraryNotes(itemId);
+    return docs.map((doc) => LibraryNote.fromJson(doc)).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  Future<void> saveLibraryNote(LibraryNote note) async {
+    await DatabaseService.instance.upsertLibraryNote(note.toJson());
+    notifyListeners();
+  }
+
+  Future<void> deleteLibraryNote(String id) async {
+    await DatabaseService.instance.deleteLibraryNote(id);
+    notifyListeners();
+  }
+
+  // ═════════════════════════════════════════════════════════════════
+  // LIBRARY ITEM METADATA
+  // ═════════════════════════════════════════════════════════════════
+
+  Future<void> updateFAPageMetadata(FAPage updatedPage) async {
+    final i = faPages.indexWhere((p) => p.pageNum == updatedPage.pageNum);
+    if (i == -1) return;
+    faPages[i] = updatedPage;
+    await _db.updateFAPage(updatedPage.toJson());
+    notifyListeners();
+  }
+
+  Future<void> updateSketchyMetadata(SketchyItem updatedItem) async {
+    final microIndex = sketchyMicroVideos.indexWhere((v) => v.id?.toString() == updatedItem.id);
+    if (microIndex != -1) {
+      sketchyMicroVideos[microIndex] = updatedItem as SketchyVideo;
+      await _db.updateSketchyMicroVideo(updatedItem.toJson());
+    } else {
+      final pharmIndex = sketchyPharmVideos.indexWhere((v) => v.id?.toString() == updatedItem.id);
+      if (pharmIndex != -1) {
+        sketchyPharmVideos[pharmIndex] = updatedItem as SketchyVideo;
+        await _db.updateSketchyPharmVideo(updatedItem.toJson());
+      }
+    }
+    notifyListeners();
+  }
+
+  Future<void> updatePathomaMetadata(PathomaItem updatedItem) async {
+    final i = pathomaChapters.indexWhere((c) => c.id?.toString() == updatedItem.id);
+    if (i == -1) return;
+    pathomaChapters[i] = updatedItem as PathomaChapter;
+    await _db.updatePathomaChapter(updatedItem.toJson());
+    notifyListeners();
+  }
+
+  Future<void> updateUWorldMetadata(UWorldTopic updatedTopic) async {
+    final i = uworldTopics.indexWhere((t) => t.id == updatedTopic.id);
+    if (i == -1) return;
+    uworldTopics[i] = updatedTopic;
+    if (updatedTopic.id != null) {
+      await _db.updateUWorldTopic(updatedTopic.toMap());
+    }
+    notifyListeners();
   }
 }
 

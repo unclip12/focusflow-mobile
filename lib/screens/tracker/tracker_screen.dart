@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:uuid/uuid.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
@@ -14,6 +15,9 @@ import 'package:focusflow_mobile/models/fa_subtopic.dart';
 import 'package:focusflow_mobile/models/pathoma_chapter.dart';
 import 'package:focusflow_mobile/models/sketchy_video.dart';
 import 'package:focusflow_mobile/models/uworld_topic.dart';
+import 'package:focusflow_mobile/screens/library/fa_item_detail_sheet.dart';
+import 'package:focusflow_mobile/screens/library/library_item_detail_sheet.dart';
+import 'package:focusflow_mobile/screens/library/uworld_detail_sheet.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 
 class TrackerScreen extends StatefulWidget {
@@ -472,7 +476,7 @@ class _LiquidFillPageBox extends StatelessWidget {
 
     return GestureDetector(
       onTap: selectionMode ? onToggleSelect : () => _showSubtopicPicker(context),
-      onLongPress: selectionMode ? null : () => _showDetailPopup(context),
+      onLongPress: selectionMode ? null : () => _showFADetailSheet(context),
       child: SizedBox(
         width: boxSize,
         height: boxSize,
@@ -661,119 +665,19 @@ class _LiquidFillPageBox extends StatelessWidget {
     }
   }
 
-  void _showDetailPopup(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final subtopics = app.getSubtopicsForPage(page.pageNum);
-    final readSubs = subtopics.where((s) => s.status != 'unread').length;
-
+  void _showFADetailSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                  color: cs.outlineVariant,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Page ${page.pageNum} — ${page.title}',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface,
-              ),
-            ),
-            Text(
-              '${page.subject} • ${page.system}',
-              style: TextStyle(
-                fontSize: 13,
-                color: cs.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 16),
-            _detailRow('Status', page.status.toUpperCase(), cs),
-            _detailRow('Subtopics',
-                '$readSubs / ${subtopics.length} done', cs),
-            if (page.firstReadAt != null)
-              _detailRow('First Read', _formatDate(page.firstReadAt!), cs),
-            if (page.ankiDoneAt != null)
-              _detailRow('Anki Done', _formatDate(page.ankiDoneAt!), cs),
-            _detailRow(
-                'Revisions', 'R${page.revisionCount}', cs),
-            if (page.revisionHistory.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text('Revision History',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: cs.onSurfaceVariant,
-                  )),
-              const SizedBox(height: 4),
-              ...page.revisionHistory.map((r) => Padding(
-                    padding: const EdgeInsets.only(left: 8, bottom: 2),
-                    child: Text(
-                      'R${r.revisionNum}: ${_formatDate(r.date)}',
-                      style: TextStyle(
-                          fontSize: 12, color: cs.onSurfaceVariant),
-                    ),
-                  )),
-            ],
-            const SizedBox(height: 16),
-            if (page.status == 'anki_done')
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _cyclePageStatus(context);
-                  },
-                  child: const Text('Mark as Unread'),
-                ),
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
+      builder: (_) => FAPageDetailSheet(
+        app: app,
+        pageNum: page.pageNum,
       ),
     );
-  }
-
-  Widget _detailRow(String label, String value, ColorScheme cs) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
-          Text(value,
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: cs.onSurface)),
-        ],
-      ),
-    );
-  }
-
-  String _formatDate(String iso) {
-    try {
-      final dt = DateTime.parse(iso);
-      return '${dt.day}/${dt.month}/${dt.year}';
-    } catch (_) {
-      return iso;
-    }
   }
 }
 
@@ -1009,31 +913,76 @@ class _SubtopicListView extends StatelessWidget {
             statusLabel = 'Unread';
         }
 
-        return ListTile(
-          dense: true,
-          title: Text(
-            st.name,
-            style: const TextStyle(fontSize: 13),
+        return Slidable(
+          key: ValueKey('st_${st.id}'),
+          endActionPane: ActionPane(
+            motion: const ScrollMotion(),
+            children: [
+              if (st.status != 'unread')
+                SlidableAction(
+                  onPressed: (_) => app.undoFASubtopic(st.id!),
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  icon: Icons.undo_rounded,
+                  label: 'Undo',
+                ),
+              SlidableAction(
+                onPressed: (_) => app.resetFASubtopic(st.id!),
+                backgroundColor: Colors.red.shade700,
+                foregroundColor: Colors.white,
+                icon: Icons.restart_alt_rounded,
+                label: 'Reset',
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(8),
+                  bottomRight: Radius.circular(8),
+                ),
+              ),
+            ],
           ),
-          subtitle: Text(
-            'Page ${st.pageNum}',
-            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
-          ),
-          trailing: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
+          child: ListTile(
+            dense: true,
+            title: Text(
+              st.name,
+              style: const TextStyle(fontSize: 13),
             ),
-            child: Text(
-              statusLabel,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: statusColor,
+            subtitle: Text(
+              'Page ${st.pageNum}',
+              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+            ),
+            trailing: InkWell(
+              onTap: () => app.advanceFASubtopicRevision(st.id!),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  statusLabel,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: statusColor,
+                  ),
+                ),
               ),
             ),
+            onTap: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                builder: (_) => FAPageDetailSheet(
+                  app: app,
+                  pageNum: st.pageNum,
+                ),
+              );
+            },
           ),
         );
       },
@@ -1224,21 +1173,100 @@ class _SketchyVideoList extends StatelessWidget {
                             activeColor: cs.primary,
                           );
                         }
-                        return CheckboxListTile(
-                          dense: true,
-                          value: v.watched,
-                          onChanged: (val) {
-                            final id = v.id;
-                            if (id != null) {
-                              onToggle(id, val ?? false);
-                            }
-                          },
-                          title: Text(
-                            v.title,
-                            style: const TextStyle(fontSize: 13),
+                        
+                        // Status color / label
+                        Color statusColor = v.watched ? Colors.green : Colors.red.shade700;
+                        String statusLabel = v.watched ? 'Watched ✓' : 'Unwatched';
+
+                        // Undo action based on micro vs pharm
+                        Future<void> handleUndo() async {
+                          final app = context.read<AppProvider>();
+                          if (v.category.toLowerCase().contains('micro')) {
+                            await app.undoSketchyMicro(v.id!);
+                          } else {
+                            await app.undoSketchyPharm(v.id!);
+                          }
+                        }
+
+                        // Reset action
+                        Future<void> handleReset() async {
+                          final app = context.read<AppProvider>();
+                          if (v.category.toLowerCase().contains('micro')) {
+                            await app.resetSketchyMicro(v.id!);
+                          } else {
+                            await app.resetSketchyPharm(v.id!);
+                          }
+                        }
+
+                        return Slidable(
+                          key: ValueKey('sketchy_${v.id}'),
+                          endActionPane: ActionPane(
+                            motion: const ScrollMotion(),
+                            children: [
+                              if (v.watched)
+                                SlidableAction(
+                                  onPressed: (_) => handleUndo(),
+                                  backgroundColor: Colors.orange,
+                                  foregroundColor: Colors.white,
+                                  icon: Icons.undo_rounded,
+                                  label: 'Undo',
+                                ),
+                              SlidableAction(
+                                onPressed: (_) => handleReset(),
+                                backgroundColor: Colors.red.shade700,
+                                foregroundColor: Colors.white,
+                                icon: Icons.restart_alt_rounded,
+                                label: 'Reset',
+                                borderRadius: const BorderRadius.only(
+                                  topRight: Radius.circular(8),
+                                  bottomRight: Radius.circular(8),
+                                ),
+                                padding: EdgeInsets.zero,
+                              ),
+                            ],
                           ),
-                          controlAffinity: ListTileControlAffinity.leading,
-                          activeColor: cs.primary,
+                          child: ListTile(
+                            dense: true,
+                            title: Text(
+                              v.title,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                            trailing: InkWell(
+                              onTap: v.id != null ? () => onToggle(v.id!, !v.watched) : null,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                                ),
+                                child: Text(
+                                  statusLabel,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: statusColor,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            onTap: () {
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                useSafeArea: true,
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                                ),
+                                builder: (_) => LibraryItemDetailSheet(
+                                  app: context.read<AppProvider>(),
+                                  item: v,
+                                  itemType: 'sketchy',
+                                ),
+                              );
+                            },
+                          ),
                         );
                       }).toList(),
                     );
@@ -1335,18 +1363,76 @@ class _PathomaTab extends StatelessWidget {
                       activeColor: cs.primary,
                     );
                   }
+                  
+                  // Status color / label
+                  Color statusColor = ch.watched ? Colors.green : Colors.red.shade700;
+                  String statusLabel = ch.watched ? 'Watched ✓' : 'Unwatched';
 
-                  return CheckboxListTile(
-                    value: ch.watched,
-                    onChanged: (val) {
-                      final id = ch.id;
-                      if (id != null) {
-                        app.togglePathomaChapterWatched(id, val ?? false);
-                      }
-                    },
-                    title: Text('Ch ${ch.chapter} — ${ch.title}'),
-                    controlAffinity: ListTileControlAffinity.leading,
-                    activeColor: cs.primary,
+                  return Slidable(
+                    key: ValueKey('pathoma_${ch.id}'),
+                    endActionPane: ActionPane(
+                      motion: const ScrollMotion(),
+                      children: [
+                        if (ch.watched)
+                          SlidableAction(
+                            onPressed: (_) => app.undoPathomaChapter(ch.id!),
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.white,
+                            icon: Icons.undo_rounded,
+                            label: 'Undo',
+                          ),
+                        SlidableAction(
+                          onPressed: (_) => app.resetPathomaChapter(ch.id!),
+                          backgroundColor: Colors.red.shade700,
+                          foregroundColor: Colors.white,
+                          icon: Icons.restart_alt_rounded,
+                          label: 'Reset',
+                          borderRadius: const BorderRadius.only(
+                            topRight: Radius.circular(8),
+                            bottomRight: Radius.circular(8),
+                          ),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ],
+                    ),
+                    child: ListTile(
+                      title: Text('Ch ${ch.chapter} — ${ch.title}'),
+                      trailing: InkWell(
+                        onTap: ch.id != null ? () => app.togglePathomaChapterWatched(ch.id!, !ch.watched) : null,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                          ),
+                          child: Text(
+                            statusLabel,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: statusColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                      onTap: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          useSafeArea: true,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                          ),
+                          builder: (_) => LibraryItemDetailSheet(
+                            app: app,
+                            item: ch,
+                            itemType: 'pathoma',
+                          ),
+                        );
+                      },
+                    ),
                   );
                 },
               ),
@@ -1579,167 +1665,13 @@ class _UWorldTab extends StatelessWidget {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _EditUWorldProgressSheet(topic: sub),
-    );
-  }
-}
-
-class _EditUWorldProgressSheet extends StatefulWidget {
-  final UWorldTopic topic;
-  const _EditUWorldProgressSheet({required this.topic});
-
-  @override
-  State<_EditUWorldProgressSheet> createState() => _EditUWorldProgressSheetState();
-}
-
-class _EditUWorldProgressSheetState extends State<_EditUWorldProgressSheet> {
-  late int _done;
-  late int _correct;
-
-  @override
-  void initState() {
-    super.initState();
-    _done = widget.topic.doneQuestions;
-    _correct = widget.topic.correctQuestions;
-  }
-
-  void _updateDone(int delta) {
-    setState(() {
-      _done = (_done + delta).clamp(0, widget.topic.totalQuestions);
-      _correct = _correct.clamp(0, _done); // Correct can't exceed done
-    });
-  }
-
-  void _updateCorrect(int delta) {
-    setState(() {
-      _correct = (_correct + delta).clamp(0, _done);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        24,
-        24,
-        24,
-        24 + MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: cs.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          Text(
-            widget.topic.subtopic,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: cs.onSurface,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            widget.topic.system,
-            style: TextStyle(color: cs.primary, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 28),
-          
-          // Row 1: Done
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Questions done:',
-                style: TextStyle(fontSize: 16, color: cs.onSurface),
-              ),
-              Row(
-                children: [
-                  IconButton.filledTonal(
-                    onPressed: _done > 0 ? () => _updateDone(-1) : null,
-                    icon: const Icon(Icons.remove),
-                    iconSize: 20,
-                  ),
-                  SizedBox(
-                    width: 48,
-                    child: Text(
-                      '$_done',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  IconButton.filledTonal(
-                    onPressed: _done < widget.topic.totalQuestions ? () => _updateDone(1) : null,
-                    icon: const Icon(Icons.add),
-                    iconSize: 20,
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          
-          // Row 2: Correct
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Correct:',
-                style: TextStyle(fontSize: 16, color: cs.onSurface),
-              ),
-              Row(
-                children: [
-                  IconButton.filledTonal(
-                    onPressed: _correct > 0 ? () => _updateCorrect(-1) : null,
-                    icon: const Icon(Icons.remove),
-                    iconSize: 20,
-                  ),
-                  SizedBox(
-                    width: 48,
-                    child: Text(
-                      '$_correct',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  IconButton.filledTonal(
-                    onPressed: _correct < _done ? () => _updateCorrect(1) : null,
-                    icon: const Icon(Icons.add),
-                    iconSize: 20,
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 28),
-          
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () {
-                final app = context.read<AppProvider>();
-                app.updateUWorldProgress(widget.topic.id!, _done, _correct);
-                Navigator.pop(context);
-              },
-              child: const Text('Save'),
-            ),
-          ),
-        ],
+      builder: (_) => UWorldDetailSheet(
+        app: context.read<AppProvider>(),
+        topic: sub,
       ),
     );
   }
@@ -2421,125 +2353,168 @@ class _FACardView extends StatelessWidget {
 
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                child: Material(
-                  color: isSelected
-                      ? cs.primary.withValues(alpha: 0.08)
-                      : cs.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(14),
-                  child: InkWell(
-                    onTap: selectionMode
-                        ? () => onToggleSelect(key)
-                        : null,
-                    borderRadius: BorderRadius.circular(14),
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: isSelected
-                              ? cs.primary
-                              : cs.outlineVariant.withValues(alpha: 0.2),
-                          width: isSelected ? 2 : 1,
+                child: Slidable(
+                  key: ValueKey(page.pageNum),
+                  endActionPane: ActionPane(
+                    motion: const ScrollMotion(),
+                    children: [
+                      if (page.status != 'unread')
+                        SlidableAction(
+                          onPressed: (_) => app.undoFAPage(page.pageNum),
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                          icon: Icons.undo_rounded,
+                          label: 'Undo',
+                          borderRadius: BorderRadius.circular(14),
                         ),
+                      SlidableAction(
+                        onPressed: (_) => app.resetFAPage(page.pageNum),
+                        backgroundColor: Colors.red.shade700,
+                        foregroundColor: Colors.white,
+                        icon: Icons.restart_alt_rounded,
+                        label: 'Reset',
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      child: Row(
-                        children: [
-                          if (selectionMode) ...[
-                            Icon(
-                              isSelected
-                                  ? Icons.check_circle_rounded
-                                  : Icons.radio_button_unchecked_rounded,
-                              color: isSelected ? cs.primary : cs.onSurfaceVariant,
-                              size: 22,
+                    ],
+                  ),
+                  child: Material(
+                    color: isSelected
+                        ? cs.primary.withValues(alpha: 0.08)
+                        : cs.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(14),
+                    child: InkWell(
+                      onTap: selectionMode
+                        ? () => onToggleSelect(key)
+                        : () {
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              useSafeArea: true,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                              ),
+                              builder: (_) => FAPageDetailSheet(
+                                app: app,
+                                pageNum: page.pageNum,
+                              ),
+                            );
+                          },
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isSelected
+                                ? cs.primary
+                                : cs.outlineVariant.withValues(alpha: 0.2),
+                            width: isSelected ? 2 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            if (selectionMode) ...[
+                              Icon(
+                                isSelected
+                                    ? Icons.check_circle_rounded
+                                    : Icons.radio_button_unchecked_rounded,
+                                color: isSelected ? cs.primary : cs.onSurfaceVariant,
+                                size: 22,
+                              ),
+                              const SizedBox(width: 12),
+                            ],
+                            // Page number badge
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                    color: statusColor.withValues(alpha: 0.3)),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '${page.pageNum}',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: statusColor,
+                                  ),
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 12),
-                          ],
-                          // Page number badge
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: statusColor.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                  color: statusColor.withValues(alpha: 0.3)),
-                            ),
-                            child: Center(
-                              child: Text(
-                                '${page.pageNum}',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w800,
-                                  color: statusColor,
-                                ),
+                            // Details
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    page.title,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: cs.onSurface,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    '${page.system} · $readSubs/${subtopics.length} subtopics',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: cs.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          // Details
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  page.title,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: cs.onSurface,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  '${page.system} · $readSubs/${subtopics.length} subtopics',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: cs.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          // Status badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: statusColor.withValues(alpha: 0.12),
+                            const SizedBox(width: 8),
+                            // Status badge (now a button to advance)
+                            InkWell(
+                              onTap: selectionMode ? null : () => app.advanceFAPageRevision(page.pageNum),
                               borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              statusLabel,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: statusColor,
-                              ),
-                            ),
-                          ),
-                          if (page.revisionCount > 0) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: cs.primary.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                'R${page.revisionCount}',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: cs.primary,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                                ),
+                                child: Text(
+                                  statusLabel,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: statusColor,
+                                  ),
                                 ),
                               ),
                             ),
+                            if (page.revisionCount > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: cs.primary.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'R${page.revisionCount}',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: cs.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
