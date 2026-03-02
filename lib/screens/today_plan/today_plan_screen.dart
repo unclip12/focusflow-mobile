@@ -450,12 +450,17 @@ class _AllTabContent extends StatefulWidget {
   State<_AllTabContent> createState() => _AllTabContentState();
 }
 
-class _AllTabContentState extends State<_AllTabContent> {
+class _AllTabContentState extends State<_AllTabContent>
+    with AutomaticKeepAliveClientMixin {
   int _segmentIndex = 0;
   static const _segments = ['Full Day Plan', 'Resume', 'Upcoming', 'Completed'];
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context); // Required by AutomaticKeepAliveClientMixin
     final cs = Theme.of(context).colorScheme;
     final app = context.watch<AppProvider>();
     final flow = app.getDailyFlow(widget.dateKey);
