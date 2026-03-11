@@ -60,6 +60,7 @@ class _TrackNowScreenState extends State<TrackNowScreen>
   bool _isTracking = false;
   String? _trackingActivityId;
   DateTime? _startedAt;
+  String? _initialActivityLabel;
 
   // Selected existing task to link to
   String? _selectedTaskId;
@@ -76,9 +77,18 @@ class _TrackNowScreenState extends State<TrackNowScreen>
     // If resuming an existing activity
     if (widget.existingActivityId != null) {
       final app = context.read<AppProvider>();
-      final activity = _findActivity(app);
+      final activity = _findActivityById(app, widget.existingActivityId);
       if (activity != null) {
-        _nameCtrl.text = activity.label;
+        _initialActivityLabel = activity.label;
+        final linkedTaskId = activity.linkedTaskIds.isNotEmpty
+            ? activity.linkedTaskIds.first
+            : null;
+        final linkedTaskTitle = linkedTaskId != null
+            ? _resolveLinkedTaskTitle(app, linkedTaskId)
+            : null;
+        _selectedTaskId = linkedTaskId;
+        _selectedTaskTitle = linkedTaskTitle;
+        _nameCtrl.text = linkedTaskTitle ?? activity.label;
         _selectedCategory = activity.category;
         _notesCtrl.text = activity.notes ?? '';
         _trackingActivityId = activity.id;
@@ -108,12 +118,13 @@ class _TrackNowScreenState extends State<TrackNowScreen>
     _startTimer();
   }
 
-  FlowActivity? _findActivity(AppProvider app) {
+  FlowActivity? _findActivityById(AppProvider app, String? activityId) {
+    if (activityId == null) return null;
     final flow = app.getDailyFlow(widget.dateKey);
     if (flow == null) return null;
     try {
       return flow.activities.firstWhere(
-        (a) => a.id == widget.existingActivityId,
+        (a) => a.id == activityId,
       );
     } catch (_) {
       return null;
@@ -126,7 +137,7 @@ class _TrackNowScreenState extends State<TrackNowScreen>
     });
     
     // Start background timer
-    final name = _selectedTaskTitle ?? _nameCtrl.text.trim();
+    final name = _trackingDisplayName;
     if (name.isNotEmpty) {
       BackgroundTimerService.start(
         activityName: name,
@@ -143,7 +154,7 @@ class _TrackNowScreenState extends State<TrackNowScreen>
         _elapsed = DateTime.now().difference(_startedAt!).inSeconds;
       });
       // Re-sync background service time in case it drifted
-      final name = _selectedTaskTitle ?? _nameCtrl.text.trim();
+      final name = _trackingDisplayName;
       BackgroundTimerService.start(
         activityName: name.isNotEmpty ? name : 'Session',
         elapsedSeconds: _elapsed,
@@ -171,10 +182,131 @@ class _TrackNowScreenState extends State<TrackNowScreen>
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
+  String get _trackingDisplayName {
+    final selectedTitle = _selectedTaskTitle?.trim();
+    if (selectedTitle != null && selectedTitle.isNotEmpty) return selectedTitle;
+
+    final manualName = _nameCtrl.text.trim();
+    if (manualName.isNotEmpty) return manualName;
+
+    final initialLabel = _initialActivityLabel?.trim();
+    if (initialLabel != null && initialLabel.isNotEmpty) return initialLabel;
+
+    return '';
+  }
+
+  String? _resolveLinkedTaskTitle(AppProvider app, String taskId) {
+    final flow = app.getDailyFlow(widget.dateKey);
+    if (flow != null) {
+      for (final activity in flow.activities) {
+        if (activity.id == taskId) return activity.label;
+      }
+    }
+
+    final blocks = app.getDayPlan(widget.dateKey)?.blocks ?? const [];
+    for (final block in blocks) {
+      if (block.id == taskId) return block.title;
+      for (final task in block.tasks ?? const []) {
+        if (task.id == taskId) return task.detail;
+      }
+    }
+
+    return null;
+  }
+
+  List<Map<String, dynamic>> _buildLinkableItems(
+    AppProvider app,
+    ColorScheme cs,
+  ) {
+    final flow = app.getDailyFlow(widget.dateKey);
+    final dayPlan = app.getDayPlan(widget.dateKey);
+    final linkableItems = <Map<String, dynamic>>[];
+
+    if (flow != null) {
+      for (final activity in flow.activities) {
+        if (activity.activityType == 'TRACK_NOW') continue;
+        linkableItems.add({
+          'id': activity.id,
+          'title': activity.label,
+          'subtitle': 'Today\'s Flow',
+          'icon': Icons.list_alt_rounded,
+          'color': cs.tertiary,
+        });
+      }
+    }
+
+    if (dayPlan != null) {
+      final linkedBlockIds = flow?.activities.expand((a) => a.linkedTaskIds).toSet() ??
+          <String>{};
+      for (final block in dayPlan.blocks ?? const []) {
+        if (block.type == BlockType.breakBlock || block.isVirtual == true) {
+          continue;
+        }
+        if (linkedBlockIds.contains(block.id)) continue;
+        linkableItems.add({
+          'id': block.id,
+          'title': block.title,
+          'subtitle': 'Today\'s Plan',
+          'icon': Icons.calendar_today_rounded,
+          'color': const Color(0xFF6366F1),
+        });
+      }
+    }
+
+    return linkableItems;
+  }
+
+  Future<void> _selectExistingTask(
+    Map<String, dynamic> item, {
+    bool allowToggle = false,
+  }) async {
+    final itemId = item['id'] as String;
+    final itemTitle = item['title'] as String;
+    final isSelected = _selectedTaskId == itemId;
+
+    if (isSelected && allowToggle) {
+      setState(() {
+        _selectedTaskId = null;
+        _selectedTaskTitle = null;
+        _nameCtrl.clear();
+      });
+      HapticsService.light();
+      return;
+    }
+
+    setState(() {
+      _selectedTaskId = itemId;
+      _selectedTaskTitle = itemTitle;
+      _nameCtrl.text = itemTitle;
+      _selectedCategory = null;
+    });
+    HapticsService.light();
+
+    if (!_isTracking || _trackingActivityId == null) return;
+
+    final app = context.read<AppProvider>();
+    final trackedActivity = _findActivityById(app, _trackingActivityId);
+    if (trackedActivity != null) {
+      await app.updateFlowActivity(
+        widget.dateKey,
+        trackedActivity.copyWith(
+          label: itemTitle,
+          linkedTaskIds: [itemId],
+        ),
+      );
+    }
+    if (mounted) {
+      await BackgroundTimerService.start(
+        activityName: _trackingDisplayName,
+        elapsedSeconds: _elapsed,
+      );
+    }
+  }
+
   // ── Actions ──────────────────────────────────────────────────
 
   Future<void> _startTracking() async {
-    final name = _selectedTaskTitle ?? _nameCtrl.text.trim();
+    final name = _trackingDisplayName;
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter or select what you are doing')),
@@ -194,7 +326,10 @@ class _TrackNowScreenState extends State<TrackNowScreen>
     if (_selectedTaskId != null) {
       await app.updateFlowActivity(
         widget.dateKey, 
-        activity.copyWith(linkedTaskIds: [_selectedTaskId!])
+        activity.copyWith(
+          label: name,
+          linkedTaskIds: [_selectedTaskId!],
+        ),
       );
     }
 
@@ -212,7 +347,7 @@ class _TrackNowScreenState extends State<TrackNowScreen>
 
     HapticsService.heavy();
     final app = context.read<AppProvider>();
-    final name = _selectedTaskTitle ?? _nameCtrl.text.trim();
+    final name = _trackingDisplayName;
     await app.stopTrackNow(
       widget.dateKey,
       _trackingActivityId!,
@@ -243,12 +378,134 @@ class _TrackNowScreenState extends State<TrackNowScreen>
     }
   }
 
+  Future<void> _cancelTracking() async {
+    if (_trackingActivityId == null) {
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
+
+    HapticsService.medium();
+    _tickTimer?.cancel();
+    BackgroundTimerService.stop();
+    await context.read<AppProvider>().discardTrackNow(
+          widget.dateKey,
+          _trackingActivityId!,
+        );
+
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
   void _openAddTask() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => AddTaskSheet(dateKey: widget.dateKey),
+    );
+  }
+
+  void _openExistingTaskPicker() {
+    final app = context.read<AppProvider>();
+    final cs = Theme.of(context).colorScheme;
+    final items = _buildLinkableItems(app, cs);
+    if (items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No existing tasks found for today')),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Container(
+          decoration: BoxDecoration(
+            color: cs.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 8),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.onSurface.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Choose Today\'s Task',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: cs.onSurface,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.55,
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    itemCount: items.length,
+                    separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      indent: 48,
+                      color: cs.outlineVariant.withValues(alpha: 0.2),
+                    ),
+                    itemBuilder: (_, index) {
+                      final item = items[index];
+                      final isSelected = _selectedTaskId == item['id'];
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        onTap: () async {
+                          Navigator.of(sheetContext).pop();
+                          await _selectExistingTask(item);
+                        },
+                        leading: Icon(
+                          item['icon'] as IconData,
+                          color: item['color'] as Color,
+                        ),
+                        title: Text(
+                          item['title'] as String,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight:
+                                isSelected ? FontWeight.w700 : FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: Text(item['subtitle'] as String),
+                        trailing: isSelected
+                            ? Icon(Icons.check_circle_rounded, color: cs.primary)
+                            : Icon(
+                                Icons.chevron_right_rounded,
+                                color: cs.onSurface.withValues(alpha: 0.3),
+                              ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -334,15 +591,11 @@ class _TrackNowScreenState extends State<TrackNowScreen>
                     ),
                   ),
                   const Spacer(),
-                  // Add task button (only while tracking)
-                  if (_isTracking)
-                    IconButton(
-                      icon: Icon(Icons.add_rounded, color: cs.primary),
-                      onPressed: _openAddTask,
-                      tooltip: 'Add Task',
-                    )
-                  else
-                    const SizedBox(width: 48),
+                  IconButton(
+                    icon: Icon(Icons.add_rounded, color: cs.primary),
+                    onPressed: _openAddTask,
+                    tooltip: 'Add Task',
+                  ),
                 ],
               ),
             ),
@@ -357,22 +610,42 @@ class _TrackNowScreenState extends State<TrackNowScreen>
             // ── Bottom action ────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              child: SizedBox(
-                width: double.infinity,
-                child: _isTracking
-                    ? FilledButton.icon(
-                        onPressed: _stopTracking,
-                        icon: const Icon(Icons.stop_rounded, size: 20),
-                        label: const Text('Stop & Save'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFEF4444),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+              child: _isTracking
+                  ? Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _cancelTracking,
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            label: const Text('Cancel'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
                           ),
                         ),
-                      )
-                    : FilledButton.icon(
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: _stopTracking,
+                            icon: const Icon(Icons.stop_rounded, size: 20),
+                            label: const Text('Stop & Save'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFFEF4444),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
                         onPressed: _startTracking,
                         icon: const Icon(Icons.play_arrow_rounded, size: 22),
                         label: const Text('Start Tracking'),
@@ -383,7 +656,7 @@ class _TrackNowScreenState extends State<TrackNowScreen>
                           ),
                         ),
                       ),
-              ),
+                    ),
             ),
           ],
         ),
@@ -554,44 +827,7 @@ class _TrackNowScreenState extends State<TrackNowScreen>
 
   Widget _buildExistingTasksList(ThemeData theme, ColorScheme cs) {
     final app = context.watch<AppProvider>();
-    final flow = app.getDailyFlow(widget.dateKey);
-    final dayPlan = app.getDayPlan(widget.dateKey);
-
-    final linkableItems = <Map<String, dynamic>>[];
-
-    // Add today's flow activities that are not already track now
-    if (flow != null) {
-      for (final a in flow.activities) {
-        if (a.activityType == 'TRACK_NOW') continue;
-        linkableItems.add({
-          'id': a.id,
-          'title': a.label,
-          'subtitle': 'Today\'s Flow',
-          'icon': Icons.list_alt_rounded,
-          'color': cs.tertiary,
-        });
-      }
-    }
-
-    // Add today's plan blocks
-    if (dayPlan != null) {
-      final blocks = dayPlan.blocks ?? [];
-      final linkedBlockIds = flow?.activities
-          .expand((a) => a.linkedTaskIds)
-          .toSet() ?? {};
-          
-      for (final b in blocks) {
-        if (b.type == BlockType.breakBlock || b.isVirtual == true) continue;
-        if (linkedBlockIds.contains(b.id)) continue;
-        linkableItems.add({
-          'id': b.id,
-          'title': b.title,
-          'subtitle': 'Today\'s Plan',
-          'icon': Icons.calendar_today_rounded,
-          'color': const Color(0xFF6366F1),
-        });
-      }
-    }
+    final linkableItems = _buildLinkableItems(app, cs);
 
     if (linkableItems.isEmpty) return const SizedBox.shrink();
 
@@ -626,27 +862,14 @@ class _TrackNowScreenState extends State<TrackNowScreen>
               final isSelected = _selectedTaskId == item['id'];
               return ListTile(
                 dense: true,
-                onTap: () {
-                  setState(() {
-                    if (isSelected) {
-                      _selectedTaskId = null;
-                      _selectedTaskTitle = null;
-                    } else {
-                      _selectedTaskId = item['id'];
-                      _selectedTaskTitle = item['title'];
-                      _nameCtrl.clear();
-                      _selectedCategory = null;
-                    }
-                  });
-                  HapticsService.light();
-                },
+                onTap: () => _selectExistingTask(item, allowToggle: true),
                 leading: Icon(
-                  item['icon'],
-                  color: item['color'],
+                  item['icon'] as IconData,
+                  color: item['color'] as Color,
                   size: 20,
                 ),
                 title: Text(
-                  item['title'],
+                  item['title'] as String,
                   style: TextStyle(
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                     fontSize: 14,
@@ -655,7 +878,7 @@ class _TrackNowScreenState extends State<TrackNowScreen>
                   overflow: TextOverflow.ellipsis,
                 ),
                 subtitle: Text(
-                  item['subtitle'],
+                  item['subtitle'] as String,
                   style: TextStyle(
                     fontSize: 11,
                     color: cs.onSurface.withValues(alpha: 0.5),
@@ -687,17 +910,25 @@ class _TrackNowScreenState extends State<TrackNowScreen>
         children: [
           const SizedBox(height: 24),
 
-          // Category icon + name
+          Text(
+            'Currently tracking',
+            style: theme.textTheme.labelLarge?.copyWith(
+              letterSpacing: 0.3,
+              fontWeight: FontWeight.w700,
+              color: cs.onSurface.withValues(alpha: 0.55),
+            ),
+          ),
+          const SizedBox(height: 10),
           Text(
             categoryData.emoji,
             style: const TextStyle(fontSize: 48),
           ),
           const SizedBox(height: 12),
           Text(
-            _nameCtrl.text,
+            _trackingDisplayName.isNotEmpty ? _trackingDisplayName : 'Session',
             textAlign: TextAlign.center,
             style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
               color: cs.onSurface,
             ),
             maxLines: 2,
@@ -792,23 +1023,23 @@ class _TrackNowScreenState extends State<TrackNowScreen>
 
           const SizedBox(height: 16),
 
-          // Add task button row
+          // Existing task picker row
           Material(
             color: cs.primary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(14),
             child: InkWell(
-              onTap: _openAddTask,
+              onTap: _openExistingTaskPicker,
               borderRadius: BorderRadius.circular(14),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.add_rounded,
+                    Icon(Icons.playlist_add_check_rounded,
                         size: 18, color: cs.primary.withValues(alpha: 0.6)),
                     const SizedBox(width: 6),
                     Text(
-                      'Add Task (FA Page, UWorld, etc.)',
+                      'Choose Existing Task For Today',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,

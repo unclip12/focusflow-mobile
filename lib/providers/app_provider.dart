@@ -1063,6 +1063,21 @@ class AppProvider extends ChangeNotifier {
     return activity;
   }
 
+  /// Discard an active Track Now activity without saving it.
+  Future<void> discardTrackNow(String date, String activityId) async {
+    final flow = getDailyFlow(date);
+    if (flow == null) return;
+
+    final activities = List<FlowActivity>.from(flow.activities);
+    activities.removeWhere(
+      (a) => a.id == activityId && a.activityType == 'TRACK_NOW',
+    );
+    if (activities.length == flow.activities.length) return;
+
+    await upsertDailyFlow(flow.copyWith(activities: activities));
+    BackgroundTimerService.stop();
+  }
+
   /// Stop the Track Now timer and mark activity as DONE.
   Future<void> stopTrackNow(
     String date,
@@ -1095,6 +1110,19 @@ class AppProvider extends ChangeNotifier {
     );
 
     await upsertDailyFlow(flow.copyWith(activities: activities));
+    final linkedId = activities[idx].linkedTaskIds.isNotEmpty
+        ? activities[idx].linkedTaskIds.first
+        : null;
+    if (linkedId != null) {
+      await _completeTrackNowLinkedItem(
+        date,
+        linkedId,
+        completedAt: now,
+        durationSeconds: duration,
+        startedAtIso: activities[idx].startedAt,
+      );
+      await _syncTrackNowLinkedLibraryItem(date, linkedId);
+    }
     BackgroundTimerService.stop();
   }
 
@@ -1109,6 +1137,189 @@ class AppProvider extends ChangeNotifier {
     } catch (_) {
       return null;
     }
+  }
+
+  Future<void> _completeTrackNowLinkedItem(
+    String date,
+    String linkedId, {
+    required DateTime completedAt,
+    required int? durationSeconds,
+    required String? startedAtIso,
+  }) async {
+    final startIso = startedAtIso ??
+        (durationSeconds != null
+            ? completedAt
+                .subtract(Duration(seconds: durationSeconds))
+                .toIso8601String()
+            : null);
+
+    final flow = getDailyFlow(date);
+    if (flow != null) {
+      final activities = List<FlowActivity>.from(flow.activities);
+      final idx = activities.indexWhere((a) => a.id == linkedId);
+      if (idx >= 0) {
+        final linkedActivity = activities[idx];
+        activities[idx] = linkedActivity.copyWith(
+          status: 'DONE',
+          startedAt: linkedActivity.startedAt ?? startIso,
+          completedAt: completedAt.toIso8601String(),
+          durationSeconds: durationSeconds ?? linkedActivity.durationSeconds,
+        );
+        await upsertDailyFlow(flow.copyWith(activities: activities));
+        return;
+      }
+    }
+
+    final plan = getDayPlan(date);
+    final planBlocks = plan?.blocks;
+    if (plan == null || planBlocks == null) return;
+
+    final blocks = List<Block>.from(planBlocks);
+    final idx = blocks.indexWhere((b) => b.id == linkedId);
+    if (idx < 0) return;
+
+    final block = blocks[idx];
+    blocks[idx] = block.copyWith(
+      status: BlockStatus.done,
+      actualStartTime: block.actualStartTime ?? startIso,
+      actualEndTime: completedAt.toIso8601String(),
+      actualDurationMinutes: durationSeconds != null
+          ? (durationSeconds / 60).ceil()
+          : block.actualDurationMinutes,
+      completionStatus: 'COMPLETED',
+    );
+    await upsertDayPlan(plan.copyWith(blocks: blocks));
+  }
+
+  Map<String, dynamic>? _resolveTrackNowStructuredTarget(
+    String date,
+    String linkedId, {
+    Set<String>? visited,
+  }) {
+    final seen = visited ?? <String>{};
+    if (!seen.add(linkedId)) return null;
+
+    final planBlocks = getDayPlan(date)?.blocks ?? const <Block>[];
+    for (final block in planBlocks) {
+      if (block.id == linkedId) {
+        final tasks = block.tasks ?? const <BlockTask>[];
+        if (tasks.length == 1 && tasks.first.meta != null) {
+          return {'task': tasks.first};
+        }
+        final hasStructuredBlockData =
+            (block.relatedFaPages?.isNotEmpty ?? false) ||
+            block.relatedVideoId != null ||
+            block.relatedQbankInfo != null;
+        if (hasStructuredBlockData) {
+          return {'block': block};
+        }
+        return null;
+      }
+
+      for (final task in block.tasks ?? const <BlockTask>[]) {
+        if (task.id == linkedId && task.meta != null) {
+          return {'task': task};
+        }
+      }
+    }
+
+    final flow = getDailyFlow(date);
+    if (flow == null) return null;
+
+    final idx = flow.activities.indexWhere((a) => a.id == linkedId);
+    if (idx < 0) return null;
+
+    for (final nestedId in flow.activities[idx].linkedTaskIds) {
+      final resolved = _resolveTrackNowStructuredTarget(
+        date,
+        nestedId,
+        visited: seen,
+      );
+      if (resolved != null) return resolved;
+    }
+    return null;
+  }
+
+  Future<void> _syncTrackNowLinkedLibraryItem(
+    String date,
+    String linkedId,
+  ) async {
+    final resolved = _resolveTrackNowStructuredTarget(date, linkedId);
+    if (resolved == null) return;
+
+    final task = resolved['task'] as BlockTask?;
+    if (task != null) {
+      await completeStudyTask(task.copyWith(completed: true));
+      return;
+    }
+
+    final block = resolved['block'] as Block?;
+    if (block == null) return;
+
+    final relatedPages = block.relatedFaPages ?? const <int>[];
+    if (relatedPages.isNotEmpty) {
+      for (final pageNum in relatedPages) {
+        final pageIdx = faPages.indexWhere((p) => p.pageNum == pageNum);
+        if (pageIdx < 0) continue;
+        final page = faPages[pageIdx];
+        if (page.status == 'unread') {
+          await updateFAPageStatus(pageNum, 'read');
+        } else {
+          await advanceFAPageRevision(pageNum);
+        }
+      }
+      return;
+    }
+
+    final videoId = int.tryParse(block.relatedVideoId ?? '');
+    if (videoId != null) {
+      if (sketchyMicroVideos.any((v) => v.id == videoId)) {
+        await advanceSketchyMicroRevision(videoId);
+        return;
+      }
+      if (sketchyPharmVideos.any((v) => v.id == videoId)) {
+        await advanceSketchyPharmRevision(videoId);
+        return;
+      }
+      if (pathomaChapters.any((c) => c.id == videoId)) {
+        await advancePathomaRevision(videoId);
+        return;
+      }
+    }
+
+    final qbankInfo = block.relatedQbankInfo;
+    if (qbankInfo == null) return;
+
+    final topicIdRaw = qbankInfo['topicId'];
+    final countRaw =
+        qbankInfo['count'] ?? qbankInfo['doneQuestions'] ?? qbankInfo['questions'];
+    final correctRaw = qbankInfo['correctQuestions'] ?? 0;
+
+    final topicId = topicIdRaw is int ? topicIdRaw : int.tryParse('$topicIdRaw');
+    final count = countRaw is int ? countRaw : int.tryParse('$countRaw');
+    final correct = correctRaw is int
+        ? correctRaw
+        : int.tryParse('$correctRaw') ?? 0;
+    if (topicId == null || count == null) return;
+
+    final topicIdx = uworldTopics.indexWhere((t) => t.id == topicId);
+    if (topicIdx < 0) return;
+
+    final topic = uworldTopics[topicIdx];
+    await updateUWorldProgress(
+      topicId,
+      topic.doneQuestions + count,
+      topic.correctQuestions + correct,
+    );
+    await addUWorldSession(
+      UWorldSession(
+        id: _uuid.v4(),
+        subject: topic.system,
+        done: count,
+        correct: correct,
+        date: date,
+      ),
+    );
   }
 
   /// Icon helper for Track Now categories.

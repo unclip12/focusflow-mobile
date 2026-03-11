@@ -136,6 +136,20 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
         _selectedDate = _selectedDate.add(const Duration(days: 1));
       });
 
+  void _openTrackNow() {
+    final app = context.read<AppProvider>();
+    final activeTrackNow = app.getActiveTrackNow(_dateKey);
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TrackNowScreen(
+          dateKey: _dateKey,
+          existingActivityId: activeTrackNow?.id,
+        ),
+      ),
+    );
+  }
+
   void _completeBlock(AppProvider app, DayPlan plan, Block block) {
     HapticsService.heavy();
     final blocks = List<Block>.from(plan.blocks ?? []);
@@ -228,16 +242,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                 // ── Active Track Now Banner (if running) ─────────────
                 if (activeTrackNow != null && activeTrackNow.startedAt != null)
                   GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => TrackNowScreen(
-                            dateKey: _dateKey,
-                            existingActivityId: activeTrackNow.id,
-                          ),
-                        ),
-                      );
-                    },
+                    onTap: _openTrackNow,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 10),
@@ -288,14 +293,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                                 if (picked != null)
                                   setState(() => _selectedDate = picked);
                               },
-                              onTrackNow: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        TrackNowScreen(dateKey: _dateKey),
-                                  ),
-                                );
-                              },
+                              onTrackNow: _openTrackNow,
                             ),
 
                             // ── Activity Selector (all dates) ─────────
