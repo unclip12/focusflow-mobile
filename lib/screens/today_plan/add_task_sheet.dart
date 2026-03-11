@@ -244,7 +244,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     }
 
     // ── Validation: Conflict check (7E) ─────────────────────────
-    if (_isRevision) {
+    final shouldWarnAlreadyStudied = _isRevision &&
+        !(_exam == ExamType.usmle && _usmleType == UsmleTaskType.faPages);
+    if (shouldWarnAlreadyStudied) {
       final confirm = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
