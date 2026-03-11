@@ -368,6 +368,45 @@ class AppProvider extends ChangeNotifier {
     catch (_) { return null; }
   }
 
+  String get todayDateKey => DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+  List<Block> getTodayBlocksForLibraryVideo({
+    required int videoId,
+    required Iterable<String> candidateTitles,
+  }) {
+    final normalizedTitles = candidateTitles
+        .map((title) => title.trim().toLowerCase())
+        .where((title) => title.isNotEmpty)
+        .toSet();
+    final blocks = getDayPlan(todayDateKey)?.blocks ?? const <Block>[];
+
+    return blocks.where((block) {
+      if (block.type != BlockType.video) return false;
+      if (block.relatedVideoId == '$videoId') return true;
+      return normalizedTitles.contains(block.title.trim().toLowerCase());
+    }).toList();
+  }
+
+  Future<void> removeTodayBlocksById(Iterable<String> blockIds) async {
+    final ids = blockIds.where((id) => id.isNotEmpty).toSet();
+    if (ids.isEmpty) return;
+
+    final plan = getDayPlan(todayDateKey);
+    final blocks = plan?.blocks;
+    if (plan == null || blocks == null) return;
+
+    final remaining = <Block>[];
+    for (final block in blocks) {
+      if (!ids.contains(block.id)) {
+        remaining.add(block.copyWith(index: remaining.length));
+      }
+    }
+    if (remaining.length == blocks.length) return;
+
+    await upsertDayPlan(plan.copyWith(blocks: remaining));
+    await syncFlowActivitiesFromDayPlan(todayDateKey);
+  }
+
   Future<void> upsertDayPlan(DayPlan plan) async {
     await _db.upsertDayPlan(plan.toJson());
     final idx = dayPlans.indexWhere((p) => p.date == plan.date);
@@ -431,6 +470,32 @@ class AppProvider extends ChangeNotifier {
   Future<void> deleteTimeLog(String id) async {
     await _db.deleteTimeLog(id);
     timeLogs.removeWhere((e) => e.id == id);
+    notifyListeners();
+  }
+
+  Future<void> _deleteTimeLogsForActivities(
+    Iterable<String> activities, {
+    TimeLogCategory? category,
+  }) async {
+    final targets = activities
+        .map((activity) => activity.trim())
+        .where((activity) => activity.isNotEmpty)
+        .toSet();
+    if (targets.isEmpty) return;
+
+    final matching = timeLogs
+        .where((log) =>
+            targets.contains(log.activity.trim()) &&
+            (category == null || log.category == category))
+        .map((log) => log.id)
+        .toList();
+
+    if (matching.isEmpty) return;
+
+    for (final id in matching) {
+      await _db.deleteTimeLog(id);
+    }
+    timeLogs.removeWhere((log) => matching.contains(log.id));
     notifyListeners();
   }
 
@@ -2211,10 +2276,18 @@ class AppProvider extends ChangeNotifier {
     }
   }
   Future<void> resetSketchyMicro(int id) async {
+    final idx = sketchyMicroVideos.indexWhere((v) => v.id == id);
+    final video = idx >= 0 ? sketchyMicroVideos[idx] : null;
     await toggleSketchyMicroWatched(id, false);
     final revId = 'sketchy-micro-$id';
     if (revisionItems.any((r) => r.id == revId)) {
       await deleteRevisionItem(revId);
+    }
+    if (video != null) {
+      await _deleteTimeLogsForActivities(
+        {'Sketchy: ${video.title}'},
+        category: TimeLogCategory.video,
+      );
     }
   }
 
@@ -2262,10 +2335,18 @@ class AppProvider extends ChangeNotifier {
     }
   }
   Future<void> resetSketchyPharm(int id) async {
+    final idx = sketchyPharmVideos.indexWhere((v) => v.id == id);
+    final video = idx >= 0 ? sketchyPharmVideos[idx] : null;
     await toggleSketchyPharmWatched(id, false);
     final revId = 'sketchy-pharm-$id';
     if (revisionItems.any((r) => r.id == revId)) {
       await deleteRevisionItem(revId);
+    }
+    if (video != null) {
+      await _deleteTimeLogsForActivities(
+        {'Sketchy: ${video.title}'},
+        category: TimeLogCategory.video,
+      );
     }
   }
 
@@ -2361,10 +2442,18 @@ class AppProvider extends ChangeNotifier {
     }
   }
   Future<void> resetPathomaChapter(int id) async {
+    final idx = pathomaChapters.indexWhere((c) => c.id == id);
+    final chapter = idx >= 0 ? pathomaChapters[idx] : null;
     await togglePathomaChapterWatched(id, false);
     final revId = 'pathoma-ch-$id';
     if (revisionItems.any((r) => r.id == revId)) {
       await deleteRevisionItem(revId);
+    }
+    if (chapter != null) {
+      await _deleteTimeLogsForActivities(
+        {'Pathoma Ch${chapter.chapter}: ${chapter.title}'},
+        category: TimeLogCategory.video,
+      );
     }
   }
 

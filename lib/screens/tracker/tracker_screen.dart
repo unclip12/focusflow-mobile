@@ -27,7 +27,48 @@ class TrackerScreen extends StatefulWidget {
   State<TrackerScreen> createState() => _TrackerScreenState();
 }
 
-const double _twoActionPaneExtentRatio = 0.62;
+const double _slidableActionExtentRatio = 0.28;
+const double _twoActionPaneExtentRatio = _slidableActionExtentRatio * 2;
+
+Future<bool> _confirmTodayTaskConflictForLibraryItem({
+  required BuildContext context,
+  required AppProvider app,
+  required int itemId,
+  required Iterable<String> candidateTitles,
+}) async {
+  final matchingBlocks = app.getTodayBlocksForLibraryVideo(
+    videoId: itemId,
+    candidateTitles: candidateTitles,
+  );
+  if (matchingBlocks.isEmpty) return true;
+
+  final action = await showDialog<String>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Already In Today\'s Tasks'),
+      content: const Text(
+        'This item is already in today\'s tasks. Mark as Revision instead?',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop('keep'),
+          child: const Text('Keep'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(dialogContext).pop('remove'),
+          child: const Text('Remove from tasks'),
+        ),
+      ],
+    ),
+  );
+
+  if (action == 'remove') {
+    await app.removeTodayBlocksById(matchingBlocks.map((block) => block.id));
+    return true;
+  }
+
+  return action == 'keep';
+}
 
 class _TrackerScreenState extends State<TrackerScreen>
     with SingleTickerProviderStateMixin {
@@ -1245,8 +1286,20 @@ class _SketchyVideoList extends StatelessWidget {
                             ),
                             trailing: InkWell(
                               onTap: v.id != null
-                                  ? () {
+                                  ? () async {
                                       final app = context.read<AppProvider>();
+                                      if (!v.watched) {
+                                        final shouldAdvance =
+                                            await _confirmTodayTaskConflictForLibraryItem(
+                                          context: context,
+                                          app: app,
+                                          itemId: v.id!,
+                                          candidateTitles: {
+                                            'Sketchy: ${v.title}',
+                                          },
+                                        );
+                                        if (!shouldAdvance) return;
+                                      }
                                       app.advanceSketchyRevision(v.id!);
                                     }
                                   : null,
@@ -1430,7 +1483,23 @@ class _PathomaTab extends StatelessWidget {
                     child: ListTile(
                       title: Text('Ch ${ch.chapter} — ${ch.title}'),
                       trailing: InkWell(
-                        onTap: ch.id != null ? () => app.advancePathomaRevision(ch.id!) : null,
+                        onTap: ch.id != null
+                            ? () async {
+                                if (!ch.watched) {
+                                  final shouldAdvance =
+                                      await _confirmTodayTaskConflictForLibraryItem(
+                                    context: context,
+                                    app: app,
+                                    itemId: ch.id!,
+                                    candidateTitles: {
+                                      'Pathoma Ch${ch.chapter}: ${ch.title}',
+                                    },
+                                  );
+                                  if (!shouldAdvance) return;
+                                }
+                                app.advancePathomaRevision(ch.id!);
+                              }
+                            : null,
                         borderRadius: BorderRadius.circular(8),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -2073,6 +2142,7 @@ class _AddToTaskSheet extends StatelessWidget {
         plannedEndTime: '00:00',
         type: blockType,
         title: title,
+        relatedVideoId: blockType == BlockType.video ? id : null,
         plannedDurationMinutes: 0,
         status: BlockStatus.notStarted,
       ));
