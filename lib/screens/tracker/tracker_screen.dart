@@ -1200,21 +1200,13 @@ class _SketchyVideoList extends StatelessWidget {
                         // Undo action based on micro vs pharm
                         Future<void> handleUndo() async {
                           final app = context.read<AppProvider>();
-                          if (v.category.toLowerCase().contains('micro')) {
-                            await app.undoSketchyMicro(v.id!);
-                          } else {
-                            await app.undoSketchyPharm(v.id!);
-                          }
+                          await app.undoSketchy(v.id!);
                         }
 
                         // Reset action
                         Future<void> handleReset() async {
                           final app = context.read<AppProvider>();
-                          if (v.category.toLowerCase().contains('micro')) {
-                            await app.resetSketchyMicro(v.id!);
-                          } else {
-                            await app.resetSketchyPharm(v.id!);
-                          }
+                          await app.resetSketchy(v.id!);
                         }
 
                         return Slidable(
@@ -1255,11 +1247,7 @@ class _SketchyVideoList extends StatelessWidget {
                               onTap: v.id != null
                                   ? () {
                                       final app = context.read<AppProvider>();
-                                      if (v.category.toLowerCase().contains('micro')) {
-                                        app.advanceSketchyMicroRevision(v.id!);
-                                      } else {
-                                        app.advanceSketchyPharmRevision(v.id!);
-                                      }
+                                      app.advanceSketchyRevision(v.id!);
                                     }
                                   : null,
                               borderRadius: BorderRadius.circular(8),

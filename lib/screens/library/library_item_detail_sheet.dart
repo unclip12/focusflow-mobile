@@ -233,11 +233,7 @@ class _ProgressTab extends StatelessWidget {
           value: item.watched,
           onChanged: (val) {
             if (itemType == 'sketchy') {
-              if (item.category.toString().toLowerCase().contains('micro')) {
-                app.toggleSketchyMicroWatched(item.id, val);
-              } else {
-                app.toggleSketchyPharmWatched(item.id, val);
-              }
+              app.toggleSketchyWatched(item.id, val);
             } else {
               app.togglePathomaChapterWatched(item.id, val);
             }

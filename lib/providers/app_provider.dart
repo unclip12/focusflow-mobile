@@ -2269,6 +2269,54 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  bool isSketchyMicroVideo(int id) {
+    return sketchyMicroVideos.any((v) => v.id == id);
+  }
+
+  bool isSketchyPharmVideo(int id) {
+    return sketchyPharmVideos.any((v) => v.id == id);
+  }
+
+  Future<void> toggleSketchyWatched(int id, bool watched) async {
+    if (isSketchyMicroVideo(id)) {
+      await toggleSketchyMicroWatched(id, watched);
+      return;
+    }
+    if (isSketchyPharmVideo(id)) {
+      await toggleSketchyPharmWatched(id, watched);
+    }
+  }
+
+  Future<void> undoSketchy(int id) async {
+    if (isSketchyMicroVideo(id)) {
+      await undoSketchyMicro(id);
+      return;
+    }
+    if (isSketchyPharmVideo(id)) {
+      await undoSketchyPharm(id);
+    }
+  }
+
+  Future<void> resetSketchy(int id) async {
+    if (isSketchyMicroVideo(id)) {
+      await resetSketchyMicro(id);
+      return;
+    }
+    if (isSketchyPharmVideo(id)) {
+      await resetSketchyPharm(id);
+    }
+  }
+
+  Future<void> advanceSketchyRevision(int id) async {
+    if (isSketchyMicroVideo(id)) {
+      await advanceSketchyMicroRevision(id);
+      return;
+    }
+    if (isSketchyPharmVideo(id)) {
+      await advanceSketchyPharmRevision(id);
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // PATHOMA CHAPTERS (G6)
   // ═══════════════════════════════════════════════════════════════
