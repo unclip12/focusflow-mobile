@@ -489,7 +489,7 @@
     },
     {
       "name": "pdfrx",
-      "rootUri": "file:///C:/Users/arsha/AppData/Local/Pub/Cache/hosted/pub.dev/pdfrx-1.0.94",
+      "rootUri": "file:///C:/Users/arsha/AppData/Local/Pub/Cache/hosted/pub.dev/pdfrx-1.0.77",
       "packageUri": "lib/",
       "languageVersion": "3.3"
     },
@@ -573,7 +573,7 @@
     },
     {
       "name": "rxdart",
-      "rootUri": "file:///C:/Users/arsha/AppData/Local/Pub/Cache/hosted/pub.dev/rxdart-0.28.0",
+      "rootUri": "file:///C:/Users/arsha/AppData/Local/Pub/Cache/hosted/pub.dev/rxdart-0.27.7",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
