@@ -1,6 +1,10 @@
 // =============================================================
 // BackupService — Save / load full app state as JSON
 // Uses path_provider (already in pubspec) + dart:io + dart:convert
+// NOTE: On Android, SAF URIs (content://) cannot be used with
+//       dart:io File directly. We always write to the app's
+//       Documents/FocusFlow directory which is always writable.
+//       The user-selected folder URI is stored for display only.
 // =============================================================
 
 import 'dart:convert';
@@ -17,26 +21,21 @@ class BackupService {
   static const _fileName = 'focusflow_backup.json';
   static const _kBackupFolderUri = 'backup_folder_uri';
 
-  /// Save the user-selected SAF folder URI to SharedPreferences.
+  /// Save the user-selected folder label to SharedPreferences (display only).
   static Future<void> setBackupFolderUri(String uri) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kBackupFolderUri, uri);
   }
 
-  /// Read the saved backup folder URI from SharedPreferences.
+  /// Read the saved backup folder label from SharedPreferences.
   static Future<String?> getBackupFolderUri() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_kBackupFolderUri);
   }
 
-  /// Returns the user-selected backup folder, or a default under Documents.
+  /// Always returns a writable path under Documents/FocusFlow.
+  /// SAF URIs (content://) cannot be used with dart:io File on Android.
   static Future<String> getBackupFolder() async {
-    final uri = await getBackupFolderUri();
-    if (uri != null && uri.isNotEmpty) {
-      final dir = Directory(uri);
-      if (await dir.exists()) return uri;
-    }
-    // Default: Documents/FocusFlow
     final docsDir = await getApplicationDocumentsDirectory();
     final backupDir = Directory('${docsDir.path}/FocusFlow');
     if (!await backupDir.exists()) {
@@ -45,13 +44,13 @@ class BackupService {
     return backupDir.path;
   }
 
-  /// Returns the static path for the old single-file backup logic.
+  /// Returns the path for the legacy single-file backup.
   static Future<String> get _filePath async {
     final folder = await getBackupFolder();
     return '$folder/$_fileName';
   }
 
-  /// Save full app state to the configured backup folder with a timestamp.
+  /// Save full app state to Documents/FocusFlow with a timestamp filename.
   static Future<String> saveBackup(
     Map<String, dynamic> data, {
     String filePrefix = 'focusflow_backup',
