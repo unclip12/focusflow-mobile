@@ -2006,6 +2006,95 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  // ── Sketchy / Pathoma revision advance (mirrors FA page cycle) ─
+  Future<void> advanceSketchyMicroRevision(int id) async {
+    final idx = sketchyMicroVideos.indexWhere((v) => v.id == id);
+    if (idx < 0) return;
+    final video = sketchyMicroVideos[idx];
+    if (!video.watched) {
+      await toggleSketchyMicroWatched(id, true);
+      return;
+    }
+    // Already watched → advance revision
+    final revId = 'sketchy-micro-$id';
+    final revIdx = revisionItems.indexWhere((r) => r.id == revId);
+    if (revIdx >= 0) {
+      final rev = revisionItems[revIdx];
+      final now = DateTime.now().toIso8601String();
+      final mode = revisionSettings?.mode ?? 'strict';
+      final newIndex = rev.currentRevisionIndex + 1;
+      final nextDate = SrsService.calculateNextRevisionDateString(
+        lastStudiedAt: now, revisionIndex: newIndex, mode: mode,
+      );
+      final updated = rev.copyWith(
+        currentRevisionIndex: newIndex,
+        lastStudiedAt: now,
+        nextRevisionAt: nextDate,
+      );
+      await _db.upsertRevisionItem(updated.toJson());
+      revisionItems[revIdx] = updated;
+      notifyListeners();
+    }
+  }
+
+  Future<void> advanceSketchyPharmRevision(int id) async {
+    final idx = sketchyPharmVideos.indexWhere((v) => v.id == id);
+    if (idx < 0) return;
+    final video = sketchyPharmVideos[idx];
+    if (!video.watched) {
+      await toggleSketchyPharmWatched(id, true);
+      return;
+    }
+    final revId = 'sketchy-pharm-$id';
+    final revIdx = revisionItems.indexWhere((r) => r.id == revId);
+    if (revIdx >= 0) {
+      final rev = revisionItems[revIdx];
+      final now = DateTime.now().toIso8601String();
+      final mode = revisionSettings?.mode ?? 'strict';
+      final newIndex = rev.currentRevisionIndex + 1;
+      final nextDate = SrsService.calculateNextRevisionDateString(
+        lastStudiedAt: now, revisionIndex: newIndex, mode: mode,
+      );
+      final updated = rev.copyWith(
+        currentRevisionIndex: newIndex,
+        lastStudiedAt: now,
+        nextRevisionAt: nextDate,
+      );
+      await _db.upsertRevisionItem(updated.toJson());
+      revisionItems[revIdx] = updated;
+      notifyListeners();
+    }
+  }
+
+  Future<void> advancePathomaRevision(int id) async {
+    final idx = pathomaChapters.indexWhere((c) => c.id == id);
+    if (idx < 0) return;
+    final ch = pathomaChapters[idx];
+    if (!ch.watched) {
+      await togglePathomaChapterWatched(id, true);
+      return;
+    }
+    final revId = 'pathoma-ch-$id';
+    final revIdx = revisionItems.indexWhere((r) => r.id == revId);
+    if (revIdx >= 0) {
+      final rev = revisionItems[revIdx];
+      final now = DateTime.now().toIso8601String();
+      final mode = revisionSettings?.mode ?? 'strict';
+      final newIndex = rev.currentRevisionIndex + 1;
+      final nextDate = SrsService.calculateNextRevisionDateString(
+        lastStudiedAt: now, revisionIndex: newIndex, mode: mode,
+      );
+      final updated = rev.copyWith(
+        currentRevisionIndex: newIndex,
+        lastStudiedAt: now,
+        nextRevisionAt: nextDate,
+      );
+      await _db.upsertRevisionItem(updated.toJson());
+      revisionItems[revIdx] = updated;
+      notifyListeners();
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // UWORLD SESSIONS (G5)
   // ═══════════════════════════════════════════════════════════════

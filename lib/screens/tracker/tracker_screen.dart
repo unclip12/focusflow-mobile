@@ -917,6 +917,7 @@ class _SubtopicListView extends StatelessWidget {
           key: ValueKey('st_${st.id}'),
           endActionPane: ActionPane(
             motion: const ScrollMotion(),
+            extentRatio: 0.5,
             children: [
               if (st.status != 'unread')
                 SlidableAction(
@@ -1174,9 +1175,25 @@ class _SketchyVideoList extends StatelessWidget {
                           );
                         }
                         
-                        // Status color / label
-                        Color statusColor = v.watched ? Colors.green : Colors.red.shade700;
-                        String statusLabel = v.watched ? 'Watched ✓' : 'Unwatched';
+                        // Status color / label based on revision progress
+                        final app = context.read<AppProvider>();
+                        final isMicro = v.category.toLowerCase().contains('micro');
+                        final skRevId = isMicro ? 'sketchy-micro-${v.id}' : 'sketchy-pharm-${v.id}';
+                        final skRevIdx = app.revisionItems.indexWhere((r) => r.id == skRevId);
+                        final skRevCount = skRevIdx >= 0 ? app.revisionItems[skRevIdx].currentRevisionIndex : 0;
+
+                        Color statusColor;
+                        String statusLabel;
+                        if (!v.watched) {
+                          statusColor = Colors.red.shade700;
+                          statusLabel = 'Unwatched';
+                        } else if (skRevCount > 0) {
+                          statusColor = Colors.blue;
+                          statusLabel = 'Rev $skRevCount';
+                        } else {
+                          statusColor = Colors.green;
+                          statusLabel = 'Watched ✓';
+                        }
 
                         // Undo action based on micro vs pharm
                         Future<void> handleUndo() async {
@@ -1202,6 +1219,7 @@ class _SketchyVideoList extends StatelessWidget {
                           key: ValueKey('sketchy_${v.id}'),
                           endActionPane: ActionPane(
                             motion: const ScrollMotion(),
+                            extentRatio: 0.5,
                             children: [
                               if (v.watched)
                                 SlidableAction(
@@ -1232,7 +1250,16 @@ class _SketchyVideoList extends StatelessWidget {
                               style: const TextStyle(fontSize: 13),
                             ),
                             trailing: InkWell(
-                              onTap: v.id != null ? () => onToggle(v.id!, !v.watched) : null,
+                              onTap: v.id != null
+                                  ? () {
+                                      final app = context.read<AppProvider>();
+                                      if (v.category.toLowerCase().contains('micro')) {
+                                        app.advanceSketchyMicroRevision(v.id!);
+                                      } else {
+                                        app.advanceSketchyPharmRevision(v.id!);
+                                      }
+                                    }
+                                  : null,
                               borderRadius: BorderRadius.circular(8),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1364,14 +1391,29 @@ class _PathomaTab extends StatelessWidget {
                     );
                   }
                   
-                  // Status color / label
-                  Color statusColor = ch.watched ? Colors.green : Colors.red.shade700;
-                  String statusLabel = ch.watched ? 'Watched ✓' : 'Unwatched';
+                   // Status color / label based on revision progress
+                   final skRevId = 'pathoma-ch-${ch.id}';
+                   final ptRevIdx = app.revisionItems.indexWhere((r) => r.id == skRevId);
+                   final ptRevCount = ptRevIdx >= 0 ? app.revisionItems[ptRevIdx].currentRevisionIndex : 0;
+
+                   Color statusColor;
+                   String statusLabel;
+                   if (!ch.watched) {
+                     statusColor = Colors.red.shade700;
+                     statusLabel = 'Unwatched';
+                   } else if (ptRevCount > 0) {
+                     statusColor = Colors.blue;
+                     statusLabel = 'Rev $ptRevCount';
+                   } else {
+                     statusColor = Colors.green;
+                     statusLabel = 'Watched ✓';
+                   }
 
                   return Slidable(
                     key: ValueKey('pathoma_${ch.id}'),
                     endActionPane: ActionPane(
                       motion: const ScrollMotion(),
+                      extentRatio: 0.5,
                       children: [
                         if (ch.watched)
                           SlidableAction(
@@ -1398,7 +1440,7 @@ class _PathomaTab extends StatelessWidget {
                     child: ListTile(
                       title: Text('Ch ${ch.chapter} — ${ch.title}'),
                       trailing: InkWell(
-                        onTap: ch.id != null ? () => app.togglePathomaChapterWatched(ch.id!, !ch.watched) : null,
+                        onTap: ch.id != null ? () => app.advancePathomaRevision(ch.id!) : null,
                         borderRadius: BorderRadius.circular(8),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1520,7 +1562,7 @@ class _UWorldTab extends StatelessWidget {
                         '$totalDone / $totalQs done',
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w400,
                           color: cs.onSurfaceVariant,
                         ),
                       ),
@@ -1528,7 +1570,7 @@ class _UWorldTab extends StatelessWidget {
                         '$overallPct% accuracy',
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w400,
                           color: cs.onSurfaceVariant,
                         ),
                       ),
@@ -1565,13 +1607,13 @@ class _UWorldTab extends StatelessWidget {
                   }
                   
                   return ExpansionTile(
-                    title: Text(sys, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    title: Text(sys, style: const TextStyle(fontWeight: FontWeight.w400)),
                     trailing: Text(
                       '$sysDone / $sysTotal',
                       style: TextStyle(
                         color: cs.onSurfaceVariant,
                         fontSize: 13,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
                     children: subs.map((sub) {
@@ -1641,7 +1683,7 @@ class _UWorldTab extends StatelessWidget {
                                 labelStyle: TextStyle(
                                   fontSize: 11,
                                   color: cs.onSurface,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w400,
                                 ),
                                 visualDensity: VisualDensity.compact,
                                 backgroundColor: cs.surfaceContainerHigh,
@@ -2357,6 +2399,7 @@ class _FACardView extends StatelessWidget {
                   key: ValueKey(page.pageNum),
                   endActionPane: ActionPane(
                     motion: const ScrollMotion(),
+                    extentRatio: 0.5,
                     children: [
                       if (page.status != 'unread')
                         SlidableAction(

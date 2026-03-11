@@ -1,4 +1,4 @@
-﻿// =============================================================
+// =============================================================
 // BackupScreen — Backup Now, Auto Backup, Export, Restore
 // Saves to user-selected folder (Documents/FocusFlow default)
 // Auto-backup & history persisted in SharedPreferences
@@ -25,7 +25,7 @@ import 'package:focusflow_mobile/widgets/app_scaffold.dart';
 const _kAutoBackup = 'backup_auto';
 const _kFrequency = 'backup_frequency';
 const _kHistory = 'backup_history'; // JSON list of {date,size,path}
-const _kBackupFolder = 'backup_folder_path';
+const _kBackupFolder = 'backup_folder_uri';
 
 class BackupScreen extends StatefulWidget {
   const BackupScreen({super.key});
@@ -102,24 +102,16 @@ class _BackupScreenState extends State<BackupScreen> {
     } catch (_) {}
   }
 
-  // ── Get or create backup folder ─────────────────────────────
+  // ── Get or create backup folder (delegates to BackupService) ──
   Future<String> _getBackupFolder() async {
-    if (_backupFolder != null && _backupFolder!.isNotEmpty) {
-      final dir = Directory(_backupFolder!);
-      if (await dir.exists()) return _backupFolder!;
+    final folder = await BackupService.getBackupFolder();
+    if (_backupFolder != folder) {
+      _backupFolder = folder;
     }
-    // Default: Documents/FocusFlow
-    final docsDir = await getApplicationDocumentsDirectory();
-    final backupDir = Directory('${docsDir.path}/FocusFlow');
-    if (!await backupDir.exists()) {
-      await backupDir.create(recursive: true);
-    }
-    _backupFolder = backupDir.path;
-    await _savePrefs();
-    return backupDir.path;
+    return folder;
   }
 
-  // ── Select backup folder ───────────────────────────────────────
+  // ── Select backup folder (SAF folder picker on Android) ────────
   Future<void> _pickBackupFolder() async {
     try {
       final result = await FilePicker.platform.getDirectoryPath(
@@ -127,6 +119,7 @@ class _BackupScreenState extends State<BackupScreen> {
       );
       if (result != null && result.isNotEmpty) {
         setState(() => _backupFolder = result);
+        await BackupService.setBackupFolderUri(result);
         await _savePrefs();
         if (mounted) {
           _showSnack('Backup folder set: $result');
@@ -139,10 +132,10 @@ class _BackupScreenState extends State<BackupScreen> {
 
   // ── Backup Now — saves to the backup folder ────────────────────
   Future<void> _backupNow() async {
-    setState(() => _backingUp = true);
-    HapticFeedback.lightImpact();
-
     try {
+      setState(() => _backingUp = true);
+      HapticFeedback.lightImpact();
+
       final ap = context.read<AppProvider>();
       final data = BackupService.buildBackupData(ap);
       final json = jsonEncode(data);
@@ -159,6 +152,7 @@ class _BackupScreenState extends State<BackupScreen> {
         size: '$sizeKb KB',
         path: filePath,
       );
+      if (!mounted) return;
       setState(() {
         _history.insert(0, entry);
         if (_history.length > 10) _history.removeLast();

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:focusflow_mobile/models/library_note.dart';
-import 'package:focusflow_mobile/models/sketchy_item.dart';
-import 'package:focusflow_mobile/models/pathoma_item.dart';
+import 'package:focusflow_mobile/models/sketchy_video.dart';
+import 'package:focusflow_mobile/models/pathoma_chapter.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/screens/library/add_note_sheet.dart';
 import 'package:focusflow_mobile/screens/library/edit_metadata_sheet.dart';
@@ -40,18 +40,18 @@ class _LibraryItemDetailSheetState extends State<LibraryItemDetailSheet>
 
   dynamic get _item {
     if (widget.itemType == 'sketchy') {
-      final sketchy = widget.item as SketchyItem;
+      final sketchy = widget.item as SketchyVideo;
       return widget.app.sketchyMicroVideos.firstWhere(
-        (v) => v.id?.toString() == sketchy.id,
+        (v) => v.id == sketchy.id,
         orElse: () => widget.app.sketchyPharmVideos.firstWhere(
-          (v) => v.id?.toString() == sketchy.id,
+          (v) => v.id == sketchy.id,
           orElse: () => widget.item,
         ),
       );
     } else {
-      final pathoma = widget.item as PathomaItem;
+      final pathoma = widget.item as PathomaChapter;
       return widget.app.pathomaChapters.firstWhere(
-        (c) => c.id?.toString() == pathoma.id,
+        (c) => c.id == pathoma.id,
         orElse: () => widget.item,
       );
     }
@@ -59,9 +59,9 @@ class _LibraryItemDetailSheetState extends State<LibraryItemDetailSheet>
 
   String get _itemId {
     if (widget.itemType == 'sketchy') {
-      return 'sketchy:${(widget.item as SketchyItem).id}';
+      return 'sketchy:${(widget.item as SketchyVideo).id}';
     } else {
-      return 'pathoma:${(widget.item as PathomaItem).id}';
+      return 'pathoma:${(widget.item as PathomaChapter).id}';
     }
   }
 

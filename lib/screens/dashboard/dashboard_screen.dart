@@ -909,6 +909,136 @@ class _RevisionCard extends StatelessWidget {
     required this.onNavigate,
   });
 
+  void _showRevisionSheet(BuildContext context) {
+    final app = context.read<AppProvider>();
+    final now = DateTime.now();
+    final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    // Do Now: items whose nextRevisionAt is at or before now
+    final doNow = app.revisionItems.where((r) {
+      final due = DateTime.tryParse(r.nextRevisionAt);
+      return due != null && !due.isAfter(now);
+    }).toList();
+
+    // Upcoming: items whose nextRevisionAt is after now but within today
+    final upcoming = app.revisionItems.where((r) {
+      final due = DateTime.tryParse(r.nextRevisionAt);
+      return due != null && due.isAfter(now) && !due.isAfter(todayEnd);
+    }).toList();
+
+    final showDoNow = doNow.isNotEmpty;
+    final items = showDoNow ? doNow : upcoming;
+    final label = showDoNow ? 'Do Now' : 'Upcoming';
+
+    final cs = Theme.of(context).colorScheme;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.85,
+        expand: false,
+        builder: (ctx, scrollCtrl) => Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Center(
+                child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '$label (${items.length})',
+                    style: TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w700,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      onNavigate();
+                    },
+                    child: const Text('View All →'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (items.isEmpty)
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle_outline_rounded, size: 48,
+                          color: Colors.green.shade400),
+                      const SizedBox(height: 12),
+                      Text('All caught up! 🎉',
+                        style: TextStyle(fontSize: 16, color: cs.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              Expanded(
+                child: ListView.separated(
+                  controller: scrollCtrl,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, i) {
+                    final r = items[i];
+                    final display = r.source == 'FA'
+                        ? 'FA Page ${r.pageNumber}'
+                        : r.title;
+                    final subtitle = r.parentTitle.isNotEmpty
+                        ? '${r.parentTitle} · Rev ${r.currentRevisionIndex}'
+                        : 'Rev ${r.currentRevisionIndex}';
+                    return ListTile(
+                      dense: true,
+                      leading: CircleAvatar(
+                        radius: 16,
+                        backgroundColor: showDoNow
+                            ? Colors.orange.withValues(alpha: 0.15)
+                            : cs.primary.withValues(alpha: 0.1),
+                        child: Icon(
+                          showDoNow ? Icons.priority_high_rounded : Icons.schedule_rounded,
+                          size: 16,
+                          color: showDoNow ? Colors.orange.shade700 : cs.primary,
+                        ),
+                      ),
+                      title: Text(display, maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 14)),
+                      subtitle: Text(subtitle,
+                          style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -973,15 +1103,14 @@ class _RevisionCard extends StatelessWidget {
                 ],
               ),
             ),
-            if (dueCount > 0)
-              IconButton.filled(
-                onPressed: onNavigate,
-                icon: const Icon(Icons.arrow_forward_rounded),
-                style: IconButton.styleFrom(
-                  backgroundColor: cs.primaryContainer,
-                  foregroundColor: cs.onPrimaryContainer,
-                ),
+            IconButton.filled(
+              onPressed: () => _showRevisionSheet(context),
+              icon: const Icon(Icons.arrow_forward_rounded),
+              style: IconButton.styleFrom(
+                backgroundColor: cs.primaryContainer,
+                foregroundColor: cs.onPrimaryContainer,
               ),
+            ),
           ],
         ),
       ),

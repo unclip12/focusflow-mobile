@@ -1149,6 +1149,7 @@ class _AllTabContentState extends State<_AllTabContent>
               child: FlowActivityCard(
                 activity: item.flowActivity!,
                 index: item.index ?? i,
+                onTap: () => _showEditTaskSheet(context, app, item.flowActivity!),
                 onComplete: item.flowActivity!.isActive || item.flowActivity!.isPaused
                     ? () => app.completeFlowActivity(widget.dateKey, item.flowActivity!.id)
                     : null,

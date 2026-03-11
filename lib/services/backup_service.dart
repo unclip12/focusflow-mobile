@@ -15,14 +15,26 @@ import 'package:focusflow_mobile/providers/app_provider.dart';
 
 class BackupService {
   static const _fileName = 'focusflow_backup.json';
+  static const _kBackupFolderUri = 'backup_folder_uri';
 
-  /// Returns the default or user-selected backup folder
-  static Future<String> getBackupFolder() async {
+  /// Save the user-selected SAF folder URI to SharedPreferences.
+  static Future<void> setBackupFolderUri(String uri) async {
     final prefs = await SharedPreferences.getInstance();
-    final folder = prefs.getString('backup_folder');
-    if (folder != null && folder.isNotEmpty) {
-      final dir = Directory(folder);
-      if (await dir.exists()) return folder;
+    await prefs.setString(_kBackupFolderUri, uri);
+  }
+
+  /// Read the saved backup folder URI from SharedPreferences.
+  static Future<String?> getBackupFolderUri() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_kBackupFolderUri);
+  }
+
+  /// Returns the user-selected backup folder, or a default under Documents.
+  static Future<String> getBackupFolder() async {
+    final uri = await getBackupFolderUri();
+    if (uri != null && uri.isNotEmpty) {
+      final dir = Directory(uri);
+      if (await dir.exists()) return uri;
     }
     // Default: Documents/FocusFlow
     final docsDir = await getApplicationDocumentsDirectory();

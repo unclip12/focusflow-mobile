@@ -83,7 +83,7 @@ class _UWorldDetailSheetState extends State<UWorldDetailSheet>
                           topic.customTitle ?? topic.subtopic,
                           style: TextStyle(
                             fontSize: 20,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w400,
                             color: cs.onSurface,
                           ),
                         ),
@@ -101,7 +101,7 @@ class _UWorldDetailSheetState extends State<UWorldDetailSheet>
                           style: TextStyle(
                             fontSize: 13,
                             color: cs.primary,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w400,
                           ),
                         ),
                         if (topic.userDescription?.isNotEmpty == true) ...[
@@ -252,7 +252,7 @@ class _ProgressTabState extends State<_ProgressTab> {
                   child: Text(
                     '$_done',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w400),
                   ),
                 ),
                 IconButton.filledTonal(
@@ -283,7 +283,7 @@ class _ProgressTabState extends State<_ProgressTab> {
                   child: Text(
                     '$_correct',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w400),
                   ),
                 ),
                 IconButton.filledTonal(
