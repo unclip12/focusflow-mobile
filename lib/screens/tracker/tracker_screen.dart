@@ -2104,6 +2104,7 @@ class _AddToTaskSheet extends StatelessWidget {
     );
 
     await app.upsertDayPlan(plan);
+    await app.syncFlowActivitiesFromDayPlan(dateKey);
 
     if (context.mounted) {
       Navigator.of(context).pop();

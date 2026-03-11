@@ -16,7 +16,6 @@ import 'package:focusflow_mobile/models/knowledge_base.dart';
 import 'package:focusflow_mobile/services/srs_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/focus_batch_calculator.dart';
-import 'package:focusflow_mobile/models/daily_flow.dart';
 
 // ── Task type enums ──────────────────────────────────────────────
 enum ExamType { usmle, fmge }
@@ -315,6 +314,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
 
     final batches = _focusBatches;
     final title = _taskTitle;
+    assert(_blockTypeIcon(_blockType).isNotEmpty);
 
     DayPlan? existing = app.getDayPlan(widget.dateKey);
     final existingBlocks = List<Block>.from(existing?.blocks ?? []);
@@ -402,22 +402,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
 
     // ── Also add as FlowActivity so it appears in flow session ──
     // Initialize flow if needed, then add each focus block as an activity
-    final existingFlow = app.getDailyFlow(widget.dateKey);
-    if (existingFlow == null) {
-      await app.initializeDailyFlow(widget.dateKey);
-    }
-    for (final block in newBlocks) {
-      if (block.type == BlockType.breakBlock) continue;
-      final flowActivity = FlowActivity(
-        id: 'task-${block.id}',
-        label: block.title,
-        icon: _blockTypeIcon(_blockType),
-        activityType: _blockType.toString().split('.').last.toUpperCase(),
-        linkedTaskIds: [block.id],
-        sortOrder: 999,
-      );
-      await app.addFlowActivity(widget.dateKey, flowActivity);
-    }
+    await app.syncFlowActivitiesFromDayPlan(widget.dateKey);
 
     if (mounted) {
       Navigator.of(context).pop();

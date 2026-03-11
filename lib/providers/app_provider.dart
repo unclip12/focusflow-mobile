@@ -710,8 +710,91 @@ class AppProvider extends ChangeNotifier {
     return flow;
   }
 
+  String _flowIconForBlockType(BlockType type) {
+    switch (type) {
+      case BlockType.revisionFa:
+        return '📚';
+      case BlockType.video:
+        return '🎬';
+      case BlockType.qbank:
+        return '📝';
+      case BlockType.anki:
+        return '🃏';
+      case BlockType.fmgeRevision:
+        return '📖';
+      case BlockType.breakBlock:
+        return '☕';
+      case BlockType.mixed:
+        return '🔄';
+      case BlockType.other:
+        return '⚡';
+    }
+  }
+
+  FlowActivity _flowActivityFromBlock(Block block, int sortOrder) {
+    final status = block.status.value;
+    final isCompleted = status == 'DONE' || status == 'SKIPPED';
+
+    return FlowActivity(
+      id: 'task-${block.id}',
+      label: block.title,
+      icon: _flowIconForBlockType(block.type),
+      activityType: block.type.value,
+      linkedTaskIds: [block.id],
+      sortOrder: sortOrder,
+      status: status,
+      startedAt: block.actualStartTime,
+      completedAt: isCompleted ? block.actualEndTime : null,
+      durationSeconds: block.actualDurationMinutes != null
+          ? block.actualDurationMinutes! * 60
+          : null,
+    );
+  }
+
+  Future<void> syncFlowActivitiesFromDayPlan(String date) async {
+    final plan = getDayPlan(date);
+    var flow = getDailyFlow(date);
+    flow ??= await initializeDailyFlow(date);
+
+    final blocks = (plan?.blocks ?? [])
+        .where((block) =>
+            block.type != BlockType.breakBlock && block.isVirtual != true)
+        .toList();
+    final existingActivities = List<FlowActivity>.from(flow.activities);
+    final linkedBlockIds = existingActivities
+        .expand((activity) => activity.linkedTaskIds)
+        .toSet();
+    final existingActivityIds =
+        existingActivities.map((activity) => activity.id).toSet();
+
+    var nextSortOrder = existingActivities.length;
+    final appendedActivities = <FlowActivity>[];
+    for (final block in blocks) {
+      final activityId = 'task-${block.id}';
+      if (linkedBlockIds.contains(block.id) ||
+          existingActivityIds.contains(activityId)) {
+        continue;
+      }
+      appendedActivities.add(_flowActivityFromBlock(block, nextSortOrder));
+      linkedBlockIds.add(block.id);
+      existingActivityIds.add(activityId);
+      nextSortOrder++;
+    }
+
+    if (appendedActivities.isNotEmpty) {
+      final updated = flow.copyWith(
+        activities: [...existingActivities, ...appendedActivities],
+      );
+      await upsertDailyFlow(updated);
+    }
+
+    notifyListeners();
+  }
+
   /// Start the daily flow.
   Future<void> startFlow(String date) async {
+    await syncFlowActivitiesFromDayPlan(date);
+
     var flow = getDailyFlow(date);
     flow ??= await initializeDailyFlow(date);
 
