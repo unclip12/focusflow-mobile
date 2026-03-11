@@ -2317,6 +2317,10 @@ class AppProvider extends ChangeNotifier {
       final now = DateTime.now().toIso8601String();
       final mode = revisionSettings?.mode ?? 'strict';
       final newIndex = rev.currentRevisionIndex + 1;
+      if (SrsService.isMastered(revisionIndex: newIndex, mode: mode)) {
+        await deleteRevisionItem(revId);
+        return;
+      }
       final nextDate = SrsService.calculateNextRevisionDateString(
         lastStudiedAt: now, revisionIndex: newIndex, mode: mode,
       );
