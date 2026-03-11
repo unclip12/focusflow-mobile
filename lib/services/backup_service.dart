@@ -51,12 +51,14 @@ class BackupService {
     return '$folder/$_fileName';
   }
 
-  /// Save full app state to JSON file with timestamp.
-  /// Returns the exact file path where it was saved.
-  static Future<String> saveBackup(Map<String, dynamic> data) async {
+  /// Save full app state to the configured backup folder with a timestamp.
+  static Future<String> saveBackup(
+    Map<String, dynamic> data, {
+    String filePrefix = 'focusflow_backup',
+  }) async {
     final folder = await getBackupFolder();
     final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-    final filePath = '$folder/focusflow_backup_$timestamp.json';
+    final filePath = '$folder/${filePrefix}_$timestamp.json';
     final file = File(filePath);
     await file.writeAsString(jsonEncode(data));
     return filePath;

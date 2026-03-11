@@ -56,18 +56,21 @@ class _BackupScreenState extends State<BackupScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final rawHistory = prefs.getStringList(_kHistory) ?? [];
-      final entries = rawHistory.map((s) {
-        try {
-          final m = jsonDecode(s) as Map<String, dynamic>;
-          return _BackupEntry(
-            date: m['date'] as String? ?? '',
-            size: m['size'] as String? ?? '',
-            path: m['path'] as String?,
-          );
-        } catch (_) {
-          return null;
-        }
-      }).whereType<_BackupEntry>().toList();
+      final entries = rawHistory
+          .map((s) {
+            try {
+              final m = jsonDecode(s) as Map<String, dynamic>;
+              return _BackupEntry(
+                date: m['date'] as String? ?? '',
+                size: m['size'] as String? ?? '',
+                path: m['path'] as String?,
+              );
+            } catch (_) {
+              return null;
+            }
+          })
+          .whereType<_BackupEntry>()
+          .toList();
 
       if (!mounted) return;
       setState(() {
@@ -102,15 +105,6 @@ class _BackupScreenState extends State<BackupScreen> {
     } catch (_) {}
   }
 
-  // ── Get or create backup folder (delegates to BackupService) ──
-  Future<String> _getBackupFolder() async {
-    final folder = await BackupService.getBackupFolder();
-    if (_backupFolder != folder) {
-      _backupFolder = folder;
-    }
-    return folder;
-  }
-
   // ── Select backup folder (SAF folder picker on Android) ────────
   Future<void> _pickBackupFolder() async {
     try {
@@ -131,36 +125,40 @@ class _BackupScreenState extends State<BackupScreen> {
   }
 
   // ── Backup Now — saves to the backup folder ────────────────────
-  Future<void> _backupNow() async {
+  Future<void> _handleBackupNowPressed() async {
     try {
-      setState(() => _backingUp = true);
-      HapticFeedback.lightImpact();
+      await _backupNow();
+    } catch (e) {
+      if (mounted) {
+        _showSnack('Backup failed: $e');
+      }
+    }
+  }
 
+  Future<void> _backupNow() async {
+    setState(() => _backingUp = true);
+    HapticFeedback.lightImpact();
+
+    try {
       final ap = context.read<AppProvider>();
       final data = BackupService.buildBackupData(ap);
-      final json = jsonEncode(data);
-
-      final folder = await _getBackupFolder();
-      final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-      final filePath = '$folder/focusflow_backup_$timestamp.json';
-      final file = File(filePath);
-      await file.writeAsString(json);
-
-      final sizeKb = (json.length / 1024).toStringAsFixed(1);
+      final filePath = await BackupService.saveBackup(data);
+      final sizeKb = (jsonEncode(data).length / 1024).toStringAsFixed(1);
       final entry = _BackupEntry(
         date: DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now()),
         size: '$sizeKb KB',
         path: filePath,
       );
+
       if (!mounted) return;
       setState(() {
         _history.insert(0, entry);
         if (_history.length > 10) _history.removeLast();
       });
       await _savePrefs();
-      if (mounted) _showSnack('✅ Backup saved to $filePath');
-    } catch (e) {
-      if (mounted) _showSnack('Backup failed: $e');
+      if (mounted) {
+        _showSnack('Backup saved to $filePath');
+      }
     } finally {
       if (mounted) setState(() => _backingUp = false);
     }
@@ -211,15 +209,11 @@ class _BackupScreenState extends State<BackupScreen> {
     try {
       final ap = context.read<AppProvider>();
       final data = BackupService.buildBackupData(ap);
-      final json = jsonEncode(data);
-
-      final folder = await _getBackupFolder();
-      final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-      final filePath = '$folder/focusflow_auto_$timestamp.json';
-      final file = File(filePath);
-      await file.writeAsString(json);
-
-      final sizeKb = (json.length / 1024).toStringAsFixed(1);
+      final filePath = await BackupService.saveBackup(
+        data,
+        filePrefix: 'focusflow_auto',
+      );
+      final sizeKb = (jsonEncode(data).length / 1024).toStringAsFixed(1);
       final entry = _BackupEntry(
         date: DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now()),
         size: '$sizeKb KB (auto)',
@@ -338,7 +332,7 @@ class _BackupScreenState extends State<BackupScreen> {
           _sectionLabel('Quick Backup', theme, cs),
           const SizedBox(height: 8),
           GestureDetector(
-            onTap: _backingUp ? null : _backupNow,
+            onTap: _backingUp ? null : _handleBackupNowPressed,
             child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -562,8 +556,7 @@ class _BackupScreenState extends State<BackupScreen> {
           const SizedBox(height: 8),
           if (_history.isEmpty)
             Container(
-              padding:
-                  const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
               decoration: _cardDecor(cs),
               child: Center(
                 child: Text(
@@ -580,8 +573,8 @@ class _BackupScreenState extends State<BackupScreen> {
               final item = e.value;
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: _cardDecor(cs),
                 child: Row(
                   children: [
@@ -620,8 +613,7 @@ class _BackupScreenState extends State<BackupScreen> {
                     // Delete button
                     IconButton(
                       icon: Icon(Icons.delete_outline_rounded,
-                          size: 18,
-                          color: cs.error.withValues(alpha: 0.6)),
+                          size: 18, color: cs.error.withValues(alpha: 0.6)),
                       onPressed: () {
                         HapticFeedback.lightImpact();
                         setState(() => _history.removeAt(idx));
@@ -707,8 +699,7 @@ class _ActionButton extends StatelessWidget {
               SizedBox(
                 width: 22,
                 height: 22,
-                child:
-                    CircularProgressIndicator(strokeWidth: 2, color: color),
+                child: CircularProgressIndicator(strokeWidth: 2, color: color),
               )
             else
               Icon(icon, size: 24, color: color),
