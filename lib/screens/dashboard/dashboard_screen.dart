@@ -1,5 +1,5 @@
 // =============================================================
-// DashboardScreen — G8 full rebuild
+// DashboardScreen ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â G8 full rebuild
 // 6 sections: Exam Countdown, Study Stats, FA Progress,
 // Revision Queue, Activity Heatmap, Subject Breakdown
 // =============================================================
@@ -13,7 +13,9 @@ import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/models/fa_page.dart';
+import 'package:focusflow_mobile/models/knowledge_base.dart';
 import 'package:focusflow_mobile/models/revision_item.dart';
+import 'package:focusflow_mobile/services/srs_service.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart' as du;
 
 class DashboardScreen extends StatelessWidget {
@@ -90,9 +92,9 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------
 // DASHBOARD BODY
-// ══════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------
 
 class _DashboardBody extends StatelessWidget {
   const _DashboardBody();
@@ -104,17 +106,18 @@ class _DashboardBody extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     final dayStartHour = sp.dayStartHour;
-    final todayStr = du.AppDateUtils.effectiveDateKey(DateTime.now(), dayStartHour);
+    final todayStr =
+        du.AppDateUtils.effectiveDateKey(DateTime.now(), dayStartHour);
     final now = DateTime.now();
 
-    // ── Exam dates (from Settings) ──────────────────────────────
+    // -- Exam dates (from Settings) ------------------------------
     final fmgeDate = DateTime.parse(sp.fmgeDate);
     final step1Date = DateTime.parse(sp.step1Date);
     final today = DateTime(now.year, now.month, now.day);
     final fmgeDays = fmgeDate.difference(today).inDays;
     final step1Days = step1Date.difference(today).inDays;
 
-    // ── Study time calculations ─────────────────────────────────
+    // -- Study time calculations ---------------------------------
     // Today: timeLogs + studyEntries on effective date
     int studyMinutesToday = 0;
     for (final l in app.timeLogs) {
@@ -140,7 +143,7 @@ class _DashboardBody extends StatelessWidget {
       }
     }
 
-    // ── Streak (from AppProvider streakData) ─────────────────────
+    // -- Streak (from AppProvider streakData) ---------------------
     final streak = app.streakData.currentStreak;
     final creditBalance = app.streakData.creditBalance;
     final dailyGoal = sp.dailyFAGoal;
@@ -154,15 +157,12 @@ class _DashboardBody extends StatelessWidget {
       if (timeUntilDeadline.isNegative) timeUntilDeadline = Duration.zero;
     }
 
-    // ── FA Progress ─────────────────────────────────────────────
-    final readPages =
-        app.faPages.where((p) => p.status != 'unread').length;
-    final ankiDone =
-        app.faPages.where((p) => p.status == 'anki_done').length;
-    final unread =
-        app.faPages.where((p) => p.status == 'unread').length;
+    // -- FA Progress ---------------------------------------------
+    final readPages = app.faPages.where((p) => p.status != 'unread').length;
+    final ankiDone = app.faPages.where((p) => p.status == 'anki_done').length;
+    final unread = app.faPages.where((p) => p.status == 'unread').length;
 
-    // ── Revision due ────────────────────────────────────────────
+    // -- Revision due --------------------------------------------
     final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
     final dueRevisions = app.revisionItems.where((r) {
       final due = DateTime.tryParse(r.nextRevisionAt);
@@ -170,8 +170,9 @@ class _DashboardBody extends StatelessWidget {
     }).toList();
     final dueRevisionCount = dueRevisions.length;
 
-    // ── Activity heatmap (last 7 days) — include timeLogs + studyEntries ─
-    final last7 = List.generate(7, (i) => today.subtract(Duration(days: 6 - i)));
+    // -- Activity heatmap (last 7 days) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â include timeLogs + studyEntries -
+    final last7 =
+        List.generate(7, (i) => today.subtract(Duration(days: 6 - i)));
     final dayMinutes = <String, int>{};
     for (final l in app.timeLogs) {
       dayMinutes[l.date] = (dayMinutes[l.date] ?? 0) + l.durationMinutes;
@@ -180,7 +181,7 @@ class _DashboardBody extends StatelessWidget {
       dayMinutes[e.date] = (dayMinutes[e.date] ?? 0) + (e.durationMinutes ?? 0);
     }
 
-    // ── Subject breakdown — include studyEntries ─────────────────
+    // -- Subject breakdown ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â include studyEntries -----------------
     final subjectMinutes = <String, int>{};
     for (final log in app.timeLogs) {
       final key = log.activity.isNotEmpty ? log.activity : 'Other';
@@ -188,7 +189,8 @@ class _DashboardBody extends StatelessWidget {
     }
     for (final e in app.studyEntries) {
       final key = e.taskName.isNotEmpty ? e.taskName : 'Other';
-      subjectMinutes[key] = (subjectMinutes[key] ?? 0) + (e.durationMinutes ?? 0);
+      subjectMinutes[key] =
+          (subjectMinutes[key] ?? 0) + (e.durationMinutes ?? 0);
     }
     final sortedSubjects = subjectMinutes.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -209,7 +211,7 @@ class _DashboardBody extends StatelessWidget {
             children: [
               const SizedBox(height: 8),
 
-              // ── Streak at risk banner ─────────────────────────
+              // -- Streak at risk banner -------------------------
               if (streakAtRisk && streak > 0)
                 _StreakAtRiskBanner(
                   pagesRemaining: pagesRemaining,
@@ -219,7 +221,7 @@ class _DashboardBody extends StatelessWidget {
                 ),
               if (streakAtRisk && streak > 0) const SizedBox(height: 12),
 
-              // ═══ SECTION 1: Exam Countdown ═══════════════════
+              // --- SECTION 1: Exam Countdown -------------------
               _sectionHeader(context, 'EXAM COUNTDOWN'),
               const SizedBox(height: 8),
               Row(
@@ -245,7 +247,7 @@ class _DashboardBody extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // ═══ SECTION 2: Today's Study Stats ══════════════
+              // --- SECTION 2: Today's Study Stats --------------
               _sectionHeader(context, "TODAY'S STUDY"),
               const SizedBox(height: 8),
               Row(
@@ -278,7 +280,7 @@ class _DashboardBody extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // ═══ SECTION 3: FA 2025 Progress ═════════════════
+              // --- SECTION 3: FA 2025 Progress -----------------
               _sectionHeader(context, 'FIRST AID 2025'),
               const SizedBox(height: 8),
               _FAProgressCard(
@@ -291,7 +293,7 @@ class _DashboardBody extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // ═══ SECTION 4: Revision Queue ═══════════════════
+              // --- SECTION 4: Revision Queue -------------------
               _sectionHeader(context, 'REVISION QUEUE'),
               const SizedBox(height: 8),
               _RevisionCard(
@@ -301,7 +303,7 @@ class _DashboardBody extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // ═══ SECTION 5: Activity Heatmap ═════════════════
+              // --- SECTION 5: Activity Heatmap -----------------
               _sectionHeader(context, 'LAST 7 DAYS'),
               const SizedBox(height: 8),
               _ActivityHeatmap(
@@ -311,7 +313,7 @@ class _DashboardBody extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // ═══ SECTION 6: Subject Breakdown ════════════════
+              // --- SECTION 6: Subject Breakdown ----------------
               _sectionHeader(context, 'TIME BY SUBJECT'),
               const SizedBox(height: 8),
               _SubjectBreakdownCard(
@@ -350,9 +352,9 @@ class _DashboardBody extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------
 // SECTION 1: Exam Countdown Card
-// ══════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------
 
 class _ExamCountdownCard extends StatelessWidget {
   final String label;
@@ -422,9 +424,9 @@ class _ExamCountdownCard extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------
 // SECTION 2: Mini Stat Card
-// ══════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------
 
 class _MiniStatCard extends StatelessWidget {
   final String label;
@@ -476,9 +478,9 @@ class _MiniStatCard extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------
 // SECTION 2b: Streak Stat Card (animated fire + credit badge)
-// ══════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------
 
 class _StreakStatCard extends StatefulWidget {
   final int streak;
@@ -546,12 +548,9 @@ class _StreakStatCardState extends State<_StreakStatCard>
             AnimatedBuilder(
               animation: _ctrl,
               builder: (_, child) {
-                final scale = widget.streak >= 10
-                    ? 1.0 + 0.15 * _ctrl.value
-                    : 1.0;
-                final glow = widget.streak >= 10
-                    ? _ctrl.value * 0.6
-                    : 0.0;
+                final scale =
+                    widget.streak >= 10 ? 1.0 + 0.15 * _ctrl.value : 1.0;
+                final glow = widget.streak >= 10 ? _ctrl.value * 0.6 : 0.0;
                 return Transform.scale(
                   scale: scale,
                   child: Container(
@@ -598,13 +597,14 @@ class _StreakStatCardState extends State<_StreakStatCard>
                 if (widget.credits > 0) ...[
                   const SizedBox(width: 4),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                     decoration: BoxDecoration(
                       color: Colors.amber.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      '${widget.credits}★',
+                      '${widget.credits}*',
                       style: const TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
@@ -622,9 +622,9 @@ class _StreakStatCardState extends State<_StreakStatCard>
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------
 // Streak At Risk Banner
-// ══════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------
 
 class _StreakAtRiskBanner extends StatelessWidget {
   final int pagesRemaining;
@@ -659,7 +659,8 @@ class _StreakAtRiskBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 22),
+          const Icon(Icons.warning_amber_rounded,
+              color: Colors.white, size: 22),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -675,7 +676,7 @@ class _StreakAtRiskBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$pagesRemaining pages remaining · $timeStr left',
+                  '$pagesRemaining pages remaining | $timeStr left',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.white.withValues(alpha: 0.9),
@@ -701,9 +702,9 @@ class _StreakAtRiskBanner extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------
 // SECTION 3: FA Progress Card
-// ══════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------
 
 class _FAProgressCard extends StatelessWidget {
   final int readPages;
@@ -762,7 +763,7 @@ class _FAProgressCard extends StatelessWidget {
       final etaDate = today.add(Duration(days: daysNeeded));
       eta = '${etaDate.day}/${etaDate.month}/${etaDate.year}';
     } else if (remaining <= 0) {
-      eta = 'Done! 🎉';
+      eta = 'Done!';
     }
 
     return Card(
@@ -784,7 +785,7 @@ class _FAProgressCard extends StatelessWidget {
                   ),
                 ),
                 ActionChip(
-                  label: const Text('Mark Pages →'),
+                  label: const Text('Mark Pages'),
                   onPressed: onNavigate,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -844,21 +845,21 @@ class _FAProgressCard extends StatelessWidget {
                 Expanded(
                   child: _metricTile(
                     cs,
-                    '📈 Overall Avg',
+                    'Overall Avg',
                     '${overallAvg.toStringAsFixed(1)} pg/day',
                   ),
                 ),
                 Expanded(
                   child: _metricTile(
                     cs,
-                    '📅 7-Day Avg',
+                    '7-Day Avg',
                     '${weeklyAvg.toStringAsFixed(1)} pg/day',
                   ),
                 ),
                 Expanded(
                   child: _metricTile(
                     cs,
-                    '🎯 ETA',
+                    'ETA',
                     eta,
                   ),
                 ),
@@ -894,9 +895,9 @@ class _FAProgressCard extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------
 // SECTION 4: Revision Queue Card
-// ══════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------
 
 class _RevisionCard extends StatelessWidget {
   final int dueCount;
@@ -911,27 +912,16 @@ class _RevisionCard extends StatelessWidget {
 
   void _showRevisionSheet(BuildContext context) {
     final app = context.read<AppProvider>();
-    final now = DateTime.now();
-    final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
-
-    // Do Now: items whose nextRevisionAt is at or before now
-    final doNow = app.revisionItems.where((r) {
-      final due = DateTime.tryParse(r.nextRevisionAt);
-      return due != null && !due.isAfter(now);
-    }).toList();
-
-    // Upcoming: items whose nextRevisionAt is after now but within today
-    final upcoming = app.revisionItems.where((r) {
-      final due = DateTime.tryParse(r.nextRevisionAt);
-      return due != null && due.isAfter(now) && !due.isAfter(todayEnd);
-    }).toList();
+    final hubItems = _buildRevisionQueueSheetItems(app);
+    final doNow = hubItems.where((item) => item.status == 'Do Now').toList();
+    final upcoming =
+        hubItems.where((item) => item.status == 'Upcoming').toList();
 
     final showDoNow = doNow.isNotEmpty;
     final items = showDoNow ? doNow : upcoming;
     final label = showDoNow ? 'Do Now' : 'Upcoming';
 
     final cs = Theme.of(context).colorScheme;
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -950,7 +940,8 @@ class _RevisionCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Center(
                 child: Container(
-                  width: 40, height: 4,
+                  width: 40,
+                  height: 4,
                   decoration: BoxDecoration(
                     color: cs.outlineVariant,
                     borderRadius: BorderRadius.circular(2),
@@ -966,7 +957,8 @@ class _RevisionCard extends StatelessWidget {
                   Text(
                     '$label (${items.length})',
                     style: TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.w700,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
                       color: cs.onSurface,
                     ),
                   ),
@@ -975,7 +967,7 @@ class _RevisionCard extends StatelessWidget {
                       Navigator.pop(ctx);
                       onNavigate();
                     },
-                    child: const Text('View All →'),
+                    child: const Text('View All'),
                   ),
                 ],
               ),
@@ -987,11 +979,13 @@ class _RevisionCard extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.check_circle_outline_rounded, size: 48,
-                          color: Colors.green.shade400),
+                      Icon(Icons.check_circle_outline_rounded,
+                          size: 48, color: Colors.green.shade400),
                       const SizedBox(height: 12),
-                      Text('All caught up! 🎉',
-                        style: TextStyle(fontSize: 16, color: cs.onSurfaceVariant),
+                      Text(
+                        'All caught up!',
+                        style:
+                            TextStyle(fontSize: 16, color: cs.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -1001,16 +995,16 @@ class _RevisionCard extends StatelessWidget {
               Expanded(
                 child: ListView.separated(
                   controller: scrollCtrl,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   itemCount: items.length,
                   separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (_, i) {
                     final r = items[i];
-                    final display = r.source == 'FA'
-                        ? 'FA Page ${r.pageNumber}'
-                        : r.title;
+                    final display =
+                        r.source == 'FA' ? 'FA Page ${r.pageNumber}' : r.title;
                     final subtitle = r.parentTitle.isNotEmpty
-                        ? '${r.parentTitle} · Rev ${r.currentRevisionIndex}'
+                        ? '${r.parentTitle} - Rev ${r.currentRevisionIndex}'
                         : 'Rev ${r.currentRevisionIndex}';
                     return ListTile(
                       dense: true,
@@ -1020,15 +1014,21 @@ class _RevisionCard extends StatelessWidget {
                             ? Colors.orange.withValues(alpha: 0.15)
                             : cs.primary.withValues(alpha: 0.1),
                         child: Icon(
-                          showDoNow ? Icons.priority_high_rounded : Icons.schedule_rounded,
+                          showDoNow
+                              ? Icons.priority_high_rounded
+                              : Icons.schedule_rounded,
                           size: 16,
-                          color: showDoNow ? Colors.orange.shade700 : cs.primary,
+                          color:
+                              showDoNow ? Colors.orange.shade700 : cs.primary,
                         ),
                       ),
-                      title: Text(display, maxLines: 1, overflow: TextOverflow.ellipsis,
+                      title: Text(display,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 14)),
                       subtitle: Text(subtitle,
-                          style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+                          style: TextStyle(
+                              fontSize: 11, color: cs.onSurfaceVariant)),
                     );
                   },
                 ),
@@ -1064,7 +1064,7 @@ class _RevisionCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   if (dueCount == 0)
                     Text(
-                      '✅ All caught up!',
+                      'All caught up!',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -1084,12 +1084,13 @@ class _RevisionCard extends StatelessWidget {
                   if (dueItems.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     ...dueItems.map((item) {
-                      final displayStr =
-                          item.source == 'FA' ? 'Page ${item.pageNumber}' : item.title;
+                      final displayStr = item.source == 'FA'
+                          ? 'Page ${item.pageNumber}'
+                          : item.title;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 2),
                         child: Text(
-                          '• $displayStr',
+                          '- $displayStr',
                           style: TextStyle(
                             fontSize: 12,
                             color: cs.onSurfaceVariant,
@@ -1118,9 +1119,110 @@ class _RevisionCard extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
+List<_RevisionQueueSheetItem> _buildRevisionQueueSheetItems(AppProvider app) {
+  final items = <_RevisionQueueSheetItem>[];
+
+  for (final revision in app.revisionItems) {
+    items.add(_RevisionQueueSheetItem.fromRevisionItem(revision));
+  }
+
+  for (final kb in app.knowledgeBase) {
+    if (kb.nextRevisionAt == null || kb.nextRevisionAt!.isEmpty) {
+      continue;
+    }
+    final alreadyTracked = app.revisionItems.any(
+      (r) => r.id == 'kb-${kb.pageNumber}',
+    );
+    if (!alreadyTracked) {
+      items.add(_RevisionQueueSheetItem.fromKnowledgeBaseEntry(kb));
+    }
+  }
+
+  final filtered = items
+      .map((item) => item.copyWith(status: _revisionQueueStatus(item)))
+      .where((item) => item.status.isNotEmpty)
+      .toList()
+    ..sort((a, b) => a.nextRevisionAt.compareTo(b.nextRevisionAt));
+
+  return filtered;
+}
+
+String _revisionQueueStatus(_RevisionQueueSheetItem item) {
+  if (SrsService.isDueNow(nextRevisionAt: item.nextRevisionAt)) {
+    return 'Do Now';
+  }
+  if (SrsService.isDueWithinDays(
+      nextRevisionAt: item.nextRevisionAt, days: 7)) {
+    return 'Upcoming';
+  }
+  return '';
+}
+
+class _RevisionQueueSheetItem {
+  final String id;
+  final String source;
+  final String title;
+  final String parentTitle;
+  final String pageNumber;
+  final String nextRevisionAt;
+  final int currentRevisionIndex;
+  final String status;
+
+  const _RevisionQueueSheetItem({
+    required this.id,
+    required this.source,
+    required this.title,
+    required this.parentTitle,
+    required this.pageNumber,
+    required this.nextRevisionAt,
+    required this.currentRevisionIndex,
+    required this.status,
+  });
+
+  factory _RevisionQueueSheetItem.fromRevisionItem(RevisionItem item) {
+    return _RevisionQueueSheetItem(
+      id: item.id,
+      source: item.source,
+      title: item.title,
+      parentTitle: item.parentTitle,
+      pageNumber: item.pageNumber,
+      nextRevisionAt: item.nextRevisionAt,
+      currentRevisionIndex: item.currentRevisionIndex,
+      status: '',
+    );
+  }
+
+  factory _RevisionQueueSheetItem.fromKnowledgeBaseEntry(
+      KnowledgeBaseEntry item) {
+    return _RevisionQueueSheetItem(
+      id: 'kb-${item.pageNumber}',
+      source: 'KB',
+      title: item.title,
+      parentTitle: item.subject,
+      pageNumber: item.pageNumber,
+      nextRevisionAt: item.nextRevisionAt ?? '',
+      currentRevisionIndex: item.currentRevisionIndex,
+      status: '',
+    );
+  }
+
+  _RevisionQueueSheetItem copyWith({String? status}) {
+    return _RevisionQueueSheetItem(
+      id: id,
+      source: source,
+      title: title,
+      parentTitle: parentTitle,
+      pageNumber: pageNumber,
+      nextRevisionAt: nextRevisionAt,
+      currentRevisionIndex: currentRevisionIndex,
+      status: status ?? this.status,
+    );
+  }
+}
+
+// ------------------------------------------------------------------
 // SECTION 5: Activity Heatmap (7 days)
-// ══════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------
 
 class _ActivityHeatmap extends StatelessWidget {
   final List<DateTime> days;
@@ -1155,9 +1257,7 @@ class _ActivityHeatmap extends StatelessWidget {
             final dayLabel = _dayLabels[d.weekday - 1];
 
             // Color intensity based on study minutes
-            final intensity = studied
-                ? (minutes / 120.0).clamp(0.3, 1.0)
-                : 0.0;
+            final intensity = studied ? (minutes / 120.0).clamp(0.3, 1.0) : 0.0;
 
             return Column(
               children: [
@@ -1215,9 +1315,9 @@ class _ActivityHeatmap extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------
 // SECTION 6: Subject Breakdown Card
-// ══════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------
 
 class _SubjectBreakdownCard extends StatelessWidget {
   final List<MapEntry<String, int>> topSubjects;
@@ -1314,9 +1414,9 @@ class _SubjectBreakdownCard extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------
 // SHIMMER LOADING PLACEHOLDER
-// ══════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------
 
 class _ShimmerLoading extends StatefulWidget {
   @override
@@ -1358,19 +1458,29 @@ class _ShimmerLoadingState extends State<_ShimmerLoading>
           children: [
             Row(
               children: [
-                Expanded(child: _shimmerBox(shimmer, double.infinity, 100, radius: 12)),
+                Expanded(
+                    child:
+                        _shimmerBox(shimmer, double.infinity, 100, radius: 12)),
                 const SizedBox(width: 12),
-                Expanded(child: _shimmerBox(shimmer, double.infinity, 100, radius: 12)),
+                Expanded(
+                    child:
+                        _shimmerBox(shimmer, double.infinity, 100, radius: 12)),
               ],
             ),
             const SizedBox(height: 16),
             Row(
               children: [
-                Expanded(child: _shimmerBox(shimmer, double.infinity, 72, radius: 12)),
+                Expanded(
+                    child:
+                        _shimmerBox(shimmer, double.infinity, 72, radius: 12)),
                 const SizedBox(width: 8),
-                Expanded(child: _shimmerBox(shimmer, double.infinity, 72, radius: 12)),
+                Expanded(
+                    child:
+                        _shimmerBox(shimmer, double.infinity, 72, radius: 12)),
                 const SizedBox(width: 8),
-                Expanded(child: _shimmerBox(shimmer, double.infinity, 72, radius: 12)),
+                Expanded(
+                    child:
+                        _shimmerBox(shimmer, double.infinity, 72, radius: 12)),
               ],
             ),
             const SizedBox(height: 16),
