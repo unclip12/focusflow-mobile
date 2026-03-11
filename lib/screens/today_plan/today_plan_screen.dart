@@ -42,11 +42,11 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
   // ── Prayer times — Vijayawada (block = leave 10 min before prayer → +20 min)
   // Format: (name, blockStartH, blockStartM, blockEndH, blockEndM, prayerH, prayerM)
   static const _prayers = [
-    ('Fajr',     5, 35,  6,  5,  5, 45),
-    ('Zuhr',    13, 20, 13, 50, 13, 30),
-    ('Asr',     16, 50, 17, 20, 17,  0),
+    ('Fajr', 5, 35, 6, 5, 5, 45),
+    ('Zuhr', 13, 20, 13, 50, 13, 30),
+    ('Asr', 16, 50, 17, 20, 17, 0),
     ('Maghrib', 18, 20, 18, 50, 18, 30),
-    ('Isha',    20,  5, 20, 35, 20, 15),
+    ('Isha', 20, 5, 20, 35, 20, 15),
   ];
 
   static TimeOfDay _parseTime(String hhmm) {
@@ -62,8 +62,10 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
       final endH = p.$4;
       final endM = p.$5;
       final dur = (endH * 60 + endM) - (startH * 60 + startM);
-      final start = '${startH.toString().padLeft(2, '0')}:${startM.toString().padLeft(2, '0')}';
-      final end = '${endH.toString().padLeft(2, '0')}:${endM.toString().padLeft(2, '0')}';
+      final start =
+          '${startH.toString().padLeft(2, '0')}:${startM.toString().padLeft(2, '0')}';
+      final end =
+          '${endH.toString().padLeft(2, '0')}:${endM.toString().padLeft(2, '0')}';
       return Block(
         id: 'prayer_${p.$1.toLowerCase()}',
         index: 0,
@@ -88,7 +90,11 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
       final p = _prayers[i];
       // Notification fires at block start time (= prayer − 10 min)
       final notifTime = DateTime(
-        now.year, now.month, now.day, p.$2, p.$3,
+        now.year,
+        now.month,
+        now.day,
+        p.$2,
+        p.$3,
       );
       if (notifTime.isAfter(now)) {
         NotificationService.instance.scheduleAt(
@@ -119,7 +125,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
   }
 
   String get _dateKey => AppDateUtils.formatDate(_selectedDate);
-  bool get _isToday => AppDateUtils.isSameDay(_selectedDate, AppDateUtils.getAdjustedDate());
+  bool get _isToday =>
+      AppDateUtils.isSameDay(_selectedDate, AppDateUtils.getAdjustedDate());
 
   void _prevDay() => setState(() {
         _selectedDate = _selectedDate.subtract(const Duration(days: 1));
@@ -162,7 +169,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
     final sp = context.watch<SettingsProvider>();
-    final DayPlan? plan = app.getDayPlan(DateFormat('yyyy-MM-dd').format(_selectedDate));
+    final DayPlan? plan =
+        app.getDayPlan(DateFormat('yyyy-MM-dd').format(_selectedDate));
     final realBlocks = List<Block>.from(plan?.blocks ?? []);
 
     // Merge prayer blocks for today
@@ -172,7 +180,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     } else {
       displayBlocks = List<Block>.from(realBlocks);
     }
-    displayBlocks.sort((a, b) => a.plannedStartTime.compareTo(b.plannedStartTime));
+    displayBlocks
+        .sort((a, b) => a.plannedStartTime.compareTo(b.plannedStartTime));
 
     // Available time (from Settings)
     final wake = _parseTime(sp.wakeTime);
@@ -185,7 +194,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
 
     // Planned minutes (real blocks only)
     final plannedMinutes = realBlocks.fold<int>(
-      0, (sum, b) => sum + b.plannedDurationMinutes,
+      0,
+      (sum, b) => sum + b.plannedDurationMinutes,
     );
     final isOverflow = _isToday && plannedMinutes > availableMinutes;
 
@@ -229,11 +239,13 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                       );
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
                       color: const Color(0xFFEF4444).withValues(alpha: 0.1),
                       child: Row(
                         children: [
-                          const Icon(Icons.timer_outlined, color: Color(0xFFEF4444), size: 18),
+                          const Icon(Icons.timer_outlined,
+                              color: Color(0xFFEF4444), size: 18),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -245,7 +257,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                               ),
                             ),
                           ),
-                          const Icon(Icons.open_in_full_rounded, color: Color(0xFFEF4444), size: 16),
+                          const Icon(Icons.open_in_full_rounded,
+                              color: Color(0xFFEF4444), size: 16),
                         ],
                       ),
                     ),
@@ -272,12 +285,14 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                                   firstDate: DateTime(2024),
                                   lastDate: DateTime(2027),
                                 );
-                                if (picked != null) setState(() => _selectedDate = picked);
+                                if (picked != null)
+                                  setState(() => _selectedDate = picked);
                               },
                               onTrackNow: () {
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
-                                    builder: (_) => TrackNowScreen(dateKey: _dateKey),
+                                    builder: (_) =>
+                                        TrackNowScreen(dateKey: _dateKey),
                                   ),
                                 );
                               },
@@ -296,19 +311,28 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                             color: Theme.of(context).colorScheme.surface,
                             padding: const EdgeInsets.only(bottom: 8),
                             child: Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 16),
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 16),
                               decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .surfaceContainerHighest
+                                    .withValues(alpha: 0.3),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: TabBar(
                                 controller: _tabCtrl,
-                                labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                                unselectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                labelStyle: const TextStyle(
+                                    fontSize: 12, fontWeight: FontWeight.w700),
+                                unselectedLabelStyle: const TextStyle(
+                                    fontSize: 12, fontWeight: FontWeight.w500),
                                 indicatorSize: TabBarIndicatorSize.tab,
                                 dividerColor: Colors.transparent,
                                 indicator: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primary
+                                      .withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 tabs: const [
@@ -466,15 +490,12 @@ class _AllTabContentState extends State<_AllTabContent>
     final flow = app.getDailyFlow(widget.dateKey);
 
     final allActivities = flow?.activities ?? [];
-    final resumeActivities = allActivities
-        .where((a) => a.isActive || a.isPaused)
-        .toList();
-    final upcomingActivities = allActivities
-        .where((a) => a.isNotStarted)
-        .toList();
-    final completedActivities = allActivities
-        .where((a) => a.isDone || a.isSkipped)
-        .toList();
+    final resumeActivities =
+        allActivities.where((a) => a.isActive || a.isPaused).toList();
+    final upcomingActivities =
+        allActivities.where((a) => a.isNotStarted).toList();
+    final completedActivities =
+        allActivities.where((a) => a.isDone || a.isSkipped).toList();
 
     // Also gather to-dos and buying items for the full day plan
     final todos = app.getTodoItemsForDate(widget.dateKey);
@@ -524,8 +545,7 @@ class _AllTabContentState extends State<_AllTabContent>
                           : cs.surfaceContainerHighest.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(8),
                       border: selected
-                          ? Border.all(
-                              color: cs.primary.withValues(alpha: 0.3))
+                          ? Border.all(color: cs.primary.withValues(alpha: 0.3))
                           : null,
                     ),
                     alignment: Alignment.center,
@@ -579,9 +599,15 @@ class _AllTabContentState extends State<_AllTabContent>
         // ── Segment content ─────────────────────────────────────
         Expanded(
           child: _buildSegmentContent(
-            context, app, flow, allActivities,
-            resumeActivities, upcomingActivities, completedActivities,
-            todos, buyingItems,
+            context,
+            app,
+            flow,
+            allActivities,
+            resumeActivities,
+            upcomingActivities,
+            completedActivities,
+            todos,
+            buyingItems,
           ),
         ),
       ],
@@ -604,25 +630,34 @@ class _AllTabContentState extends State<_AllTabContent>
     switch (_segmentIndex) {
       case 0: // Full Day Plan — everything
         return _buildFullDayPlan(
-          context, app, flow, allActivities, todos, buyingItems,
+          context,
+          app,
+          flow,
+          allActivities,
+          todos,
+          buyingItems,
         );
       case 1: // Resume — grouped by time of day
         if (resumeActivities.isEmpty) {
-          return _emptySegment(cs, 'No active items', Icons.play_circle_outline_rounded);
+          return _emptySegment(
+              cs, 'No active items', Icons.play_circle_outline_rounded);
         }
         return _buildGroupedList(context, app, resumeActivities, allActivities,
-          showComplete: true, showUndo: false);
+            showComplete: true, showUndo: false);
       case 2: // Upcoming — grouped by time of day
         if (upcomingActivities.isEmpty) {
           return _emptySegment(cs, 'Nothing upcoming', Icons.upcoming_rounded);
         }
-        return _buildGroupedList(context, app, upcomingActivities, allActivities,
-          showComplete: false, showUndo: false);
+        return _buildGroupedList(
+            context, app, upcomingActivities, allActivities,
+            showComplete: false, showUndo: false);
       case 3: // Completed
         if (completedActivities.isEmpty) {
-          return _emptySegment(cs, 'Nothing completed yet', Icons.check_circle_outline_rounded);
+          return _emptySegment(
+              cs, 'Nothing completed yet', Icons.check_circle_outline_rounded);
         }
-        return _buildCompletedTab(context, app, completedActivities, allActivities);
+        return _buildCompletedTab(
+            context, app, completedActivities, allActivities);
       default:
         return const SizedBox.shrink();
     }
@@ -645,8 +680,15 @@ class _AllTabContentState extends State<_AllTabContent>
       children: [
         _timeGroup('Morning (5 AM – 12 PM)', Icons.wb_twilight_rounded,
             groups['morning']!, allActivities, app, cs, showComplete, showUndo),
-        _timeGroup('Afternoon (12 PM – 5 PM)', Icons.wb_sunny_rounded,
-            groups['afternoon']!, allActivities, app, cs, showComplete, showUndo),
+        _timeGroup(
+            'Afternoon (12 PM – 5 PM)',
+            Icons.wb_sunny_rounded,
+            groups['afternoon']!,
+            allActivities,
+            app,
+            cs,
+            showComplete,
+            showUndo),
         _timeGroup('Evening (5 PM – 9 PM)', Icons.nights_stay_rounded,
             groups['evening']!, allActivities, app, cs, showComplete, showUndo),
         _timeGroup('Night (9 PM – 5 AM)', Icons.bedtime_rounded,
@@ -687,36 +729,38 @@ class _AllTabContentState extends State<_AllTabContent>
           ),
         ),
         ...activities.map((a) => Dismissible(
-          key: ValueKey('dismiss-${a.id}'),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            alignment: Alignment.centerRight,
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.only(right: 20),
-            decoration: BoxDecoration(
-              color: Colors.red.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.delete_outline_rounded, color: Colors.red),
-          ),
-          onDismissed: (_) => app.removeFlowActivity(widget.dateKey, a.id),
-          child: FlowActivityCard(
-            activity: a,
-            index: allActivities.indexOf(a),
-            onTap: () => _showEditTaskSheet(context, app, a),
-            onComplete: showComplete && (a.isActive || a.isPaused)
-                ? () => app.completeFlowActivity(widget.dateKey, a.id)
-                : null,
-            onUndo: showUndo && a.isDone
-                ? () => app.undoFlowActivity(widget.dateKey, a.id)
-                : null,
-          ),
-        )),
+              key: ValueKey('dismiss-${a.id}'),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                alignment: Alignment.centerRight,
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(right: 20),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child:
+                    const Icon(Icons.delete_outline_rounded, color: Colors.red),
+              ),
+              onDismissed: (_) => _deleteFlowActivity(app, a),
+              child: FlowActivityCard(
+                activity: a,
+                index: allActivities.indexOf(a),
+                onTap: () => _showFlowTaskActionsSheet(context, app, a),
+                onComplete: showComplete && (a.isActive || a.isPaused)
+                    ? () => app.completeFlowActivity(widget.dateKey, a.id)
+                    : null,
+                onUndo: showUndo && a.isDone
+                    ? () => app.undoFlowActivity(widget.dateKey, a.id)
+                    : null,
+              ),
+            )),
       ],
     );
   }
 
-  Map<String, List<FlowActivity>> _groupByTimeOfDay(List<FlowActivity> activities) {
+  Map<String, List<FlowActivity>> _groupByTimeOfDay(
+      List<FlowActivity> activities) {
     final morning = <FlowActivity>[];
     final afternoon = <FlowActivity>[];
     final evening = <FlowActivity>[];
@@ -744,11 +788,349 @@ class _AllTabContentState extends State<_AllTabContent>
         night.add(a);
       }
     }
-    return {'morning': morning, 'afternoon': afternoon, 'evening': evening, 'night': night};
+    return {
+      'morning': morning,
+      'afternoon': afternoon,
+      'evening': evening,
+      'night': night
+    };
   }
 
   // ── Edit Task Bottom Sheet ──────────────────────────────────────
-  void _showEditTaskSheet(BuildContext context, AppProvider app, FlowActivity activity) {
+  Future<void> _deleteFlowActivity(
+      AppProvider app, FlowActivity activity) async {
+    await app.removeFlowActivity(widget.dateKey, activity.id);
+  }
+
+  Future<void> _deleteBlock(AppProvider app, Block block) async {
+    final plan = app.getDayPlan(block.date);
+    if (plan == null) return;
+    final blocks = List<Block>.from(plan.blocks ?? [])
+      ..removeWhere((b) => b.id == block.id);
+    await app.upsertDayPlan(plan.copyWith(blocks: blocks));
+  }
+
+  Future<void> _upsertBlockInPlan(
+      AppProvider app, String date, Block block) async {
+    final plan = app.getDayPlan(date);
+    if (plan == null) return;
+    final blocks = List<Block>.from(plan.blocks ?? []);
+    final idx = blocks.indexWhere((b) => b.id == block.id);
+    if (idx >= 0) {
+      blocks[idx] = block;
+    } else {
+      blocks.add(block.copyWith(index: blocks.length));
+    }
+    await app.upsertDayPlan(plan.copyWith(blocks: blocks));
+  }
+
+  DateTime _dateFromKey(String dateKey) {
+    return DateTime.tryParse(dateKey) ?? DateTime.now();
+  }
+
+  DateTime? _tryParseIso(String? value) {
+    if (value == null || value.isEmpty) return null;
+    return DateTime.tryParse(value);
+  }
+
+  TimeOfDay _timeFromHm(String value) {
+    final parts = value.split(':');
+    if (parts.length != 2) return const TimeOfDay(hour: 0, minute: 0);
+    return TimeOfDay(
+      hour: int.tryParse(parts[0]) ?? 0,
+      minute: int.tryParse(parts[1]) ?? 0,
+    );
+  }
+
+  String _formatTimeOfDay(TimeOfDay time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  DateTime _flowActivityDate(FlowActivity activity) {
+    final dt = _tryParseIso(activity.startedAt) ??
+        _tryParseIso(activity.completedAt) ??
+        _dateFromKey(widget.dateKey);
+    return DateTime(dt.year, dt.month, dt.day);
+  }
+
+  String? _updatedActivityTimestamp(
+    String? current,
+    DateTime targetDate,
+    TimeOfDay? pickedTime,
+  ) {
+    final parsed = _tryParseIso(current);
+    if (parsed == null && pickedTime == null) return current;
+    final time = pickedTime ??
+        TimeOfDay(hour: parsed?.hour ?? 0, minute: parsed?.minute ?? 0);
+    return DateTime(
+      targetDate.year,
+      targetDate.month,
+      targetDate.day,
+      time.hour,
+      time.minute,
+    ).toIso8601String();
+  }
+
+  int _blockDurationMinutes(TimeOfDay start, TimeOfDay end) {
+    final startMinutes = start.hour * 60 + start.minute;
+    final endMinutes = end.hour * 60 + end.minute;
+    return max(0, endMinutes - startMinutes);
+  }
+
+  Future<void> _moveOrUpdateFlowActivity(
+    AppProvider app,
+    FlowActivity activity, {
+    DateTime? date,
+    TimeOfDay? startTime,
+    TimeOfDay? endTime,
+  }) async {
+    final targetDate = date ?? _flowActivityDate(activity);
+    final targetDateKey = DateFormat('yyyy-MM-dd').format(targetDate);
+    final updated = activity.copyWith(
+      startedAt:
+          _updatedActivityTimestamp(activity.startedAt, targetDate, startTime),
+      completedAt:
+          _updatedActivityTimestamp(activity.completedAt, targetDate, endTime),
+    );
+
+    if (targetDateKey == widget.dateKey) {
+      await app.updateFlowActivity(widget.dateKey, updated);
+      return;
+    }
+
+    await app.removeFlowActivity(widget.dateKey, activity.id);
+    await app.addFlowActivity(targetDateKey, updated);
+  }
+
+  Future<void> _moveOrUpdateBlock(
+    AppProvider app,
+    Block block, {
+    DateTime? date,
+    TimeOfDay? startTime,
+    TimeOfDay? endTime,
+  }) async {
+    final targetDate = date ?? _dateFromKey(block.date);
+    final targetDateKey = DateFormat('yyyy-MM-dd').format(targetDate);
+    final nextStart = startTime ?? _timeFromHm(block.plannedStartTime);
+    final nextEnd = endTime ?? _timeFromHm(block.plannedEndTime);
+    var updated = block.copyWith(
+      date: targetDateKey,
+      plannedStartTime: _formatTimeOfDay(nextStart),
+      plannedEndTime: _formatTimeOfDay(nextEnd),
+      plannedDurationMinutes: _blockDurationMinutes(nextStart, nextEnd),
+    );
+
+    if (targetDateKey == block.date) {
+      await _upsertBlockInPlan(app, block.date, updated);
+      return;
+    }
+
+    await _deleteBlock(app, block);
+    final targetPlan = app.getDayPlan(targetDateKey);
+    if (targetPlan == null) return;
+    final targetBlocks = List<Block>.from(targetPlan.blocks ?? []);
+    updated = updated.copyWith(index: targetBlocks.length);
+    await app.upsertDayPlan(targetPlan.copyWith(
+      blocks: [...targetBlocks, updated],
+    ));
+  }
+
+  Widget _dismissibleBackground() {
+    return Container(
+      alignment: Alignment.centerRight,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(right: 20),
+      decoration: BoxDecoration(
+        color: Colors.red.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+    );
+  }
+
+  Future<void> _showFlowTaskActionsSheet(
+    BuildContext context,
+    AppProvider app,
+    FlowActivity activity,
+  ) async {
+    final cs = Theme.of(context).colorScheme;
+    await showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.edit_calendar_rounded),
+                title: const Text('Edit Date'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _flowActivityDate(activity),
+                    firstDate: DateTime(2024),
+                    lastDate: DateTime(2027),
+                  );
+                  if (picked != null) {
+                    await _moveOrUpdateFlowActivity(app, activity,
+                        date: picked);
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.schedule_rounded),
+                title: const Text('Edit Start Time'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final current = _tryParseIso(activity.startedAt);
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime: current != null
+                        ? TimeOfDay(hour: current.hour, minute: current.minute)
+                        : const TimeOfDay(hour: 9, minute: 0),
+                  );
+                  if (picked != null) {
+                    await _moveOrUpdateFlowActivity(app, activity,
+                        startTime: picked);
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.schedule_send_rounded),
+                title: const Text('Edit End Time'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final current = _tryParseIso(activity.completedAt);
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime: current != null
+                        ? TimeOfDay(hour: current.hour, minute: current.minute)
+                        : const TimeOfDay(hour: 10, minute: 0),
+                  );
+                  if (picked != null) {
+                    await _moveOrUpdateFlowActivity(app, activity,
+                        endTime: picked);
+                  }
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.delete_outline_rounded, color: cs.error),
+                title: Text('Delete', style: TextStyle(color: cs.error)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await _deleteFlowActivity(app, activity);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showBlockTaskActionsSheet(
+    BuildContext context,
+    AppProvider app,
+    Block block,
+  ) async {
+    final cs = Theme.of(context).colorScheme;
+    await showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.edit_calendar_rounded),
+                title: const Text('Edit Date'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _dateFromKey(block.date),
+                    firstDate: DateTime(2024),
+                    lastDate: DateTime(2027),
+                  );
+                  if (picked != null) {
+                    await _moveOrUpdateBlock(app, block, date: picked);
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.schedule_rounded),
+                title: const Text('Edit Start Time'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime: _timeFromHm(block.plannedStartTime),
+                  );
+                  if (picked != null) {
+                    await _moveOrUpdateBlock(app, block, startTime: picked);
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.schedule_send_rounded),
+                title: const Text('Edit End Time'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime: _timeFromHm(block.plannedEndTime),
+                  );
+                  if (picked != null) {
+                    await _moveOrUpdateBlock(app, block, endTime: picked);
+                  }
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.delete_outline_rounded, color: cs.error),
+                title: Text('Delete', style: TextStyle(color: cs.error)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await _deleteBlock(app, block);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void showEditTaskSheet(
+      BuildContext context, AppProvider app, FlowActivity activity) {
     final nameCtrl = TextEditingController(text: activity.label);
     final cs = Theme.of(context).colorScheme;
 
@@ -759,7 +1141,10 @@ class _AllTabContentState extends State<_AllTabContent>
       builder: (ctx) {
         return Container(
           padding: EdgeInsets.fromLTRB(
-            20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20,
+            20,
+            20,
+            20,
+            MediaQuery.of(ctx).viewInsets.bottom + 20,
           ),
           decoration: BoxDecoration(
             color: Theme.of(ctx).colorScheme.surface,
@@ -772,7 +1157,8 @@ class _AllTabContentState extends State<_AllTabContent>
               // Handle bar
               Center(
                 child: Container(
-                  width: 40, height: 4,
+                  width: 40,
+                  height: 4,
                   decoration: BoxDecoration(
                     color: cs.onSurface.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(2),
@@ -805,8 +1191,8 @@ class _AllTabContentState extends State<_AllTabContent>
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline_rounded, size: 18,
-                        color: cs.onSurface.withValues(alpha: 0.5)),
+                    Icon(Icons.info_outline_rounded,
+                        size: 18, color: cs.onSurface.withValues(alpha: 0.5)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -837,7 +1223,8 @@ class _AllTabContentState extends State<_AllTabContent>
                       label: const Text('Delete'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: cs.error,
-                        side: BorderSide(color: cs.error.withValues(alpha: 0.3)),
+                        side:
+                            BorderSide(color: cs.error.withValues(alpha: 0.3)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
@@ -920,7 +1307,8 @@ class _AllTabContentState extends State<_AllTabContent>
       }
     }
 
-    Widget buildGroup(String title, IconData icon, List<FlowActivity> activities) {
+    Widget buildGroup(
+        String title, IconData icon, List<FlowActivity> activities) {
       if (activities.isEmpty) return const SizedBox.shrink();
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -929,7 +1317,8 @@ class _AllTabContentState extends State<_AllTabContent>
             padding: const EdgeInsets.only(left: 4, bottom: 8, top: 16),
             child: Row(
               children: [
-                Icon(icon, size: 16, color: cs.onSurface.withValues(alpha: 0.5)),
+                Icon(icon,
+                    size: 16, color: cs.onSurface.withValues(alpha: 0.5)),
                 const SizedBox(width: 8),
                 Text(
                   title,
@@ -943,10 +1332,10 @@ class _AllTabContentState extends State<_AllTabContent>
             ),
           ),
           ...activities.map((a) => FlowActivityCard(
-            activity: a,
-            index: allActivities.indexOf(a),
-            onUndo: () => app.undoFlowActivity(widget.dateKey, a.id),
-          )),
+                activity: a,
+                index: allActivities.indexOf(a),
+                onUndo: () => app.undoFlowActivity(widget.dateKey, a.id),
+              )),
         ],
       );
     }
@@ -961,8 +1350,10 @@ class _AllTabContentState extends State<_AllTabContent>
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       children: [
-        buildGroup('Morning (5 AM - 12 PM)', Icons.wb_twilight_rounded, morning),
-        buildGroup('Afternoon (12 PM - 5 PM)', Icons.wb_sunny_rounded, afternoon),
+        buildGroup(
+            'Morning (5 AM - 12 PM)', Icons.wb_twilight_rounded, morning),
+        buildGroup(
+            'Afternoon (12 PM - 5 PM)', Icons.wb_sunny_rounded, afternoon),
         buildGroup('Evening (5 PM - 9 PM)', Icons.nights_stay_rounded, evening),
         buildGroup('Night (9 PM - 5 AM)', Icons.bedtime_rounded, night),
 
@@ -986,7 +1377,8 @@ class _AllTabContentState extends State<_AllTabContent>
                       color: cs.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(Icons.insights_rounded, size: 16, color: cs.primary),
+                    child: Icon(Icons.insights_rounded,
+                        size: 16, color: cs.primary),
                   ),
                   const SizedBox(width: 12),
                   Text(
@@ -1017,9 +1409,11 @@ class _AllTabContentState extends State<_AllTabContent>
                   runSpacing: 8,
                   children: categorySeconds.entries.map((e) {
                     return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                        color:
+                            cs.surfaceContainerHighest.withValues(alpha: 0.5),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
@@ -1065,19 +1459,26 @@ class _AllTabContentState extends State<_AllTabContent>
   ) {
     final cs = Theme.of(context).colorScheme;
 
-    if (allActivities.isEmpty && todos.isEmpty && buyingItems.isEmpty &&
+    if (allActivities.isEmpty &&
+        todos.isEmpty &&
+        buyingItems.isEmpty &&
         widget.displayBlocks.isEmpty) {
-      return _EmptyState(hasNoPlan: widget.plan == null, dateKey: widget.dateKey);
+      return _EmptyState(
+          hasNoPlan: widget.plan == null, dateKey: widget.dateKey);
     }
 
     // Build unified list items — pending first, completed at bottom
     final items = <_FullDayItem>[];
-    final pending = allActivities.where((a) => !a.isDone && !a.isSkipped).toList();
+    final pending =
+        allActivities.where((a) => !a.isDone && !a.isSkipped).toList();
     final done = allActivities.where((a) => a.isDone || a.isSkipped).toList();
 
     // Pending flow activities first
     for (int i = 0; i < pending.length; i++) {
-      items.add(_FullDayItem(type: 'flow', flowActivity: pending[i], index: allActivities.indexOf(pending[i])));
+      items.add(_FullDayItem(
+          type: 'flow',
+          flowActivity: pending[i],
+          index: allActivities.indexOf(pending[i])));
     }
 
     // Add activity button (only if flow exists)
@@ -1092,17 +1493,22 @@ class _AllTabContentState extends State<_AllTabContent>
 
     // To-dos
     for (final t in todos) {
-      items.add(_FullDayItem(type: 'todo', todoTitle: t.title, todoDone: t.done));
+      items.add(
+          _FullDayItem(type: 'todo', todoTitle: t.title, todoDone: t.done));
     }
 
     // Buying items
     for (final b in buyingItems) {
-      items.add(_FullDayItem(type: 'buying', buyingTitle: b.name, buyingDone: b.bought));
+      items.add(_FullDayItem(
+          type: 'buying', buyingTitle: b.name, buyingDone: b.bought));
     }
 
     // Completed flow activities at the bottom
     for (int i = 0; i < done.length; i++) {
-      items.add(_FullDayItem(type: 'flow', flowActivity: done[i], index: allActivities.indexOf(done[i])));
+      items.add(_FullDayItem(
+          type: 'flow',
+          flowActivity: done[i],
+          index: allActivities.indexOf(done[i])));
     }
 
     return ReorderableListView.builder(
@@ -1135,26 +1541,21 @@ class _AllTabContentState extends State<_AllTabContent>
             child: Dismissible(
               key: ValueKey('dismiss-${item.flowActivity!.id}'),
               direction: DismissDirection.endToStart,
-              background: Container(
-                alignment: Alignment.centerRight,
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.only(right: 20),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(Icons.delete_outline_rounded, color: Colors.red),
-              ),
-              onDismissed: (_) => app.removeFlowActivity(widget.dateKey, item.flowActivity!.id),
+              background: _dismissibleBackground(),
+              onDismissed: (_) => _deleteFlowActivity(app, item.flowActivity!),
               child: FlowActivityCard(
                 activity: item.flowActivity!,
                 index: item.index ?? i,
-                onTap: () => _showEditTaskSheet(context, app, item.flowActivity!),
-                onComplete: item.flowActivity!.isActive || item.flowActivity!.isPaused
-                    ? () => app.completeFlowActivity(widget.dateKey, item.flowActivity!.id)
-                    : null,
+                onTap: () =>
+                    _showFlowTaskActionsSheet(context, app, item.flowActivity!),
+                onComplete:
+                    item.flowActivity!.isActive || item.flowActivity!.isPaused
+                        ? () => app.completeFlowActivity(
+                            widget.dateKey, item.flowActivity!.id)
+                        : null,
                 onUndo: item.flowActivity!.isDone
-                    ? () => app.undoFlowActivity(widget.dateKey, item.flowActivity!.id)
+                    ? () => app.undoFlowActivity(
+                        widget.dateKey, item.flowActivity!.id)
                     : null,
               ),
             ),
@@ -1165,26 +1566,37 @@ class _AllTabContentState extends State<_AllTabContent>
           final b = item.block!;
           return KeyedSubtree(
             key: ValueKey('block-${b.id}'),
-            child: Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              color: cs.surfaceContainerHighest.withValues(alpha: 0.3),
-              child: ListTile(
-                dense: true,
-                leading: Icon(Icons.book_rounded, size: 20,
-                    color: cs.primary.withValues(alpha: 0.6)),
-                title: Text(b.title.isNotEmpty ? b.title : 'Study Block',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                subtitle: Text(
-                  '${b.plannedStartTime} – ${b.plannedEndTime} • ${b.plannedDurationMinutes}m',
-                  style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.4)),
+            child: Dismissible(
+              key: ValueKey('dismiss-block-${b.id}'),
+              direction: DismissDirection.endToStart,
+              background: _dismissibleBackground(),
+              onDismissed: (_) => _deleteBlock(app, b),
+              child: Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                trailing: b.status == BlockStatus.done
-                    ? const Icon(Icons.check_circle_rounded, size: 18, color: Color(0xFF10B981))
-                    : null,
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.3),
+                child: ListTile(
+                  onTap: () => _showBlockTaskActionsSheet(context, app, b),
+                  dense: true,
+                  leading: Icon(Icons.book_rounded,
+                      size: 20, color: cs.primary.withValues(alpha: 0.6)),
+                  title: Text(b.title.isNotEmpty ? b.title : 'Study Block',
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600)),
+                  subtitle: Text(
+                    '${b.plannedStartTime} – ${b.plannedEndTime} • ${b.plannedDurationMinutes}m',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: cs.onSurface.withValues(alpha: 0.4)),
+                  ),
+                  trailing: b.status == BlockStatus.done
+                      ? const Icon(Icons.check_circle_rounded,
+                          size: 18, color: Color(0xFF10B981))
+                      : null,
+                ),
               ),
             ),
           );
@@ -1196,20 +1608,29 @@ class _AllTabContentState extends State<_AllTabContent>
             child: Card(
               margin: const EdgeInsets.only(bottom: 6),
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
               color: cs.surfaceContainerHighest.withValues(alpha: 0.2),
               child: ListTile(
                 dense: true,
                 leading: Icon(
-                  item.todoDone == true ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                  item.todoDone == true
+                      ? Icons.check_circle_rounded
+                      : Icons.radio_button_unchecked_rounded,
                   size: 18,
-                  color: item.todoDone == true ? const Color(0xFF10B981) : cs.onSurface.withValues(alpha: 0.3),
+                  color: item.todoDone == true
+                      ? const Color(0xFF10B981)
+                      : cs.onSurface.withValues(alpha: 0.3),
                 ),
                 title: Text(item.todoTitle ?? '',
                     style: TextStyle(
                       fontSize: 12,
-                      decoration: item.todoDone == true ? TextDecoration.lineThrough : null,
-                      color: item.todoDone == true ? cs.onSurface.withValues(alpha: 0.4) : cs.onSurface,
+                      decoration: item.todoDone == true
+                          ? TextDecoration.lineThrough
+                          : null,
+                      color: item.todoDone == true
+                          ? cs.onSurface.withValues(alpha: 0.4)
+                          : cs.onSurface,
                     )),
               ),
             ),
@@ -1222,17 +1643,25 @@ class _AllTabContentState extends State<_AllTabContent>
             child: Card(
               margin: const EdgeInsets.only(bottom: 6),
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
               color: cs.surfaceContainerHighest.withValues(alpha: 0.2),
               child: ListTile(
                 dense: true,
-                leading: Icon(Icons.shopping_cart_outlined, size: 18,
-                    color: item.buyingDone == true ? const Color(0xFF10B981) : cs.onSurface.withValues(alpha: 0.3)),
+                leading: Icon(Icons.shopping_cart_outlined,
+                    size: 18,
+                    color: item.buyingDone == true
+                        ? const Color(0xFF10B981)
+                        : cs.onSurface.withValues(alpha: 0.3)),
                 title: Text(item.buyingTitle ?? '',
                     style: TextStyle(
                       fontSize: 12,
-                      decoration: item.buyingDone == true ? TextDecoration.lineThrough : null,
-                      color: item.buyingDone == true ? cs.onSurface.withValues(alpha: 0.4) : cs.onSurface,
+                      decoration: item.buyingDone == true
+                          ? TextDecoration.lineThrough
+                          : null,
+                      color: item.buyingDone == true
+                          ? cs.onSurface.withValues(alpha: 0.4)
+                          : cs.onSurface,
                     )),
               ),
             ),
@@ -1262,7 +1691,8 @@ class _AllTabContentState extends State<_AllTabContent>
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.add_rounded, size: 18, color: cs.primary.withValues(alpha: 0.5)),
+                        Icon(Icons.add_rounded,
+                            size: 18, color: cs.primary.withValues(alpha: 0.5)),
                         const SizedBox(width: 6),
                         Text(
                           'Add Activity',
@@ -1298,7 +1728,10 @@ class _AllTabContentState extends State<_AllTabContent>
           decoration: InputDecoration(
             hintText: 'Activity name...',
             filled: true,
-            fillColor: Theme.of(ctx).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            fillColor: Theme.of(ctx)
+                .colorScheme
+                .surfaceContainerHighest
+                .withValues(alpha: 0.5),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -1405,21 +1838,23 @@ class _CelebrationOverlayState extends State<_CelebrationOverlay>
     });
     _ctrl.forward();
 
-    _particles = List.generate(24, (_) => _Particle(
-      x: _rng.nextDouble(),
-      y: _rng.nextDouble() * 0.3,
-      vx: (_rng.nextDouble() - 0.5) * 0.6,
-      vy: -0.5 - _rng.nextDouble() * 0.5,
-      size: 4 + _rng.nextDouble() * 6,
-      color: [
-        const Color(0xFF6366F1),
-        const Color(0xFF10B981),
-        const Color(0xFFF59E0B),
-        const Color(0xFFEF4444),
-        const Color(0xFF8B5CF6),
-        const Color(0xFF3B82F6),
-      ][_rng.nextInt(6)],
-    ));
+    _particles = List.generate(
+        24,
+        (_) => _Particle(
+              x: _rng.nextDouble(),
+              y: _rng.nextDouble() * 0.3,
+              vx: (_rng.nextDouble() - 0.5) * 0.6,
+              vy: -0.5 - _rng.nextDouble() * 0.5,
+              size: 4 + _rng.nextDouble() * 6,
+              color: [
+                const Color(0xFF6366F1),
+                const Color(0xFF10B981),
+                const Color(0xFFF59E0B),
+                const Color(0xFFEF4444),
+                const Color(0xFF8B5CF6),
+                const Color(0xFF3B82F6),
+              ][_rng.nextInt(6)],
+            ));
   }
 
   @override
@@ -1454,7 +1889,8 @@ class _CelebrationOverlayState extends State<_CelebrationOverlay>
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                            color:
+                                const Color(0xFF10B981).withValues(alpha: 0.3),
                             blurRadius: 20,
                             spreadRadius: 4,
                           ),
@@ -1513,9 +1949,12 @@ class _Particle {
   final double x, y, vx, vy, size;
   final Color color;
   const _Particle({
-    required this.x, required this.y,
-    required this.vx, required this.vy,
-    required this.size, required this.color,
+    required this.x,
+    required this.y,
+    required this.vx,
+    required this.vy,
+    required this.size,
+    required this.color,
   });
 }
 
@@ -1530,7 +1969,8 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => 44.0;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
     return _child;
   }
 
@@ -1582,9 +2022,7 @@ class _DateHeader extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        isToday
-                            ? 'Today'
-                            : DateFormat('EEEE').format(date),
+                        isToday ? 'Today' : DateFormat('EEEE').format(date),
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                           color: isToday ? cs.primary : cs.onSurface,
@@ -1592,7 +2030,8 @@ class _DateHeader extends StatelessWidget {
                       ),
                       if (streakCount > 0) ...[
                         const SizedBox(width: 6),
-                        Icon(Icons.local_fire_department_rounded, size: 14, color: Colors.deepOrange),
+                        Icon(Icons.local_fire_department_rounded,
+                            size: 14, color: Colors.deepOrange),
                         const SizedBox(width: 2),
                         Text(
                           '$streakCount',
@@ -1694,7 +2133,8 @@ class _EmptyState extends StatelessWidget {
                 icon: const Icon(Icons.auto_awesome_rounded, size: 18),
                 label: const Text('Plan from Template'),
                 style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
