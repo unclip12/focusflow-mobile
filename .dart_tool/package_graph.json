@@ -7,6 +7,7 @@
       "name": "focusflow_mobile",
       "version": "2.0.0+2",
       "dependencies": [
+        "awesome_video_player",
         "collection",
         "file_picker",
         "fl_chart",
@@ -21,7 +22,9 @@
         "intl",
         "path",
         "path_provider",
+        "pdfrx",
         "permission_handler",
+        "photo_view",
         "provider",
         "share_plus",
         "shared_preferences",
@@ -58,6 +61,26 @@
         "stream_channel",
         "test_api",
         "vector_math"
+      ]
+    },
+    {
+      "name": "awesome_video_player",
+      "version": "1.0.5",
+      "dependencies": [
+        "collection",
+        "flutter",
+        "flutter_localizations",
+        "flutter_widget_from_html_core",
+        "path_provider",
+        "visibility_detector",
+        "wakelock_plus"
+      ]
+    },
+    {
+      "name": "photo_view",
+      "version": "0.15.0",
+      "dependencies": [
+        "flutter"
       ]
     },
     {
@@ -148,7 +171,7 @@
     },
     {
       "name": "intl",
-      "version": "0.19.0",
+      "version": "0.20.2",
       "dependencies": [
         "clock",
         "meta",
@@ -372,6 +395,22 @@
         "stream_channel",
         "string_scanner",
         "term_glyph"
+      ]
+    },
+    {
+      "name": "visibility_detector",
+      "version": "0.4.0+2",
+      "dependencies": [
+        "flutter"
+      ]
+    },
+    {
+      "name": "flutter_localizations",
+      "version": "0.0.0",
+      "dependencies": [
+        "flutter",
+        "intl",
+        "path"
       ]
     },
     {
@@ -1102,6 +1141,92 @@
         "collection",
         "source_span",
         "string_scanner"
+      ]
+    },
+    {
+      "name": "flutter_widget_from_html_core",
+      "version": "0.16.1",
+      "dependencies": [
+        "csslib",
+        "flutter",
+        "html",
+        "logging"
+      ]
+    },
+    {
+      "name": "csslib",
+      "version": "1.0.2",
+      "dependencies": [
+        "source_span"
+      ]
+    },
+    {
+      "name": "html",
+      "version": "0.15.6",
+      "dependencies": [
+        "csslib",
+        "source_span"
+      ]
+    },
+    {
+      "name": "pdfrx",
+      "version": "1.0.94",
+      "dependencies": [
+        "collection",
+        "crypto",
+        "ffi",
+        "flutter",
+        "http",
+        "path",
+        "path_provider",
+        "rxdart",
+        "synchronized",
+        "url_launcher",
+        "vector_math",
+        "web"
+      ]
+    },
+    {
+      "name": "url_launcher",
+      "version": "6.3.2",
+      "dependencies": [
+        "flutter",
+        "url_launcher_android",
+        "url_launcher_ios",
+        "url_launcher_linux",
+        "url_launcher_macos",
+        "url_launcher_platform_interface",
+        "url_launcher_web",
+        "url_launcher_windows"
+      ]
+    },
+    {
+      "name": "url_launcher_macos",
+      "version": "3.2.5",
+      "dependencies": [
+        "flutter",
+        "url_launcher_platform_interface"
+      ]
+    },
+    {
+      "name": "url_launcher_ios",
+      "version": "6.4.1",
+      "dependencies": [
+        "flutter",
+        "url_launcher_platform_interface"
+      ]
+    },
+    {
+      "name": "rxdart",
+      "version": "0.28.0",
+      "dependencies": []
+    },
+    {
+      "name": "url_launcher_android",
+      "version": "6.3.28",
+      "dependencies": [
+        "flutter",
+        "url_launcher_platform_interface"
       ]
     }
   ],

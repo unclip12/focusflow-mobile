@@ -5,6 +5,7 @@ import 'package:focusflow_mobile/models/pathoma_chapter.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/screens/library/add_note_sheet.dart';
 import 'package:focusflow_mobile/screens/library/edit_metadata_sheet.dart';
+import 'package:focusflow_mobile/screens/library/attachment_helper.dart';
 
 class LibraryItemDetailSheet extends StatefulWidget {
   final AppProvider app;
@@ -356,10 +357,13 @@ class _NotesTabState extends State<_NotesTab> {
                                 spacing: 8,
                                 runSpacing: 8,
                                 children: note.attachmentPaths.map((path) {
-                                  return Chip(
-                                    avatar: const Icon(Icons.attachment_rounded, size: 14),
-                                    label: Text(path.split('/').last),
-                                    visualDensity: VisualDensity.compact,
+                                  return GestureDetector(
+                                    onTap: () => AttachmentHelper.openAttachment(context, path),
+                                    child: Chip(
+                                      avatar: Icon(AttachmentHelper.getIcon(path), size: 14),
+                                      label: Text(path.split('/').last),
+                                      visualDensity: VisualDensity.compact,
+                                    ),
                                   );
                                 }).toList(),
                               ),

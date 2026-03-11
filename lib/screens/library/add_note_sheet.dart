@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'package:focusflow_mobile/models/library_note.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
+import 'package:focusflow_mobile/screens/library/attachment_helper.dart';
 
 class AddNoteSheet extends StatefulWidget {
   final String itemId;
@@ -181,11 +182,15 @@ class _AddNoteSheetState extends State<AddNoteSheet> {
               runSpacing: 8,
               children: _attachments.map((path) {
                 final filename = path.split('/').last.split('\\').last;
-                return Chip(
-                  label: Text(filename),
-                  onDeleted: () {
-                    setState(() => _attachments.remove(path));
-                  },
+                return GestureDetector(
+                  onTap: () => AttachmentHelper.openAttachment(context, path),
+                  child: Chip(
+                    avatar: Icon(AttachmentHelper.getIcon(path), size: 16),
+                    label: Text(filename),
+                    onDeleted: () {
+                      setState(() => _attachments.remove(path));
+                    },
+                  ),
                 );
               }).toList(),
             ),
