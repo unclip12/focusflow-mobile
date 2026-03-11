@@ -7,7 +7,6 @@
       "name": "focusflow_mobile",
       "version": "2.0.0+2",
       "dependencies": [
-        "awesome_video_player",
         "collection",
         "file_picker",
         "fl_chart",
@@ -20,6 +19,9 @@
         "http",
         "image_picker",
         "intl",
+        "media_kit",
+        "media_kit_libs_video",
+        "media_kit_video",
         "path",
         "path_provider",
         "pdfrx",
@@ -64,23 +66,28 @@
       ]
     },
     {
-      "name": "awesome_video_player",
-      "version": "1.0.5",
-      "dependencies": [
-        "collection",
-        "flutter",
-        "flutter_localizations",
-        "flutter_widget_from_html_core",
-        "path_provider",
-        "visibility_detector",
-        "wakelock_plus"
-      ]
-    },
-    {
       "name": "photo_view",
       "version": "0.15.0",
       "dependencies": [
         "flutter"
+      ]
+    },
+    {
+      "name": "pdfrx",
+      "version": "1.0.94",
+      "dependencies": [
+        "collection",
+        "crypto",
+        "ffi",
+        "flutter",
+        "http",
+        "path",
+        "path_provider",
+        "rxdart",
+        "synchronized",
+        "url_launcher",
+        "vector_math",
+        "web"
       ]
     },
     {
@@ -398,19 +405,44 @@
       ]
     },
     {
-      "name": "visibility_detector",
-      "version": "0.4.0+2",
+      "name": "web",
+      "version": "0.5.1",
+      "dependencies": []
+    },
+    {
+      "name": "url_launcher",
+      "version": "6.3.2",
       "dependencies": [
-        "flutter"
+        "flutter",
+        "url_launcher_android",
+        "url_launcher_ios",
+        "url_launcher_linux",
+        "url_launcher_macos",
+        "url_launcher_platform_interface",
+        "url_launcher_web",
+        "url_launcher_windows"
       ]
     },
     {
-      "name": "flutter_localizations",
-      "version": "0.0.0",
+      "name": "synchronized",
+      "version": "3.4.0",
+      "dependencies": []
+    },
+    {
+      "name": "rxdart",
+      "version": "0.28.0",
+      "dependencies": []
+    },
+    {
+      "name": "ffi",
+      "version": "2.2.0",
+      "dependencies": []
+    },
+    {
+      "name": "crypto",
+      "version": "3.0.7",
       "dependencies": [
-        "flutter",
-        "intl",
-        "path"
+        "typed_data"
       ]
     },
     {
@@ -437,11 +469,6 @@
         "platform",
         "plugin_platform_interface"
       ]
-    },
-    {
-      "name": "web",
-      "version": "0.5.1",
-      "dependencies": []
     },
     {
       "name": "package_info_plus",
@@ -496,13 +523,6 @@
       "name": "fixnum",
       "version": "1.1.1",
       "dependencies": []
-    },
-    {
-      "name": "crypto",
-      "version": "3.0.7",
-      "dependencies": [
-        "typed_data"
-      ]
     },
     {
       "name": "permission_handler_platform_interface",
@@ -622,11 +642,6 @@
         "collection",
         "meta"
       ]
-    },
-    {
-      "name": "ffi",
-      "version": "2.2.0",
-      "dependencies": []
     },
     {
       "name": "url_launcher_platform_interface",
@@ -974,6 +989,37 @@
       ]
     },
     {
+      "name": "url_launcher_macos",
+      "version": "3.2.5",
+      "dependencies": [
+        "flutter",
+        "url_launcher_platform_interface"
+      ]
+    },
+    {
+      "name": "url_launcher_ios",
+      "version": "6.4.1",
+      "dependencies": [
+        "flutter",
+        "url_launcher_platform_interface"
+      ]
+    },
+    {
+      "name": "url_launcher_android",
+      "version": "6.3.28",
+      "dependencies": [
+        "flutter",
+        "url_launcher_platform_interface"
+      ]
+    },
+    {
+      "name": "typed_data",
+      "version": "1.4.0",
+      "dependencies": [
+        "collection"
+      ]
+    },
+    {
       "name": "platform",
       "version": "3.1.6",
       "dependencies": []
@@ -1000,13 +1046,6 @@
       "name": "args",
       "version": "2.7.0",
       "dependencies": []
-    },
-    {
-      "name": "typed_data",
-      "version": "1.4.0",
-      "dependencies": [
-        "collection"
-      ]
     },
     {
       "name": "file_selector_windows",
@@ -1065,11 +1104,6 @@
         "native_toolchain_c",
         "pub_semver"
       ]
-    },
-    {
-      "name": "synchronized",
-      "version": "3.4.0",
-      "dependencies": []
     },
     {
       "name": "vm_service",
@@ -1144,89 +1178,196 @@
       ]
     },
     {
-      "name": "flutter_widget_from_html_core",
-      "version": "0.16.1",
+      "name": "media_kit_libs_video",
+      "version": "1.0.7",
       "dependencies": [
-        "csslib",
+        "media_kit_libs_android_video",
+        "media_kit_libs_ios_video",
+        "media_kit_libs_linux",
+        "media_kit_libs_macos_video",
+        "media_kit_libs_windows_video"
+      ]
+    },
+    {
+      "name": "media_kit_libs_windows_video",
+      "version": "1.0.11",
+      "dependencies": [
+        "flutter"
+      ]
+    },
+    {
+      "name": "media_kit_libs_macos_video",
+      "version": "1.1.4",
+      "dependencies": [
         "flutter",
-        "html",
-        "logging"
+        "plugin_platform_interface"
       ]
     },
     {
-      "name": "csslib",
-      "version": "1.0.2",
+      "name": "media_kit_libs_linux",
+      "version": "1.2.1",
       "dependencies": [
-        "source_span"
+        "flutter"
       ]
     },
     {
-      "name": "html",
-      "version": "0.15.6",
+      "name": "media_kit_libs_ios_video",
+      "version": "1.1.4",
       "dependencies": [
-        "csslib",
-        "source_span"
-      ]
-    },
-    {
-      "name": "pdfrx",
-      "version": "1.0.94",
-      "dependencies": [
-        "collection",
-        "crypto",
-        "ffi",
         "flutter",
-        "http",
-        "path",
-        "path_provider",
-        "rxdart",
+        "plugin_platform_interface"
+      ]
+    },
+    {
+      "name": "media_kit_libs_android_video",
+      "version": "1.3.8",
+      "dependencies": [
+        "flutter",
+        "plugin_platform_interface"
+      ]
+    },
+    {
+      "name": "media_kit_video",
+      "version": "1.2.5",
+      "dependencies": [
+        "flutter",
+        "media_kit",
+        "plugin_platform_interface",
+        "screen_brightness",
         "synchronized",
-        "url_launcher",
-        "vector_math",
-        "web"
+        "universal_platform",
+        "volume_controller",
+        "wakelock_plus"
       ]
     },
     {
-      "name": "url_launcher",
-      "version": "6.3.2",
-      "dependencies": [
-        "flutter",
-        "url_launcher_android",
-        "url_launcher_ios",
-        "url_launcher_linux",
-        "url_launcher_macos",
-        "url_launcher_platform_interface",
-        "url_launcher_web",
-        "url_launcher_windows"
-      ]
-    },
-    {
-      "name": "url_launcher_macos",
-      "version": "3.2.5",
-      "dependencies": [
-        "flutter",
-        "url_launcher_platform_interface"
-      ]
-    },
-    {
-      "name": "url_launcher_ios",
-      "version": "6.4.1",
-      "dependencies": [
-        "flutter",
-        "url_launcher_platform_interface"
-      ]
-    },
-    {
-      "name": "rxdart",
-      "version": "0.28.0",
+      "name": "universal_platform",
+      "version": "1.1.0",
       "dependencies": []
     },
     {
-      "name": "url_launcher_android",
-      "version": "6.3.28",
+      "name": "volume_controller",
+      "version": "2.0.8",
+      "dependencies": [
+        "flutter"
+      ]
+    },
+    {
+      "name": "screen_brightness",
+      "version": "0.2.2+1",
       "dependencies": [
         "flutter",
-        "url_launcher_platform_interface"
+        "screen_brightness_android",
+        "screen_brightness_ios",
+        "screen_brightness_macos",
+        "screen_brightness_platform_interface",
+        "screen_brightness_windows"
+      ]
+    },
+    {
+      "name": "screen_brightness_platform_interface",
+      "version": "0.1.0",
+      "dependencies": [
+        "flutter",
+        "plugin_platform_interface"
+      ]
+    },
+    {
+      "name": "screen_brightness_ios",
+      "version": "0.1.0",
+      "dependencies": [
+        "flutter",
+        "screen_brightness_platform_interface"
+      ]
+    },
+    {
+      "name": "screen_brightness_macos",
+      "version": "0.1.0+1",
+      "dependencies": [
+        "flutter",
+        "screen_brightness_platform_interface"
+      ]
+    },
+    {
+      "name": "screen_brightness_android",
+      "version": "0.1.0+2",
+      "dependencies": [
+        "flutter",
+        "screen_brightness_platform_interface"
+      ]
+    },
+    {
+      "name": "screen_brightness_windows",
+      "version": "0.1.3",
+      "dependencies": [
+        "flutter",
+        "screen_brightness_platform_interface"
+      ]
+    },
+    {
+      "name": "media_kit",
+      "version": "1.1.11",
+      "dependencies": [
+        "collection",
+        "http",
+        "image",
+        "js",
+        "meta",
+        "path",
+        "safe_local_storage",
+        "synchronized",
+        "universal_platform",
+        "uri_parser",
+        "uuid"
+      ]
+    },
+    {
+      "name": "uri_parser",
+      "version": "2.0.2",
+      "dependencies": [
+        "path",
+        "safe_local_storage"
+      ]
+    },
+    {
+      "name": "safe_local_storage",
+      "version": "1.0.2",
+      "dependencies": [
+        "path",
+        "synchronized"
+      ]
+    },
+    {
+      "name": "js",
+      "version": "0.6.7",
+      "dependencies": [
+        "meta"
+      ]
+    },
+    {
+      "name": "image",
+      "version": "4.8.0",
+      "dependencies": [
+        "archive",
+        "meta",
+        "xml"
+      ]
+    },
+    {
+      "name": "archive",
+      "version": "4.0.9",
+      "dependencies": [
+        "path",
+        "posix"
+      ]
+    },
+    {
+      "name": "posix",
+      "version": "6.5.0",
+      "dependencies": [
+        "ffi",
+        "meta",
+        "path"
       ]
     }
   ],

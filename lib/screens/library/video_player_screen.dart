@@ -1,5 +1,6 @@
-import 'package:awesome_video_player/awesome_video_player.dart';
 import 'package:flutter/material.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final String filePath;
@@ -11,27 +12,18 @@ class VideoPlayerScreen extends StatefulWidget {
 }
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
-  late BetterPlayerController _controller;
+  late final Player player = Player();
+  late final VideoController controller = VideoController(player);
 
   @override
   void initState() {
     super.initState();
-    final dataSource = BetterPlayerDataSource(
-      BetterPlayerDataSourceType.file,
-      widget.filePath,
-    );
-    _controller = BetterPlayerController(
-      const BetterPlayerConfiguration(
-        autoPlay: true,
-        fit: BoxFit.contain,
-      ),
-      betterPlayerDataSource: dataSource,
-    );
+    player.open(Media(widget.filePath));
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    player.dispose();
     super.dispose();
   }
 
@@ -47,7 +39,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         title: Text(filename, style: const TextStyle(fontSize: 16)),
       ),
       body: Center(
-        child: BetterPlayer(controller: _controller),
+        child: Video(
+          controller: controller,
+        ),
       ),
     );
   }
