@@ -59,7 +59,8 @@ class _TaskLinkerSheetState extends State<TaskLinkerSheet> {
     // Add today's flow activities
     if (flow != null) {
       for (final a in flow.activities) {
-        if (a.activityType == 'TRACK_NOW') continue; // Don't link track now to track now
+        if (a.activityType == 'TRACK_NOW')
+          continue; // Don't link track now to track now
         if (_search.isNotEmpty &&
             !(a.label.toLowerCase().contains(_search.toLowerCase()))) continue;
         linkableItems.add(_LinkableItem(
@@ -72,26 +73,44 @@ class _TaskLinkerSheetState extends State<TaskLinkerSheet> {
       }
     }
 
-    // Add today's day plan blocks that don't have a flow activity yet
+    final linkedItemIds =
+        flow?.activities.expand((a) => a.linkedTaskIds).toSet() ?? <String>{};
+
+    // Add today's day plan blocks and their task entries
     if (dayPlan != null) {
       final blocks = dayPlan.blocks ?? [];
-      final linkedBlockIds = flow?.activities
-          .expand((a) => a.linkedTaskIds)
-          .toSet() ?? {};
-          
+
       for (final b in blocks) {
         if (b.type == BlockType.breakBlock || b.isVirtual == true) continue;
-        if (linkedBlockIds.contains(b.id)) continue; // Already in flow
-        
-        if (_search.isNotEmpty &&
-            !(b.title.toLowerCase().contains(_search.toLowerCase()))) continue;
-        linkableItems.add(_LinkableItem(
-          id: b.id,
-          title: b.title,
-          subtitle: 'Today\'s Plan',
-          icon: Icons.calendar_today_rounded,
-          color: const Color(0xFF6366F1),
-        ));
+        if (!linkedItemIds.contains(b.id)) {
+          final matchesBlockSearch = _search.isEmpty ||
+              b.title.toLowerCase().contains(_search.toLowerCase());
+          if (matchesBlockSearch) {
+            linkableItems.add(_LinkableItem(
+              id: b.id,
+              title: b.title,
+              subtitle: 'Today\'s Plan',
+              icon: Icons.calendar_today_rounded,
+              color: const Color(0xFF6366F1),
+            ));
+          }
+        }
+
+        for (final task in b.tasks ?? const []) {
+          final detail = task.detail.trim();
+          if (detail.isEmpty || linkedItemIds.contains(task.id)) continue;
+          if (_search.isNotEmpty &&
+              !detail.toLowerCase().contains(_search.toLowerCase())) {
+            continue;
+          }
+          linkableItems.add(_LinkableItem(
+            id: task.id,
+            title: detail,
+            subtitle: 'Today\'s Plan • ${b.title}',
+            icon: Icons.task_alt_rounded,
+            color: const Color(0xFF4F46E5),
+          ));
+        }
       }
     }
 
@@ -185,14 +204,13 @@ class _TaskLinkerSheetState extends State<TaskLinkerSheet> {
                   prefixIcon: const Icon(Icons.search_rounded, size: 20),
                   isDense: true,
                   filled: true,
-                  fillColor:
-                      cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                  fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
               ),
             ),
@@ -254,8 +272,8 @@ class _TaskLinkerSheetState extends State<TaskLinkerSheet> {
                                   .withValues(alpha: 0.3),
                           child: ListTile(
                             dense: true,
-                            leading: Icon(item.icon,
-                                size: 20, color: item.color),
+                            leading:
+                                Icon(item.icon, size: 20, color: item.color),
                             title: Text(item.title,
                                 style: const TextStyle(
                                   fontSize: 13,
