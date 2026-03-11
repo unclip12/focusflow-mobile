@@ -1868,12 +1868,32 @@ class AppProvider extends ChangeNotifier {
       'last_reviewed': null,
     }));
     faPages[idx] = updated;
+
+    final subtopicIdsToDelete = <String>[];
+    for (var i = 0; i < faSubtopics.length; i++) {
+      final sub = faSubtopics[i];
+      if (sub.pageNum != pageNum || sub.id == null) continue;
+
+      await _db.resetFASubtopic(sub.id!);
+      faSubtopics[i] = FASubtopic(
+        id: sub.id,
+        pageNum: sub.pageNum,
+        name: sub.name,
+      );
+      subtopicIdsToDelete.add('fa-sub-${sub.pageNum}-${sub.id}');
+    }
     
     final revId = 'fa-page-$pageNum';
     if (revisionItems.any((r) => r.id == revId)) {
       await deleteRevisionItem(revId);
     }
+    for (final subRevId in subtopicIdsToDelete) {
+      if (revisionItems.any((r) => r.id == subRevId)) {
+        await deleteRevisionItem(subRevId);
+      }
+    }
     notifyListeners();
+    unawaited(_triggerBackup());
   }
 
   // ═══════════════════════════════════════════════════════════════

@@ -27,6 +27,8 @@ class TrackerScreen extends StatefulWidget {
   State<TrackerScreen> createState() => _TrackerScreenState();
 }
 
+const double _twoActionPaneExtentRatio = 0.62;
+
 class _TrackerScreenState extends State<TrackerScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
@@ -917,7 +919,7 @@ class _SubtopicListView extends StatelessWidget {
           key: ValueKey('st_${st.id}'),
           endActionPane: ActionPane(
             motion: const ScrollMotion(),
-            extentRatio: 0.5,
+            extentRatio: _twoActionPaneExtentRatio,
             children: [
               if (st.status != 'unread')
                 SlidableAction(
@@ -1219,7 +1221,7 @@ class _SketchyVideoList extends StatelessWidget {
                           key: ValueKey('sketchy_${v.id}'),
                           endActionPane: ActionPane(
                             motion: const ScrollMotion(),
-                            extentRatio: 0.5,
+                            extentRatio: _twoActionPaneExtentRatio,
                             children: [
                               if (v.watched)
                                 SlidableAction(
@@ -1413,7 +1415,7 @@ class _PathomaTab extends StatelessWidget {
                     key: ValueKey('pathoma_${ch.id}'),
                     endActionPane: ActionPane(
                       motion: const ScrollMotion(),
-                      extentRatio: 0.5,
+                      extentRatio: _twoActionPaneExtentRatio,
                       children: [
                         if (ch.watched)
                           SlidableAction(
@@ -2400,7 +2402,7 @@ class _FACardView extends StatelessWidget {
                   key: ValueKey(page.pageNum),
                   endActionPane: ActionPane(
                     motion: const ScrollMotion(),
-                    extentRatio: 0.5,
+                    extentRatio: _twoActionPaneExtentRatio,
                     children: [
                       if (page.status != 'unread')
                         SlidableAction(
