@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:pdfrx/pdfrx.dart';
+import 'dart:io';
+
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 class PdfViewerScreen extends StatelessWidget {
   final String filePath;
@@ -15,13 +17,10 @@ class PdfViewerScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(filename, style: const TextStyle(fontSize: 16)),
       ),
-      body: PdfViewer.file(
-        filePath,
-        params: PdfViewerParams(
-          backgroundColor: cs.surface,
-          loadingBannerBuilder: (context, bytesDownloaded, totalBytes) {
-            return const Center(child: CircularProgressIndicator());
-          },
+      body: Container(
+        color: cs.surface,
+        child: SfPdfViewer.file(
+          File(filePath),
         ),
       ),
     );
