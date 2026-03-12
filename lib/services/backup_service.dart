@@ -1,5 +1,5 @@
 // =============================================================
-// BackupService — Save / load full app state as JSON
+// BackupService - Save / load full app state as JSON
 // Uses path_provider (already in pubspec) + dart:io + dart:convert
 // NOTE: On Android, SAF URIs (content://) cannot be used with
 //       dart:io File directly. We always write to the app's
@@ -10,15 +10,18 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
-
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:focusflow_mobile/providers/app_provider.dart';
 
+String _encodeBackupPayload(Map<String, dynamic> data) => jsonEncode(data);
+
+Object? _decodeBackupPayload(String contents) => jsonDecode(contents);
+
 class BackupService {
-  static const _fileName = 'focusflow_backup.json';
   static const _kBackupFolderUri = 'backup_folder_uri';
 
   /// Save the user-selected folder label to SharedPreferences (display only).
@@ -44,12 +47,6 @@ class BackupService {
     return backupDir.path;
   }
 
-  /// Returns the path for the legacy single-file backup.
-  static Future<String> get _filePath async {
-    final folder = await getBackupFolder();
-    return '$folder/$_fileName';
-  }
-
   /// Save full app state to Documents/FocusFlow with a timestamp filename.
   static Future<String> saveBackup(
     Map<String, dynamic> data, {
@@ -59,29 +56,75 @@ class BackupService {
     final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
     final filePath = '$folder/${filePrefix}_$timestamp.json';
     final file = File(filePath);
-    await file.writeAsString(jsonEncode(data));
+    final payload = await compute(_encodeBackupPayload, data);
+    await file.writeAsString(payload);
     return filePath;
   }
 
-  /// Load backup from JSON file — returns null if not found.
-  static Future<Map<String, dynamic>?> loadBackup() async {
-    final path = await _filePath;
-    final file = File(path);
-    if (!await file.exists()) return null;
+  /// Returns the newest JSON backup file in Documents/FocusFlow.
+  static Future<File?> getLatestBackupFile() async {
+    final folder = Directory(await getBackupFolder());
+    final entities = await folder.list().toList();
+    final files = entities
+        .whereType<File>()
+        .where((file) => file.path.toLowerCase().endsWith('.json'))
+        .toList();
+
+    if (files.isEmpty) return null;
+
+    final fileStats = await Future.wait(
+      files.map((file) async => MapEntry(file, await file.stat())),
+    );
+    fileStats.sort((a, b) => b.value.modified.compareTo(a.value.modified));
+    return fileStats.first.key;
+  }
+
+  /// Returns the newest JSON backup path in Documents/FocusFlow.
+  static Future<String?> getLatestBackupPath() async {
+    final latestFile = await getLatestBackupFile();
+    return latestFile?.path;
+  }
+
+  /// Reads and decodes a backup JSON file off the UI isolate.
+  static Future<Map<String, dynamic>> restoreBackup(String filePath) async {
+    final file = File(filePath);
+    if (!await file.exists()) {
+      throw Exception('Backup file not found: $filePath');
+    }
+
     final contents = await file.readAsString();
-    return jsonDecode(contents) as Map<String, dynamic>;
+    final decoded = await compute(_decodeBackupPayload, contents);
+    if (decoded is! Map) {
+      throw const FormatException(
+          'Backup file does not contain a JSON object.');
+    }
+
+    return Map<String, dynamic>.from(decoded);
   }
 
-  /// Delete backup file.
+  /// Load the latest backup from Documents/FocusFlow.
+  static Future<Map<String, dynamic>?> loadBackup() async {
+    final path = await getLatestBackupPath();
+    if (path == null) return null;
+    return restoreBackup(path);
+  }
+
+  /// Delete the newest backup file.
   static Future<void> deleteBackup() async {
-    final path = await _filePath;
+    final path = await getLatestBackupPath();
+    if (path == null) return;
+
     final file = File(path);
-    if (await file.exists()) await file.delete();
+    if (await file.exists()) {
+      await file.delete();
+    }
   }
 
-  /// Get last modified time of backup file.
+  /// Get last modified time of the newest backup file.
   static Future<DateTime?> lastBackupTime() async {
-    final path = await _filePath;
+    final path = await getLatestBackupPath();
+    if (path == null) return null;
+
     final file = File(path);
     if (!await file.exists()) return null;
     return file.lastModified();
