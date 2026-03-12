@@ -24,14 +24,11 @@ ios/.symlinks/
 ios/Flutter/.last_build_id
 
 # 🔒 SECURITY: Firebase configuration files — NEVER commit these
-# These contain your Firebase API keys and project config
-# They are generated during CI/CD from GitHub Secrets
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
 lib/firebase_options.dart
 
 # 🔑 SECURITY: Android release signing keystore — NEVER commit
-# If leaked, someone can publish fake versions of your app
 *.jks
 *.keystore
 key.properties
@@ -45,11 +42,15 @@ android/key.properties
 .env.*.local
 
 # 🤖 AI agent workspace data — NEVER commit
-# Contains your full AI session history, code context, reasoning
-# This is a MAJOR privacy/security risk if made public
+# Codex environment config (auto-generated, not a secret but noisy)
+# NOTE: .codex/environments/environment.toml is safe but unnecessary to track
+# Keep .codex/ committed if you want Codex environment setup shared with team
+# Remove the # below to block it:
+# .codex/
 .cognetivy/
 .cursor/mcp.json
 .claude/
+.antigravity/
 
 # API keys in Dart files
 **/*secret*.dart
@@ -61,6 +62,9 @@ android/key.properties
 
 # VSCode
 .vscode/launch.json
+
+# Generated/noisy files that don't need tracking
+git_log.txt
 
 node_modules/
 scripts/
