@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/daily_flow.dart';
 import 'flow_session_screen.dart';
+import 'study_session_picker.dart';
 
 class FlowControlBar extends StatelessWidget {
   final String dateKey;
@@ -33,6 +34,7 @@ class FlowControlBar extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             Expanded(
               child: FilledButton.icon(
@@ -51,6 +53,29 @@ class FlowControlBar extends StatelessWidget {
                 label: const Text('Start Flow'),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => StudySessionPicker(dateKey: dateKey),
+                  );
+                },
+                icon: const Icon(Icons.school_rounded, size: 20),
+                label: const Text('Start Study Session'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: const Color(0xFF8B5CF6),
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
