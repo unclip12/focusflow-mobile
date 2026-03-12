@@ -423,6 +423,7 @@ class AppProvider extends ChangeNotifier {
     if (remaining.length == blocks.length) return;
 
     await upsertDayPlan(plan.copyWith(blocks: remaining));
+    await syncFlowActivitiesFromDayPlan(date);
   }
 
   Future<void> upsertDayPlan(DayPlan plan) async {
@@ -757,6 +758,31 @@ class AppProvider extends ChangeNotifier {
     catch (_) { return null; }
   }
 
+  List<FlowActivity> getFlowActivitiesForDate(String dateKey) {
+    final flow = getDailyFlow(dateKey);
+    if (flow == null || flow.activities.isEmpty) return const [];
+
+    final deduped = <FlowActivity>[];
+    final seenIds = <String>{};
+    final firstSeenOrder = <String, int>{};
+
+    for (int i = 0; i < flow.activities.length; i++) {
+      final activity = flow.activities[i];
+      firstSeenOrder.putIfAbsent(activity.id, () => i);
+      if (seenIds.add(activity.id)) {
+        deduped.add(activity);
+      }
+    }
+
+    deduped.sort((a, b) {
+      final sortOrderCompare = a.sortOrder.compareTo(b.sortOrder);
+      if (sortOrderCompare != 0) return sortOrderCompare;
+      return (firstSeenOrder[a.id] ?? 0).compareTo(firstSeenOrder[b.id] ?? 0);
+    });
+
+    return deduped;
+  }
+
   Future<void> upsertDailyFlow(DailyFlow flow) async {
     await _db.upsertDailyFlow(flow.toJson());
     final idx = dailyFlows.indexWhere((f) => f.date == flow.date);
@@ -854,12 +880,16 @@ class AppProvider extends ChangeNotifier {
         .where((block) =>
             block.type != BlockType.breakBlock && block.isVirtual != true)
         .toList();
+    final blockActivityIds = blocks.map((block) => 'task-${block.id}').toSet();
     final existingActivities = List<FlowActivity>.from(flow.activities);
     final normalizedActivities = <FlowActivity>[];
     final seenActivityIds = <String>{};
     for (final activity in existingActivities) {
       if (seenActivityIds.add(activity.id)) {
-        normalizedActivities.add(activity);
+        if (!activity.id.startsWith('task-') ||
+            blockActivityIds.contains(activity.id)) {
+          normalizedActivities.add(activity);
+        }
       }
     }
 
@@ -878,7 +908,14 @@ class AppProvider extends ChangeNotifier {
       }
     }
 
-    await upsertDailyFlow(flow.copyWith(activities: normalizedActivities));
+    final reindexedActivities = <FlowActivity>[];
+    for (int i = 0; i < normalizedActivities.length; i++) {
+      reindexedActivities.add(
+        normalizedActivities[i].copyWith(sortOrder: i),
+      );
+    }
+
+    await upsertDailyFlow(flow.copyWith(activities: reindexedActivities));
   }
 
   /// Start the daily flow.

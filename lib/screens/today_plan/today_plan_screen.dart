@@ -486,8 +486,8 @@ class _AllTabContentState extends State<_AllTabContent>
     final cs = Theme.of(context).colorScheme;
     final app = context.watch<AppProvider>();
     final flow = app.getDailyFlow(widget.dateKey);
-
-    final allActivities = flow?.activities ?? [];
+    final allActivities = app.getFlowActivitiesForDate(widget.dateKey);
+    final flowView = flow?.copyWith(activities: allActivities);
     final resumeActivities =
         allActivities.where((a) => a.isActive || a.isPaused).toList();
     final upcomingActivities =
@@ -504,7 +504,7 @@ class _AllTabContentState extends State<_AllTabContent>
         // ── Flow control bar ────────────────────────────────────
         FlowControlBar(
           dateKey: widget.dateKey,
-          flow: flow,
+          flow: flowView,
           onAddTask: () {
             showModalBottomSheet(
               context: context,
@@ -599,7 +599,6 @@ class _AllTabContentState extends State<_AllTabContent>
           child: _buildSegmentContent(
             context,
             app,
-            flow,
             allActivities,
             resumeActivities,
             upcomingActivities,
@@ -615,7 +614,6 @@ class _AllTabContentState extends State<_AllTabContent>
   Widget _buildSegmentContent(
     BuildContext context,
     AppProvider app,
-    DailyFlow? flow,
     List<FlowActivity> allActivities,
     List<FlowActivity> resumeActivities,
     List<FlowActivity> upcomingActivities,
@@ -630,7 +628,6 @@ class _AllTabContentState extends State<_AllTabContent>
         return _buildFullDayPlan(
           context,
           app,
-          flow,
           allActivities,
           todos,
           buyingItems,
@@ -829,24 +826,6 @@ class _AllTabContentState extends State<_AllTabContent>
     }
   }
 
-  Future<void> _deleteBlock(AppProvider app, Block block) async {
-    await app.removeBlockFromDayPlan(block.id, block.date);
-  }
-
-  Future<void> _upsertBlockInPlan(
-      AppProvider app, String date, Block block) async {
-    final plan = app.getDayPlan(date);
-    if (plan == null) return;
-    final blocks = List<Block>.from(plan.blocks ?? []);
-    final idx = blocks.indexWhere((b) => b.id == block.id);
-    if (idx >= 0) {
-      blocks[idx] = block;
-    } else {
-      blocks.add(block.copyWith(index: blocks.length));
-    }
-    await app.upsertDayPlan(plan.copyWith(blocks: blocks));
-  }
-
   DateTime _dateFromKey(String dateKey) {
     return DateTime.tryParse(dateKey) ?? DateTime.now();
   }
@@ -854,19 +833,6 @@ class _AllTabContentState extends State<_AllTabContent>
   DateTime? _tryParseIso(String? value) {
     if (value == null || value.isEmpty) return null;
     return DateTime.tryParse(value);
-  }
-
-  TimeOfDay _timeFromHm(String value) {
-    final parts = value.split(':');
-    if (parts.length != 2) return const TimeOfDay(hour: 0, minute: 0);
-    return TimeOfDay(
-      hour: int.tryParse(parts[0]) ?? 0,
-      minute: int.tryParse(parts[1]) ?? 0,
-    );
-  }
-
-  String _formatTimeOfDay(TimeOfDay time) {
-    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
 
   DateTime _flowActivityDate(FlowActivity activity) {
@@ -894,12 +860,6 @@ class _AllTabContentState extends State<_AllTabContent>
     ).toIso8601String();
   }
 
-  int _blockDurationMinutes(TimeOfDay start, TimeOfDay end) {
-    final startMinutes = start.hour * 60 + start.minute;
-    final endMinutes = end.hour * 60 + end.minute;
-    return max(0, endMinutes - startMinutes);
-  }
-
   Future<void> _moveOrUpdateFlowActivity(
     AppProvider app,
     FlowActivity activity, {
@@ -925,39 +885,83 @@ class _AllTabContentState extends State<_AllTabContent>
     await app.addFlowActivity(targetDateKey, updated);
   }
 
-  Future<void> _moveOrUpdateBlock(
-    AppProvider app,
-    Block block, {
-    DateTime? date,
-    TimeOfDay? startTime,
-    TimeOfDay? endTime,
-  }) async {
-    final targetDate = date ?? _dateFromKey(block.date);
-    final targetDateKey = DateFormat('yyyy-MM-dd').format(targetDate);
-    final nextStart = startTime ?? _timeFromHm(block.plannedStartTime);
-    final nextEnd = endTime ?? _timeFromHm(block.plannedEndTime);
-    var updated = block.copyWith(
-      date: targetDateKey,
-      plannedStartTime: _formatTimeOfDay(nextStart),
-      plannedEndTime: _formatTimeOfDay(nextEnd),
-      plannedDurationMinutes: _blockDurationMinutes(nextStart, nextEnd),
-    );
-
-    if (targetDateKey == block.date) {
-      await _upsertBlockInPlan(app, block.date, updated);
-      return;
+  Block? _blockForActivity(FlowActivity activity) {
+    final candidateIds = <String>{};
+    const taskPrefix = 'task-';
+    if (activity.id.startsWith(taskPrefix)) {
+      final blockId = activity.id.substring(taskPrefix.length);
+      if (blockId.isNotEmpty) {
+        candidateIds.add(blockId);
+      }
     }
+    candidateIds.addAll(activity.linkedTaskIds);
 
-    await _deleteBlock(app, block);
-    final targetPlan = app.getDayPlan(targetDateKey);
-    if (targetPlan == null) return;
-    final targetBlocks = List<Block>.from(targetPlan.blocks ?? []);
-    updated = updated.copyWith(index: targetBlocks.length);
-    await app.upsertDayPlan(targetPlan.copyWith(
-      blocks: [...targetBlocks, updated],
-    ));
+    for (final block in widget.realBlocks) {
+      if (candidateIds.contains(block.id)) {
+        return block;
+      }
+    }
+    return null;
   }
 
+  bool _isMeaningfulHm(String? value) {
+    if (value == null || value.isEmpty || value == '00:00') return false;
+    final parts = value.split(':');
+    if (parts.length != 2) return false;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return false;
+    return hour != 0 || minute != 0;
+  }
+
+  bool _isMeaningfulDateTime(DateTime? value) {
+    return value != null && (value.hour != 0 || value.minute != 0);
+  }
+
+  String _formatDisplayTime(DateTime value) {
+    return DateFormat('h:mm a').format(value);
+  }
+
+  String _formatHmDisplay(String value) {
+    final parts = value.split(':');
+    final hour = int.parse(parts[0]);
+    final minute = int.parse(parts[1]);
+    return _formatDisplayTime(DateTime(2000, 1, 1, hour, minute));
+  }
+
+  String? _plannedSubtitleForBlock(Block block) {
+    if (!_isMeaningfulHm(block.plannedStartTime) ||
+        !_isMeaningfulHm(block.plannedEndTime) ||
+        block.plannedDurationMinutes <= 0) {
+      return null;
+    }
+
+    return '${_formatHmDisplay(block.plannedStartTime)} → ${_formatHmDisplay(block.plannedEndTime)} • ${block.plannedDurationMinutes} min';
+  }
+
+  String? _actualSubtitleForActivity(FlowActivity activity) {
+    final start = _tryParseIso(activity.startedAt);
+    final end = _tryParseIso(activity.completedAt);
+    final durationMinutes = activity.durationSeconds != null
+        ? activity.durationSeconds! ~/ 60
+        : 0;
+
+    if (!_isMeaningfulDateTime(start) ||
+        !_isMeaningfulDateTime(end) ||
+        durationMinutes <= 0) {
+      return null;
+    }
+
+    return '${_formatDisplayTime(start!)} → ${_formatDisplayTime(end!)} • $durationMinutes min';
+  }
+
+  String? _fullDaySubtitleForActivity(FlowActivity activity) {
+    final block = _blockForActivity(activity);
+    if (block != null) {
+      return _plannedSubtitleForBlock(block);
+    }
+    return _actualSubtitleForActivity(activity);
+  }
   Widget _dismissibleBackground() {
     return Container(
       alignment: Alignment.centerRight,
@@ -1066,223 +1070,6 @@ class _AllTabContentState extends State<_AllTabContent>
     );
   }
 
-  Future<void> _showBlockTaskActionsSheet(
-    BuildContext context,
-    AppProvider app,
-    Block block,
-  ) async {
-    final cs = Theme.of(context).colorScheme;
-    await showModalBottomSheet(
-      context: context,
-      useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: cs.onSurface.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.edit_calendar_rounded),
-                title: const Text('Edit Date'),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _dateFromKey(block.date),
-                    firstDate: DateTime(2024),
-                    lastDate: DateTime(2027),
-                  );
-                  if (picked != null) {
-                    await _moveOrUpdateBlock(app, block, date: picked);
-                  }
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.schedule_rounded),
-                title: const Text('Edit Start Time'),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final picked = await showTimePicker(
-                    context: context,
-                    initialTime: _timeFromHm(block.plannedStartTime),
-                  );
-                  if (picked != null) {
-                    await _moveOrUpdateBlock(app, block, startTime: picked);
-                  }
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.schedule_send_rounded),
-                title: const Text('Edit End Time'),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final picked = await showTimePicker(
-                    context: context,
-                    initialTime: _timeFromHm(block.plannedEndTime),
-                  );
-                  if (picked != null) {
-                    await _moveOrUpdateBlock(app, block, endTime: picked);
-                  }
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.delete_outline_rounded, color: cs.error),
-                title: Text('Delete', style: TextStyle(color: cs.error)),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  await _deleteBlock(app, block);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void showEditTaskSheet(
-      BuildContext context, AppProvider app, FlowActivity activity) {
-    final nameCtrl = TextEditingController(text: activity.label);
-    final cs = Theme.of(context).colorScheme;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Container(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            20,
-            20,
-            MediaQuery.of(ctx).viewInsets.bottom + 20,
-          ),
-          decoration: BoxDecoration(
-            color: Theme.of(ctx).colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Handle bar
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: cs.onSurface.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text('Edit Task', style: Theme.of(ctx).textTheme.titleMedium),
-              const SizedBox(height: 16),
-
-              // Name field
-              TextField(
-                controller: nameCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Task Name',
-                  prefixIcon: const Icon(Icons.edit_rounded, size: 20),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Status info
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHighest.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline_rounded,
-                        size: 18, color: cs.onSurface.withValues(alpha: 0.5)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Status: ${activity.status} • '
-                        'Type: ${activity.activityType}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: cs.onSurface.withValues(alpha: 0.5),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Action buttons
-              Row(
-                children: [
-                  // Delete button
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        Navigator.pop(ctx);
-                        await _deleteFlowActivity(app, activity);
-                      },
-                      icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                      label: const Text('Delete'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: cs.error,
-                        side:
-                            BorderSide(color: cs.error.withValues(alpha: 0.3)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  // Save button
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () {
-                        final newName = nameCtrl.text.trim();
-                        if (newName.isNotEmpty && newName != activity.label) {
-                          app.updateFlowActivity(
-                            widget.dateKey,
-                            activity.copyWith(label: newName),
-                          );
-                        }
-                        Navigator.pop(ctx);
-                      },
-                      icon: const Icon(Icons.check_rounded, size: 18),
-                      label: const Text('Save'),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // ── Completed Tab (Grouped by Time of Day) ──────────────────────────
   Widget _buildCompletedTab(
     BuildContext context,
     AppProvider app,
@@ -1475,7 +1262,6 @@ class _AllTabContentState extends State<_AllTabContent>
   Widget _buildFullDayPlan(
     BuildContext context,
     AppProvider app,
-    DailyFlow? flow,
     List<FlowActivity> allActivities,
     List<dynamic> todos,
     List<dynamic> buyingItems,
@@ -1490,55 +1276,47 @@ class _AllTabContentState extends State<_AllTabContent>
           hasNoPlan: widget.plan == null, dateKey: widget.dateKey);
     }
 
-    // Build unified list items — pending first, completed at bottom
     final items = <_FullDayItem>[];
     final pending =
         allActivities.where((a) => !a.isDone && !a.isSkipped).toList();
     final done = allActivities.where((a) => a.isDone || a.isSkipped).toList();
 
-    // Pending flow activities first
     for (int i = 0; i < pending.length; i++) {
       items.add(_FullDayItem(
-          type: 'flow',
-          flowActivity: pending[i],
-          index: allActivities.indexOf(pending[i])));
+        type: 'flow',
+        flowActivity: pending[i],
+        index: allActivities.indexOf(pending[i]),
+      ));
     }
 
-    // Add activity button (only if flow exists)
-    if (allActivities.isNotEmpty) {
-      items.add(const _FullDayItem(type: 'addButton'));
-    }
-
-    // Study blocks (non-flow, existing blocks)
-    for (final b in widget.realBlocks) {
-      items.add(_FullDayItem(type: 'block', block: b));
-    }
-
-    // To-dos
     for (final t in todos) {
       items.add(
-          _FullDayItem(type: 'todo', todoTitle: t.title, todoDone: t.done));
+        _FullDayItem(type: 'todo', todoTitle: t.title, todoDone: t.done),
+      );
     }
 
-    // Buying items
     for (final b in buyingItems) {
-      items.add(_FullDayItem(
-          type: 'buying', buyingTitle: b.name, buyingDone: b.bought));
+      items.add(
+        _FullDayItem(
+          type: 'buying',
+          buyingTitle: b.name,
+          buyingDone: b.bought,
+        ),
+      );
     }
 
-    // Completed flow activities at the bottom
     for (int i = 0; i < done.length; i++) {
       items.add(_FullDayItem(
-          type: 'flow',
-          flowActivity: done[i],
-          index: allActivities.indexOf(done[i])));
+        type: 'flow',
+        flowActivity: done[i],
+        index: allActivities.indexOf(done[i]),
+      ));
     }
 
     return ReorderableListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
       itemCount: items.length,
       onReorder: (oldIdx, newIdx) {
-        // Only reorder flow activities
         if (oldIdx < allActivities.length && newIdx <= allActivities.length) {
           app.reorderFlowActivities(widget.dateKey, oldIdx, newIdx);
         }
@@ -1559,67 +1337,25 @@ class _AllTabContentState extends State<_AllTabContent>
         final item = items[i];
 
         if (item.type == 'flow') {
+          final activity = item.flowActivity!;
           return KeyedSubtree(
-            key: ValueKey('flow-${item.flowActivity!.id}'),
+            key: ValueKey('flow-${activity.id}'),
             child: Dismissible(
-              key: ValueKey('dismiss-${item.flowActivity!.id}'),
+              key: ValueKey('dismiss-${activity.id}'),
               direction: DismissDirection.endToStart,
               background: _dismissibleBackground(),
-              onDismissed: (_) => _deleteFlowActivity(app, item.flowActivity!),
-              child: FlowActivityCard(
-                activity: item.flowActivity!,
+              onDismissed: (_) => _deleteFlowActivity(app, activity),
+              child: _FullDayFlowCard(
+                activity: activity,
                 index: item.index ?? i,
-                onTap: () =>
-                    _showFlowTaskActionsSheet(context, app, item.flowActivity!),
-                onComplete:
-                    item.flowActivity!.isActive || item.flowActivity!.isPaused
-                        ? () => app.completeFlowActivity(
-                            widget.dateKey, item.flowActivity!.id)
-                        : null,
-                onUndo: item.flowActivity!.isDone
-                    ? () => app.undoFlowActivity(
-                        widget.dateKey, item.flowActivity!.id)
+                subtitle: _fullDaySubtitleForActivity(activity),
+                onTap: () => _showFlowTaskActionsSheet(context, app, activity),
+                onComplete: activity.isActive || activity.isPaused
+                    ? () => app.completeFlowActivity(widget.dateKey, activity.id)
                     : null,
-              ),
-            ),
-          );
-        }
-
-        if (item.type == 'block') {
-          final b = item.block!;
-          return KeyedSubtree(
-            key: ValueKey('block-${b.id}'),
-            child: Dismissible(
-              key: ValueKey('dismiss-block-${b.id}'),
-              direction: DismissDirection.endToStart,
-              background: _dismissibleBackground(),
-              onDismissed: (_) => _deleteBlock(app, b),
-              child: Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                color: cs.surfaceContainerHighest.withValues(alpha: 0.3),
-                child: ListTile(
-                  onTap: () => _showBlockTaskActionsSheet(context, app, b),
-                  dense: true,
-                  leading: Icon(Icons.book_rounded,
-                      size: 20, color: cs.primary.withValues(alpha: 0.6)),
-                  title: Text(b.title.isNotEmpty ? b.title : 'Study Block',
-                      style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600)),
-                  subtitle: Text(
-                    '${b.plannedStartTime} – ${b.plannedEndTime} • ${b.plannedDurationMinutes}m',
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: cs.onSurface.withValues(alpha: 0.4)),
-                  ),
-                  trailing: b.status == BlockStatus.done
-                      ? const Icon(Icons.check_circle_rounded,
-                          size: 18, color: Color(0xFF10B981))
-                      : null,
-                ),
+                onUndo: activity.isDone
+                    ? () => app.undoFlowActivity(widget.dateKey, activity.id)
+                    : null,
               ),
             ),
           );
@@ -1691,104 +1427,10 @@ class _AllTabContentState extends State<_AllTabContent>
           );
         }
 
-        if (item.type == 'addButton') {
-          return KeyedSubtree(
-            key: const ValueKey('add-activity-btn'),
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Material(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(14),
-                child: InkWell(
-                  onTap: () => _showAddActivityDialog(context, app),
-                  borderRadius: BorderRadius.circular(14),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: cs.primary.withValues(alpha: 0.2),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.add_rounded,
-                            size: 18, color: cs.primary.withValues(alpha: 0.5)),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Add Activity',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: cs.primary.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
-
         return SizedBox.shrink(key: ValueKey('unknown-$i'));
       },
     );
   }
-
-  void _showAddActivityDialog(BuildContext context, AppProvider app) {
-    final nameCtrl = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add Activity'),
-        content: TextField(
-          controller: nameCtrl,
-          autofocus: true,
-          decoration: InputDecoration(
-            hintText: 'Activity name...',
-            filled: true,
-            fillColor: Theme.of(ctx)
-                .colorScheme
-                .surfaceContainerHighest
-                .withValues(alpha: 0.5),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final name = nameCtrl.text.trim();
-              if (name.isEmpty) return;
-              app.addFlowActivity(
-                widget.dateKey,
-                FlowActivity(
-                  id: DateTime.now().microsecondsSinceEpoch.toString(),
-                  label: name,
-                  icon: '⚡',
-                  activityType: 'CUSTOM',
-                  sortOrder: 999,
-                ),
-              );
-              Navigator.pop(ctx);
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _emptySegment(ColorScheme cs, String msg, IconData icon) {
     return Center(
       child: Column(
@@ -1807,10 +1449,229 @@ class _AllTabContentState extends State<_AllTabContent>
   }
 }
 
+class _FullDayFlowCard extends StatelessWidget {
+  final FlowActivity activity;
+  final int index;
+  final String? subtitle;
+  final VoidCallback? onComplete;
+  final VoidCallback? onUndo;
+  final VoidCallback? onTap;
+
+  const _FullDayFlowCard({
+    required this.activity,
+    required this.index,
+    this.subtitle,
+    this.onComplete,
+    this.onUndo,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    Color statusColor;
+    IconData statusIcon;
+    String statusLabel;
+
+    switch (activity.status) {
+      case 'DONE':
+        statusColor = const Color(0xFF10B981);
+        statusIcon = Icons.check_circle_rounded;
+        statusLabel = 'Done';
+      case 'IN_PROGRESS':
+        statusColor = const Color(0xFF3B82F6);
+        statusIcon = Icons.play_circle_filled_rounded;
+        statusLabel = 'Active';
+      case 'PAUSED':
+        statusColor = const Color(0xFFF59E0B);
+        statusIcon = Icons.pause_circle_filled_rounded;
+        statusLabel = 'Paused';
+      case 'SKIPPED':
+        statusColor = cs.onSurface.withValues(alpha: 0.3);
+        statusIcon = Icons.skip_next_rounded;
+        statusLabel = 'Skipped';
+      default:
+        statusColor = cs.onSurface.withValues(alpha: 0.25);
+        statusIcon = Icons.circle_outlined;
+        statusLabel = '';
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: activity.isActive
+            ? BorderSide(
+                color: const Color(0xFF3B82F6).withValues(alpha: 0.4),
+                width: 1.5,
+              )
+            : BorderSide.none,
+      ),
+      color: activity.isDone
+          ? const Color(0xFF10B981).withValues(alpha: 0.06)
+          : activity.isActive
+              ? const Color(0xFF3B82F6).withValues(alpha: 0.06)
+              : cs.surfaceContainerHighest.withValues(alpha: 0.4),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: activity.isNotStarted
+                      ? Text(
+                          '${index + 1}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: cs.onSurface.withValues(alpha: 0.4),
+                          ),
+                        )
+                      : Icon(statusIcon, size: 20, color: statusColor),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(activity.icon,
+                            style: const TextStyle(fontSize: 16)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            activity.label,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: activity.isDone
+                                  ? cs.onSurface.withValues(alpha: 0.5)
+                                  : cs.onSurface,
+                              decoration: activity.isDone
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (subtitle != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Text(
+                          subtitle!,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: cs.onSurface.withValues(alpha: 0.55),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    if (activity.linkedTaskIds.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Text(
+                          '${activity.linkedTaskIds.length} task${activity.linkedTaskIds.length == 1 ? '' : 's'} linked',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: cs.primary.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ),
+                    if (activity.notes != null && activity.notes!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Row(
+                          children: [
+                            Icon(Icons.sticky_note_2_outlined,
+                                size: 12,
+                                color: cs.onSurface.withValues(alpha: 0.3)),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                activity.notes!,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: cs.onSurface.withValues(alpha: 0.5),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (statusLabel.isNotEmpty && !activity.isNotStarted)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            statusLabel,
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: statusColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (activity.isDone && onUndo != null)
+                IconButton(
+                  onPressed: onUndo,
+                  icon: const Icon(Icons.undo_rounded, size: 18),
+                  color: cs.onSurface.withValues(alpha: 0.4),
+                  tooltip: 'Undo',
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
+                ),
+              if ((activity.isActive || activity.isPaused) && onComplete != null)
+                IconButton(
+                  onPressed: onComplete,
+                  icon: const Icon(Icons.check_circle_outline_rounded,
+                      size: 22),
+                  color: const Color(0xFF10B981),
+                  tooltip: 'Complete',
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 class _FullDayItem {
-  final String type; // 'flow' | 'block' | 'todo' | 'buying' | 'addButton'
+  final String type; // 'flow' | 'todo' | 'buying'
   final FlowActivity? flowActivity;
-  final Block? block;
   final String? todoTitle;
   final bool? todoDone;
   final String? buyingTitle;
@@ -1820,7 +1681,6 @@ class _FullDayItem {
   const _FullDayItem({
     required this.type,
     this.flowActivity,
-    this.block,
     this.todoTitle,
     this.todoDone,
     this.buyingTitle,
