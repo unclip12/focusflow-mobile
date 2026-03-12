@@ -39,12 +39,44 @@ This app is built entirely using **AI-assisted development**. No manual code wri
 - Codex has full filesystem access in a sandboxed local clone
 - Every change is committed with a descriptive message — history is traceable
 - `flutter analyze` with 0 errors is mandatory before every commit
-- Perplexity approves Codex's plan before execution ("Approved. Proceed.")
+- Perplexity approves Codex’s plan before execution (“Approved. Proceed.”)
 
 ### Prompt Review Process
 When Codex shows a plan before executing, Arsh shares it with Perplexity. Perplexity checks it and replies with either:
 - `Approved. Proceed.` — paste this directly into Codex
 - Corrections/additions — paste the corrected version into Codex
+
+---
+
+## AI Agent Suite (.github/agents/)
+
+Inspired by [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents), this repo includes a set of plain `.md` agent prompt files in `.github/agents/`. Paste them as system prompts in Claude/Gemini/GPT before a coding session to get project-specific expert responses.
+
+| Agent File | Purpose |
+|---|---|
+| `MOBILE_APP_BUILDER.md` | Flutter expert knowing FocusFlow’s exact stack (Drift, Provider, GoRouter, offline-first) |
+| `UI_DESIGNER.md` | Liquid glass morphism design agent with FocusFlow color constants |
+| `DEVOPS_AUTOMATOR.md` | GitHub Actions / Firebase deployment agent |
+| `RAPID_PROTOTYPER.md` | Fast POC agent for new feature validation |
+| `SECURITY_ENGINEER.md` | Firebase rules + auth security agent |
+| `README.md` | Explains the agent workflow: Rapid Prototype → Build → UI Polish → Security Review → Deploy |
+
+See [`.github/DEVELOPMENT.md`](.github/DEVELOPMENT.md) for full dev guide (stack, folder structure, batch workflow, color constants).
+
+---
+
+## Security
+
+See [`.github/SECURITY.md`](.github/SECURITY.md) for the full security policy.
+
+**Files that must NEVER be committed:**
+- `google-services.json`, `GoogleService-Info.plist`, `firebase_options.dart`
+- `*.jks`, `*.keystore`, `key.properties`
+- `.env`, `.env.*`
+- `.cognetivy/`, `.antigravity/`, `.cursor/mcp.json`, `.claude/`
+- `git_log.txt`
+
+The `.gitignore` is fully hardened to block all of the above. Both repos were scanned for leaked secrets — **zero found, both repos are clean**.
 
 ---
 
@@ -80,7 +112,7 @@ lib/
 │   ├── today_plan/               # TodayPlanScreen, AddTaskSheet, TrackNowScreen,
 │   │                             #   StudySessionPicker, StudyFlowScreen, FlowSessionScreen
 │   ├── tracker/                  # TrackerScreen + _AddToTaskSheet
-│   ├── session/                  # SessionScreen (single-block timer)
+├── session/                      # SessionScreen (single-block timer)
 │   ├── revision_hub/             # RevisionCard, due/upcoming SRS queue
 │   ├── knowledge_base/           # FA/Sketchy/Pathoma/UWorld content
 │   ├── backup/                   # BackupScreen, restore_confirm_dialog
@@ -91,6 +123,20 @@ lib/
 │   └── focus_batch_calculator.dart
 └── widgets/
     └── app_scaffold.dart         # Shared scaffold with sidebar nav
+
+.github/
+├── agents/                       # AI agent system prompts (paste into Claude/Gemini/GPT)
+│   ├── MOBILE_APP_BUILDER.md
+│   ├── UI_DESIGNER.md
+│   ├── DEVOPS_AUTOMATOR.md
+│   ├── RAPID_PROTOTYPER.md
+│   ├── SECURITY_ENGINEER.md
+│   └── README.md
+├── DEVELOPMENT.md                # Full dev guide: stack, folder structure, batch workflow
+├── SECURITY.md                   # Security policy: files never to commit
+└── ISSUE_TEMPLATE/
+    ├── bug_report.md
+    └── feature_request.md
 ```
 
 ---
@@ -133,7 +179,6 @@ lib/
 ### Prompt 1 — Backup Black Screen Fix (Perplexity direct commit)
 - `backup_service.dart`: removed SAF URI path usage — `dart:io File()` cannot write to `content://` URIs on Android
 - Always writes to `Documents/FocusFlow` (internal, always writable)
-- User-selected folder URI stored for display only
 - Commit: `f3f3726`
 
 ### Prompt 3 — Today Plan Task Edit + Swipe (Codex)
@@ -145,34 +190,38 @@ lib/
 ### Prompt 4 — Sync DayPlan Blocks Into Flow Activities (Codex)
 - `AppProvider.syncFlowActivitiesFromDayPlan(date)` — single source of truth for Block → FlowActivity mapping
 - Dedupes by block id, excludes break/virtual blocks, mirrors block status
-- Called from: `startFlow()`, `AddTaskSheet` after upsertDayPlan, tracker `_AddToTaskSheet` after upsertDayPlan
+- Called from: `startFlow()`, `AddTaskSheet`, tracker `_AddToTaskSheet`
 - Ends with `notifyListeners()` for immediate UI rebuild
-- 3 files: `app_provider.dart` (+95 -12), `add_task_sheet.dart` (+11 -26), `tracker_screen.dart` (+6 -5)
 
-### Prompt 5 — Show Today's Tracker Tasks (Codex)
-- Today's tracker tasks visible in Today Plan UI
+### Prompt 5 — Show Today’s Tracker Tasks (Codex)
+- Today’s tracker tasks visible in Today Plan UI
 
 ### Prompt 6 — Fix Track Now Session Flow (Codex)
 - Resume existing active session instead of pushing a fresh one
-- Top-right `+` always opens AddTaskSheet; lower action opens today-only existing task picker
-- Tracked task name shown prominently above timer
-- Cancel button (discard) + Stop & Save (complete) in 2-button row
+- Cancel (discard) + Stop & Save (complete) 2-button row
 - On Stop & Save: marks linked DayPlan block or FlowActivity as DONE
-- RevisionHub/library sync only when linked task has structured metadata (strict mode)
+- RevisionHub sync only when linked task has structured metadata (strict mode)
 
 ### Prompt 10 — Fix Study Queue Flow (Codex)
-- FA picker: full DB-backed page list, no 20/50 cap, queues exact selected pages
-- UWorld picker: real topic selection from full `app.uworldTopics`, no system-only cap
-- Start button always navigates to StudyFlowScreen with queue snapshot
-- StudyFlowScreen queue mode: advances through selected items, marks each done on completion
+- FA picker: full DB-backed page list, no caps, queues exact selected pages
+- UWorld picker: real topic selection, no truncation
+- StudyFlowScreen queue mode: advances through items, marks each done
+
+### .github Infrastructure (March 12, 2026)
+- Added `.github/agents/` AI agent suite (5 agents + README) — inspired by msitarzewski/agency-agents
+- Added `.github/DEVELOPMENT.md` — full dev guide
+- Added `.github/SECURITY.md` — security policy
+- Added `.github/ISSUE_TEMPLATE/bug_report.md` and `feature_request.md`
+- `.gitignore` fully hardened: blocks google-services.json, firebase_options.dart, *.jks, .env, .cognetivy/, .antigravity/, .cursor/mcp.json, .claude/, git_log.txt
+- Repo scanned for leaked secrets — **zero found, clean**
+- **No `lib/` or app code was changed** — all additions in `.github/` only
 
 ---
 
 ## 🔴 Known Issues / Next Up
 
-- **Prompt 3 (Task Edit + Swipe)** — Codex plan approved, may still be in progress or pending test
-- Run `flutter analyze` and test on device after each Codex commit before starting next prompt
-- Always `git pull origin main` in Codex terminal before starting a new prompt (to get latest committed changes)
+- Always `git pull origin main` in Codex terminal before starting a new prompt
+- Run `flutter analyze` and test on device after each Codex commit
 
 ---
 
@@ -184,6 +233,7 @@ lib/
 - **Always** commit with a descriptive message and push to `main`
 - **Do NOT** rewrite `database_service.dart` or model files unless explicitly instructed
 - **Do NOT** use SAF URIs (`content://`) with `dart:io File()` — use `getApplicationDocumentsDirectory()` instead
+- **Do NOT** commit `google-services.json`, `firebase_options.dart`, `*.jks`, `.env`, or any secrets
 - Use `context.watch<AppProvider>()` in `build()` methods
 - Use `context.read<AppProvider>()` in event handlers
 - `AppProvider.loadAll()` is called once in `main.dart` — do not call it elsewhere
