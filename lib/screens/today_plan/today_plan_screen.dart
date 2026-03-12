@@ -795,17 +795,42 @@ class _AllTabContentState extends State<_AllTabContent>
   }
 
   // ── Edit Task Bottom Sheet ──────────────────────────────────────
+  String? _dayPlanBackedBlockId(AppProvider app, FlowActivity activity) {
+    const taskPrefix = 'task-';
+    if (activity.id.startsWith(taskPrefix)) {
+      final blockId = activity.id.substring(taskPrefix.length);
+      if (blockId.isNotEmpty) {
+        return blockId;
+      }
+    }
+
+    final plan = app.getDayPlan(widget.dateKey);
+    final blockIds = (plan?.blocks ?? const <Block>[])
+        .map((block) => block.id)
+        .toSet();
+    for (final linkedId in activity.linkedTaskIds) {
+      if (blockIds.contains(linkedId)) {
+        return linkedId;
+      }
+    }
+
+    return null;
+  }
+
   Future<void> _deleteFlowActivity(
       AppProvider app, FlowActivity activity) async {
+    final blockId = _dayPlanBackedBlockId(app, activity);
     await app.removeFlowActivity(widget.dateKey, activity.id);
+    if (blockId != null) {
+      await app.removeBlockFromDayPlan(blockId, widget.dateKey);
+    }
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _deleteBlock(AppProvider app, Block block) async {
-    final plan = app.getDayPlan(block.date);
-    if (plan == null) return;
-    final blocks = List<Block>.from(plan.blocks ?? [])
-      ..removeWhere((b) => b.id == block.id);
-    await app.upsertDayPlan(plan.copyWith(blocks: blocks));
+    await app.removeBlockFromDayPlan(block.id, block.date);
   }
 
   Future<void> _upsertBlockInPlan(
@@ -1213,9 +1238,9 @@ class _AllTabContentState extends State<_AllTabContent>
                   // Delete button
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () {
+                      onPressed: () async {
                         Navigator.pop(ctx);
-                        app.removeFlowActivity(widget.dateKey, activity.id);
+                        await _deleteFlowActivity(app, activity);
                       },
                       icon: const Icon(Icons.delete_outline_rounded, size: 18),
                       label: const Text('Delete'),

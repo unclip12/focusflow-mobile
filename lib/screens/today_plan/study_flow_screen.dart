@@ -241,21 +241,8 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       return;
     }
 
-    for (final topicId in task.topicIds) {
-      final topic = app.uworldTopics.cast<UWorldTopic?>().firstWhere(
-            (item) => item?.id == topicId,
-            orElse: () => null,
-          );
-      if (topic == null || topic.id == null) {
-        continue;
-      }
-      await app.updateUWorldProgress(
-        topic.id!,
-        topic.totalQuestions,
-        topic.correctQuestions > topic.totalQuestions
-            ? topic.totalQuestions
-            : topic.correctQuestions,
-      );
+    for (final topicId in task.topicIds.toSet()) {
+      await app.markUWorldTopicDone(topicId);
     }
 
     if (!mounted) {

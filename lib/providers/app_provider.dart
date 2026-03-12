@@ -407,6 +407,24 @@ class AppProvider extends ChangeNotifier {
     await syncFlowActivitiesFromDayPlan(todayDateKey);
   }
 
+  Future<void> removeBlockFromDayPlan(String blockId, String date) async {
+    if (blockId.isEmpty) return;
+
+    final plan = getDayPlan(date);
+    final blocks = plan?.blocks;
+    if (plan == null || blocks == null) return;
+
+    final remaining = <Block>[];
+    for (final block in blocks) {
+      if (block.id != blockId) {
+        remaining.add(block.copyWith(index: remaining.length));
+      }
+    }
+    if (remaining.length == blocks.length) return;
+
+    await upsertDayPlan(plan.copyWith(blocks: remaining));
+  }
+
   Future<void> upsertDayPlan(DayPlan plan) async {
     await _db.upsertDayPlan(plan.toJson());
     final idx = dayPlans.indexWhere((p) => p.date == plan.date);
@@ -796,9 +814,20 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  String _flowStatusFromBlockStatus(BlockStatus status) {
+    switch (status) {
+      case BlockStatus.done:
+        return 'DONE';
+      case BlockStatus.inProgress:
+        return 'IN_PROGRESS';
+      default:
+        return 'NOT_STARTED';
+    }
+  }
+
   FlowActivity _flowActivityFromBlock(Block block, int sortOrder) {
-    final status = block.status.value;
-    final isCompleted = status == 'DONE' || status == 'SKIPPED';
+    final status = _flowStatusFromBlockStatus(block.status);
+    final isCompleted = status == 'DONE';
 
     return FlowActivity(
       id: 'task-${block.id}',
@@ -826,34 +855,30 @@ class AppProvider extends ChangeNotifier {
             block.type != BlockType.breakBlock && block.isVirtual != true)
         .toList();
     final existingActivities = List<FlowActivity>.from(flow.activities);
-    final linkedBlockIds = existingActivities
-        .expand((activity) => activity.linkedTaskIds)
-        .toSet();
-    final existingActivityIds =
-        existingActivities.map((activity) => activity.id).toSet();
+    final normalizedActivities = <FlowActivity>[];
+    final seenActivityIds = <String>{};
+    for (final activity in existingActivities) {
+      if (seenActivityIds.add(activity.id)) {
+        normalizedActivities.add(activity);
+      }
+    }
 
-    var nextSortOrder = existingActivities.length;
-    final appendedActivities = <FlowActivity>[];
     for (final block in blocks) {
       final activityId = 'task-${block.id}';
-      if (linkedBlockIds.contains(block.id) ||
-          existingActivityIds.contains(activityId)) {
-        continue;
-      }
-      appendedActivities.add(_flowActivityFromBlock(block, nextSortOrder));
-      linkedBlockIds.add(block.id);
-      existingActivityIds.add(activityId);
-      nextSortOrder++;
-    }
-
-    if (appendedActivities.isNotEmpty) {
-      final updated = flow.copyWith(
-        activities: [...existingActivities, ...appendedActivities],
+      final existingIdx = normalizedActivities.indexWhere(
+        (activity) => activity.id == activityId,
       );
-      await upsertDailyFlow(updated);
+      if (existingIdx >= 0) {
+        final existing = normalizedActivities[existingIdx];
+        normalizedActivities[existingIdx] =
+            _flowActivityFromBlock(block, existing.sortOrder);
+      } else {
+        normalizedActivities
+            .add(_flowActivityFromBlock(block, normalizedActivities.length));
+      }
     }
 
-    notifyListeners();
+    await upsertDailyFlow(flow.copyWith(activities: normalizedActivities));
   }
 
   /// Start the daily flow.
@@ -2604,6 +2629,20 @@ class AppProvider extends ChangeNotifier {
     await _db.updateUWorldProgress(id, done, correct);
     await loadUWorldTopics();
     unawaited(_triggerBackup());
+  }
+
+  Future<void> markUWorldTopicDone(int topicId) async {
+    final topicIdx = uworldTopics.indexWhere((topic) => topic.id == topicId);
+    if (topicIdx < 0) return;
+
+    final topic = uworldTopics[topicIdx];
+    await updateUWorldProgress(
+      topicId,
+      topic.totalQuestions,
+      topic.correctQuestions > topic.totalQuestions
+          ? topic.totalQuestions
+          : topic.correctQuestions,
+    );
   }
 
   // ═══════════════════════════════════════════════════════════════
