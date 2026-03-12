@@ -4,18 +4,21 @@
 // =============================================================
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:focusflow_mobile/models/day_plan.dart';
+import 'package:focusflow_mobile/models/daily_flow.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
-
+import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/services/notification_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'add_task_sheet.dart';
+import 'study_flow_screen.dart';
 
 class FlowSessionScreen extends StatefulWidget {
   final String dateKey;
@@ -27,6 +30,8 @@ class FlowSessionScreen extends StatefulWidget {
 
 class _FlowSessionScreenState extends State<FlowSessionScreen>
     with WidgetsBindingObserver {
+  static const _plannedStudySessionKind = 'planned_study_session';
+
   // ── Timer state ──────────────────────────────────────────────
   late final DateTime _sessionStartedAt;
   int _activityElapsed = 0;
@@ -297,6 +302,118 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
     );
   }
 
+  Block? _studySessionBlockForActivity(
+      AppProvider app, FlowActivity? activity) {
+    if (activity == null) return null;
+
+    final planBlocks =
+        app.getDayPlan(widget.dateKey)?.blocks ?? const <Block>[];
+    final candidateIds = <String>{};
+    if (activity.id.startsWith('task-') && activity.id.length > 5) {
+      candidateIds.add(activity.id.substring(5));
+    }
+    candidateIds.addAll(activity.linkedTaskIds);
+
+    for (final block in planBlocks) {
+      if (candidateIds.contains(block.id) &&
+          block.type == BlockType.studySession) {
+        return block;
+      }
+    }
+
+    return null;
+  }
+
+  List<StudyTask> _plannedQueueFromBlock(Block block) {
+    final notes = block.reflectionNotes;
+    if (notes == null || notes.isEmpty) {
+      return const <StudyTask>[];
+    }
+    try {
+      final decoded = jsonDecode(notes);
+      if (decoded is! Map<String, dynamic>) {
+        return const <StudyTask>[];
+      }
+      if (decoded['kind'] != _plannedStudySessionKind) {
+        return const <StudyTask>[];
+      }
+      return StudyTask.fromJsonList(decoded['tasks']);
+    } catch (_) {
+      return const <StudyTask>[];
+    }
+  }
+
+  int _plannedQueueMinutes(Block block, List<StudyTask> queue) {
+    final notes = block.reflectionNotes;
+    if (notes != null && notes.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(notes);
+        if (decoded is Map<String, dynamic>) {
+          final minutes = decoded['estimatedDurationMinutes'] as int?;
+          if (minutes != null && minutes > 0) {
+            return minutes;
+          }
+        }
+      } catch (_) {
+        // Fall back to the block data or queue estimate.
+      }
+    }
+    if (block.plannedDurationMinutes > 0) {
+      return block.plannedDurationMinutes;
+    }
+    return StudyTask.estimateQueueDurationMinutes(queue);
+  }
+
+  String _formatDurationLabel(int minutes) {
+    final hours = minutes ~/ 60;
+    final mins = minutes % 60;
+    if (hours == 0) {
+      return '${mins}min';
+    }
+    return '${hours}h ${mins.toString().padLeft(2, '0')}min';
+  }
+
+  Future<void> _beginPlannedStudySession(
+    AppProvider app,
+    Block block,
+    List<StudyTask> queue,
+  ) async {
+    if (_localPaused) {
+      await app.resumeFlow(widget.dateKey);
+      if (mounted) {
+        setState(() => _localPaused = false);
+      }
+    }
+
+    final startedAt = DateTime.now();
+    if (!mounted) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => StudyFlowScreen(
+          dateKey: widget.dateKey,
+          queuedTasks: queue,
+          onComplete: () {
+            final completedAt = DateTime.now();
+            unawaited(
+              app.completeDayPlanBlock(
+                widget.dateKey,
+                block.id,
+                startedAt: startedAt,
+                completedAt: completedAt,
+                durationSeconds: completedAt.difference(startedAt).inSeconds,
+                autoAdvanceFlow: true,
+              ),
+            );
+            if (mounted) {
+              setState(() => _activityElapsed = 0);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -319,6 +436,16 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
     // Current active activity
     final currentActivity = flow?.nextPendingActivity;
     final isFlowPaused = flow?.isPaused == true || flow?.isStopped == true;
+    final studySessionBlock =
+        _studySessionBlockForActivity(app, currentActivity);
+    final plannedQueue = studySessionBlock != null
+        ? _plannedQueueFromBlock(studySessionBlock)
+        : const <StudyTask>[];
+    final hasPlannedStudySession =
+        studySessionBlock != null && plannedQueue.isNotEmpty;
+    final plannedQueueMinutes = hasPlannedStudySession
+        ? _plannedQueueMinutes(studySessionBlock, plannedQueue)
+        : 0;
 
     // Sync local pause state
     if (isFlowPaused != _localPaused) {
@@ -345,8 +472,8 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
                   const Spacer(),
                   // Status badge
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: cs.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
@@ -461,46 +588,58 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
 
             const SizedBox(height: 24),
 
-            // ── Large timer ────────────────────────────────────
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-              decoration: BoxDecoration(
-                color: cs.primary.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    _fmtTime(_activityElapsed),
-                    style: theme.textTheme.displayLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 56,
-                      color: cs.primary,
-                      fontFeatures: const [FontFeature.tabularFigures()],
+            if (hasPlannedStudySession)
+              _StudySessionLaunchCard(
+                queue: plannedQueue,
+                durationLabel: _formatDurationLabel(plannedQueueMinutes),
+                onBegin: () => _beginPlannedStudySession(
+                  app,
+                  studySessionBlock,
+                  plannedQueue,
+                ),
+              )
+            else ...[
+              // ── Large timer ────────────────────────────────────
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+                decoration: BoxDecoration(
+                  color: cs.primary.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      _fmtTime(_activityElapsed),
+                      style: theme.textTheme.displayLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 56,
+                        color: cs.primary,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Total: ${_fmtTime(_totalElapsed)}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: cs.onSurface.withValues(alpha: 0.45),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Total: ${_fmtTime(_totalElapsed)}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurface.withValues(alpha: 0.45),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
 
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
 
-            // ── Started at ─────────────────────────────────────
-            Text(
-              'Session started at ${DateFormat('h:mm a').format(_sessionStartedAt)}',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: cs.onSurface.withValues(alpha: 0.4),
+              // ── Started at ─────────────────────────────────────
+              Text(
+                'Session started at ${DateFormat('h:mm a').format(_sessionStartedAt)}',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: cs.onSurface.withValues(alpha: 0.4),
+                ),
               ),
-            ),
+            ],
 
             const Spacer(flex: 2),
 
@@ -533,7 +672,7 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
                     ),
                   const SizedBox(width: 10),
                   // Done / Next
-                  if (currentActivity != null)
+                  if (currentActivity != null && !hasPlannedStudySession)
                     Expanded(
                       child: _ActionButton(
                         icon: Icons.check_rounded,
@@ -630,6 +769,155 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
 // ═══════════════════════════════════════════════════════════════════
 // ACTION BUTTON
 // ═══════════════════════════════════════════════════════════════════
+
+class _StudySessionLaunchCard extends StatelessWidget {
+  final List<StudyTask> queue;
+  final String durationLabel;
+  final VoidCallback onBegin;
+
+  const _StudySessionLaunchCard({
+    required this.queue,
+    required this.durationLabel,
+    required this.onBegin,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final itemCount = StudyTask.totalItemCount(queue);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: cs.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.16)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: cs.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(Icons.school_rounded, color: cs.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Study Session',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$itemCount item${itemCount == 1 ? '' : 's'} • $durationLabel',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurface.withValues(alpha: 0.6),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 180),
+            child: SingleChildScrollView(
+              child: Column(
+                children: queue
+                    .map(
+                      (task) => Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cs.surface,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              task.type == 'FA'
+                                  ? Icons.menu_book_rounded
+                                  : Icons.quiz_rounded,
+                              size: 20,
+                              color: task.type == 'FA'
+                                  ? const Color(0xFF8B5CF6)
+                                  : const Color(0xFFF59E0B),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    task.label,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: cs.onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    task.detail,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color:
+                                          cs.onSurface.withValues(alpha: 0.62),
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onBegin,
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: const Text('Begin Study Session'),
+              style: FilledButton.styleFrom(
+                backgroundColor: cs.primary,
+                foregroundColor: cs.onPrimary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _ActionButton extends StatelessWidget {
   final IconData icon;

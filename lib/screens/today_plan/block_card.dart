@@ -131,6 +131,7 @@ class _BlockCardState extends State<BlockCard>
       case BlockType.revisionFa:   return Icons.menu_book_rounded;
       case BlockType.anki:         return Icons.style_rounded;
       case BlockType.qbank:        return Icons.quiz_rounded;
+      case BlockType.studySession: return Icons.school_rounded;
       case BlockType.breakBlock:   return Icons.coffee_rounded;
       case BlockType.fmgeRevision: return Icons.medical_services_rounded;
       case BlockType.mixed:        return Icons.dashboard_rounded;

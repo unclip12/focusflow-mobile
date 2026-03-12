@@ -422,6 +422,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
 
   String _blockTypeIcon(BlockType type) {
     switch (type) {
+      case BlockType.studySession:  return '🎓';
       case BlockType.revisionFa:   return '📚';
       case BlockType.video:         return '🎬';
       case BlockType.qbank:         return '📝';

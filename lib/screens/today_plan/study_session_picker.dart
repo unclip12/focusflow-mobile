@@ -1,10 +1,17 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/models/fa_page.dart';
 import 'package:focusflow_mobile/models/sketchy_video.dart';
 import 'package:focusflow_mobile/models/uworld_topic.dart';
+import 'package:intl/intl.dart';
+import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
+import 'package:focusflow_mobile/services/notification_service.dart';
+import 'package:focusflow_mobile/utils/constants.dart';
 
 import 'study_flow_screen.dart';
 
@@ -18,12 +25,463 @@ class StudySessionPicker extends StatefulWidget {
 
 class _StudySessionPickerState extends State<StudySessionPicker> {
   final List<StudyTask> _queue = [];
+  static const _plannedStudySessionKind = 'planned_study_session';
+
+  List<Block> _plannedSessionBlocks(AppProvider app) {
+    final plan = app.getDayPlan(widget.dateKey);
+    final blocks = (plan?.blocks ?? const <Block>[])
+        .where(
+          (block) =>
+              block.type == BlockType.studySession &&
+              block.status == BlockStatus.notStarted,
+        )
+        .toList()
+      ..sort((a, b) => a.plannedStartTime.compareTo(b.plannedStartTime));
+    return blocks;
+  }
+
+  List<StudyTask> _plannedQueueFromBlock(Block block) {
+    final notes = block.reflectionNotes;
+    if (notes == null || notes.isEmpty) {
+      return const <StudyTask>[];
+    }
+    try {
+      final decoded = jsonDecode(notes);
+      if (decoded is! Map<String, dynamic>) {
+        return const <StudyTask>[];
+      }
+      if (decoded['kind'] != _plannedStudySessionKind) {
+        return const <StudyTask>[];
+      }
+      return StudyTask.fromJsonList(decoded['tasks']);
+    } catch (_) {
+      return const <StudyTask>[];
+    }
+  }
+
+  int _plannedQueueMinutesFromBlock(Block block) {
+    final notes = block.reflectionNotes;
+    if (notes != null && notes.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(notes);
+        if (decoded is Map<String, dynamic>) {
+          final minutes = decoded['estimatedDurationMinutes'] as int?;
+          if (minutes != null && minutes > 0) {
+            return minutes;
+          }
+        }
+      } catch (_) {
+        // Fall back to queue-derived estimate.
+      }
+    }
+    if (block.plannedDurationMinutes > 0) {
+      return block.plannedDurationMinutes;
+    }
+    return StudyTask.estimateQueueDurationMinutes(_plannedQueueFromBlock(block));
+  }
+
+  int _plannedQueueItemCount(Block block) {
+    return StudyTask.totalItemCount(_plannedQueueFromBlock(block));
+  }
+
+  String _buildStudySessionTitle(List<StudyTask> tasks) {
+    final parts = <String>[];
+    final faPages = tasks
+        .where((task) => task.type == 'FA')
+        .expand((task) => task.pageNumbers)
+        .toList()
+      ..sort();
+    if (faPages.isNotEmpty) {
+      if (faPages.length == 1) {
+        parts.add('FA p.${faPages.first}');
+      } else {
+        parts.add('FA pp.${faPages.first}-${faPages.last}');
+      }
+    }
+    if (tasks.any((task) => task.type == 'UWORLD')) {
+      parts.add('UWorld');
+    }
+
+    if (parts.isEmpty) {
+      return 'Study Session';
+    }
+    return 'Study Session • ${parts.join(' + ')}';
+  }
+
+  Map<String, dynamic> _plannedStudySessionPayload(
+    List<StudyTask> tasks,
+    int estimatedMinutes,
+  ) {
+    return {
+      'kind': _plannedStudySessionKind,
+      'estimatedDurationMinutes': estimatedMinutes,
+      'tasks': StudyTask.toJsonList(tasks),
+    };
+  }
+
+  String _formatPlannedTime(String hhmm) {
+    final parts = hhmm.split(':');
+    if (parts.length != 2) {
+      return hhmm;
+    }
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) {
+      return hhmm;
+    }
+    return DateFormat('h:mm a').format(DateTime(2000, 1, 1, hour, minute));
+  }
+
+  String _formatTimeOfDay(TimeOfDay time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatDurationLabel(int minutes) {
+    final hours = minutes ~/ 60;
+    final mins = minutes % 60;
+    if (hours == 0) {
+      return '${mins}min';
+    }
+    return '${hours}h ${mins.toString().padLeft(2, '0')}min';
+  }
+
+  int _notificationIdForBlock(String blockId) {
+    return blockId.codeUnits.fold<int>(
+      0,
+      (value, code) => ((value * 31) + code) & 0x7fffffff,
+    );
+  }
+
+  Future<void> _startPlannedSession(Block block) async {
+    final queue = _plannedQueueFromBlock(block);
+    if (queue.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to start planned study session'),
+        ),
+      );
+      return;
+    }
+
+    final navigator = Navigator.of(context);
+    final app = context.read<AppProvider>();
+    final dateKey = widget.dateKey;
+    final startedAt = DateTime.now();
+    navigator.pop();
+    Future.microtask(() {
+      navigator.push(
+        MaterialPageRoute(
+          builder: (_) => StudyFlowScreen(
+            dateKey: dateKey,
+            queuedTasks: queue,
+            onComplete: () {
+              final completedAt = DateTime.now();
+              unawaited(
+                app.completeDayPlanBlock(
+                  dateKey,
+                  block.id,
+                  startedAt: startedAt,
+                  completedAt: completedAt,
+                  durationSeconds: completedAt.difference(startedAt).inSeconds,
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    });
+  }
+
+  Future<void> _showPlanForLaterSheet() async {
+    final plannedQueue = StudyTask.plannableOnly(_queue);
+    if (plannedQueue.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No supported study items to plan (FA pages and UWorld only)'),
+        ),
+      );
+      return;
+    }
+
+    final estimatedMinutes =
+        StudyTask.estimateQueueDurationMinutes(plannedQueue);
+    TimeOfDay selectedTime = TimeOfDay.now();
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final cs = Theme.of(sheetContext).colorScheme;
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return Container(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              decoration: BoxDecoration(
+                color: cs.surface,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: cs.onSurface.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Plan for Later',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Estimated duration: ${_formatDurationLabel(estimatedMinutes)}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Planned Queue',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 220),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: plannedQueue.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (_, index) {
+                          final task = plannedQueue[index];
+                          return Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: cs.surfaceContainerHighest
+                                  .withValues(alpha: 0.45),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                _iconForType(task.type),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        task.label,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: cs.onSurface,
+                                        ),
+                                      ),
+                                      Text(
+                                        task.detail,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color:
+                                              cs.onSurface.withValues(alpha: 0.55),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Scheduled Start',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final picked = await showTimePicker(
+                          context: sheetContext,
+                          initialTime: selectedTime,
+                        );
+                        if (picked != null) {
+                          setSheetState(() {
+                            selectedTime = picked;
+                          });
+                        }
+                      },
+                      icon: const Icon(Icons.schedule_rounded, size: 18),
+                      label: Text(selectedTime.format(sheetContext)),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: () => _savePlannedSession(
+                          sheetContext,
+                          plannedQueue,
+                          selectedTime,
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF8B5CF6),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          'Save to Day Plan',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _savePlannedSession(
+    BuildContext sheetContext,
+    List<StudyTask> plannedQueue,
+    TimeOfDay selectedTime,
+  ) async {
+    final app = context.read<AppProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final sheetNavigator = Navigator.of(sheetContext);
+    final rootNavigator = Navigator.of(context);
+    final date = DateTime.tryParse(widget.dateKey) ?? DateTime.now();
+    final scheduledAt = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      selectedTime.hour,
+      selectedTime.minute,
+    );
+    final estimatedMinutes =
+        StudyTask.estimateQueueDurationMinutes(plannedQueue);
+    final endAt = scheduledAt.add(Duration(minutes: estimatedMinutes));
+    final title = _buildStudySessionTitle(plannedQueue);
+    final block = Block(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      index: 0,
+      date: widget.dateKey,
+      plannedStartTime: _formatTimeOfDay(selectedTime),
+      plannedEndTime:
+          '${endAt.hour.toString().padLeft(2, '0')}:${endAt.minute.toString().padLeft(2, '0')}',
+      type: BlockType.studySession,
+      title: title,
+      plannedDurationMinutes: estimatedMinutes,
+      status: BlockStatus.notStarted,
+      reflectionNotes: jsonEncode(
+        _plannedStudySessionPayload(plannedQueue, estimatedMinutes),
+      ),
+    );
+
+    final existingPlan = app.getDayPlan(widget.dateKey);
+    final allBlocks = [...(existingPlan?.blocks ?? const <Block>[]), block]
+      ..sort((a, b) => a.plannedStartTime.compareTo(b.plannedStartTime));
+    final reindexedBlocks = List<Block>.generate(
+      allBlocks.length,
+      (index) => allBlocks[index].copyWith(index: index),
+    );
+    final totalStudyMinutes = reindexedBlocks
+        .where((entry) => entry.type != BlockType.breakBlock)
+        .fold<int>(0, (sum, entry) => sum + entry.plannedDurationMinutes);
+    final totalBreakMinutes = reindexedBlocks
+        .where((entry) => entry.type == BlockType.breakBlock)
+        .fold<int>(0, (sum, entry) => sum + entry.plannedDurationMinutes);
+
+    final plan = existingPlan?.copyWith(
+          blocks: reindexedBlocks,
+          totalStudyMinutesPlanned: totalStudyMinutes,
+          totalBreakMinutes: totalBreakMinutes,
+        ) ??
+        DayPlan(
+          date: widget.dateKey,
+          faPages: const [],
+          faPagesCount: 0,
+          videos: const [],
+          notesFromUser: '',
+          notesFromAI: '',
+          attachments: const [],
+          breaks: const [],
+          blocks: reindexedBlocks,
+          totalStudyMinutesPlanned: totalStudyMinutes,
+          totalBreakMinutes: totalBreakMinutes,
+        );
+
+    await app.upsertDayPlan(plan);
+    await app.syncFlowActivitiesFromDayPlan(widget.dateKey);
+
+    if (scheduledAt.isAfter(DateTime.now())) {
+      await NotificationService.instance.scheduleStudySessionReminder(
+        id: _notificationIdForBlock(block.id),
+        blockTitle: title,
+        when: scheduledAt,
+      );
+    }
+
+    if (!mounted) return;
+    sheetNavigator.pop();
+    rootNavigator.pop();
+    Future.microtask(() {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Study session planned for ${DateFormat('h:mm a').format(scheduledAt)}',
+          ),
+        ),
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final app = context.watch<AppProvider>();
     final settingsProvider = context.watch<SettingsProvider>();
+    final plannedBlocks = _plannedSessionBlocks(app);
     final nextPage = app.getNextContinuePage();
     final targetPages = app.getTodayTargetPages(
       count: settingsProvider.dailyFAGoal,
@@ -56,39 +514,76 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.school_rounded, color: cs.primary, size: 24),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Start Study Session',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: cs.onSurface,
+                    Row(
+                      children: [
+                        Icon(Icons.school_rounded, color: cs.primary, size: 24),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Start Study Session',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              color: cs.onSurface,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                    if (_queue.isNotEmpty)
-                      FilledButton.icon(
-                        onPressed: _startSession,
-                        icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                        label: Text(
-                          'Start (${_queue.length})',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF8B5CF6),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
+                    if (_queue.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: _startSession,
+                              icon: const Icon(
+                                Icons.play_arrow_rounded,
+                                size: 18,
+                              ),
+                              label: Text(
+                                'Start (${_queue.length})',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFF8B5CF6),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _showPlanForLaterSheet,
+                              icon: const Icon(
+                                Icons.schedule_rounded,
+                                size: 18,
+                              ),
+                              label: const Text(
+                                'Plan for Later',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
+                    ],
                   ],
                 ),
               ),
@@ -98,6 +593,32 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                   controller: scrollController,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   children: [
+                    if (plannedBlocks.isNotEmpty) ...[
+                      Text(
+                        'Planned Sessions',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ...plannedBlocks.map((block) {
+                        final itemCount = _plannedQueueItemCount(block);
+                        final durationMinutes =
+                            _plannedQueueMinutesFromBlock(block);
+                        return _PlannedSessionCard(
+                          title: block.title,
+                          scheduledTime: _formatPlannedTime(
+                            block.plannedStartTime,
+                          ),
+                          itemCount: itemCount,
+                          durationLabel: _formatDurationLabel(durationMinutes),
+                          onStartNow: () => _startPlannedSession(block),
+                        );
+                      }),
+                      const SizedBox(height: 16),
+                    ],
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
@@ -892,6 +1413,91 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
           );
         });
       },
+    );
+  }
+}
+
+class _PlannedSessionCard extends StatelessWidget {
+  final String title;
+  final String scheduledTime;
+  final int itemCount;
+  final String durationLabel;
+  final VoidCallback onStartNow;
+
+  const _PlannedSessionCard({
+    required this.title,
+    required this.scheduledTime,
+    required this.itemCount,
+    required this.durationLabel,
+    required this.onStartNow,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.schedule_rounded,
+              color: Color(0xFF8B5CF6),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$scheduledTime • $itemCount item${itemCount == 1 ? '' : 's'} • $durationLabel',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: cs.onSurface.withValues(alpha: 0.55),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          FilledButton(
+            onPressed: onStartNow,
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF8B5CF6),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              'Start Now',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

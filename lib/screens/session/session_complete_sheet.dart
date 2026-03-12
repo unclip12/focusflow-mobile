@@ -110,6 +110,8 @@ class _CompletionSheetState extends State<_CompletionSheet> {
         return 'QBANK';
       case BlockType.anki:
         return 'ANKI';
+      case BlockType.studySession:
+        return 'STUDY';
       case BlockType.fmgeRevision:
         return 'FMGE';
       default:

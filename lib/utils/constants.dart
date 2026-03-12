@@ -129,6 +129,7 @@ enum BlockType {
   revisionFa,
   anki,
   qbank,
+  studySession,
   breakBlock,
   other,
   mixed,
@@ -140,6 +141,7 @@ enum BlockType {
       case BlockType.revisionFa:   return 'REVISION_FA';
       case BlockType.anki:         return 'ANKI';
       case BlockType.qbank:        return 'QBANK';
+      case BlockType.studySession: return 'STUDY_SESSION';
       case BlockType.breakBlock:   return 'BREAK';
       case BlockType.other:        return 'OTHER';
       case BlockType.mixed:        return 'MIXED';
@@ -153,6 +155,7 @@ enum BlockType {
       case 'REVISION_FA':   return BlockType.revisionFa;
       case 'ANKI':          return BlockType.anki;
       case 'QBANK':         return BlockType.qbank;
+      case 'STUDY_SESSION': return BlockType.studySession;
       case 'BREAK':         return BlockType.breakBlock;
       case 'OTHER':         return BlockType.other;
       case 'MIXED':         return BlockType.mixed;

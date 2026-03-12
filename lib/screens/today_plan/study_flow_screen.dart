@@ -26,6 +26,81 @@ class StudyTask {
     this.topicIds = const [],
     this.questionCount = 0,
   });
+
+  bool get isPlannable => type == 'FA' || type == 'UWORLD';
+
+  int get itemCount {
+    switch (type) {
+      case 'FA':
+        return pageNumbers.length;
+      case 'UWORLD':
+        return topicIds.length;
+      default:
+        return pageNumbers.isNotEmpty ? pageNumbers.length : topicIds.length;
+    }
+  }
+
+  int get estimatedDurationMinutes {
+    switch (type) {
+      case 'FA':
+        return pageNumbers.length * 15;
+      case 'UWORLD':
+        return topicIds.length * 20;
+      default:
+        return 0;
+    }
+  }
+
+  Map<String, dynamic> toJson() => {
+        'type': type,
+        'label': label,
+        'detail': detail,
+        'pageNumbers': pageNumbers,
+        'topicIds': topicIds,
+        'questionCount': questionCount,
+      };
+
+  factory StudyTask.fromJson(Map<String, dynamic> json) => StudyTask(
+        type: json['type']?.toString() ?? '',
+        label: json['label']?.toString() ?? '',
+        detail: json['detail']?.toString() ?? '',
+        pageNumbers: json['pageNumbers'] != null
+            ? List<int>.from(json['pageNumbers'])
+            : const [],
+        topicIds:
+            json['topicIds'] != null ? List<int>.from(json['topicIds']) : const [],
+        questionCount: json['questionCount'] as int? ?? 0,
+      );
+
+  static List<StudyTask> plannableOnly(Iterable<StudyTask> tasks) {
+    return tasks.where((task) => task.isPlannable).toList();
+  }
+
+  static int totalItemCount(Iterable<StudyTask> tasks) {
+    return tasks.fold<int>(0, (sum, task) => sum + task.itemCount);
+  }
+
+  static int estimateQueueDurationMinutes(Iterable<StudyTask> tasks) {
+    final total = tasks.fold<int>(
+      0,
+      (sum, task) => sum + task.estimatedDurationMinutes,
+    );
+    return total > 0 ? total : 15;
+  }
+
+  static List<Map<String, dynamic>> toJsonList(Iterable<StudyTask> tasks) {
+    return tasks.map((task) => task.toJson()).toList();
+  }
+
+  static List<StudyTask> fromJsonList(dynamic json) {
+    if (json is! List) {
+      return const <StudyTask>[];
+    }
+    return json
+        .whereType<Map>()
+        .map((task) => StudyTask.fromJson(Map<String, dynamic>.from(task)))
+        .toList();
+  }
 }
 
 class StudyFlowScreen extends StatefulWidget {

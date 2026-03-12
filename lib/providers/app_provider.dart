@@ -440,6 +440,76 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> completeDayPlanBlock(
+    String date,
+    String blockId, {
+    DateTime? startedAt,
+    DateTime? completedAt,
+    int? durationSeconds,
+    bool autoAdvanceFlow = false,
+  }) async {
+    final plan = getDayPlan(date);
+    final blocks = plan?.blocks;
+    if (plan == null || blocks == null) return;
+
+    final blockIdx = blocks.indexWhere((block) => block.id == blockId);
+    if (blockIdx < 0) return;
+
+    final end = completedAt ?? DateTime.now();
+    final block = blocks[blockIdx];
+    final existingStart = DateTime.tryParse(block.actualStartTime ?? '');
+    final start = startedAt ?? existingStart ?? end;
+    final resolvedDurationSeconds =
+        durationSeconds ?? end.difference(start).inSeconds;
+
+    final updatedBlocks = List<Block>.from(blocks);
+    updatedBlocks[blockIdx] = block.copyWith(
+      status: BlockStatus.done,
+      actualStartTime: block.actualStartTime ?? start.toIso8601String(),
+      actualEndTime: end.toIso8601String(),
+      actualDurationMinutes: (resolvedDurationSeconds / 60).ceil(),
+      completionStatus: 'COMPLETED',
+    );
+    await upsertDayPlan(plan.copyWith(blocks: updatedBlocks));
+
+    final flow = getDailyFlow(date);
+    if (flow == null) return;
+
+    final activities = List<FlowActivity>.from(flow.activities);
+    final activityIdx = activities.indexWhere(
+      (activity) =>
+          activity.id == 'task-$blockId' ||
+          activity.linkedTaskIds.contains(blockId),
+    );
+    if (activityIdx < 0) return;
+
+    if (autoAdvanceFlow) {
+      if (startedAt != null) {
+        activities[activityIdx] = activities[activityIdx].copyWith(
+          startedAt: startedAt.toIso8601String(),
+        );
+        await upsertDailyFlow(flow.copyWith(activities: activities));
+      }
+      await completeFlowActivity(date, activities[activityIdx].id);
+      return;
+    }
+
+    final activity = activities[activityIdx];
+    activities[activityIdx] = activity.copyWith(
+      status: 'DONE',
+      startedAt: activity.startedAt ?? start.toIso8601String(),
+      completedAt: end.toIso8601String(),
+      durationSeconds: resolvedDurationSeconds,
+    );
+    final allDone = activities.every((a) => a.isDone || a.isSkipped);
+    await upsertDailyFlow(
+      flow.copyWith(
+        activities: activities,
+        status: allDone ? 'COMPLETED' : flow.status,
+      ),
+    );
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // STUDY PLAN
   // ═══════════════════════════════════════════════════════════════
@@ -829,6 +899,8 @@ class AppProvider extends ChangeNotifier {
         return '📝';
       case BlockType.anki:
         return '🃏';
+      case BlockType.studySession:
+        return '🎓';
       case BlockType.fmgeRevision:
         return '📖';
       case BlockType.breakBlock:
@@ -851,9 +923,31 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  FlowActivity _flowActivityFromBlock(Block block, int sortOrder) {
-    final status = _flowStatusFromBlockStatus(block.status);
+  FlowActivity _flowActivityFromBlock(
+    Block block,
+    int sortOrder, {
+    FlowActivity? existing,
+  }) {
+    final blockStatus = _flowStatusFromBlockStatus(block.status);
+    final preserveExistingState = existing != null &&
+        block.status == BlockStatus.notStarted &&
+        existing.status != 'NOT_STARTED';
+    final status = preserveExistingState ? existing.status : blockStatus;
     final isCompleted = status == 'DONE';
+    final startedAt = preserveExistingState
+        ? (existing.startedAt ?? block.actualStartTime)
+        : block.actualStartTime;
+    final completedAt = preserveExistingState
+        ? (existing.completedAt ?? block.actualEndTime)
+        : block.actualEndTime;
+    final durationSeconds = preserveExistingState
+        ? (existing.durationSeconds ??
+            (block.actualDurationMinutes != null
+                ? block.actualDurationMinutes! * 60
+                : null))
+        : (block.actualDurationMinutes != null
+            ? block.actualDurationMinutes! * 60
+            : null);
 
     return FlowActivity(
       id: 'task-${block.id}',
@@ -863,11 +957,12 @@ class AppProvider extends ChangeNotifier {
       linkedTaskIds: [block.id],
       sortOrder: sortOrder,
       status: status,
-      startedAt: block.actualStartTime,
-      completedAt: isCompleted ? block.actualEndTime : null,
-      durationSeconds: block.actualDurationMinutes != null
-          ? block.actualDurationMinutes! * 60
-          : null,
+      startedAt: startedAt,
+      completedAt: isCompleted ? completedAt : null,
+      durationSeconds: durationSeconds,
+      pausedUntil: preserveExistingState ? existing.pausedUntil : null,
+      notes: preserveExistingState ? existing.notes : null,
+      category: preserveExistingState ? existing.category : null,
     );
   }
 
@@ -900,8 +995,11 @@ class AppProvider extends ChangeNotifier {
       );
       if (existingIdx >= 0) {
         final existing = normalizedActivities[existingIdx];
-        normalizedActivities[existingIdx] =
-            _flowActivityFromBlock(block, existing.sortOrder);
+        normalizedActivities[existingIdx] = _flowActivityFromBlock(
+          block,
+          existing.sortOrder,
+          existing: existing,
+        );
       } else {
         normalizedActivities
             .add(_flowActivityFromBlock(block, normalizedActivities.length));

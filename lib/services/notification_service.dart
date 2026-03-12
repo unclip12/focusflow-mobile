@@ -28,6 +28,7 @@ class NotificationService {
   static const String _chRevisionDue   = 'revision_due';
   static const String _chStreakReminder = 'streak_reminder';
   static const String _chDailySummary  = 'daily_summary';
+  static const String _chStudySession  = 'study_session';
 
   // ── Android channels ─────────────────────────────────────────
   static const _timerChannel = AndroidNotificationChannel(
@@ -62,6 +63,14 @@ class NotificationService {
     importance: Importance.defaultImportance,
   );
 
+  static const _studySessionChannel = AndroidNotificationChannel(
+    _chStudySession,
+    'Study Sessions',
+    description: 'Alerts when a planned study session is due',
+    importance: Importance.high,
+    playSound: true,
+  );
+
   /// Initialise the plugin and create all Android channels.
   Future<void> init() async {
     if (_initialised) return;
@@ -89,6 +98,7 @@ class NotificationService {
     await androidPlugin?.createNotificationChannel(_revisionChannel);
     await androidPlugin?.createNotificationChannel(_streakChannel);
     await androidPlugin?.createNotificationChannel(_summaryChannel);
+    await androidPlugin?.createNotificationChannel(_studySessionChannel);
 
     _initialised = true;
   }
@@ -306,6 +316,37 @@ class NotificationService {
         ),
       ),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+    );
+  }
+
+  Future<void> scheduleStudySessionReminder({
+    required int id,
+    required String blockTitle,
+    required DateTime when,
+  }) async {
+    await _plugin.cancel(id);
+    await _plugin.zonedSchedule(
+      id,
+      'Study Session Starting',
+      '$blockTitle is scheduled now',
+      tz.TZDateTime.from(when, tz.local),
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _chStudySession,
+          'Study Sessions',
+          channelDescription: 'Alerts when a planned study session is due',
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: true,
+        ),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );
