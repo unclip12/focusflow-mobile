@@ -1657,6 +1657,7 @@ class _UWorldTab extends StatelessWidget {
                 itemBuilder: (context, i) {
                   final sys = systems[i];
                   final subs = grouped[sys]!;
+                  final subtopicCount = subs.length;
                   
                   int sysDone = 0;
                   int sysTotal = 0;
@@ -1667,6 +1668,14 @@ class _UWorldTab extends StatelessWidget {
                   
                   return ExpansionTile(
                     title: Text(sys, style: const TextStyle(fontWeight: FontWeight.w400)),
+                    subtitle: Text(
+                      '$subtopicCount ${subtopicCount == 1 ? 'subtopic' : 'subtopics'}',
+                      style: TextStyle(
+                        color: cs.onSurfaceVariant,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
                     trailing: Text(
                       '$sysDone / $sysTotal',
                       style: TextStyle(
