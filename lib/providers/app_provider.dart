@@ -1507,6 +1507,19 @@ class AppProvider extends ChangeNotifier {
     return maxPage;
   }
 
+  FAPage? getFAPage(int pageNum) {
+    final idx = faPages.indexWhere((p) => p.pageNum == pageNum);
+    if (idx < 0) return null;
+    return faPages[idx];
+  }
+
+  RevisionItem? getFAPageRevisionItem(int pageNum) {
+    final revId = 'fa-page-$pageNum';
+    final idx = revisionItems.indexWhere((item) => item.id == revId);
+    if (idx < 0) return null;
+    return revisionItems[idx];
+  }
+
   /// Gap-aware: find the first unread FA page in book order.
   /// Respects gaps — e.g. if 33-34 read, 35 unread, 36-37 read → returns 35.
   /// After 35, returns 38 (since 36-37 already read).
@@ -3152,4 +3165,3 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 }
-

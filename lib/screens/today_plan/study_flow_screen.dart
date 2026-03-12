@@ -1,11 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:focusflow_mobile/models/fa_page.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/models/uworld_topic.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
+import 'package:focusflow_mobile/services/srs_service.dart';
 
 class StudyTask {
   final String type;
@@ -46,6 +49,9 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
   int _pagesCompletedInSession = 0;
   int _targetPages = 10;
   bool _isStudying = false;
+  bool _isRevisionPage = false;
+  bool _timersPaused = false;
+  bool _isResolvingQueuedRevision = false;
   bool _showAnkiPrompt = false;
   final List<int> _ankiPendingPages = [];
   Timer? _timer;
@@ -123,6 +129,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
     }
 
     _pageElapsed = 0;
+    _isRevisionPage = false;
     _showAnkiPrompt = false;
     _ankiPendingPages.clear();
   }
@@ -133,8 +140,13 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       _pageElapsed = 0;
     });
 
+    _ensureTimerRunning();
+    _triggerQueuedFaRevisionGateIfNeeded();
+  }
+
+  void _ensureTimerRunning() {
     _timer ??= Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) {
+      if (!mounted || !_isStudying || _timersPaused) {
         return;
       }
       setState(() {
@@ -142,6 +154,232 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
         _pageElapsed++;
       });
     });
+  }
+
+  void _triggerQueuedFaRevisionGateIfNeeded() {
+    if (!_isStudying || !_hasQueuedTasks || !_isQueueFaTask) {
+      return;
+    }
+    unawaited(_handleQueuedFaRevisionGateIfNeeded());
+  }
+
+  Future<void> _handleQueuedFaRevisionGateIfNeeded() async {
+    if (!mounted ||
+        !_isStudying ||
+        !_hasQueuedTasks ||
+        !_isQueueFaTask ||
+        _isResolvingQueuedRevision) {
+      return;
+    }
+
+    final app = context.read<AppProvider>();
+    final page = app.getFAPage(_currentPage);
+    final revisionItem = app.getFAPageRevisionItem(_currentPage);
+    final scheduledAt =
+        SrsService.parseRevisionDate(revisionItem?.nextRevisionAt);
+    final isRevisionTask = page != null &&
+        page.status != 'unread' &&
+        revisionItem != null &&
+        scheduledAt != null;
+
+    if (!isRevisionTask) {
+      if (_timersPaused || _isRevisionPage || _isResolvingQueuedRevision) {
+        setState(() {
+          _timersPaused = false;
+          _isRevisionPage = false;
+          _isResolvingQueuedRevision = false;
+        });
+      }
+      return;
+    }
+
+    setState(() {
+      _timersPaused = true;
+      _isRevisionPage = true;
+      _isResolvingQueuedRevision = true;
+    });
+
+    final reviseNow = await _showRevisionDueSheet(
+      page: page,
+      scheduledAt: scheduledAt,
+    );
+
+    if (!mounted || !_isStudying) {
+      return;
+    }
+
+    if (reviseNow) {
+      setState(() {
+        _timersPaused = false;
+        _isRevisionPage = true;
+        _isResolvingQueuedRevision = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isRevisionPage = false;
+      _isResolvingQueuedRevision = false;
+    });
+    _moveToNextPage(triggerRevisionGate: false);
+
+    if (!mounted || !_isStudying) {
+      return;
+    }
+
+    if (!_isQueueFaTask) {
+      setState(() {
+        _timersPaused = false;
+      });
+      return;
+    }
+
+    _triggerQueuedFaRevisionGateIfNeeded();
+  }
+
+  Future<bool> _showRevisionDueSheet({
+    required FAPage page,
+    required DateTime scheduledAt,
+  }) async {
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        final cs = theme.colorScheme;
+        final scheduledLabel =
+            DateFormat('EEE, d MMM yyyy').format(scheduledAt.toLocal());
+        final isDueNow = SrsService.isScheduledTodayOrPast(
+          nextRevisionAt: scheduledAt.toIso8601String(),
+        );
+        final daysUntil = SrsService.daysUntilScheduledDate(
+              nextRevisionAt: scheduledAt.toIso8601String(),
+            ) ??
+            0;
+        final statusText =
+            isDueNow ? 'Due now' : 'Scheduled in $daysUntil day${daysUntil == 1 ? '' : 's'}';
+
+        return PopScope(
+          canPop: false,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                decoration: BoxDecoration(
+                  color: cs.surface,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Page ${page.pageNum} - Revision Due',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${page.subject} - ${page.title}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: cs.onSurface.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Scheduled for $scheduledLabel',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isDueNow
+                            ? cs.errorContainer.withValues(alpha: 0.65)
+                            : cs.primaryContainer.withValues(alpha: 0.65),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isDueNow
+                                ? Icons.warning_amber_rounded
+                                : Icons.schedule_rounded,
+                            color: isDueNow ? cs.error : cs.primary,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              isDueNow ? 'Due now' : statusText,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: isDueNow ? cs.onErrorContainer : cs.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: () => Navigator.of(sheetContext).pop(true),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF8B5CF6),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          'Revise Now',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(sheetContext).pop(false),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          'Keep for Scheduled Time',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    return result ?? false;
   }
 
   void _markPageDone() {
@@ -159,16 +397,20 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       ),
     );
 
-    final subs = app.getSubtopicsForPage(_currentPage);
-    if (subs.isNotEmpty) {
-      final unreadIds =
-          subs.where((s) => s.status == 'unread').map((s) => s.id!).toList();
-      if (unreadIds.isNotEmpty) {
-        app.markSubtopicsRead(unreadIds);
+    if (_isRevisionPage) {
+      app.advanceFAPageRevision(_currentPage);
+    } else {
+      final subs = app.getSubtopicsForPage(_currentPage);
+      if (subs.isNotEmpty) {
+        final unreadIds =
+            subs.where((s) => s.status == 'unread').map((s) => s.id!).toList();
+        if (unreadIds.isNotEmpty) {
+          app.markSubtopicsRead(unreadIds);
+        }
       }
-    }
 
-    app.updateFAPageStatus(_currentPage, 'read');
+      app.updateFAPageStatus(_currentPage, 'read');
+    }
     _pagesCompletedInSession++;
 
     if (!_hasQueuedTasks) {
@@ -184,7 +426,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
     _moveToNextPage();
   }
 
-  void _moveToNextPage() {
+  void _moveToNextPage({bool triggerRevisionGate = true}) {
     if (_hasQueuedTasks && _isQueueFaTask) {
       final pages = _currentTask?.pageNumbers ?? const <int>[];
       final nextIndex = _currentTaskPageIndex + 1;
@@ -193,10 +435,14 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
           _currentTaskPageIndex = nextIndex;
           _currentPage = pages[nextIndex];
           _pageElapsed = 0;
+          _isRevisionPage = false;
         });
+        if (triggerRevisionGate) {
+          _triggerQueuedFaRevisionGateIfNeeded();
+        }
         return;
       }
-      _advanceQueue();
+      _advanceQueue(triggerRevisionGate: triggerRevisionGate);
       return;
     }
 
@@ -212,10 +458,11 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
     setState(() {
       _currentPage = next;
       _pageElapsed = 0;
+      _isRevisionPage = false;
     });
   }
 
-  void _advanceQueue() {
+  void _advanceQueue({bool triggerRevisionGate = true}) {
     final nextTaskIndex = _currentTaskIndex + 1;
     if (nextTaskIndex >= _queue.length) {
       _endSession();
@@ -227,6 +474,9 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       _currentTaskPageIndex = 0;
       _prepareQueuedTask();
     });
+    if (triggerRevisionGate) {
+      _triggerQueuedFaRevisionGateIfNeeded();
+    }
   }
 
   Future<void> _completeQueuedUWorldTask() async {
@@ -278,7 +528,12 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
   void _endSession() {
     _timer?.cancel();
     _timer = null;
-    setState(() => _isStudying = false);
+    setState(() {
+      _isStudying = false;
+      _timersPaused = false;
+      _isRevisionPage = false;
+      _isResolvingQueuedRevision = false;
+    });
     widget.onComplete?.call();
     Navigator.pop(context);
   }

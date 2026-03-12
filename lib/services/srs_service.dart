@@ -8,6 +8,45 @@ import 'package:focusflow_mobile/utils/constants.dart';
 class SrsService {
   SrsService._();
 
+  static DateTime? parseRevisionDate(String? nextRevisionAt) {
+    if (nextRevisionAt == null || nextRevisionAt.trim().isEmpty) {
+      return null;
+    }
+    return DateTime.tryParse(nextRevisionAt);
+  }
+
+  static bool isScheduledTodayOrPast({
+    required String? nextRevisionAt,
+    DateTime? now,
+  }) {
+    final scheduled = parseRevisionDate(nextRevisionAt);
+    if (scheduled == null) return false;
+    final current = now ?? DateTime.now();
+    final scheduledDate = DateTime(
+      scheduled.year,
+      scheduled.month,
+      scheduled.day,
+    );
+    final currentDate = DateTime(current.year, current.month, current.day);
+    return !scheduledDate.isAfter(currentDate);
+  }
+
+  static int? daysUntilScheduledDate({
+    required String? nextRevisionAt,
+    DateTime? now,
+  }) {
+    final scheduled = parseRevisionDate(nextRevisionAt);
+    if (scheduled == null) return null;
+    final current = now ?? DateTime.now();
+    final scheduledDate = DateTime(
+      scheduled.year,
+      scheduled.month,
+      scheduled.day,
+    );
+    final currentDate = DateTime(current.year, current.month, current.day);
+    return scheduledDate.difference(currentDate).inDays;
+  }
+
   /// Returns the next revision DateTime based on the SRS schedule.
   ///
   /// [lastStudied] — when the item was last studied/revised
