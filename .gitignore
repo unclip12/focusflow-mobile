@@ -3,15 +3,64 @@
 build/
 *.iml
 .idea/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+**/doc/api/
 
 # Android build outputs only (keep android/ tracked)
 android/.gradle/
 android/local.properties
 android/captures/
+/android/app/debug
+/android/app/profile
+/android/app/release
 
 # iOS build outputs only (keep ios/ tracked)
 ios/Pods/
 ios/.symlinks/
+ios/Flutter/.last_build_id
+
+# 🔒 SECURITY: Firebase configuration files — NEVER commit these
+# These contain your Firebase API keys and project config
+# They are generated during CI/CD from GitHub Secrets
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
+
+# 🔑 SECURITY: Android release signing keystore — NEVER commit
+# If leaked, someone can publish fake versions of your app
+*.jks
+*.keystore
+key.properties
+keystore-base64.txt
+android/app/release-keystore.jks
+android/key.properties
+
+# 🌍 Environment variables — NEVER commit
+.env
+.env.local
+.env.*.local
+
+# 🤖 AI agent workspace data — NEVER commit
+# Contains your full AI session history, code context, reasoning
+# This is a MAJOR privacy/security risk if made public
+.cognetivy/
+.cursor/mcp.json
+.claude/
+
+# API keys in Dart files
+**/*secret*.dart
+**/*apikey*.dart
+**/*_keys.dart
+
+# macOS
+.DS_Store
+
+# VSCode
+.vscode/launch.json
 
 node_modules/
 scripts/
