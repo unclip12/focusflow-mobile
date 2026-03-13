@@ -248,65 +248,13 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
     );
   }
 
-  Future<int?> _pickTaskDurationMinutes(
-    BuildContext dialogContext,
-    int initialMinutes,
-  ) async {
-    final controller = TextEditingController(text: initialMinutes.toString());
-    String? errorText;
-
-    final result = await showDialog<int>(
-      context: dialogContext,
+  Future<int?> _pickTaskDurationMinutes(int initialMinutes) {
+    return showDialog<int>(
+      context: context,
       builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            return AlertDialog(
-              title: const Text('Task duration'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Set duration between 5 and 120 minutes.'),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: controller,
-                    keyboardType: TextInputType.number,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      labelText: 'Minutes',
-                      suffixText: 'min',
-                      errorText: errorText,
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    final minutes = int.tryParse(controller.text.trim());
-                    if (minutes == null || minutes < 5 || minutes > 120) {
-                      setDialogState(() {
-                        errorText = 'Enter a value from 5 to 120.';
-                      });
-                      return;
-                    }
-                    Navigator.of(dialogContext).pop(minutes);
-                  },
-                  child: const Text('Save'),
-                ),
-              ],
-            );
-          },
-        );
+        return _TaskDurationDialog(initialMinutes: initialMinutes);
       },
     );
-
-    controller.dispose();
-    return result;
   }
 
   RevisionItem? _findRevisionItem(AppProvider app, String revisionId) {
@@ -643,10 +591,12 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                                     onPressed: () async {
                                       final minutes =
                                           await _pickTaskDurationMinutes(
-                                        sheetContext,
                                         task.estimatedDurationMinutes,
                                       );
                                       if (minutes == null) {
+                                        return;
+                                      }
+                                      if (!mounted || !sheetContext.mounted) {
                                         return;
                                       }
                                       setSheetState(() {
@@ -2055,6 +2005,91 @@ class _PlannedSessionCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _TaskDurationDialog extends StatefulWidget {
+  final int initialMinutes;
+
+  const _TaskDurationDialog({
+    required this.initialMinutes,
+  });
+
+  @override
+  State<_TaskDurationDialog> createState() => _TaskDurationDialogState();
+}
+
+class _TaskDurationDialogState extends State<_TaskDurationDialog> {
+  late final TextEditingController _controller;
+  String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller =
+        TextEditingController(text: widget.initialMinutes.toString());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final minutes = int.tryParse(_controller.text.trim());
+    if (minutes == null || minutes < 5 || minutes > 120) {
+      setState(() {
+        _errorText = 'Enter a value from 5 to 120.';
+      });
+      return;
+    }
+
+    Navigator.of(context).pop(minutes);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Task duration'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('5 - 120 min'),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controller,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Minutes',
+              suffixText: 'min',
+              errorText: _errorText,
+            ),
+            onChanged: (_) {
+              if (_errorText == null) {
+                return;
+              }
+              setState(() {
+                _errorText = null;
+              });
+            },
+            onSubmitted: (_) => _save(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _save,
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }
