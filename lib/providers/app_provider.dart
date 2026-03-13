@@ -54,6 +54,7 @@ class AppNotification {
   final String message;
   final DateTime createdAt;
   bool isRead;
+
   /// Optional route name payload — used by NotificationCard to navigate.
   final String? routeName;
 
@@ -166,9 +167,8 @@ class AppProvider extends ChangeNotifier {
         .map((j) => KnowledgeBaseEntry.fromJson(j))
         .toList();
 
-    dayPlans = (await _db.getAllDayPlans())
-        .map((j) => DayPlan.fromJson(j))
-        .toList();
+    dayPlans =
+        (await _db.getAllDayPlans()).map((j) => DayPlan.fromJson(j)).toList();
 
     studyPlan = (await _db.getAllStudyPlanItems())
         .map((j) => StudyPlanItem.fromJson(j))
@@ -206,9 +206,8 @@ class AppProvider extends ChangeNotifier {
         .map((j) => RevisionItem.fromJson(j))
         .toList();
 
-    faPages = (await _db.getAllFAPages())
-        .map((j) => FAPage.fromJson(j))
-        .toList();
+    faPages =
+        (await _db.getAllFAPages()).map((j) => FAPage.fromJson(j)).toList();
     sketchyItems = (await _db.getAllSketchyItems())
         .map((j) => SketchyItem.fromJson(j))
         .toList();
@@ -229,18 +228,16 @@ class AppProvider extends ChangeNotifier {
     faSubtopics = await _db.getAllFASubtopics();
 
     // V6: Routines, Buying, To-Do, Default Order
-    routines = (await _db.getAllRoutines())
-        .map((j) => Routine.fromJson(j))
-        .toList();
+    routines =
+        (await _db.getAllRoutines()).map((j) => Routine.fromJson(j)).toList();
     routineLogs = (await _db.getAllRoutineLogs())
         .map((j) => RoutineLog.fromJson(j))
         .toList();
     buyingItems = (await _db.getAllBuyingItems())
         .map((j) => BuyingItem.fromJson(j))
         .toList();
-    todoItems = (await _db.getAllTodoItems())
-        .map((j) => TodoItem.fromJson(j))
-        .toList();
+    todoItems =
+        (await _db.getAllTodoItems()).map((j) => TodoItem.fromJson(j)).toList();
     defaultActivities = (await _db.getAllDefaultActivities())
         .map((j) => DefaultActivity.fromJson(j))
         .toList();
@@ -262,7 +259,8 @@ class AppProvider extends ChangeNotifier {
     userProfile = upJson != null ? UserProfile.fromJson(upJson) : null;
 
     final rsJson = await _db.getRevisionSettings();
-    revisionSettings = rsJson != null ? RevisionSettings.fromJson(rsJson) : null;
+    revisionSettings =
+        rsJson != null ? RevisionSettings.fromJson(rsJson) : null;
 
     final sdJson = await _db.getStreakData();
     streakData = sdJson != null ? StreakData.fromJson(sdJson) : StreakData();
@@ -328,10 +326,26 @@ class AppProvider extends ChangeNotifier {
 
     // ── Seed sample habits (in-memory only) ───────────────────────
     habits = [
-      Habit(id: 'h1', name: 'Morning Revision', frequency: HabitFrequency.daily, color: const Color(0xFF6366F1)),
-      Habit(id: 'h2', name: 'Read First Aid', frequency: HabitFrequency.daily, color: const Color(0xFF10B981)),
-      Habit(id: 'h3', name: 'QBank Practice', frequency: HabitFrequency.weekdays, color: const Color(0xFFEC4899)),
-      Habit(id: 'h4', name: 'Anki Review', frequency: HabitFrequency.daily, color: const Color(0xFFF59E0B)),
+      Habit(
+          id: 'h1',
+          name: 'Morning Revision',
+          frequency: HabitFrequency.daily,
+          color: const Color(0xFF6366F1)),
+      Habit(
+          id: 'h2',
+          name: 'Read First Aid',
+          frequency: HabitFrequency.daily,
+          color: const Color(0xFF10B981)),
+      Habit(
+          id: 'h3',
+          name: 'QBank Practice',
+          frequency: HabitFrequency.weekdays,
+          color: const Color(0xFFEC4899)),
+      Habit(
+          id: 'h4',
+          name: 'Anki Review',
+          frequency: HabitFrequency.daily,
+          color: const Color(0xFFF59E0B)),
     ];
 
     _loaded = true;
@@ -344,7 +358,8 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> upsertKBEntry(KnowledgeBaseEntry entry) async {
     await _db.upsertKBEntry(entry.toJson());
-    final idx = knowledgeBase.indexWhere((e) => e.pageNumber == entry.pageNumber);
+    final idx =
+        knowledgeBase.indexWhere((e) => e.pageNumber == entry.pageNumber);
     if (idx >= 0) {
       knowledgeBase[idx] = entry;
     } else {
@@ -364,8 +379,11 @@ class AppProvider extends ChangeNotifier {
   // ═══════════════════════════════════════════════════════════════
 
   DayPlan? getDayPlan(String date) {
-    try { return dayPlans.firstWhere((p) => p.date == date); }
-    catch (_) { return null; }
+    try {
+      return dayPlans.firstWhere((p) => p.date == date);
+    } catch (_) {
+      return null;
+    }
   }
 
   String get todayDateKey => DateFormat('yyyy-MM-dd').format(DateTime.now());
@@ -426,12 +444,22 @@ class AppProvider extends ChangeNotifier {
     await syncFlowActivitiesFromDayPlan(date);
   }
 
-  Future<void> upsertDayPlan(DayPlan plan) async {
+  Future<void> _saveDayPlan(DayPlan plan, {bool notify = true}) async {
     await _db.upsertDayPlan(plan.toJson());
     final idx = dayPlans.indexWhere((p) => p.date == plan.date);
-    if (idx >= 0) { dayPlans[idx] = plan; } else { dayPlans.add(plan); }
-    notifyListeners();
+    if (idx >= 0) {
+      dayPlans[idx] = plan;
+    } else {
+      dayPlans.add(plan);
+    }
+    if (notify) {
+      notifyListeners();
+    }
     unawaited(_triggerBackup());
+  }
+
+  Future<void> upsertDayPlan(DayPlan plan) async {
+    await _saveDayPlan(plan);
   }
 
   Future<void> deleteDayPlan(String date) async {
@@ -470,10 +498,16 @@ class AppProvider extends ChangeNotifier {
       actualDurationMinutes: (resolvedDurationSeconds / 60).ceil(),
       completionStatus: 'COMPLETED',
     );
-    await upsertDayPlan(plan.copyWith(blocks: updatedBlocks));
+    final updatedPlan = plan.copyWith(blocks: updatedBlocks);
+    await _saveDayPlan(updatedPlan, notify: !autoAdvanceFlow);
 
     final flow = getDailyFlow(date);
-    if (flow == null) return;
+    if (flow == null) {
+      if (autoAdvanceFlow) {
+        notifyListeners();
+      }
+      return;
+    }
 
     final activities = List<FlowActivity>.from(flow.activities);
     final activityIdx = activities.indexWhere(
@@ -481,16 +515,29 @@ class AppProvider extends ChangeNotifier {
           activity.id == 'task-$blockId' ||
           activity.linkedTaskIds.contains(blockId),
     );
-    if (activityIdx < 0) return;
+    if (activityIdx < 0) {
+      if (autoAdvanceFlow) {
+        notifyListeners();
+      }
+      return;
+    }
 
     if (autoAdvanceFlow) {
       if (startedAt != null) {
         activities[activityIdx] = activities[activityIdx].copyWith(
           startedAt: startedAt.toIso8601String(),
         );
-        await upsertDailyFlow(flow.copyWith(activities: activities));
+        await upsertDailyFlow(
+          flow.copyWith(activities: activities),
+          notify: false,
+        );
       }
-      await completeFlowActivity(date, activities[activityIdx].id);
+      await completeFlowActivity(
+        date,
+        activities[activityIdx].id,
+        notify: false,
+      );
+      notifyListeners();
       return;
     }
 
@@ -517,7 +564,11 @@ class AppProvider extends ChangeNotifier {
   Future<void> upsertStudyPlanItem(StudyPlanItem item) async {
     await _db.upsertStudyPlanItem(item.toJson());
     final idx = studyPlan.indexWhere((i) => i.id == item.id);
-    if (idx >= 0) { studyPlan[idx] = item; } else { studyPlan.add(item); }
+    if (idx >= 0) {
+      studyPlan[idx] = item;
+    } else {
+      studyPlan.add(item);
+    }
     notifyListeners();
   }
 
@@ -534,7 +585,11 @@ class AppProvider extends ChangeNotifier {
   Future<void> upsertFMGEEntry(FMGEEntry entry) async {
     await _db.upsertFMGEEntry(entry.toJson());
     final idx = fmgeEntries.indexWhere((e) => e.id == entry.id);
-    if (idx >= 0) { fmgeEntries[idx] = entry; } else { fmgeEntries.add(entry); }
+    if (idx >= 0) {
+      fmgeEntries[idx] = entry;
+    } else {
+      fmgeEntries.add(entry);
+    }
     notifyListeners();
   }
 
@@ -551,7 +606,11 @@ class AppProvider extends ChangeNotifier {
   Future<void> upsertTimeLog(TimeLogEntry entry) async {
     await _db.upsertTimeLog(entry.toJson());
     final idx = timeLogs.indexWhere((e) => e.id == entry.id);
-    if (idx >= 0) { timeLogs[idx] = entry; } else { timeLogs.add(entry); }
+    if (idx >= 0) {
+      timeLogs[idx] = entry;
+    } else {
+      timeLogs.add(entry);
+    }
     notifyListeners();
     unawaited(_triggerBackup());
   }
@@ -593,14 +652,21 @@ class AppProvider extends ChangeNotifier {
   // ═══════════════════════════════════════════════════════════════
 
   DailyTracker? getDailyTracker(String date) {
-    try { return dailyTrackers.firstWhere((t) => t.date == date); }
-    catch (_) { return null; }
+    try {
+      return dailyTrackers.firstWhere((t) => t.date == date);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> upsertDailyTracker(DailyTracker tracker) async {
     await _db.upsertDailyTracker(tracker.toJson());
     final idx = dailyTrackers.indexWhere((t) => t.date == tracker.date);
-    if (idx >= 0) { dailyTrackers[idx] = tracker; } else { dailyTrackers.add(tracker); }
+    if (idx >= 0) {
+      dailyTrackers[idx] = tracker;
+    } else {
+      dailyTrackers.add(tracker);
+    }
     notifyListeners();
   }
 
@@ -611,7 +677,11 @@ class AppProvider extends ChangeNotifier {
   Future<void> upsertStudyEntry(StudyEntry entry) async {
     await _db.upsertStudyEntry(entry.toJson());
     final idx = studyEntries.indexWhere((e) => e.id == entry.id);
-    if (idx >= 0) { studyEntries[idx] = entry; } else { studyEntries.add(entry); }
+    if (idx >= 0) {
+      studyEntries[idx] = entry;
+    } else {
+      studyEntries.add(entry);
+    }
     notifyListeners();
   }
 
@@ -628,7 +698,11 @@ class AppProvider extends ChangeNotifier {
   Future<void> upsertStudyMaterial(StudyMaterial material) async {
     await _db.upsertStudyMaterial(material.toJson());
     final idx = studyMaterials.indexWhere((m) => m.id == material.id);
-    if (idx >= 0) { studyMaterials[idx] = material; } else { studyMaterials.add(material); }
+    if (idx >= 0) {
+      studyMaterials[idx] = material;
+    } else {
+      studyMaterials.add(material);
+    }
     notifyListeners();
   }
 
@@ -659,22 +733,23 @@ class AppProvider extends ChangeNotifier {
   Future<void> sendMentorMessage(String text) async {
     // 1. Add user message
     final userMsg = MentorMessage(
-      id:        _uuid.v4(),
-      role:      'user',
-      text:      text,
+      id: _uuid.v4(),
+      role: 'user',
+      text: text,
       timestamp: DateTime.now().toIso8601String(),
     );
     await addMentorMessage(userMsg);
 
     // 2. Mock mentor reply after delay
     await Future.delayed(const Duration(milliseconds: 800));
-    final reply = _kMentorAutoReplies[_mentorReplyIdx % _kMentorAutoReplies.length];
+    final reply =
+        _kMentorAutoReplies[_mentorReplyIdx % _kMentorAutoReplies.length];
     _mentorReplyIdx++;
 
     final mentorMsg = MentorMessage(
-      id:        _uuid.v4(),
-      role:      'model',
-      text:      reply,
+      id: _uuid.v4(),
+      role: 'model',
+      text: reply,
       timestamp: DateTime.now().toIso8601String(),
     );
     await addMentorMessage(mentorMsg);
@@ -703,7 +778,8 @@ class AppProvider extends ChangeNotifier {
   }
 
   /// Alias for saveUserProfile — screens may call either name.
-  Future<void> updateUserProfile(UserProfile profile) => saveUserProfile(profile);
+  Future<void> updateUserProfile(UserProfile profile) =>
+      saveUserProfile(profile);
 
   Future<void> saveRevisionSettings(RevisionSettings s) async {
     revisionSettings = s;
@@ -718,7 +794,11 @@ class AppProvider extends ChangeNotifier {
   Future<void> upsertRoutine(Routine routine) async {
     await _db.upsertRoutine(routine.toJson());
     final idx = routines.indexWhere((r) => r.id == routine.id);
-    if (idx >= 0) { routines[idx] = routine; } else { routines.add(routine); }
+    if (idx >= 0) {
+      routines[idx] = routine;
+    } else {
+      routines.add(routine);
+    }
     notifyListeners();
   }
 
@@ -735,7 +815,11 @@ class AppProvider extends ChangeNotifier {
   Future<void> upsertRoutineLog(RoutineLog log) async {
     await _db.upsertRoutineLog(log.toJson());
     final idx = routineLogs.indexWhere((l) => l.id == log.id);
-    if (idx >= 0) { routineLogs[idx] = log; } else { routineLogs.add(log); }
+    if (idx >= 0) {
+      routineLogs[idx] = log;
+    } else {
+      routineLogs.add(log);
+    }
     notifyListeners();
   }
 
@@ -755,7 +839,11 @@ class AppProvider extends ChangeNotifier {
   Future<void> upsertBuyingItem(BuyingItem item) async {
     await _db.upsertBuyingItem(item.toJson());
     final idx = buyingItems.indexWhere((i) => i.id == item.id);
-    if (idx >= 0) { buyingItems[idx] = item; } else { buyingItems.add(item); }
+    if (idx >= 0) {
+      buyingItems[idx] = item;
+    } else {
+      buyingItems.add(item);
+    }
     notifyListeners();
   }
 
@@ -775,7 +863,11 @@ class AppProvider extends ChangeNotifier {
   Future<void> upsertTodoItem(TodoItem item) async {
     await _db.upsertTodoItem(item.toJson());
     final idx = todoItems.indexWhere((i) => i.id == item.id);
-    if (idx >= 0) { todoItems[idx] = item; } else { todoItems.add(item); }
+    if (idx >= 0) {
+      todoItems[idx] = item;
+    } else {
+      todoItems.add(item);
+    }
     notifyListeners();
   }
 
@@ -798,7 +890,11 @@ class AppProvider extends ChangeNotifier {
   Future<void> upsertDefaultActivity(DefaultActivity activity) async {
     await _db.upsertDefaultActivity(activity.toJson());
     final idx = defaultActivities.indexWhere((a) => a.id == activity.id);
-    if (idx >= 0) { defaultActivities[idx] = activity; } else { defaultActivities.add(activity); }
+    if (idx >= 0) {
+      defaultActivities[idx] = activity;
+    } else {
+      defaultActivities.add(activity);
+    }
     defaultActivities.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     notifyListeners();
   }
@@ -824,8 +920,11 @@ class AppProvider extends ChangeNotifier {
   // ═════════════════════════════════════════════════════════════════
 
   DailyFlow? getDailyFlow(String date) {
-    try { return dailyFlows.firstWhere((f) => f.date == date); }
-    catch (_) { return null; }
+    try {
+      return dailyFlows.firstWhere((f) => f.date == date);
+    } catch (_) {
+      return null;
+    }
   }
 
   List<FlowActivity> getFlowActivitiesForDate(String dateKey) {
@@ -853,11 +952,21 @@ class AppProvider extends ChangeNotifier {
     return deduped;
   }
 
-  Future<void> upsertDailyFlow(DailyFlow flow) async {
+  Future<void> _saveDailyFlow(DailyFlow flow, {bool notify = true}) async {
     await _db.upsertDailyFlow(flow.toJson());
     final idx = dailyFlows.indexWhere((f) => f.date == flow.date);
-    if (idx >= 0) { dailyFlows[idx] = flow; } else { dailyFlows.add(flow); }
-    notifyListeners();
+    if (idx >= 0) {
+      dailyFlows[idx] = flow;
+    } else {
+      dailyFlows.add(flow);
+    }
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
+  Future<void> upsertDailyFlow(DailyFlow flow, {bool notify = true}) async {
+    await _saveDailyFlow(flow, notify: notify);
   }
 
   Future<void> deleteDailyFlow(String date) async {
@@ -868,7 +977,8 @@ class AppProvider extends ChangeNotifier {
 
   /// Initialize a daily flow for a date by cloning the default activity chain.
   /// If a flow already exists for the date, it is returned as-is.
-  Future<DailyFlow> initializeDailyFlow(String date) async {
+  Future<DailyFlow> initializeDailyFlow(String date,
+      {bool notify = true}) async {
     final existing = getDailyFlow(date);
     if (existing != null) return existing;
 
@@ -885,7 +995,7 @@ class AppProvider extends ChangeNotifier {
     }).toList();
 
     final flow = DailyFlow(date: date, activities: activities);
-    await upsertDailyFlow(flow);
+    await _saveDailyFlow(flow, notify: notify);
     return flow;
   }
 
@@ -966,10 +1076,13 @@ class AppProvider extends ChangeNotifier {
     );
   }
 
-  Future<void> syncFlowActivitiesFromDayPlan(String date) async {
+  Future<void> syncFlowActivitiesFromDayPlan(
+    String date, {
+    bool notify = true,
+  }) async {
     final plan = getDayPlan(date);
     var flow = getDailyFlow(date);
-    flow ??= await initializeDailyFlow(date);
+    flow ??= await initializeDailyFlow(date, notify: false);
 
     final blocks = (plan?.blocks ?? [])
         .where((block) =>
@@ -1013,15 +1126,18 @@ class AppProvider extends ChangeNotifier {
       );
     }
 
-    await upsertDailyFlow(flow.copyWith(activities: reindexedActivities));
+    await _saveDailyFlow(
+      flow.copyWith(activities: reindexedActivities),
+      notify: notify,
+    );
   }
 
   /// Start the daily flow.
   Future<void> startFlow(String date) async {
-    await syncFlowActivitiesFromDayPlan(date);
+    await syncFlowActivitiesFromDayPlan(date, notify: false);
 
     var flow = getDailyFlow(date);
-    flow ??= await initializeDailyFlow(date);
+    flow ??= await initializeDailyFlow(date, notify: false);
 
     final now = DateTime.now().toIso8601String();
     final activities = List<FlowActivity>.from(flow.activities);
@@ -1042,7 +1158,7 @@ class AppProvider extends ChangeNotifier {
       activities: activities,
       startedAt: flow.startedAt ?? now,
     );
-    await upsertDailyFlow(updated);
+    await _saveDailyFlow(updated);
   }
 
   /// Pause the flow with an optional duration.
@@ -1123,7 +1239,11 @@ class AppProvider extends ChangeNotifier {
   }
 
   /// Mark a flow activity as completed.
-  Future<void> completeFlowActivity(String date, String activityId) async {
+  Future<void> completeFlowActivity(
+    String date,
+    String activityId, {
+    bool notify = true,
+  }) async {
     final flow = getDailyFlow(date);
     if (flow == null) return;
 
@@ -1136,9 +1256,8 @@ class AppProvider extends ChangeNotifier {
     final startTime = activity.startedAt != null
         ? DateTime.tryParse(activity.startedAt!)
         : null;
-    final duration = startTime != null
-        ? now.difference(startTime).inSeconds
-        : null;
+    final duration =
+        startTime != null ? now.difference(startTime).inSeconds : null;
 
     activities[idx] = activity.copyWith(
       status: 'DONE',
@@ -1161,10 +1280,13 @@ class AppProvider extends ChangeNotifier {
 
     // Check if all completed
     final allDone = activities.every((a) => a.isDone || a.isSkipped);
-    await upsertDailyFlow(flow.copyWith(
-      activities: activities,
-      status: allDone ? 'COMPLETED' : (foundNext ? 'ACTIVE' : 'COMPLETED'),
-    ));
+    await _saveDailyFlow(
+      flow.copyWith(
+        activities: activities,
+        status: allDone ? 'COMPLETED' : (foundNext ? 'ACTIVE' : 'COMPLETED'),
+      ),
+      notify: notify,
+    );
   }
 
   /// Undo a completed activity — moves it back to NOT_STARTED.
@@ -1194,7 +1316,8 @@ class AppProvider extends ChangeNotifier {
   }
 
   /// Reorder flow activities.
-  Future<void> reorderFlowActivities(String date, int oldIdx, int newIdx) async {
+  Future<void> reorderFlowActivities(
+      String date, int oldIdx, int newIdx) async {
     final flow = getDailyFlow(date);
     if (flow == null) return;
 
@@ -1284,7 +1407,8 @@ class AppProvider extends ChangeNotifier {
       startedAt: now,
       category: category,
     );
-    await addFlowActivity(date, activity.copyWith(status: 'IN_PROGRESS', startedAt: now));
+    await addFlowActivity(
+        date, activity.copyWith(status: 'IN_PROGRESS', startedAt: now));
     return activity;
   }
 
@@ -1322,9 +1446,8 @@ class AppProvider extends ChangeNotifier {
     final startTime = activity.startedAt != null
         ? DateTime.tryParse(activity.startedAt!)
         : null;
-    final duration = startTime != null
-        ? now.difference(startTime).inSeconds
-        : null;
+    final duration =
+        startTime != null ? now.difference(startTime).inSeconds : null;
 
     activities[idx] = activity.copyWith(
       status: 'DONE',
@@ -1433,8 +1556,8 @@ class AppProvider extends ChangeNotifier {
         }
         final hasStructuredBlockData =
             (block.relatedFaPages?.isNotEmpty ?? false) ||
-            block.relatedVideoId != null ||
-            block.relatedQbankInfo != null;
+                block.relatedVideoId != null ||
+                block.relatedQbankInfo != null;
         if (hasStructuredBlockData) {
           return {'block': block};
         }
@@ -1516,15 +1639,16 @@ class AppProvider extends ChangeNotifier {
     if (qbankInfo == null) return;
 
     final topicIdRaw = qbankInfo['topicId'];
-    final countRaw =
-        qbankInfo['count'] ?? qbankInfo['doneQuestions'] ?? qbankInfo['questions'];
+    final countRaw = qbankInfo['count'] ??
+        qbankInfo['doneQuestions'] ??
+        qbankInfo['questions'];
     final correctRaw = qbankInfo['correctQuestions'] ?? 0;
 
-    final topicId = topicIdRaw is int ? topicIdRaw : int.tryParse('$topicIdRaw');
+    final topicId =
+        topicIdRaw is int ? topicIdRaw : int.tryParse('$topicIdRaw');
     final count = countRaw is int ? countRaw : int.tryParse('$countRaw');
-    final correct = correctRaw is int
-        ? correctRaw
-        : int.tryParse('$correctRaw') ?? 0;
+    final correct =
+        correctRaw is int ? correctRaw : int.tryParse('$correctRaw') ?? 0;
     if (topicId == null || count == null) return;
 
     final topicIdx = uworldTopics.indexWhere((t) => t.id == topicId);
@@ -1550,17 +1674,28 @@ class AppProvider extends ChangeNotifier {
   /// Icon helper for Track Now categories.
   static String _categoryIcon(String? category) {
     switch (category?.toLowerCase()) {
-      case 'cooking': return '🍳';
-      case 'cleaning': return '🧹';
-      case 'exercise': return '💪';
-      case 'study': return '📚';
-      case 'prayer': return '🕌';
-      case 'shopping': return '🛒';
-      case 'eating': return '🍽️';
-      case 'rest': return '😴';
-      case 'travel': return '🚗';
-      case 'work': return '💼';
-      default: return '⏱️';
+      case 'cooking':
+        return '🍳';
+      case 'cleaning':
+        return '🧹';
+      case 'exercise':
+        return '💪';
+      case 'study':
+        return '📚';
+      case 'prayer':
+        return '🕌';
+      case 'shopping':
+        return '🛒';
+      case 'eating':
+        return '🍽️';
+      case 'rest':
+        return '😴';
+      case 'travel':
+        return '🚗';
+      case 'work':
+        return '💼';
+      default:
+        return '⏱️';
     }
   }
 
@@ -1582,11 +1717,31 @@ class AppProvider extends ChangeNotifier {
         icon: '🕌',
         color: 0xFF059669,
         steps: [
-          RoutineStep(id: '${name.toLowerCase()}_wudu', title: 'Wudu (Ablution)', estimatedMinutes: 5, sortOrder: 0),
-          RoutineStep(id: '${name.toLowerCase()}_walk', title: 'Walk to Mosque', estimatedMinutes: 5, sortOrder: 1),
-          RoutineStep(id: '${name.toLowerCase()}_pray', title: '$name Prayer', estimatedMinutes: 10, sortOrder: 2),
-          RoutineStep(id: '${name.toLowerCase()}_tasbeeh', title: 'Tasbeeh & Dhikr', estimatedMinutes: 5, sortOrder: 3),
-          RoutineStep(id: '${name.toLowerCase()}_dua', title: 'Dua & Quran Reading', estimatedMinutes: 5, sortOrder: 4),
+          RoutineStep(
+              id: '${name.toLowerCase()}_wudu',
+              title: 'Wudu (Ablution)',
+              estimatedMinutes: 5,
+              sortOrder: 0),
+          RoutineStep(
+              id: '${name.toLowerCase()}_walk',
+              title: 'Walk to Mosque',
+              estimatedMinutes: 5,
+              sortOrder: 1),
+          RoutineStep(
+              id: '${name.toLowerCase()}_pray',
+              title: '$name Prayer',
+              estimatedMinutes: 10,
+              sortOrder: 2),
+          RoutineStep(
+              id: '${name.toLowerCase()}_tasbeeh',
+              title: 'Tasbeeh & Dhikr',
+              estimatedMinutes: 5,
+              sortOrder: 3),
+          RoutineStep(
+              id: '${name.toLowerCase()}_dua',
+              title: 'Dua & Quran Reading',
+              estimatedMinutes: 5,
+              sortOrder: 4),
         ],
         createdAt: DateTime.now().toIso8601String(),
       );
@@ -1598,7 +1753,8 @@ class AppProvider extends ChangeNotifier {
   int getLastCompletedFAPage() {
     int maxPage = 0;
     for (final p in faPages) {
-      if ((p.status == 'read' || p.status == 'anki_done') && p.pageNum > maxPage) {
+      if ((p.status == 'read' || p.status == 'anki_done') &&
+          p.pageNum > maxPage) {
         maxPage = p.pageNum;
       }
     }
@@ -1665,7 +1821,11 @@ class AppProvider extends ChangeNotifier {
   Future<void> upsertRevisionItem(RevisionItem item) async {
     await _db.upsertRevisionItem(item.toJson());
     final idx = revisionItems.indexWhere((e) => e.id == item.id);
-    if (idx >= 0) { revisionItems[idx] = item; } else { revisionItems.add(item); }
+    if (idx >= 0) {
+      revisionItems[idx] = item;
+    } else {
+      revisionItems.add(item);
+    }
     notifyListeners();
     unawaited(_triggerBackup());
   }
@@ -1696,7 +1856,8 @@ class AppProvider extends ChangeNotifier {
     );
     final updated = item.copyWith(
       currentRevisionIndex: newIndex,
-      nextRevisionAt: nextDate ?? now.add(const Duration(days: 1)).toIso8601String(),
+      nextRevisionAt:
+          nextDate ?? now.add(const Duration(days: 1)).toIso8601String(),
       lastStudiedAt: now.toIso8601String(),
     );
     await upsertRevisionItem(updated);
@@ -1759,7 +1920,8 @@ class AppProvider extends ChangeNotifier {
             (v) => v.title.toLowerCase() == meta.topic!.toLowerCase(),
           );
           if (microIdx >= 0 && !sketchyMicroVideos[microIdx].watched) {
-            await toggleSketchyMicroWatched(sketchyMicroVideos[microIdx].id!, true);
+            await toggleSketchyMicroWatched(
+                sketchyMicroVideos[microIdx].id!, true);
             break;
           }
           // Try Sketchy Pharm
@@ -1767,7 +1929,8 @@ class AppProvider extends ChangeNotifier {
             (v) => v.title.toLowerCase() == meta.topic!.toLowerCase(),
           );
           if (pharmIdx >= 0 && !sketchyPharmVideos[pharmIdx].watched) {
-            await toggleSketchyPharmWatched(sketchyPharmVideos[pharmIdx].id!, true);
+            await toggleSketchyPharmWatched(
+                sketchyPharmVideos[pharmIdx].id!, true);
             break;
           }
           // Try Pathoma
@@ -1775,7 +1938,8 @@ class AppProvider extends ChangeNotifier {
             (v) => v.title.toLowerCase() == meta.topic!.toLowerCase(),
           );
           if (pathomaIdx >= 0 && !pathomaChapters[pathomaIdx].watched) {
-            await togglePathomaChapterWatched(pathomaChapters[pathomaIdx].id!, true);
+            await togglePathomaChapterWatched(
+                pathomaChapters[pathomaIdx].id!, true);
             break;
           }
         }
@@ -1810,7 +1974,11 @@ class AppProvider extends ChangeNotifier {
   Future<void> upsertFAPage(FAPage page) async {
     await _db.upsertFAPage(page.toJson());
     final idx = faPages.indexWhere((p) => p.pageNum == page.pageNum);
-    if (idx >= 0) { faPages[idx] = page; } else { faPages.add(page); }
+    if (idx >= 0) {
+      faPages[idx] = page;
+    } else {
+      faPages.add(page);
+    }
     notifyListeners();
   }
 
@@ -1825,9 +1993,8 @@ class AppProvider extends ChangeNotifier {
       firstReadAt: (status == 'read' || status == 'anki_done')
           ? (page.firstReadAt ?? now)
           : page.firstReadAt,
-      ankiDoneAt: status == 'anki_done'
-          ? (page.ankiDoneAt ?? now)
-          : page.ankiDoneAt,
+      ankiDoneAt:
+          status == 'anki_done' ? (page.ankiDoneAt ?? now) : page.ankiDoneAt,
     );
     await upsertFAPage(updated);
 
@@ -1849,7 +2016,8 @@ class AppProvider extends ChangeNotifier {
           pageNumber: pageNum.toString(),
           title: updated.title,
           parentTitle: updated.subject,
-          nextRevisionAt: nextDate ?? DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
+          nextRevisionAt: nextDate ??
+              DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
           currentRevisionIndex: 0,
           lastStudiedAt: now,
           totalSteps: SrsService.totalSteps(mode),
@@ -1883,9 +2051,8 @@ class AppProvider extends ChangeNotifier {
           firstReadAt: (status == 'read' || status == 'anki_done')
               ? (p.firstReadAt ?? now)
               : p.firstReadAt,
-          ankiDoneAt: status == 'anki_done'
-              ? (p.ankiDoneAt ?? now)
-              : p.ankiDoneAt,
+          ankiDoneAt:
+              status == 'anki_done' ? (p.ankiDoneAt ?? now) : p.ankiDoneAt,
         );
         // DB write — no notifyListeners here
         await _db.upsertFAPage(updated.toJson());
@@ -1994,7 +2161,7 @@ class AppProvider extends ChangeNotifier {
     final idx = faPages.indexWhere((p) => p.pageNum == pageNum);
     if (idx < 0) return;
     final page = faPages[idx];
-    
+
     String nextStatus;
     if (page.status == 'unread') {
       nextStatus = 'read';
@@ -2007,14 +2174,20 @@ class AppProvider extends ChangeNotifier {
     final now = DateTime.now().toIso8601String();
     final updated = page.copyWith(
       status: nextStatus,
-      revisionCount: (page.status == 'anki_done') ? page.revisionCount + 1 : page.revisionCount,
+      revisionCount: (page.status == 'anki_done')
+          ? page.revisionCount + 1
+          : page.revisionCount,
       lastReviewed: now,
-      firstReadAt: (nextStatus == 'read' && page.status == 'unread') ? now : page.firstReadAt,
-      ankiDoneAt: (nextStatus == 'anki_done' && page.status != 'anki_done') ? now : page.ankiDoneAt,
+      firstReadAt: (nextStatus == 'read' && page.status == 'unread')
+          ? now
+          : page.firstReadAt,
+      ankiDoneAt: (nextStatus == 'anki_done' && page.status != 'anki_done')
+          ? now
+          : page.ankiDoneAt,
     );
-    
+
     await upsertFAPage(updated);
-    
+
     if (nextStatus == 'read' || nextStatus == 'anki_done') {
       final revId = 'fa-page-$pageNum';
       final mode = revisionSettings?.mode ?? 'strict';
@@ -2023,7 +2196,7 @@ class AppProvider extends ChangeNotifier {
         revisionIndex: updated.revisionCount,
         mode: mode,
       );
-      
+
       final existingRevIdx = revisionItems.indexWhere((r) => r.id == revId);
       if (existingRevIdx >= 0) {
         final existing = revisionItems[existingRevIdx];
@@ -2042,7 +2215,8 @@ class AppProvider extends ChangeNotifier {
           pageNumber: pageNum.toString(),
           title: updated.title,
           parentTitle: updated.subject,
-          nextRevisionAt: nextDate ?? DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
+          nextRevisionAt: nextDate ??
+              DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
           currentRevisionIndex: updated.revisionCount,
           lastStudiedAt: now,
           totalSteps: SrsService.totalSteps(mode),
@@ -2058,10 +2232,10 @@ class AppProvider extends ChangeNotifier {
     final idx = faPages.indexWhere((p) => p.pageNum == pageNum);
     if (idx < 0) return;
     final page = faPages[idx];
-    
+
     String nextStatus = page.status;
     int nextRevCount = page.revisionCount;
-    
+
     if (page.revisionCount > 0) {
       nextRevCount--;
     } else if (page.status == 'anki_done') {
@@ -2074,9 +2248,9 @@ class AppProvider extends ChangeNotifier {
       status: nextStatus,
       revisionCount: nextRevCount,
     );
-    
+
     await upsertFAPage(updated);
-    
+
     if (nextStatus == 'unread') {
       final revId = 'fa-page-$pageNum';
       if (revisionItems.any((r) => r.id == revId)) {
@@ -2090,7 +2264,7 @@ class AppProvider extends ChangeNotifier {
     final idx = faPages.indexWhere((p) => p.pageNum == pageNum);
     if (idx < 0) return;
     final page = faPages[idx];
-    
+
     final updated = page.copyWith(
       status: 'unread',
       revisionCount: 0,
@@ -2098,13 +2272,14 @@ class AppProvider extends ChangeNotifier {
       ankiDoneAt: null,
       lastReviewed: null,
     );
-    
+
     // We update DB directly to nullify the fields properly since copyWith might ignore nulls depending on implementation
-    await _db.updateFAPage(updated.toJson()..addAll({
-      'first_read_at': null,
-      'anki_done_at': null,
-      'last_reviewed': null,
-    }));
+    await _db.updateFAPage(updated.toJson()
+      ..addAll({
+        'first_read_at': null,
+        'anki_done_at': null,
+        'last_reviewed': null,
+      }));
     faPages[idx] = updated;
 
     final subtopicIdsToDelete = <String>[];
@@ -2120,7 +2295,7 @@ class AppProvider extends ChangeNotifier {
       );
       subtopicIdsToDelete.add('fa-sub-${sub.pageNum}-${sub.id}');
     }
-    
+
     final revId = 'fa-page-$pageNum';
     if (revisionItems.any((r) => r.id == revId)) {
       await deleteRevisionItem(revId);
@@ -2241,7 +2416,7 @@ class AppProvider extends ChangeNotifier {
     final idx = faSubtopics.indexWhere((s) => s.id == subtopicId);
     if (idx < 0) return;
     final sub = faSubtopics[idx];
-    
+
     if (sub.status == 'unread') {
       await markSubtopicRead(subtopicId);
     } else if (sub.status == 'read') {
@@ -2253,10 +2428,11 @@ class AppProvider extends ChangeNotifier {
     final idx = faSubtopics.indexWhere((s) => s.id == subtopicId);
     if (idx < 0) return;
     final sub = faSubtopics[idx];
-    
+
     if (sub.status == 'anki_done') {
       final updated = sub.copyWith(status: 'read');
-      await _db.updateFASubtopicStatus(subtopicId, status: 'read', firstReadAt: sub.firstReadAt);
+      await _db.updateFASubtopicStatus(subtopicId,
+          status: 'read', firstReadAt: sub.firstReadAt);
       faSubtopics[idx] = updated;
       notifyListeners();
     } else if (sub.status == 'read') {
@@ -2296,7 +2472,8 @@ class AppProvider extends ChangeNotifier {
       pageNumber: sub.pageNum.toString(),
       title: sub.name,
       parentTitle: '${page.subject} p.${sub.pageNum}',
-      nextRevisionAt: nextDate ?? DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
+      nextRevisionAt: nextDate ??
+          DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
       currentRevisionIndex: 0,
       lastStudiedAt: now,
       totalSteps: SrsService.totalSteps(mode),
@@ -2308,7 +2485,8 @@ class AppProvider extends ChangeNotifier {
   Future<void> _checkPageCompletion(int pageNum) async {
     final subs = getSubtopicsForPage(pageNum);
     if (subs.isEmpty) return;
-    final allRead = subs.every((s) => s.status == 'read' || s.status == 'anki_done');
+    final allRead =
+        subs.every((s) => s.status == 'read' || s.status == 'anki_done');
     if (allRead) {
       final pageIdx = faPages.indexWhere((p) => p.pageNum == pageNum);
       if (pageIdx >= 0 && faPages[pageIdx].status == 'unread') {
@@ -2324,8 +2502,7 @@ class AppProvider extends ChangeNotifier {
         // Cancel all subtopic-level revisions for this page
         final subRevIds = revisionItems
             .where((r) =>
-                r.type == 'SUBTOPIC' &&
-                r.pageNumber == pageNum.toString())
+                r.type == 'SUBTOPIC' && r.pageNumber == pageNum.toString())
             .map((r) => r.id)
             .toList();
         for (final rid in subRevIds) {
@@ -2348,7 +2525,8 @@ class AppProvider extends ChangeNotifier {
           pageNumber: pageNum.toString(),
           title: updated.title,
           parentTitle: updated.subject,
-          nextRevisionAt: nextDate ?? DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
+          nextRevisionAt: nextDate ??
+              DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
           currentRevisionIndex: 0,
           lastStudiedAt: nowStr,
           totalSteps: SrsService.totalSteps(mode),
@@ -2375,7 +2553,11 @@ class AppProvider extends ChangeNotifier {
   Future<void> upsertSketchyItem(SketchyItem item) async {
     await _db.upsertSketchyItem(item.toJson());
     final idx = sketchyItems.indexWhere((i) => i.id == item.id);
-    if (idx >= 0) { sketchyItems[idx] = item; } else { sketchyItems.add(item); }
+    if (idx >= 0) {
+      sketchyItems[idx] = item;
+    } else {
+      sketchyItems.add(item);
+    }
     notifyListeners();
     unawaited(_triggerBackup());
   }
@@ -2393,7 +2575,11 @@ class AppProvider extends ChangeNotifier {
   Future<void> upsertPathomaItem(PathomaItem item) async {
     await _db.upsertPathomaItem(item.toJson());
     final idx = pathomaItems.indexWhere((i) => i.id == item.id);
-    if (idx >= 0) { pathomaItems[idx] = item; } else { pathomaItems.add(item); }
+    if (idx >= 0) {
+      pathomaItems[idx] = item;
+    } else {
+      pathomaItems.add(item);
+    }
     notifyListeners();
     unawaited(_triggerBackup());
   }
@@ -2412,7 +2598,8 @@ class AppProvider extends ChangeNotifier {
     await _db.toggleSketchyMicro(id, watched);
     final idx = sketchyMicroVideos.indexWhere((v) => v.id == id);
     if (idx >= 0) {
-      sketchyMicroVideos[idx] = sketchyMicroVideos[idx].copyWith(watched: watched);
+      sketchyMicroVideos[idx] =
+          sketchyMicroVideos[idx].copyWith(watched: watched);
       // Create revision item when watched
       if (watched) {
         final video = sketchyMicroVideos[idx];
@@ -2422,14 +2609,21 @@ class AppProvider extends ChangeNotifier {
           final mode = revisionSettings?.mode ?? 'strict';
           final now = DateTime.now().toIso8601String();
           final nextDate = SrsService.calculateNextRevisionDateString(
-            lastStudiedAt: now, revisionIndex: 0, mode: mode,
+            lastStudiedAt: now,
+            revisionIndex: 0,
+            mode: mode,
           );
           final revItem = RevisionItem(
-            id: revId, type: 'VIDEO', source: 'SKETCHY_MICRO',
-            pageNumber: '', title: video.title,
+            id: revId,
+            type: 'VIDEO',
+            source: 'SKETCHY_MICRO',
+            pageNumber: '',
+            title: video.title,
             parentTitle: '${video.category} › ${video.subcategory}',
-            nextRevisionAt: nextDate ?? DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
-            currentRevisionIndex: 0, lastStudiedAt: now,
+            nextRevisionAt: nextDate ??
+                DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
+            currentRevisionIndex: 0,
+            lastStudiedAt: now,
             totalSteps: SrsService.totalSteps(mode),
           );
           await upsertRevisionItem(revItem);
@@ -2448,6 +2642,7 @@ class AppProvider extends ChangeNotifier {
       await deleteRevisionItem(revId);
     }
   }
+
   Future<void> resetSketchyMicro(int id) async {
     final idx = sketchyMicroVideos.indexWhere((v) => v.id == id);
     final video = idx >= 0 ? sketchyMicroVideos[idx] : null;
@@ -2472,7 +2667,8 @@ class AppProvider extends ChangeNotifier {
     await _db.toggleSketchyPharm(id, watched);
     final idx = sketchyPharmVideos.indexWhere((v) => v.id == id);
     if (idx >= 0) {
-      sketchyPharmVideos[idx] = sketchyPharmVideos[idx].copyWith(watched: watched);
+      sketchyPharmVideos[idx] =
+          sketchyPharmVideos[idx].copyWith(watched: watched);
       // Create revision item when watched
       if (watched) {
         final video = sketchyPharmVideos[idx];
@@ -2482,14 +2678,21 @@ class AppProvider extends ChangeNotifier {
           final mode = revisionSettings?.mode ?? 'strict';
           final now = DateTime.now().toIso8601String();
           final nextDate = SrsService.calculateNextRevisionDateString(
-            lastStudiedAt: now, revisionIndex: 0, mode: mode,
+            lastStudiedAt: now,
+            revisionIndex: 0,
+            mode: mode,
           );
           final revItem = RevisionItem(
-            id: revId, type: 'VIDEO', source: 'SKETCHY_PHARM',
-            pageNumber: '', title: video.title,
+            id: revId,
+            type: 'VIDEO',
+            source: 'SKETCHY_PHARM',
+            pageNumber: '',
+            title: video.title,
             parentTitle: '${video.category} › ${video.subcategory}',
-            nextRevisionAt: nextDate ?? DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
-            currentRevisionIndex: 0, lastStudiedAt: now,
+            nextRevisionAt: nextDate ??
+                DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
+            currentRevisionIndex: 0,
+            lastStudiedAt: now,
             totalSteps: SrsService.totalSteps(mode),
           );
           await upsertRevisionItem(revItem);
@@ -2507,6 +2710,7 @@ class AppProvider extends ChangeNotifier {
       await deleteRevisionItem(revId);
     }
   }
+
   Future<void> resetSketchyPharm(int id) async {
     final idx = sketchyPharmVideos.indexWhere((v) => v.id == id);
     final video = idx >= 0 ? sketchyPharmVideos[idx] : null;
@@ -2589,14 +2793,21 @@ class AppProvider extends ChangeNotifier {
           final mode = revisionSettings?.mode ?? 'strict';
           final now = DateTime.now().toIso8601String();
           final nextDate = SrsService.calculateNextRevisionDateString(
-            lastStudiedAt: now, revisionIndex: 0, mode: mode,
+            lastStudiedAt: now,
+            revisionIndex: 0,
+            mode: mode,
           );
           final revItem = RevisionItem(
-            id: revId, type: 'CHAPTER', source: 'PATHOMA',
-            pageNumber: 'Ch ${ch.chapter}', title: ch.title,
+            id: revId,
+            type: 'CHAPTER',
+            source: 'PATHOMA',
+            pageNumber: 'Ch ${ch.chapter}',
+            title: ch.title,
             parentTitle: 'Pathoma Ch ${ch.chapter}',
-            nextRevisionAt: nextDate ?? DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
-            currentRevisionIndex: 0, lastStudiedAt: now,
+            nextRevisionAt: nextDate ??
+                DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
+            currentRevisionIndex: 0,
+            lastStudiedAt: now,
             totalSteps: SrsService.totalSteps(mode),
           );
           await upsertRevisionItem(revItem);
@@ -2614,6 +2825,7 @@ class AppProvider extends ChangeNotifier {
       await deleteRevisionItem(revId);
     }
   }
+
   Future<void> resetPathomaChapter(int id) async {
     final idx = pathomaChapters.indexWhere((c) => c.id == id);
     final chapter = idx >= 0 ? pathomaChapters[idx] : null;
@@ -2652,7 +2864,9 @@ class AppProvider extends ChangeNotifier {
         return;
       }
       final nextDate = SrsService.calculateNextRevisionDateString(
-        lastStudiedAt: now, revisionIndex: newIndex, mode: mode,
+        lastStudiedAt: now,
+        revisionIndex: newIndex,
+        mode: mode,
       );
       final updated = rev.copyWith(
         currentRevisionIndex: newIndex,
@@ -2681,7 +2895,9 @@ class AppProvider extends ChangeNotifier {
       final mode = revisionSettings?.mode ?? 'strict';
       final newIndex = rev.currentRevisionIndex + 1;
       final nextDate = SrsService.calculateNextRevisionDateString(
-        lastStudiedAt: now, revisionIndex: newIndex, mode: mode,
+        lastStudiedAt: now,
+        revisionIndex: newIndex,
+        mode: mode,
       );
       final updated = rev.copyWith(
         currentRevisionIndex: newIndex,
@@ -2710,7 +2926,9 @@ class AppProvider extends ChangeNotifier {
       final mode = revisionSettings?.mode ?? 'strict';
       final newIndex = rev.currentRevisionIndex + 1;
       final nextDate = SrsService.calculateNextRevisionDateString(
-        lastStudiedAt: now, revisionIndex: newIndex, mode: mode,
+        lastStudiedAt: now,
+        revisionIndex: newIndex,
+        mode: mode,
       );
       final updated = rev.copyWith(
         currentRevisionIndex: newIndex,
@@ -2740,14 +2958,21 @@ class AppProvider extends ChangeNotifier {
         final mode = revisionSettings?.mode ?? 'strict';
         final now = DateTime.now().toIso8601String();
         final nextDate = SrsService.calculateNextRevisionDateString(
-          lastStudiedAt: now, revisionIndex: 0, mode: mode,
+          lastStudiedAt: now,
+          revisionIndex: 0,
+          mode: mode,
         );
         final revItem = RevisionItem(
-          id: revId, type: 'UWORLD_Q', source: 'UWORLD',
-          pageNumber: '', title: '$wrong wrong Q${wrong > 1 ? 's' : ''} — ${session.subject}',
+          id: revId,
+          type: 'UWORLD_Q',
+          source: 'UWORLD',
+          pageNumber: '',
+          title: '$wrong wrong Q${wrong > 1 ? 's' : ''} — ${session.subject}',
           parentTitle: 'UWorld ${session.date}',
-          nextRevisionAt: nextDate ?? DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
-          currentRevisionIndex: 0, lastStudiedAt: now,
+          nextRevisionAt: nextDate ??
+              DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
+          currentRevisionIndex: 0,
+          lastStudiedAt: now,
           totalSteps: SrsService.totalSteps(mode),
         );
         await upsertRevisionItem(revItem);
@@ -2810,7 +3035,10 @@ class AppProvider extends ChangeNotifier {
   void markAllNotificationsRead() {
     bool changed = false;
     for (final n in notifications) {
-      if (!n.isRead) { n.isRead = true; changed = true; }
+      if (!n.isRead) {
+        n.isRead = true;
+        changed = true;
+      }
     }
     if (changed) notifyListeners();
   }
@@ -2876,9 +3104,9 @@ class AppProvider extends ChangeNotifier {
     if (plan?.blocks != null) {
       for (final block in plan!.blocks!) {
         result.add(DateActivity(
-          type:            'block',
-          title:           block.title,
-          subtitle:        '${block.plannedStartTime} – ${block.plannedEndTime}',
+          type: 'block',
+          title: block.title,
+          subtitle: '${block.plannedStartTime} – ${block.plannedEndTime}',
           durationMinutes: block.plannedDurationMinutes,
         ));
       }
@@ -2888,9 +3116,9 @@ class AppProvider extends ChangeNotifier {
     for (final log in timeLogs) {
       if (log.date == dateStr) {
         result.add(DateActivity(
-          type:            'timeLog',
-          title:           log.activity,
-          subtitle:        log.category.value,
+          type: 'timeLog',
+          title: log.activity,
+          subtitle: log.category.value,
           durationMinutes: log.durationMinutes,
         ));
       }
@@ -2900,8 +3128,8 @@ class AppProvider extends ChangeNotifier {
     for (final item in studyPlan) {
       if (item.date == dateStr) {
         result.add(DateActivity(
-          type:     'studyPlan',
-          title:    item.topic,
+          type: 'studyPlan',
+          title: item.topic,
           subtitle: item.type,
         ));
       }
@@ -3105,7 +3333,8 @@ class AppProvider extends ChangeNotifier {
 
   /// Count pages read today (effective date).
   int getTodayPagesRead(int dayStartHour) {
-    final todayKey = du.AppDateUtils.effectiveDateKey(DateTime.now(), dayStartHour);
+    final todayKey =
+        du.AppDateUtils.effectiveDateKey(DateTime.now(), dayStartHour);
     return getPagesReadOnDate(todayKey, dayStartHour);
   }
 
@@ -3117,7 +3346,8 @@ class AppProvider extends ChangeNotifier {
     if (streakData.lastStreakDate == todayKey) return null; // already validated
     final todayDate = du.AppDateUtils.effectiveDate(now, dayStartHour);
     // Deadline: day start + 30 hours
-    return DateTime(todayDate.year, todayDate.month, todayDate.day, dayStartHour)
+    return DateTime(
+            todayDate.year, todayDate.month, todayDate.day, dayStartHour)
         .add(const Duration(hours: 30));
   }
 
@@ -3152,8 +3382,9 @@ class AppProvider extends ChangeNotifier {
     if (deadline != null && now.isBefore(deadline)) {
       // Still within window
       final todayDate = du.AppDateUtils.effectiveDate(now, dayStartHour);
-      final dayEnd = DateTime(todayDate.year, todayDate.month, todayDate.day, dayStartHour)
-          .add(const Duration(hours: 24));
+      final dayEnd =
+          DateTime(todayDate.year, todayDate.month, todayDate.day, dayStartHour)
+              .add(const Duration(hours: 24));
       if (now.isBefore(dayEnd)) {
         return 'at_risk'; // Within 24h
       }
@@ -3167,7 +3398,8 @@ class AppProvider extends ChangeNotifier {
   /// Redeem credits to save the streak for a missed day.
   /// Returns true if successful, false if insufficient credits.
   Future<bool> redeemCreditsForStreak(int dayStartHour, int dailyGoal) async {
-    final todayKey = du.AppDateUtils.effectiveDateKey(DateTime.now(), dayStartHour);
+    final todayKey =
+        du.AppDateUtils.effectiveDateKey(DateTime.now(), dayStartHour);
     final todayRead = getTodayPagesRead(dayStartHour);
     final missedPages = dailyGoal - todayRead;
     if (missedPages <= 0) return true; // Target already met
@@ -3231,12 +3463,14 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> updateSketchyMetadata(SketchyItem updatedItem) async {
-    final microIndex = sketchyMicroVideos.indexWhere((v) => v.id?.toString() == updatedItem.id);
+    final microIndex = sketchyMicroVideos
+        .indexWhere((v) => v.id?.toString() == updatedItem.id);
     if (microIndex != -1) {
       sketchyMicroVideos[microIndex] = updatedItem as SketchyVideo;
       await _db.updateSketchyMicroVideo(updatedItem.toJson());
     } else {
-      final pharmIndex = sketchyPharmVideos.indexWhere((v) => v.id?.toString() == updatedItem.id);
+      final pharmIndex = sketchyPharmVideos
+          .indexWhere((v) => v.id?.toString() == updatedItem.id);
       if (pharmIndex != -1) {
         sketchyPharmVideos[pharmIndex] = updatedItem as SketchyVideo;
         await _db.updateSketchyPharmVideo(updatedItem.toJson());
@@ -3246,7 +3480,8 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> updatePathomaMetadata(PathomaItem updatedItem) async {
-    final i = pathomaChapters.indexWhere((c) => c.id?.toString() == updatedItem.id);
+    final i =
+        pathomaChapters.indexWhere((c) => c.id?.toString() == updatedItem.id);
     if (i == -1) return;
     pathomaChapters[i] = updatedItem as PathomaChapter;
     await _db.updatePathomaChapter(updatedItem.toJson());

@@ -136,6 +136,104 @@ class StudyTask {
             plannedDurationMinutes ?? this.plannedDurationMinutes,
       );
 
+  static List<StudyTask> explodeForExecution({
+    required Iterable<StudyTask> tasks,
+    required List<UWorldTopic> uworldTopics,
+    required List<SketchyVideo> sketchyMicroVideos,
+    required List<SketchyVideo> sketchyPharmVideos,
+    required List<PathomaChapter> pathomaChapters,
+  }) {
+    final uworldById = <int, UWorldTopic>{
+      for (final topic in uworldTopics)
+        if (topic.id != null) topic.id!: topic,
+    };
+    final sketchyMicroById = <int, SketchyVideo>{
+      for (final video in sketchyMicroVideos)
+        if (video.id != null) video.id!: video,
+    };
+    final sketchyPharmById = <int, SketchyVideo>{
+      for (final video in sketchyPharmVideos)
+        if (video.id != null) video.id!: video,
+    };
+    final pathomaById = <int, PathomaChapter>{
+      for (final chapter in pathomaChapters)
+        if (chapter.id != null) chapter.id!: chapter,
+    };
+
+    return tasks.expand((task) {
+      switch (task.type) {
+        case 'FA':
+          if (task.pageNumbers.isEmpty) {
+            return <StudyTask>[task];
+          }
+          return task.pageNumbers.map(
+            (page) => task.copyWith(
+              id: '${task.id}#fa:$page',
+              detail: 'Page $page',
+              pageNumbers: <int>[page],
+              topicIds: const <int>[],
+              questionCount: 0,
+              plannedDurationMinutes: _atomicPlannedDurationMinutes(task),
+            ),
+          );
+        case 'UWORLD':
+          if (task.topicIds.isEmpty) {
+            return <StudyTask>[task];
+          }
+          return task.topicIds.map((topicId) {
+            final topic = uworldById[topicId];
+            final remainingQuestions = topic == null
+                ? 0
+                : (topic.totalQuestions - topic.doneQuestions)
+                    .clamp(0, topic.totalQuestions);
+            return task.copyWith(
+              id: '${task.id}#uw:$topicId',
+              detail: topic == null
+                  ? task.detail
+                  : '${topic.subtopic} - ${topic.system}',
+              pageNumbers: const <int>[],
+              topicIds: <int>[topicId],
+              questionCount: remainingQuestions > 0
+                  ? remainingQuestions
+                  : (task.questionCount > 0 ? task.questionCount : 1),
+              plannedDurationMinutes: _atomicPlannedDurationMinutes(task),
+            );
+          });
+        case 'SKETCHY_MICRO':
+          return _explodeSketchyTask(
+            task,
+            sketchyMicroById,
+            runtimeTypeKey: 'sketchy-micro',
+          );
+        case 'SKETCHY_PHARM':
+          return _explodeSketchyTask(
+            task,
+            sketchyPharmById,
+            runtimeTypeKey: 'sketchy-pharm',
+          );
+        case 'PATHOMA':
+          if (task.topicIds.isEmpty) {
+            return <StudyTask>[task];
+          }
+          return task.topicIds.map((chapterId) {
+            final chapter = pathomaById[chapterId];
+            return task.copyWith(
+              id: '${task.id}#pathoma:$chapterId',
+              detail: chapter == null
+                  ? task.detail
+                  : 'Chapter ${chapter.chapter} - ${chapter.title}',
+              pageNumbers: const <int>[],
+              topicIds: <int>[chapterId],
+              questionCount: 0,
+              plannedDurationMinutes: _atomicPlannedDurationMinutes(task),
+            );
+          });
+        default:
+          return <StudyTask>[task];
+      }
+    }).toList();
+  }
+
   static List<StudyTask> plannableOnly(Iterable<StudyTask> tasks) {
     return List<StudyTask>.from(tasks);
   }
@@ -192,6 +290,37 @@ class StudyTask {
     ];
     return parts.join('|');
   }
+
+  static Iterable<StudyTask> _explodeSketchyTask(
+    StudyTask task,
+    Map<int, SketchyVideo> videosById, {
+    required String runtimeTypeKey,
+  }) {
+    if (task.topicIds.isEmpty) {
+      return <StudyTask>[task];
+    }
+    return task.topicIds.map((videoId) {
+      final video = videosById[videoId];
+      return task.copyWith(
+        id: '${task.id}#$runtimeTypeKey:$videoId',
+        detail: video == null ? task.detail : video.title,
+        pageNumbers: const <int>[],
+        topicIds: <int>[videoId],
+        questionCount: 0,
+        plannedDurationMinutes: _atomicPlannedDurationMinutes(task),
+      );
+    });
+  }
+
+  static int? _atomicPlannedDurationMinutes(StudyTask task) {
+    final plannedDurationMinutes = task.plannedDurationMinutes;
+    if (plannedDurationMinutes == null) {
+      return null;
+    }
+
+    final itemCount = task.itemCount > 0 ? task.itemCount : 1;
+    return (plannedDurationMinutes / itemCount).ceil().clamp(5, 120);
+  }
 }
 
 class StudyFlowScreen extends StatefulWidget {
@@ -228,7 +357,6 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
 
   late final List<StudyTask> _queue;
   int _currentTaskIndex = 0;
-  int _currentTaskPageIndex = 0;
 
   static const _motivations = [
     'Come on, you got this!',
@@ -256,12 +384,22 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
   bool get _isQueueUWorldTask => _currentTask?.type == 'UWORLD';
   bool get _isQueueStructuredTask => _isQueueFaTask || _isQueueUWorldTask;
 
+  void _setStateIfMounted(VoidCallback fn) {
+    if (!mounted) return;
+    setState(fn);
+  }
+
   @override
   void initState() {
     super.initState();
-    _queue = List<StudyTask>.from(widget.queuedTasks ?? const []);
-
     final app = context.read<AppProvider>();
+    _queue = StudyTask.explodeForExecution(
+      tasks: widget.queuedTasks ?? const <StudyTask>[],
+      uworldTopics: app.uworldTopics,
+      sketchyMicroVideos: app.sketchyMicroVideos,
+      sketchyPharmVideos: app.sketchyPharmVideos,
+      pathomaChapters: app.pathomaChapters,
+    );
     final settingsProvider = context.read<SettingsProvider>();
 
     settingsProvider.ensureStudyPlanStartDate();
@@ -289,11 +427,8 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       return;
     }
 
-    if (task.type == 'FA') {
-      _currentTaskPageIndex = 0;
-      if (task.pageNumbers.isNotEmpty) {
-        _currentPage = task.pageNumbers.first;
-      }
+    if (task.type == 'FA' && task.pageNumbers.isNotEmpty) {
+      _currentPage = task.pageNumbers.first;
     }
 
     _pageElapsed = 0;
@@ -306,7 +441,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
   }
 
   void _startStudying() {
-    setState(() {
+    _setStateIfMounted(() {
       _isStudying = true;
       _pageElapsed = 0;
     });
@@ -329,7 +464,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       if (!mounted || !_isStudying || _timersPaused) {
         return;
       }
-      setState(() {
+      _setStateIfMounted(() {
         _totalElapsed++;
         _pageElapsed++;
       });
@@ -364,7 +499,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
 
     if (!isRevisionTask) {
       if (_timersPaused || _isRevisionPage || _isResolvingQueuedRevision) {
-        setState(() {
+        _setStateIfMounted(() {
           _timersPaused = false;
           _isRevisionPage = false;
           _isResolvingQueuedRevision = false;
@@ -373,7 +508,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       return;
     }
 
-    setState(() {
+    _setStateIfMounted(() {
       _timersPaused = true;
       _isRevisionPage = true;
       _isResolvingQueuedRevision = true;
@@ -389,7 +524,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
     }
 
     if (reviseNow) {
-      setState(() {
+      _setStateIfMounted(() {
         _timersPaused = false;
         _isRevisionPage = true;
         _isResolvingQueuedRevision = false;
@@ -397,18 +532,21 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       return;
     }
 
-    setState(() {
+    _setStateIfMounted(() {
       _isRevisionPage = false;
       _isResolvingQueuedRevision = false;
     });
-    await _moveToNextPage(triggerRevisionGate: false);
+    await _advanceQueue(
+      triggerRevisionGate: false,
+      completeCurrentTask: false,
+    );
 
     if (!mounted || !_isStudying) {
       return;
     }
 
     if (!_isQueueFaTask) {
-      setState(() {
+      _setStateIfMounted(() {
         _timersPaused = false;
       });
       return;
@@ -598,7 +736,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
     if (!_hasQueuedTasks) {
       _ankiPendingPages.add(_currentPage);
       if (_ankiPendingPages.length >= 4) {
-        setState(() {
+        _setStateIfMounted(() {
           _showAnkiPrompt = true;
         });
         return;
@@ -610,20 +748,6 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
 
   Future<void> _moveToNextPage({bool triggerRevisionGate = true}) async {
     if (_hasQueuedTasks && _isQueueFaTask) {
-      final pages = _currentTask?.pageNumbers ?? const <int>[];
-      final nextIndex = _currentTaskPageIndex + 1;
-      if (nextIndex < pages.length) {
-        setState(() {
-          _currentTaskPageIndex = nextIndex;
-          _currentPage = pages[nextIndex];
-          _pageElapsed = 0;
-          _isRevisionPage = false;
-        });
-        if (triggerRevisionGate) {
-          _triggerQueuedFaRevisionGateIfNeeded();
-        }
-        return;
-      }
       await _advanceQueue(triggerRevisionGate: triggerRevisionGate);
       return;
     }
@@ -637,24 +761,33 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       }
       next++;
     }
-    setState(() {
+    _setStateIfMounted(() {
       _currentPage = next;
       _pageElapsed = 0;
       _isRevisionPage = false;
     });
   }
 
-  Future<void> _advanceQueue({bool triggerRevisionGate = true}) async {
-    await _completeCurrentQueuedTask();
+  Future<void> _advanceQueue({
+    bool triggerRevisionGate = true,
+    bool completeCurrentTask = true,
+  }) async {
+    if (completeCurrentTask) {
+      await _completeCurrentQueuedTask();
+    } else {
+      final currentTask = _currentTask;
+      if (currentTask != null) {
+        _taskStartedAt.remove(currentTask.id);
+      }
+    }
     final nextTaskIndex = _currentTaskIndex + 1;
     if (nextTaskIndex >= _queue.length) {
       _endSession();
       return;
     }
 
-    setState(() {
+    _setStateIfMounted(() {
       _currentTaskIndex = nextTaskIndex;
-      _currentTaskPageIndex = 0;
       _prepareQueuedTask();
     });
     if (triggerRevisionGate) {
@@ -682,7 +815,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       return;
     }
 
-    setState(() {
+    _setStateIfMounted(() {
       _pageElapsed = 0;
     });
     await _advanceQueue();
@@ -719,7 +852,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       return;
     }
 
-    setState(() {
+    _setStateIfMounted(() {
       _pageElapsed = 0;
     });
     await _advanceQueue();
@@ -730,7 +863,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
     for (final page in _ankiPendingPages) {
       app.updateFAPageStatus(page, 'anki_done');
     }
-    setState(() {
+    _setStateIfMounted(() {
       _showAnkiPrompt = false;
       _ankiPendingPages.clear();
     });
@@ -738,7 +871,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
   }
 
   void _skipAnki() {
-    setState(() {
+    _setStateIfMounted(() {
       _showAnkiPrompt = false;
       _ankiPendingPages.clear();
     });
@@ -748,14 +881,15 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
   void _endSession() {
     _timer?.cancel();
     _timer = null;
-    setState(() {
-      _isStudying = false;
-      _timersPaused = false;
-      _isRevisionPage = false;
-      _isResolvingQueuedRevision = false;
-    });
+    _isStudying = false;
+    _timersPaused = false;
+    _isRevisionPage = false;
+    _isResolvingQueuedRevision = false;
+    _setStateIfMounted(() {});
     widget.onComplete?.call();
-    Navigator.pop(context);
+    if (mounted) {
+      Navigator.pop(context);
+    }
   }
 
   Future<void> _completeCurrentQueuedTask() async {
@@ -994,8 +1128,9 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
   String _faBannerText() {
     if (_hasQueuedTasks && _isQueueFaTask) {
       final task = _currentTask!;
-      final remaining = task.pageNumbers.length - _currentTaskPageIndex;
-      return 'Task ${_currentTaskIndex + 1}/${_queue.length}: $remaining selected page${remaining == 1 ? '' : 's'} left.';
+      final pageNumber =
+          task.pageNumbers.isNotEmpty ? task.pageNumbers.first : _currentPage;
+      return 'Task ${_currentTaskIndex + 1}/${_queue.length}: page $pageNumber.';
     }
 
     final remaining = _targetPages - _pagesCompletedInSession;

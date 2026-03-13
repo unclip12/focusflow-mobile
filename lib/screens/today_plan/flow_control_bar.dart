@@ -37,7 +37,6 @@ class FlowControlBar extends StatelessWidget {
     }
 
     Future<void> startAndOpenFlow() async {
-      await app.initializeDailyFlow(dateKey);
       await app.startFlow(dateKey);
       if (!context.mounted) {
         return;
@@ -135,7 +134,7 @@ class FlowControlBar extends StatelessWidget {
 
     if (allDone) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

@@ -44,6 +44,11 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
   late String _currentQuote;
   final _rng = Random();
 
+  void _setStateIfMounted(VoidCallback fn) {
+    if (!mounted) return;
+    setState(fn);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -75,19 +80,17 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
 
   void _startTimers() {
     _tickTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!_localPaused && mounted) {
-        setState(() {
+      if (!_localPaused) {
+        _setStateIfMounted(() {
           _activityElapsed++;
           _totalElapsed++;
         });
       }
     });
     _quoteTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) {
-        setState(
-          () => _currentQuote = kFocusQuotes[_rng.nextInt(kFocusQuotes.length)],
-        );
-      }
+      _setStateIfMounted(
+        () => _currentQuote = kFocusQuotes[_rng.nextInt(kFocusQuotes.length)],
+      );
     });
   }
 
@@ -106,7 +109,7 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
             _activityElapsed = DateTime.now().difference(started).inSeconds;
           }
         }
-        if (mounted) setState(() {});
+        _setStateIfMounted(() {});
       }
     }
   }
@@ -141,7 +144,7 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
     final active = flow.activities.where((a) => a.isActive).toList();
     if (active.isNotEmpty) {
       app.completeFlowActivity(widget.dateKey, active.first.id);
-      setState(() => _activityElapsed = 0);
+      _setStateIfMounted(() => _activityElapsed = 0);
     }
   }
 
@@ -186,7 +189,7 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
                   body: 'Your pause is over — ready to continue?',
                   when: DateTime.now().add(Duration(minutes: pauseMinutes)),
                 );
-                setState(() => _localPaused = true);
+                _setStateIfMounted(() => _localPaused = true);
                 Navigator.pop(ctx);
               },
               child: Text('Pause for ${pauseMinutes}m'),
@@ -200,7 +203,7 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
   void _resumeFlow() {
     final app = context.read<AppProvider>();
     app.resumeFlow(widget.dateKey);
-    setState(() => _localPaused = false);
+    _setStateIfMounted(() => _localPaused = false);
   }
 
   void _showStopDialog() {
@@ -373,6 +376,18 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
     return '${hours}h ${mins.toString().padLeft(2, '0')}min';
   }
 
+  double _plannedStudySessionCardHeight(
+    BuildContext context,
+    BoxConstraints constraints,
+  ) {
+    const reservedHeight = 400.0;
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final extraHeight = ((textScale - 1).clamp(0, 1.5) * 72).toDouble();
+    return (constraints.maxHeight - reservedHeight - extraHeight)
+        .clamp(150.0, 360.0)
+        .toDouble();
+  }
+
   Future<void> _beginPlannedStudySession(
     AppProvider app,
     Block block,
@@ -380,9 +395,7 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
   ) async {
     if (_localPaused) {
       await app.resumeFlow(widget.dateKey);
-      if (mounted) {
-        setState(() => _localPaused = false);
-      }
+      _setStateIfMounted(() => _localPaused = false);
     }
 
     final startedAt = DateTime.now();
@@ -405,9 +418,7 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
                 autoAdvanceFlow: true,
               ),
             );
-            if (mounted) {
-              setState(() => _activityElapsed = 0);
-            }
+            _setStateIfMounted(() => _activityElapsed = 0);
           },
         ),
       ),
@@ -450,275 +461,284 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
     // Sync local pause state
     if (isFlowPaused != _localPaused) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _localPaused = isFlowPaused);
+        _setStateIfMounted(() => _localPaused = isFlowPaused);
       });
     }
 
     return Scaffold(
       backgroundColor: cs.surface,
       body: SafeArea(
-        child: Column(
-          children: [
-            // ── Top bar ────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.close_rounded,
-                        color: cs.onSurface.withValues(alpha: 0.5)),
-                    onPressed: _showExitConfirm,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final plannedStudySessionCardMaxHeight = hasPlannedStudySession
+                ? _plannedStudySessionCardHeight(context, constraints)
+                : 0.0;
+            return Column(
+              children: [
+                // ── Top bar ────────────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.close_rounded,
+                            color: cs.onSurface.withValues(alpha: 0.5)),
+                        onPressed: _showExitConfirm,
+                      ),
+                      const Spacer(),
+                      // Status badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: cs.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.circle,
+                                size: 8,
+                                color: _localPaused
+                                    ? Colors.orange
+                                    : const Color(0xFF10B981)),
+                            const SizedBox(width: 6),
+                            Text(
+                              _localPaused ? 'Paused' : 'In Flow',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      // Add task button
+                      IconButton(
+                        icon: Icon(Icons.add_rounded, color: cs.primary),
+                        onPressed: _openAddTask,
+                      ),
+                    ],
                   ),
-                  const Spacer(),
-                  // Status badge
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: cs.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
+                ),
+
+                // ── Progress bar ───────────────────────────────────
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '$completed / $total activities',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: cs.onSurface.withValues(alpha: 0.5),
+                            ),
+                          ),
+                          Text(
+                            '${(progress * 100).toInt()}%',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: cs.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 6,
+                          backgroundColor: cs.primary.withValues(alpha: 0.1),
+                          valueColor: AlwaysStoppedAnimation(
+                            completed == total && total > 0
+                                ? const Color(0xFF10B981)
+                                : cs.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const Spacer(flex: 2),
+
+                // ── Current activity name ──────────────────────────
+                if (currentActivity != null) ...[
+                  Text(
+                    currentActivity.icon,
+                    style: const TextStyle(fontSize: 48),
+                  ),
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Text(
+                      currentActivity.label,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                  ),
+                ] else ...[
+                  Icon(Icons.check_circle_rounded,
+                      size: 64, color: const Color(0xFF10B981)),
+                  const SizedBox(height: 16),
+                  Text(
+                    'All activities done!',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF10B981),
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 24),
+
+                if (hasPlannedStudySession)
+                  _StudySessionLaunchCard(
+                    queue: plannedQueue,
+                    durationLabel: _formatDurationLabel(plannedQueueMinutes),
+                    maxHeight: plannedStudySessionCardMaxHeight,
+                    onBegin: () => _beginPlannedStudySession(
+                      app,
+                      studySessionBlock,
+                      plannedQueue,
+                    ),
+                  )
+                else ...[
+                  // ── Large timer ────────────────────────────────────
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 40, vertical: 24),
+                    decoration: BoxDecoration(
+                      color: cs.primary.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Column(
                       children: [
-                        Icon(Icons.circle,
-                            size: 8,
-                            color: _localPaused
-                                ? Colors.orange
-                                : const Color(0xFF10B981)),
-                        const SizedBox(width: 6),
                         Text(
-                          _localPaused ? 'Paused' : 'In Flow',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: cs.onSurface,
+                          _fmtTime(_activityElapsed),
+                          style: theme.textTheme.displayLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 56,
+                            color: cs.primary,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Total: ${_fmtTime(_totalElapsed)}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: cs.onSurface.withValues(alpha: 0.45),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const Spacer(),
-                  // Add task button
-                  IconButton(
-                    icon: Icon(Icons.add_rounded, color: cs.primary),
-                    onPressed: _openAddTask,
+
+                  const SizedBox(height: 12),
+
+                  // ── Started at ─────────────────────────────────────
+                  Text(
+                    'Session started at ${DateFormat('h:mm a').format(_sessionStartedAt)}',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: cs.onSurface.withValues(alpha: 0.4),
+                    ),
                   ),
                 ],
-              ),
-            ),
 
-            // ── Progress bar ───────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                const Spacer(flex: 2),
+
+                // ── Control buttons ────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Row(
                     children: [
-                      Text(
-                        '$completed / $total activities',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: cs.onSurface.withValues(alpha: 0.5),
+                      // Pause / Resume
+                      if (_localPaused)
+                        Expanded(
+                          child: _ActionButton(
+                            icon: Icons.play_arrow_rounded,
+                            label: 'Resume',
+                            color: Colors.white,
+                            backgroundColor: const Color(0xFF3B82F6),
+                            onTap: _resumeFlow,
+                          ),
+                        )
+                      else
+                        Expanded(
+                          child: _ActionButton(
+                            icon: Icons.pause_rounded,
+                            label: 'Pause',
+                            color: const Color(0xFFF59E0B),
+                            backgroundColor:
+                                const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                            onTap: _showPauseDialog,
+                          ),
                         ),
-                      ),
-                      Text(
-                        '${(progress * 100).toInt()}%',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: cs.primary,
+                      const SizedBox(width: 10),
+                      // Done / Next
+                      if (currentActivity != null && !hasPlannedStudySession)
+                        Expanded(
+                          child: _ActionButton(
+                            icon: Icons.check_rounded,
+                            label: 'Done',
+                            color: Colors.white,
+                            backgroundColor: const Color(0xFF10B981),
+                            onTap: _completeCurrent,
+                          ),
+                        ),
+                      const SizedBox(width: 10),
+                      // Stop
+                      Expanded(
+                        child: _ActionButton(
+                          icon: Icons.stop_rounded,
+                          label: 'Stop',
+                          color: Colors.white,
+                          backgroundColor: cs.error,
+                          onTap: _showStopDialog,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 6,
-                      backgroundColor: cs.primary.withValues(alpha: 0.1),
-                      valueColor: AlwaysStoppedAnimation(
-                        completed == total && total > 0
-                            ? const Color(0xFF10B981)
-                            : cs.primary,
+                ),
+
+                const Spacer(flex: 1),
+
+                // ── Motivational quote ─────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 500),
+                    child: Text(
+                      '"$_currentQuote"',
+                      key: ValueKey(_currentQuote),
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontStyle: FontStyle.italic,
+                        color: cs.onSurface.withValues(alpha: 0.35),
+                        height: 1.5,
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
-
-            const Spacer(flex: 2),
-
-            // ── Current activity name ──────────────────────────
-            if (currentActivity != null) ...[
-              Text(
-                currentActivity.icon,
-                style: const TextStyle(fontSize: 48),
-              ),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Text(
-                  currentActivity.label,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: cs.onSurface,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ] else ...[
-              Icon(Icons.check_circle_rounded,
-                  size: 64, color: const Color(0xFF10B981)),
-              const SizedBox(height: 16),
-              Text(
-                'All activities done!',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF10B981),
-                ),
-              ),
-            ],
 
-            const SizedBox(height: 24),
-
-            if (hasPlannedStudySession)
-              _StudySessionLaunchCard(
-                queue: plannedQueue,
-                durationLabel: _formatDurationLabel(plannedQueueMinutes),
-                onBegin: () => _beginPlannedStudySession(
-                  app,
-                  studySessionBlock,
-                  plannedQueue,
-                ),
-              )
-            else ...[
-              // ── Large timer ────────────────────────────────────
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-                decoration: BoxDecoration(
-                  color: cs.primary.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      _fmtTime(_activityElapsed),
-                      style: theme.textTheme.displayLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 56,
-                        color: cs.primary,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Total: ${_fmtTime(_totalElapsed)}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: cs.onSurface.withValues(alpha: 0.45),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // ── Started at ─────────────────────────────────────
-              Text(
-                'Session started at ${DateFormat('h:mm a').format(_sessionStartedAt)}',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: cs.onSurface.withValues(alpha: 0.4),
-                ),
-              ),
-            ],
-
-            const Spacer(flex: 2),
-
-            // ── Control buttons ────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                children: [
-                  // Pause / Resume
-                  if (_localPaused)
-                    Expanded(
-                      child: _ActionButton(
-                        icon: Icons.play_arrow_rounded,
-                        label: 'Resume',
-                        color: Colors.white,
-                        backgroundColor: const Color(0xFF3B82F6),
-                        onTap: _resumeFlow,
-                      ),
-                    )
-                  else
-                    Expanded(
-                      child: _ActionButton(
-                        icon: Icons.pause_rounded,
-                        label: 'Pause',
-                        color: const Color(0xFFF59E0B),
-                        backgroundColor:
-                            const Color(0xFFF59E0B).withValues(alpha: 0.12),
-                        onTap: _showPauseDialog,
-                      ),
-                    ),
-                  const SizedBox(width: 10),
-                  // Done / Next
-                  if (currentActivity != null && !hasPlannedStudySession)
-                    Expanded(
-                      child: _ActionButton(
-                        icon: Icons.check_rounded,
-                        label: 'Done',
-                        color: Colors.white,
-                        backgroundColor: const Color(0xFF10B981),
-                        onTap: _completeCurrent,
-                      ),
-                    ),
-                  const SizedBox(width: 10),
-                  // Stop
-                  Expanded(
-                    child: _ActionButton(
-                      icon: Icons.stop_rounded,
-                      label: 'Stop',
-                      color: Colors.white,
-                      backgroundColor: cs.error,
-                      onTap: _showStopDialog,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const Spacer(flex: 1),
-
-            // ── Motivational quote ─────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 500),
-                child: Text(
-                  '"$_currentQuote"',
-                  key: ValueKey(_currentQuote),
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontStyle: FontStyle.italic,
-                    color: cs.onSurface.withValues(alpha: 0.35),
-                    height: 1.5,
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-          ],
+                const SizedBox(height: 24),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -773,11 +793,13 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
 class _StudySessionLaunchCard extends StatelessWidget {
   final List<StudyTask> queue;
   final String durationLabel;
+  final double maxHeight;
   final VoidCallback onBegin;
 
   const _StudySessionLaunchCard({
     required this.queue,
     required this.durationLabel,
+    required this.maxHeight,
     required this.onBegin,
   });
 
@@ -820,129 +842,131 @@ class _StudySessionLaunchCard extends StatelessWidget {
     final cs = theme.colorScheme;
     final itemCount = StudyTask.totalItemCount(queue);
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: cs.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: cs.primary.withValues(alpha: 0.16)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: cs.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
+    return SizedBox(
+      height: maxHeight,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 24),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: cs.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: cs.primary.withValues(alpha: 0.16)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: cs.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(Icons.school_rounded, color: cs.primary),
                 ),
-                child: Icon(Icons.school_rounded, color: cs.primary),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Study Session',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: cs.onSurface,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Study Session',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: cs.onSurface,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '$itemCount item${itemCount == 1 ? '' : 's'} • $durationLabel',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: cs.onSurface.withValues(alpha: 0.6),
-                        fontWeight: FontWeight.w600,
+                      const SizedBox(height: 2),
+                      Text(
+                        '$itemCount item${itemCount == 1 ? '' : 's'} • $durationLabel',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.onSurface.withValues(alpha: 0.6),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 180),
-            child: SingleChildScrollView(
-              child: Column(
-                children: queue
-                    .map(
-                      (task) => Container(
-                        width: double.infinity,
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
+              ],
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                itemCount: queue.length,
+                itemBuilder: (context, index) {
+                  final task = queue[index];
+                  return Container(
+                    width: double.infinity,
+                    margin: EdgeInsets.only(
+                      bottom: index == queue.length - 1 ? 0 : 10,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cs.surface,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          _iconForTask(task),
+                          size: 20,
+                          color: _colorForTask(task),
                         ),
-                        decoration: BoxDecoration(
-                          color: cs.surface,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              _iconForTask(task),
-                              size: 20,
-                              color: _colorForTask(task),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    task.label,
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                      color: cs.onSurface,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    task.detail,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color:
-                                          cs.onSurface.withValues(alpha: 0.62),
-                                      height: 1.35,
-                                    ),
-                                  ),
-                                ],
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                task.label,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: cs.onSurface,
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 2),
+                              Text(
+                                task.detail,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: cs.onSurface.withValues(alpha: 0.62),
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    )
-                    .toList(),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: onBegin,
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: const Text('Begin Study Session'),
-              style: FilledButton.styleFrom(
-                backgroundColor: cs.primary,
-                foregroundColor: cs.onPrimary,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: onBegin,
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: const Text('Begin Study Session'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: cs.primary,
+                  foregroundColor: cs.onPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

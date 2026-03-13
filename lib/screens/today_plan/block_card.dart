@@ -107,35 +107,54 @@ class _BlockCardState extends State<BlockCard>
 
   Color _statusColor(BlockStatus status, ColorScheme cs) {
     switch (status) {
-      case BlockStatus.notStarted: return cs.onSurface.withValues(alpha: 0.4);
-      case BlockStatus.inProgress: return const Color(0xFF3B82F6);
-      case BlockStatus.paused:     return const Color(0xFFF59E0B);
-      case BlockStatus.done:       return const Color(0xFF10B981);
-      case BlockStatus.skipped:    return cs.onSurface.withValues(alpha: 0.25);
+      case BlockStatus.notStarted:
+        return cs.onSurface.withValues(alpha: 0.4);
+      case BlockStatus.inProgress:
+        return const Color(0xFF3B82F6);
+      case BlockStatus.paused:
+        return const Color(0xFFF59E0B);
+      case BlockStatus.done:
+        return const Color(0xFF10B981);
+      case BlockStatus.skipped:
+        return cs.onSurface.withValues(alpha: 0.25);
     }
   }
 
   String _statusLabel(BlockStatus status) {
     switch (status) {
-      case BlockStatus.notStarted: return 'Pending';
-      case BlockStatus.inProgress: return 'Active';
-      case BlockStatus.paused:     return 'Paused';
-      case BlockStatus.done:       return 'Done';
-      case BlockStatus.skipped:    return 'Skipped';
+      case BlockStatus.notStarted:
+        return 'Pending';
+      case BlockStatus.inProgress:
+        return 'Active';
+      case BlockStatus.paused:
+        return 'Paused';
+      case BlockStatus.done:
+        return 'Done';
+      case BlockStatus.skipped:
+        return 'Skipped';
     }
   }
 
   IconData _typeIcon(BlockType type) {
     switch (type) {
-      case BlockType.video:        return Icons.play_circle_rounded;
-      case BlockType.revisionFa:   return Icons.menu_book_rounded;
-      case BlockType.anki:         return Icons.style_rounded;
-      case BlockType.qbank:        return Icons.quiz_rounded;
-      case BlockType.studySession: return Icons.school_rounded;
-      case BlockType.breakBlock:   return Icons.coffee_rounded;
-      case BlockType.fmgeRevision: return Icons.medical_services_rounded;
-      case BlockType.mixed:        return Icons.dashboard_rounded;
-      case BlockType.other:        return Icons.task_alt_rounded;
+      case BlockType.video:
+        return Icons.play_circle_rounded;
+      case BlockType.revisionFa:
+        return Icons.menu_book_rounded;
+      case BlockType.anki:
+        return Icons.style_rounded;
+      case BlockType.qbank:
+        return Icons.quiz_rounded;
+      case BlockType.studySession:
+        return Icons.school_rounded;
+      case BlockType.breakBlock:
+        return Icons.coffee_rounded;
+      case BlockType.fmgeRevision:
+        return Icons.medical_services_rounded;
+      case BlockType.mixed:
+        return Icons.dashboard_rounded;
+      case BlockType.other:
+        return Icons.task_alt_rounded;
     }
   }
 
@@ -152,196 +171,198 @@ class _BlockCardState extends State<BlockCard>
     final isDone = block.status == BlockStatus.done;
     final isSkipped = block.status == BlockStatus.skipped;
 
-    return GestureDetector(
-      onTap: () => _openDetail(context),
-      onTapDown: _onTapDown,
-      onLongPress: () {
-        HapticsService.heavy();
-        _showContextMenu(context);
-      },
-      child: ScaleTransition(
-        scale: _scaleAnim,
-        child: AnimatedOpacity(
-          opacity: isSkipped ? 0.5 : 1.0,
-          duration: const Duration(milliseconds: 200),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeInOut,
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isDone
-                  ? cs.primary.withValues(alpha: 0.04)
-                  : cs.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: block.status == BlockStatus.inProgress
-                    ? statusColor.withValues(alpha: 0.5)
-                    : isDone
-                        ? statusColor.withValues(alpha: 0.2)
-                        : cs.onSurface.withValues(alpha: 0.06),
-                width: block.status == BlockStatus.inProgress ? 1.5 : 1,
+    return RepaintBoundary(
+      child: GestureDetector(
+        onTap: () => _openDetail(context),
+        onTapDown: _onTapDown,
+        onLongPress: () {
+          HapticsService.heavy();
+          _showContextMenu(context);
+        },
+        child: ScaleTransition(
+          scale: _scaleAnim,
+          child: AnimatedOpacity(
+            opacity: isSkipped ? 0.5 : 1.0,
+            duration: const Duration(milliseconds: 200),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeInOut,
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDone ? cs.primary.withValues(alpha: 0.04) : cs.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: block.status == BlockStatus.inProgress
+                      ? statusColor.withValues(alpha: 0.5)
+                      : isDone
+                          ? statusColor.withValues(alpha: 0.2)
+                          : cs.onSurface.withValues(alpha: 0.06),
+                  width: block.status == BlockStatus.inProgress ? 1.5 : 1,
+                ),
               ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Header row ──────────────────────────────────────
-                Row(
-                  children: [
-                    // ── Animated checkbox icon ────────────────────────
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      curve: Curves.easeInOut,
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isDone
-                            ? statusColor.withValues(alpha: 0.2)
-                            : statusColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Header row ──────────────────────────────────────
+                  Row(
+                    children: [
+                      // ── Animated checkbox icon ────────────────────────
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeInOut,
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isDone
+                              ? statusColor.withValues(alpha: 0.2)
+                              : statusColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          child: isDone
+                              ? Icon(Icons.check_circle_rounded,
+                                  key: const ValueKey('done'),
+                                  size: 18,
+                                  color: statusColor)
+                              : Icon(_typeIcon(block.type),
+                                  key: const ValueKey('type'),
+                                  size: 18,
+                                  color: statusColor),
+                        ),
                       ),
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 200),
-                        child: isDone
-                            ? Icon(Icons.check_circle_rounded,
-                                key: const ValueKey('done'),
-                                size: 18, color: statusColor)
-                            : Icon(_typeIcon(block.type),
-                                key: const ValueKey('type'),
-                                size: 18, color: statusColor),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // ── Animated strike-through title ──────────
-                          TweenAnimationBuilder<double>(
-                            tween: Tween(
-                              begin: 0,
-                              end: isDone ? 1.0 : 0.0,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // ── Animated strike-through title ──────────
+                            TweenAnimationBuilder<double>(
+                              tween: Tween(
+                                begin: 0,
+                                end: isDone ? 1.0 : 0.0,
+                              ),
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeOut,
+                              builder: (context, value, child) {
+                                return Text(
+                                  block.title,
+                                  style: theme.textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    decoration: value > 0.5
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                    color: cs.onSurface
+                                        .withValues(alpha: 1.0 - (value * 0.4)),
+                                  ),
+                                );
+                              },
                             ),
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeOut,
-                            builder: (context, value, child) {
-                              return Text(
-                                block.title,
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  decoration: value > 0.5
-                                      ? TextDecoration.lineThrough
-                                      : null,
-                                  color: cs.onSurface.withValues(
-                                      alpha: 1.0 - (value * 0.4)),
-                                ),
-                              );
-                            },
+                            const SizedBox(height: 2),
+                            Text(
+                              '${block.plannedStartTime} – ${block.plannedEndTime}',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: cs.onSurface.withValues(alpha: 0.45),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Status chip
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _statusLabel(block.status),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: statusColor,
                           ),
-                          const SizedBox(height: 2),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // ── Progress bar ────────────────────────────────────
+                  if (tasksTotal > 0) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: TweenAnimationBuilder<double>(
+                              tween: Tween(begin: 0, end: progress),
+                              duration: const Duration(milliseconds: 400),
+                              curve: Curves.easeOut,
+                              builder: (context, val, _) {
+                                return LinearProgressIndicator(
+                                  value: val,
+                                  minHeight: 4,
+                                  backgroundColor:
+                                      cs.onSurface.withValues(alpha: 0.06),
+                                  valueColor:
+                                      AlwaysStoppedAnimation(statusColor),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '$tasksDone/$tasksTotal',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontSize: 11,
+                            color: cs.onSurface.withValues(alpha: 0.4),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  // ── Inline timer for active blocks ──────────────────
+                  if (block.status == BlockStatus.inProgress &&
+                      _elapsedSeconds > 0) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3B82F6).withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: const Color(0xFF3B82F6).withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.timer_rounded,
+                              size: 16, color: Color(0xFF3B82F6)),
+                          const SizedBox(width: 6),
                           Text(
-                            '${block.plannedStartTime} – ${block.plannedEndTime}',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: cs.onSurface.withValues(alpha: 0.45),
-                              fontSize: 12,
+                            _formatElapsed(_elapsedSeconds),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF3B82F6),
+                              fontFeatures: [FontFeature.tabularFigures()],
                             ),
                           ),
                         ],
                       ),
                     ),
-                    // Status chip
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _statusLabel(block.status),
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: statusColor,
-                        ),
-                      ),
-                    ),
                   ],
-                ),
-
-                // ── Progress bar ────────────────────────────────────
-                if (tasksTotal > 0) ...[
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: TweenAnimationBuilder<double>(
-                            tween: Tween(begin: 0, end: progress),
-                            duration: const Duration(milliseconds: 400),
-                            curve: Curves.easeOut,
-                            builder: (context, val, _) {
-                              return LinearProgressIndicator(
-                                value: val,
-                                minHeight: 4,
-                                backgroundColor:
-                                    cs.onSurface.withValues(alpha: 0.06),
-                                valueColor:
-                                    AlwaysStoppedAnimation(statusColor),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '$tasksDone/$tasksTotal',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontSize: 11,
-                          color: cs.onSurface.withValues(alpha: 0.4),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
-
-                // ── Inline timer for active blocks ──────────────────
-                if (block.status == BlockStatus.inProgress &&
-                    _elapsedSeconds > 0) ...[
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF3B82F6).withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: const Color(0xFF3B82F6).withValues(alpha: 0.2),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.timer_rounded,
-                            size: 16, color: Color(0xFF3B82F6)),
-                        const SizedBox(width: 6),
-                        Text(
-                          _formatElapsed(_elapsedSeconds),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF3B82F6),
-                            fontFeatures: [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
+              ),
             ),
           ),
         ),
