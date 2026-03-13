@@ -3,6 +3,7 @@
 // =============================================================
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/routine.dart';
@@ -256,10 +257,43 @@ class _RoutineCard extends StatelessWidget {
     required this.onDelete,
   });
 
+  String? _formatReminderTime() {
+    final reminderTime = routine.reminderTime;
+    if (reminderTime == null || reminderTime.isEmpty) return null;
+    try {
+      final parsed = DateFormat('HH:mm').parseStrict(reminderTime);
+      return DateFormat.jm().format(parsed);
+    } catch (_) {
+      return reminderTime;
+    }
+  }
+
+  String? _recurrenceLabel() {
+    if (routine.reminderTime == null) return null;
+
+    switch (routine.recurrence ?? 'daily') {
+      case 'weekly':
+        return 'Weekly';
+      case 'until_date':
+        final endDate = routine.recurrenceEndDate;
+        if (endDate == null || endDate.isEmpty) return 'Until date';
+        try {
+          final parsed = DateTime.parse(endDate);
+          return 'Until ${DateFormat('dd MMM').format(parsed)}';
+        } catch (_) {
+          return 'Until $endDate';
+        }
+      default:
+        return 'Daily';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final routineColor = Color(routine.color);
+    final reminderLabel = _formatReminderTime();
+    final recurrenceLabel = _recurrenceLabel();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -322,6 +356,52 @@ class _RoutineCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 4),
+                    if (reminderLabel != null || recurrenceLabel != null) ...[
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          if (reminderLabel != null)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.access_time_rounded,
+                                  size: 14,
+                                  color: cs.onSurface.withValues(alpha: 0.55),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  reminderLabel,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: cs.onSurface.withValues(alpha: 0.7),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          if (recurrenceLabel != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: routineColor.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                recurrenceLabel,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: routineColor,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                    ],
                     Text(
                       '${routine.steps.length} steps • ~${routine.totalEstimatedMinutes} min',
                       style: TextStyle(

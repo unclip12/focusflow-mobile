@@ -3,6 +3,8 @@
 // User-created sequential routines with step-by-step execution
 // =============================================================
 
+const Object _routineFieldUnset = Object();
+
 class RoutineStep {
   final String id;
   final String title;
@@ -50,6 +52,10 @@ class Routine {
   final String icon; // emoji or icon name
   final int color; // 0xAARRGGBB
   final List<RoutineStep> steps;
+  final String? reminderTime; // HH:mm
+  final String? recurrence; // daily | weekly | until_date
+  final String? recurrenceEndDate; // YYYY-MM-DD
+  final int? reminderWeekday; // 1=Mon .. 7=Sun
   final String createdAt;
   final String? updatedAt;
 
@@ -59,6 +65,10 @@ class Routine {
     required this.icon,
     required this.color,
     required this.steps,
+    this.reminderTime,
+    this.recurrence,
+    this.recurrenceEndDate,
+    this.reminderWeekday,
     required this.createdAt,
     this.updatedAt,
   });
@@ -72,6 +82,10 @@ class Routine {
                 ?.map((s) => RoutineStep.fromJson(s))
                 .toList() ??
             [],
+        reminderTime: j['reminderTime'],
+        recurrence: j['recurrence'],
+        recurrenceEndDate: j['recurrenceEndDate'],
+        reminderWeekday: j['reminderWeekday'],
         createdAt: j['createdAt'] ?? '',
         updatedAt: j['updatedAt'],
       );
@@ -82,6 +96,10 @@ class Routine {
         'icon': icon,
         'color': color,
         'steps': steps.map((s) => s.toJson()).toList(),
+        if (reminderTime != null) 'reminderTime': reminderTime,
+        if (recurrence != null) 'recurrence': recurrence,
+        if (recurrenceEndDate != null) 'recurrenceEndDate': recurrenceEndDate,
+        if (reminderWeekday != null) 'reminderWeekday': reminderWeekday,
         'createdAt': createdAt,
         if (updatedAt != null) 'updatedAt': updatedAt,
       };
@@ -95,6 +113,10 @@ class Routine {
     String? icon,
     int? color,
     List<RoutineStep>? steps,
+    Object? reminderTime = _routineFieldUnset,
+    Object? recurrence = _routineFieldUnset,
+    Object? recurrenceEndDate = _routineFieldUnset,
+    Object? reminderWeekday = _routineFieldUnset,
     String? createdAt,
     String? updatedAt,
   }) =>
@@ -104,6 +126,18 @@ class Routine {
         icon: icon ?? this.icon,
         color: color ?? this.color,
         steps: steps ?? this.steps,
+        reminderTime: identical(reminderTime, _routineFieldUnset)
+            ? this.reminderTime
+            : reminderTime as String?,
+        recurrence: identical(recurrence, _routineFieldUnset)
+            ? this.recurrence
+            : recurrence as String?,
+        recurrenceEndDate: identical(recurrenceEndDate, _routineFieldUnset)
+            ? this.recurrenceEndDate
+            : recurrenceEndDate as String?,
+        reminderWeekday: identical(reminderWeekday, _routineFieldUnset)
+            ? this.reminderWeekday
+            : reminderWeekday as int?,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
       );

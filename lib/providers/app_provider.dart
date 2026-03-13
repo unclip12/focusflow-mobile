@@ -7,6 +7,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:focusflow_mobile/services/backup_service.dart';
+import 'package:focusflow_mobile/services/notification_service.dart';
 import 'package:focusflow_mobile/services/database_service.dart';
 import 'package:focusflow_mobile/services/srs_service.dart';
 import 'package:focusflow_mobile/services/background_timer_service.dart';
@@ -147,6 +148,7 @@ class AppProvider extends ChangeNotifier {
   List<UWorldTopic> uworldTopics = [];
   List<FASubtopic> faSubtopics = [];
   List<Routine> routines = [];
+  final List<Routine> _pendingExpiredRoutinePrompts = [];
   List<RoutineLog> routineLogs = [];
   List<BuyingItem> buyingItems = [];
   List<TodoItem> todoItems = [];
@@ -267,6 +269,7 @@ class AppProvider extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     faViewMode = prefs.getString('faViewMode') ?? 'cards';
+    await _refreshRoutineReminderState();
 
     // ── Seed sample notifications (in-memory only) ────────────────
     final now = DateTime.now();
@@ -791,6 +794,38 @@ class AppProvider extends ChangeNotifier {
   // ROUTINES (V6)
   // ═══════════════════════════════════════════════════════════════
 
+  DateTime _routineDateOnly(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
+
+  DateTime? _parseRoutineEndDate(String? ymd) {
+    if (ymd == null || ymd.isEmpty) return null;
+    final parsed = DateTime.tryParse(ymd);
+    if (parsed == null) return null;
+    return _routineDateOnly(parsed);
+  }
+
+  bool _isExpiredUntilDateRoutine(Routine routine) {
+    if (routine.recurrence != 'until_date') return false;
+    final endDate = _parseRoutineEndDate(routine.recurrenceEndDate);
+    if (endDate == null) return false;
+    return _routineDateOnly(DateTime.now()).isAfter(endDate);
+  }
+
+  Future<void> _refreshRoutineReminderState() async {
+    _pendingExpiredRoutinePrompts
+      ..clear()
+      ..addAll(routines.where(_isExpiredUntilDateRoutine));
+    await NotificationService.instance.rescheduleAllRoutineReminders(routines);
+  }
+
+  bool get hasPendingExpiredRoutinePrompts =>
+      _pendingExpiredRoutinePrompts.isNotEmpty;
+
+  Routine? takeNextExpiredRoutinePrompt() {
+    if (_pendingExpiredRoutinePrompts.isEmpty) return null;
+    return _pendingExpiredRoutinePrompts.removeAt(0);
+  }
+
   Future<void> upsertRoutine(Routine routine) async {
     await _db.upsertRoutine(routine.toJson());
     final idx = routines.indexWhere((r) => r.id == routine.id);
@@ -799,12 +834,15 @@ class AppProvider extends ChangeNotifier {
     } else {
       routines.add(routine);
     }
+    await _refreshRoutineReminderState();
     notifyListeners();
   }
 
   Future<void> deleteRoutine(String id) async {
     await _db.deleteRoutine(id);
     routines.removeWhere((r) => r.id == id);
+    await NotificationService.instance.cancelRoutineReminder(id);
+    await _refreshRoutineReminderState();
     notifyListeners();
   }
 

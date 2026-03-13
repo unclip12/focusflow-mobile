@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:focusflow_mobile/services/notification_service.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:focusflow_mobile/models/routine.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
@@ -21,6 +22,7 @@ import 'activity_selector.dart';
 import 'todo_tab.dart';
 import 'buying_tab.dart';
 import 'routines_tab.dart';
+import 'routine_editor_sheet.dart';
 import 'flow_control_bar.dart';
 import 'flow_activity_card.dart';
 import 'package:focusflow_mobile/models/daily_flow.dart';
@@ -37,9 +39,12 @@ class TodayPlanScreen extends StatefulWidget {
 
 class _TodayPlanScreenState extends State<TodayPlanScreen>
     with SingleTickerProviderStateMixin {
+  static const int _routinesTabIndex = 3;
+
   late DateTime _selectedDate;
   String? _completedBlockId; // triggers celebration
   late TabController _tabCtrl;
+  bool _didProcessExpiredRoutineQueue = false;
 
   void _setStateIfMounted(VoidCallback fn) {
     if (!mounted) return;
@@ -91,7 +96,9 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
   /// Schedule OS notifications for today's prayers (10 min before prayer).
   void _schedulePrayerNotifications() {
     if (!_isToday) return;
-    NotificationService.instance.cancelAll();
+    for (int i = 0; i < _prayers.length; i++) {
+      NotificationService.instance.cancel(1000 + i);
+    }
     final now = DateTime.now();
     for (int i = 0; i < _prayers.length; i++) {
       final p = _prayers[i];
@@ -114,14 +121,77 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     }
   }
 
+  Future<void> _showRoutineEditorSheet(Routine routine) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => RoutineEditorSheet(existing: routine),
+    );
+  }
+
+  Future<void> _showExpiredRoutineDialogs() async {
+    if (_didProcessExpiredRoutineQueue || !mounted) return;
+    _didProcessExpiredRoutineQueue = true;
+
+    await _processNextExpiredRoutineDialog(context.read<AppProvider>());
+  }
+
+  Future<void> _processNextExpiredRoutineDialog(AppProvider app) async {
+    if (!mounted || !app.hasPendingExpiredRoutinePrompts) return;
+
+    final routine = app.takeNextExpiredRoutinePrompt();
+    if (routine == null) return;
+
+    final endDate = DateTime.tryParse(routine.recurrenceEndDate ?? '');
+    final formattedDate = endDate == null
+        ? (routine.recurrenceEndDate ?? 'the selected date')
+        : DateFormat('dd MMM yyyy').format(endDate);
+
+    final shouldUpdate = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Routine schedule expired'),
+            content: Text(
+              '${routine.name} was scheduled until $formattedDate. Update it?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Dismiss'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Update'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!mounted) return;
+
+    if (shouldUpdate) {
+      _tabCtrl.animateTo(_routinesTabIndex);
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      if (!mounted) return;
+      await _showRoutineEditorSheet(routine);
+      if (!mounted) return;
+    }
+
+    await _processNextExpiredRoutineDialog(app);
+  }
+
   @override
   void initState() {
     super.initState();
     _selectedDate = AppDateUtils.getAdjustedDate();
     _tabCtrl = TabController(length: 4, vsync: this);
-    // Schedule prayer notifications for today on launch
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _schedulePrayerNotifications();
+      _showExpiredRoutineDialogs();
     });
   }
 

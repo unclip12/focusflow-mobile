@@ -5,6 +5,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:focusflow_mobile/models/routine.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz_data;
 
@@ -29,6 +30,7 @@ class NotificationService {
   static const String _chStreakReminder = 'streak_reminder';
   static const String _chDailySummary  = 'daily_summary';
   static const String _chStudySession  = 'study_session';
+  static const String _chRoutineReminder = 'routine_reminder';
 
   // ── Android channels ─────────────────────────────────────────
   static const _timerChannel = AndroidNotificationChannel(
@@ -71,6 +73,14 @@ class NotificationService {
     playSound: true,
   );
 
+  static const _routineReminderChannel = AndroidNotificationChannel(
+    _chRoutineReminder,
+    'Routine Reminders',
+    description: 'Alerts when a routine reminder is due',
+    importance: Importance.high,
+    playSound: true,
+  );
+
   /// Initialise the plugin and create all Android channels.
   Future<void> init() async {
     if (_initialised) return;
@@ -99,6 +109,7 @@ class NotificationService {
     await androidPlugin?.createNotificationChannel(_streakChannel);
     await androidPlugin?.createNotificationChannel(_summaryChannel);
     await androidPlugin?.createNotificationChannel(_studySessionChannel);
+    await androidPlugin?.createNotificationChannel(_routineReminderChannel);
 
     _initialised = true;
   }
@@ -110,6 +121,85 @@ class NotificationService {
             AndroidFlutterLocalNotificationsPlugin>();
     final granted = await androidPlugin?.requestNotificationsPermission();
     return granted ?? true;
+  }
+
+  int _routineNotificationId(String routineId) => routineId.hashCode;
+
+  DateTime _today() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  TimeOfDay? _parseRoutineTime(String? hhmm) {
+    if (hhmm == null || hhmm.isEmpty) return null;
+    final parts = hhmm.split(':');
+    if (parts.length != 2) return null;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return null;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  DateTime? _parseRoutineDate(String? ymd) {
+    if (ymd == null || ymd.isEmpty) return null;
+    final parsed = DateTime.tryParse(ymd);
+    if (parsed == null) return null;
+    return DateTime(parsed.year, parsed.month, parsed.day);
+  }
+
+  tz.TZDateTime _nextDailyOccurrence(TimeOfDay time) {
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduled = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      time.hour,
+      time.minute,
+    );
+    if (!scheduled.isAfter(now)) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
+    return scheduled;
+  }
+
+  tz.TZDateTime _nextWeeklyOccurrence(TimeOfDay time, int weekday) {
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduled = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      time.hour,
+      time.minute,
+    );
+    var daysAhead = (weekday - scheduled.weekday) % DateTime.daysPerWeek;
+    if (daysAhead < 0) {
+      daysAhead += DateTime.daysPerWeek;
+    }
+    scheduled = scheduled.add(Duration(days: daysAhead));
+    if (!scheduled.isAfter(now)) {
+      scheduled = scheduled.add(const Duration(days: DateTime.daysPerWeek));
+    }
+    return scheduled;
+  }
+
+  NotificationDetails _routineReminderDetails() {
+    return const NotificationDetails(
+      android: AndroidNotificationDetails(
+        _chRoutineReminder,
+        'Routine Reminders',
+        channelDescription: 'Alerts when a routine reminder is due',
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: '@mipmap/ic_launcher',
+      ),
+      iOS: DarwinNotificationDetails(
+        presentAlert: true,
+        presentSound: true,
+      ),
+    );
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -350,6 +440,82 @@ class NotificationService {
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );
+  }
+
+  Future<void> scheduleRoutineReminder(Routine routine) async {
+    final reminderTime = _parseRoutineTime(routine.reminderTime);
+    if (reminderTime == null) {
+      await cancelRoutineReminder(routine.id);
+      return;
+    }
+
+    final recurrence = routine.recurrence ?? 'daily';
+    final id = _routineNotificationId(routine.id);
+    final details = _routineReminderDetails();
+    final title = routine.name;
+    final body = 'Time for your ${routine.name} routine';
+
+    if (recurrence == 'weekly') {
+      final weekday = routine.reminderWeekday;
+      if (weekday == null || weekday < 1 || weekday > 7) {
+        await cancelRoutineReminder(routine.id);
+        return;
+      }
+
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        _nextWeeklyOccurrence(reminderTime, weekday),
+        details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+      );
+      return;
+    }
+
+    final scheduled = _nextDailyOccurrence(reminderTime);
+    if (recurrence == 'until_date') {
+      final endDate = _parseRoutineDate(routine.recurrenceEndDate);
+      final scheduledDate = DateTime(
+        scheduled.year,
+        scheduled.month,
+        scheduled.day,
+      );
+      if (endDate == null ||
+          _today().isAfter(endDate) ||
+          scheduledDate.isAfter(endDate)) {
+        await cancelRoutineReminder(routine.id);
+        return;
+      }
+    }
+
+    await _plugin.zonedSchedule(
+      id,
+      title,
+      body,
+      scheduled,
+      details,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.time,
+    );
+  }
+
+  Future<void> cancelRoutineReminder(String routineId) async {
+    await _plugin.cancel(_routineNotificationId(routineId));
+  }
+
+  Future<void> rescheduleAllRoutineReminders(List<Routine> routines) async {
+    for (final routine in routines) {
+      await cancelRoutineReminder(routine.id);
+    }
+    for (final routine in routines) {
+      await scheduleRoutineReminder(routine);
+    }
   }
 
   /// Cancel all scheduled notifications.
