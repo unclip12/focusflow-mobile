@@ -201,6 +201,7 @@ enum TimeLogCategory {
   qbank,
   anki,
   video,
+  prayer,
   noteTaking,
   breakTime,
   personal,
@@ -217,6 +218,7 @@ enum TimeLogCategory {
       case TimeLogCategory.qbank:         return 'QBANK';
       case TimeLogCategory.anki:          return 'ANKI';
       case TimeLogCategory.video:         return 'VIDEO';
+      case TimeLogCategory.prayer:        return 'PRAYER';
       case TimeLogCategory.noteTaking:    return 'NOTE_TAKING';
       case TimeLogCategory.breakTime:     return 'BREAK';
       case TimeLogCategory.personal:      return 'PERSONAL';
@@ -235,6 +237,7 @@ enum TimeLogCategory {
       case 'QBANK':         return TimeLogCategory.qbank;
       case 'ANKI':          return TimeLogCategory.anki;
       case 'VIDEO':         return TimeLogCategory.video;
+      case 'PRAYER':        return TimeLogCategory.prayer;
       case 'NOTE_TAKING':   return TimeLogCategory.noteTaking;
       case 'BREAK':         return TimeLogCategory.breakTime;
       case 'PERSONAL':      return TimeLogCategory.personal;

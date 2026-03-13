@@ -254,6 +254,7 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
       case TimeLogCategory.qbank:         return 'QBank';
       case TimeLogCategory.anki:          return 'Anki';
       case TimeLogCategory.video:         return 'Video';
+      case TimeLogCategory.prayer:        return 'Prayer';
       case TimeLogCategory.noteTaking:    return 'Note Taking';
       case TimeLogCategory.breakTime:     return 'Break';
       case TimeLogCategory.personal:      return 'Personal';
