@@ -271,7 +271,6 @@ class AppProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     faViewMode = prefs.getString('faViewMode') ?? 'cards';
     await _refreshRoutineReminderState();
-    await injectRoutinesIntoDayPlan(todayDateKey);
 
     // ── Seed sample notifications (in-memory only) ────────────────
     final now = DateTime.now();
@@ -355,6 +354,7 @@ class AppProvider extends ChangeNotifier {
 
     _loaded = true;
     notifyListeners();
+    await injectRoutinesIntoDayPlan(todayDateKey);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -817,19 +817,19 @@ class AppProvider extends ChangeNotifier {
     final reminderTime = routine.reminderTime;
     if (reminderTime == null || reminderTime.isEmpty) return false;
 
-    switch (routine.recurrence) {
-      case null:
-      case 'daily':
-        return true;
-      case 'weekly':
-        return routine.reminderWeekday == today.weekday;
-      case 'until_date':
-        final endDate = _parseRoutineEndDate(routine.recurrenceEndDate);
-        if (endDate == null) return false;
-        return !today.isAfter(endDate);
-      default:
-        return false;
+    final recurrence = routine.recurrence?.toLowerCase().trim();
+    if (recurrence == null || recurrence == 'daily' || recurrence.isEmpty) {
+      return true;
     }
+    if (recurrence == 'weekly') {
+      return routine.reminderWeekday == today.weekday;
+    }
+    if (recurrence == 'until_date') {
+      final endDate = _parseRoutineEndDate(routine.recurrenceEndDate);
+      if (endDate == null) return false;
+      return !today.isAfter(endDate);
+    }
+    return true;
   }
 
   int? _minutesSinceMidnight(String hhmm) {
