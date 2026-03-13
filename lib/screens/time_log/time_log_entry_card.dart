@@ -24,6 +24,7 @@ class TimeLogEntryCard extends StatelessWidget {
       case TimeLogCategory.qbank:         return const Color(0xFFEC4899);
       case TimeLogCategory.anki:          return const Color(0xFFF59E0B);
       case TimeLogCategory.video:         return const Color(0xFF3B82F6);
+      case TimeLogCategory.prayer:        return const Color(0xFF34D399);
       case TimeLogCategory.noteTaking:    return const Color(0xFF10B981);
       case TimeLogCategory.breakTime:     return const Color(0xFF94A3B8);
       case TimeLogCategory.personal:      return const Color(0xFFF97316);
@@ -42,6 +43,7 @@ class TimeLogEntryCard extends StatelessWidget {
       case TimeLogCategory.qbank:         return 'QBank';
       case TimeLogCategory.anki:          return 'Anki';
       case TimeLogCategory.video:         return 'Video';
+      case TimeLogCategory.prayer:        return 'Prayer';
       case TimeLogCategory.noteTaking:    return 'Notes';
       case TimeLogCategory.breakTime:     return 'Break';
       case TimeLogCategory.personal:      return 'Personal';

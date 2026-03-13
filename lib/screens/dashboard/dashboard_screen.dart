@@ -1,7 +1,7 @@
 // =============================================================
 // DashboardScreen ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â G8 full rebuild
-// 6 sections: Exam Countdown, Study Stats, FA Progress,
-// Revision Queue, Activity Heatmap, Subject Breakdown
+// 7 sections: Exam Countdown, Study Stats, Analytics,
+// FA Progress, Revision Queue, Activity Heatmap, Subject Breakdown
 // =============================================================
 
 import 'package:flutter/material.dart';
@@ -16,6 +16,7 @@ import 'package:focusflow_mobile/models/fa_page.dart';
 import 'package:focusflow_mobile/models/knowledge_base.dart';
 import 'package:focusflow_mobile/models/revision_item.dart';
 import 'package:focusflow_mobile/services/srs_service.dart';
+import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart' as du;
 
 class DashboardScreen extends StatelessWidget {
@@ -109,6 +110,7 @@ class _DashboardBody extends StatelessWidget {
     final todayStr =
         du.AppDateUtils.effectiveDateKey(DateTime.now(), dayStartHour);
     final now = DateTime.now();
+    final adjustedToday = du.AppDateUtils.effectiveDate(now, dayStartHour);
 
     // -- Exam dates (from Settings) ------------------------------
     final fmgeDate = DateTime.parse(sp.fmgeDate);
@@ -197,6 +199,13 @@ class _DashboardBody extends StatelessWidget {
     final topSubjects = sortedSubjects.take(4).toList();
     final maxSubjectMinutes =
         topSubjects.isNotEmpty ? topSubjects.first.value : 1;
+    final todayBreakdown = _buildTodayTimeBreakdown(app, cs, todayStr);
+    final weeklyPlannedVsActual =
+        _buildWeeklyPlannedVsActual(app, adjustedToday);
+    final topActivitiesThisWeek =
+        _buildTopActivitiesThisWeek(app, adjustedToday, limit: 5);
+    final dailyAverageStudyMinutes =
+        _getDailyAverageStudyMinutes(app, adjustedToday, days: 30);
 
     return Scaffold(
       appBar: DashboardScreen._buildAppBar(context),
@@ -280,7 +289,21 @@ class _DashboardBody extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // --- SECTION 3: FA 2025 Progress -----------------
+              // --- SECTION 3: Analytics ------------------------
+              _sectionHeader(context, 'ANALYTICS'),
+              const SizedBox(height: 8),
+              _TodayTimeBreakdownCard(entries: todayBreakdown),
+              const SizedBox(height: 12),
+              _WeeklyPlannedVsActualCard(days: weeklyPlannedVsActual),
+              const SizedBox(height: 12),
+              _TopActivitiesCard(activities: topActivitiesThisWeek),
+              const SizedBox(height: 12),
+              _DailyAverageStudyCard(
+                averageMinutes: dailyAverageStudyMinutes,
+              ),
+              const SizedBox(height: 20),
+
+              // --- SECTION 4: FA 2025 Progress -----------------
               _sectionHeader(context, 'FIRST AID 2025'),
               const SizedBox(height: 8),
               _FAProgressCard(
@@ -293,7 +316,7 @@ class _DashboardBody extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // --- SECTION 4: Revision Queue -------------------
+              // --- SECTION 5: Revision Queue -------------------
               _sectionHeader(context, 'REVISION QUEUE'),
               const SizedBox(height: 8),
               _RevisionCard(
@@ -303,7 +326,7 @@ class _DashboardBody extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // --- SECTION 5: Activity Heatmap -----------------
+              // --- SECTION 6: Activity Heatmap -----------------
               _sectionHeader(context, 'LAST 7 DAYS'),
               const SizedBox(height: 8),
               _ActivityHeatmap(
@@ -313,7 +336,7 @@ class _DashboardBody extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // --- SECTION 6: Subject Breakdown ----------------
+              // --- SECTION 7: Subject Breakdown ----------------
               _sectionHeader(context, 'TIME BY SUBJECT'),
               const SizedBox(height: 8),
               _SubjectBreakdownCard(
@@ -349,6 +372,546 @@ class _DashboardBody extends StatelessWidget {
     if (h == 0) return '${m}m';
     if (m == 0) return '${h}h';
     return '${h}h ${m}m';
+  }
+
+  static List<_AnalyticsCategoryStat> _buildTodayTimeBreakdown(
+    AppProvider app,
+    ColorScheme cs,
+    String todayStr,
+  ) {
+    final totals = <String, int>{};
+    for (final log in app.timeLogs) {
+      if (log.date != todayStr) continue;
+      final key = _analyticsBucketKey(log.category);
+      totals[key] = (totals[key] ?? 0) + log.durationMinutes;
+    }
+
+    return _analyticsCategoryConfigs(cs)
+        .map((config) => _AnalyticsCategoryStat(
+              config: config,
+              minutes: totals[config.key] ?? 0,
+            ))
+        .where((entry) => entry.minutes > 0)
+        .toList();
+  }
+
+  static String _analyticsBucketKey(TimeLogCategory category) {
+    switch (category) {
+      case TimeLogCategory.study:
+        return 'study';
+      case TimeLogCategory.revision:
+        return 'revision';
+      case TimeLogCategory.video:
+        return 'video';
+      case TimeLogCategory.qbank:
+        return 'qbank';
+      case TimeLogCategory.anki:
+        return 'anki';
+      case TimeLogCategory.prayer:
+        return 'prayer';
+      case TimeLogCategory.noteTaking:
+      case TimeLogCategory.breakTime:
+      case TimeLogCategory.personal:
+      case TimeLogCategory.sleep:
+      case TimeLogCategory.entertainment:
+      case TimeLogCategory.outing:
+      case TimeLogCategory.life:
+      case TimeLogCategory.other:
+        return 'other';
+    }
+  }
+
+  static List<_AnalyticsCategoryConfig> _analyticsCategoryConfigs(
+      ColorScheme cs) {
+    return [
+      _AnalyticsCategoryConfig(
+        key: 'study',
+        label: 'Study',
+        icon: Icons.menu_book_rounded,
+        color: cs.primary,
+      ),
+      _AnalyticsCategoryConfig(
+        key: 'revision',
+        label: 'Revision',
+        icon: Icons.refresh_rounded,
+        color: cs.tertiary,
+      ),
+      _AnalyticsCategoryConfig(
+        key: 'video',
+        label: 'Video',
+        icon: Icons.play_circle_fill_rounded,
+        color: cs.secondary,
+      ),
+      _AnalyticsCategoryConfig(
+        key: 'qbank',
+        label: 'QBank',
+        icon: Icons.quiz_rounded,
+        color: Colors.deepOrange,
+      ),
+      _AnalyticsCategoryConfig(
+        key: 'anki',
+        label: 'Anki',
+        icon: Icons.style_rounded,
+        color: Colors.amber.shade700,
+      ),
+      const _AnalyticsCategoryConfig(
+        key: 'prayer',
+        label: 'Prayer',
+        icon: Icons.self_improvement_rounded,
+        color: Color(0xFF34D399),
+      ),
+      _AnalyticsCategoryConfig(
+        key: 'other',
+        label: 'Other',
+        icon: Icons.more_horiz_rounded,
+        color: cs.outline,
+      ),
+    ];
+  }
+
+  static List<_WeeklyPlannedActualDay> _buildWeeklyPlannedVsActual(
+    AppProvider app,
+    DateTime adjustedToday,
+  ) {
+    final weekStart =
+        adjustedToday.subtract(Duration(days: adjustedToday.weekday - 1));
+    return List.generate(adjustedToday.weekday, (index) {
+      final date = weekStart.add(Duration(days: index));
+      final plan = app.getDayPlan(du.AppDateUtils.formatDate(date));
+      final blocks = plan?.blocks ?? const [];
+
+      var plannedMinutes = 0;
+      var actualMinutes = 0;
+      for (final block in blocks) {
+        plannedMinutes += block.plannedDurationMinutes;
+        if (block.status == BlockStatus.done) {
+          actualMinutes += block.actualDurationMinutes ?? 0;
+        }
+      }
+
+      return _WeeklyPlannedActualDay(
+        date: date,
+        plannedMinutes: plannedMinutes,
+        actualMinutes: actualMinutes,
+      );
+    });
+  }
+
+  static List<_RankedActivityStat> _buildTopActivitiesThisWeek(
+    AppProvider app,
+    DateTime adjustedToday, {
+    required int limit,
+  }) {
+    final weekStart =
+        adjustedToday.subtract(Duration(days: adjustedToday.weekday - 1));
+    final totals = <String, int>{};
+
+    for (final log in app.timeLogs) {
+      final date = du.AppDateUtils.parseDate(log.date);
+      if (date == null || date.isBefore(weekStart) || date.isAfter(adjustedToday)) {
+        continue;
+      }
+      final key = log.activity.trim().isNotEmpty ? log.activity.trim() : 'Other';
+      totals[key] = (totals[key] ?? 0) + log.durationMinutes;
+    }
+
+    final sorted = totals.entries.toList()
+      ..sort((a, b) {
+        final byMinutes = b.value.compareTo(a.value);
+        if (byMinutes != 0) return byMinutes;
+        return a.key.toLowerCase().compareTo(b.key.toLowerCase());
+      });
+
+    return sorted
+        .take(limit)
+        .map((entry) => _RankedActivityStat(
+              activity: entry.key,
+              minutes: entry.value,
+            ))
+        .toList();
+  }
+
+  static double _getDailyAverageStudyMinutes(
+    AppProvider app,
+    DateTime adjustedToday, {
+    required int days,
+  }) {
+    const studyCategories = {
+      TimeLogCategory.study,
+      TimeLogCategory.revision,
+      TimeLogCategory.video,
+      TimeLogCategory.qbank,
+      TimeLogCategory.anki,
+    };
+
+    final rangeStart = adjustedToday.subtract(Duration(days: days - 1));
+    final studyDates = <String>{};
+    var totalMinutes = 0;
+
+    for (final log in app.timeLogs) {
+      if (!studyCategories.contains(log.category)) continue;
+      final date = du.AppDateUtils.parseDate(log.date);
+      if (date == null || date.isBefore(rangeStart) || date.isAfter(adjustedToday)) {
+        continue;
+      }
+      totalMinutes += log.durationMinutes;
+      studyDates.add(log.date);
+    }
+
+    if (studyDates.isEmpty) return 0;
+    return totalMinutes / studyDates.length;
+  }
+}
+
+class _AnalyticsCategoryConfig {
+  final String key;
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  const _AnalyticsCategoryConfig({
+    required this.key,
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+}
+
+class _AnalyticsCategoryStat {
+  final _AnalyticsCategoryConfig config;
+  final int minutes;
+
+  const _AnalyticsCategoryStat({
+    required this.config,
+    required this.minutes,
+  });
+}
+
+class _WeeklyPlannedActualDay {
+  final DateTime date;
+  final int plannedMinutes;
+  final int actualMinutes;
+
+  const _WeeklyPlannedActualDay({
+    required this.date,
+    required this.plannedMinutes,
+    required this.actualMinutes,
+  });
+}
+
+class _RankedActivityStat {
+  final String activity;
+  final int minutes;
+
+  const _RankedActivityStat({
+    required this.activity,
+    required this.minutes,
+  });
+}
+
+class _TodayTimeBreakdownCard extends StatelessWidget {
+  final List<_AnalyticsCategoryStat> entries;
+
+  const _TodayTimeBreakdownCard({required this.entries});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final totalMinutes = entries.fold<int>(0, (sum, entry) => sum + entry.minutes);
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Today's Time Breakdown",
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (entries.isEmpty)
+              Text(
+                'No activity logged today',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: cs.onSurfaceVariant,
+                ),
+              )
+            else
+              ...entries.map((entry) {
+                final fraction =
+                    totalMinutes == 0 ? 0.0 : entry.minutes / totalMinutes;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: entry.config.color,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(
+                            entry.config.icon,
+                            size: 16,
+                            color: entry.config.color,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              entry.config.label,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            _DashboardBody._formatHM(entry.minutes),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: LinearProgressIndicator(
+                          value: fraction,
+                          minHeight: 7,
+                          backgroundColor: cs.surfaceContainerHighest,
+                          color: entry.config.color,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WeeklyPlannedVsActualCard extends StatelessWidget {
+  final List<_WeeklyPlannedActualDay> days;
+
+  const _WeeklyPlannedVsActualCard({required this.days});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Planned vs Actual (This Week)',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...days.map((day) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        DateFormat('E').format(day.date),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 16,
+                        runSpacing: 4,
+                        children: [
+                          Text(
+                            'Planned: ${_DashboardBody._formatHM(day.plannedMinutes)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                          Text(
+                            'Actual: ${_DashboardBody._formatHM(day.actualMinutes)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TopActivitiesCard extends StatelessWidget {
+  final List<_RankedActivityStat> activities;
+
+  const _TopActivitiesCard({required this.activities});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Top 5 Activities This Week',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (activities.isEmpty)
+              Text(
+                'No activity logged this week',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: cs.onSurfaceVariant,
+                ),
+              )
+            else
+              ...activities.asMap().entries.map((entry) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: cs.primaryContainer,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '${entry.key + 1}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: cs.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            entry.value.activity,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: cs.onSurface,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _DashboardBody._formatHM(entry.value.minutes),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DailyAverageStudyCard extends StatelessWidget {
+  final double averageMinutes;
+
+  const _DailyAverageStudyCard({required this.averageMinutes});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final roundedAverage = averageMinutes.round();
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Daily Average Study Time',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Avg ${_DashboardBody._formatHM(roundedAverage)} / study day',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: cs.onSurface,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Last 30 days',
+              style: TextStyle(
+                fontSize: 12,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
