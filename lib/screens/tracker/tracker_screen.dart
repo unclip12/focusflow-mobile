@@ -96,6 +96,25 @@ class _TrackerScreenState extends State<TrackerScreen>
     });
   }
 
+  void _showTrackerAddSheet() {
+    WidgetBuilder? builder;
+    if (_tabController.index == 0) {
+      builder = (_) => const _AddFAPageSheet();
+    } else if (_tabController.index == 3) {
+      builder = (_) => const _AddUWorldTopicSheet();
+    }
+    if (builder == null) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: builder,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -132,6 +151,15 @@ class _TrackerScreenState extends State<TrackerScreen>
               icon: const Icon(Icons.checklist_rounded),
               tooltip: 'Select items',
               onPressed: () => setState(() => _selectionMode = true),
+            ),
+          if (!_selectionMode &&
+              (_tabController.index == 0 || _tabController.index == 3))
+            IconButton(
+              icon: const Icon(Icons.add_rounded),
+              tooltip: _tabController.index == 0
+                  ? 'Add FA page'
+                  : 'Add UWorld topic',
+              onPressed: _showTrackerAddSheet,
             ),
           if (_selectionMode && _selectedItems.isNotEmpty)
             TextButton.icon(
@@ -1790,6 +1818,372 @@ class _UWorldTab extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════
 // Shared empty placeholder widget
 // ═══════════════════════════════════════════════════════════════
+
+class _AddFAPageSheet extends StatefulWidget {
+  const _AddFAPageSheet();
+
+  @override
+  State<_AddFAPageSheet> createState() => _AddFAPageSheetState();
+}
+
+class _AddFAPageSheetState extends State<_AddFAPageSheet> {
+  final _pageNumCtrl = TextEditingController();
+  final _titleCtrl = TextEditingController();
+  final _notesCtrl = TextEditingController();
+
+  String? _subject;
+  String? _system;
+  String? _pageError;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _pageNumCtrl.dispose();
+    _titleCtrl.dispose();
+    _notesCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final pageNumText = _pageNumCtrl.text.trim();
+    final title = _titleCtrl.text.trim();
+    final notes = _notesCtrl.text.trim();
+    final pageNum = int.tryParse(pageNumText);
+
+    setState(() {
+      _pageError = pageNumText.isEmpty || pageNum == null
+          ? 'Enter a valid page number'
+          : null;
+    });
+    if (_pageError != null) return;
+
+    final app = context.read<AppProvider>();
+    if (app.faPages.any((p) => p.pageNum == pageNum)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Page already exists')),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
+    final page = FAPage(
+      pageNum: pageNum!,
+      subject: _subject ?? '',
+      system: _system ?? '',
+      title: title,
+      userDescription: notes.isEmpty ? null : notes,
+      status: 'unread',
+      orderIndex: pageNum,
+    );
+
+    await app.upsertFAPage(page);
+    if (!mounted) return;
+
+    navigator.pop();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('FA Page $pageNum added'),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        24,
+        16,
+        24,
+        24 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: cs.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Text(
+              'Add FA Page',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _pageNumCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Page number',
+                border: const OutlineInputBorder(),
+                errorText: _pageError,
+              ),
+              onChanged: (_) {
+                if (_pageError != null) {
+                  setState(() => _pageError = null);
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _subject,
+              decoration: const InputDecoration(
+                labelText: 'Subject',
+                border: OutlineInputBorder(),
+              ),
+              items: kFmgeSubjects
+                  .map((subject) => DropdownMenuItem<String>(
+                        value: subject,
+                        child: Text(subject),
+                      ))
+                  .toList(),
+              onChanged: (value) => setState(() => _subject = value),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _system,
+              decoration: const InputDecoration(
+                labelText: 'System',
+                border: OutlineInputBorder(),
+              ),
+              items: kBodySystems
+                  .map((system) => DropdownMenuItem<String>(
+                        value: system,
+                        child: Text(system),
+                      ))
+                  .toList(),
+              onChanged: (value) => setState(() => _system = value),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _titleCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Title / Topic',
+                border: OutlineInputBorder(),
+              ),
+              textCapitalization: TextCapitalization.sentences,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _notesCtrl,
+              minLines: 3,
+              maxLines: 5,
+              decoration: const InputDecoration(
+                labelText: 'Notes',
+                alignLabelWithHint: true,
+                border: OutlineInputBorder(),
+              ),
+              textCapitalization: TextCapitalization.sentences,
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _saving ? null : _save,
+                child: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Save Page'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AddUWorldTopicSheet extends StatefulWidget {
+  const _AddUWorldTopicSheet();
+
+  @override
+  State<_AddUWorldTopicSheet> createState() => _AddUWorldTopicSheetState();
+}
+
+class _AddUWorldTopicSheetState extends State<_AddUWorldTopicSheet> {
+  final _topicNameCtrl = TextEditingController();
+  final _totalQuestionsCtrl = TextEditingController();
+
+  String? _system;
+  String? _topicNameError;
+  String? _totalQuestionsError;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _topicNameCtrl.dispose();
+    _totalQuestionsCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final topicName = _topicNameCtrl.text.trim();
+    final totalQuestionsText = _totalQuestionsCtrl.text.trim();
+    final totalQuestions = int.tryParse(totalQuestionsText);
+
+    setState(() {
+      _topicNameError =
+          topicName.isEmpty ? 'Topic name is required' : null;
+      _totalQuestionsError =
+          totalQuestionsText.isEmpty || totalQuestions == null
+              ? 'Enter a valid total questions value'
+              : null;
+    });
+    if (_topicNameError != null || _totalQuestionsError != null) return;
+
+    setState(() => _saving = true);
+    final app = context.read<AppProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
+    final topic = UWorldTopic(
+      system: _system ?? '',
+      subtopic: topicName,
+      totalQuestions: totalQuestions!,
+      doneQuestions: 0,
+      correctQuestions: 0,
+    );
+
+    await app.addUWorldTopic(topic);
+    if (!mounted) return;
+
+    navigator.pop();
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('UWorld topic added'),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        24,
+        16,
+        24,
+        24 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: cs.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Text(
+              'Add UWorld Topic',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _topicNameCtrl,
+              decoration: InputDecoration(
+                labelText: 'Topic name',
+                border: const OutlineInputBorder(),
+                errorText: _topicNameError,
+              ),
+              textCapitalization: TextCapitalization.sentences,
+              onChanged: (_) {
+                if (_topicNameError != null) {
+                  setState(() => _topicNameError = null);
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _system,
+              decoration: const InputDecoration(
+                labelText: 'System',
+                border: OutlineInputBorder(),
+              ),
+              items: kBodySystems
+                  .map((system) => DropdownMenuItem<String>(
+                        value: system,
+                        child: Text(system),
+                      ))
+                  .toList(),
+              onChanged: (value) => setState(() => _system = value),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _totalQuestionsCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Total questions',
+                border: const OutlineInputBorder(),
+                errorText: _totalQuestionsError,
+              ),
+              onChanged: (_) {
+                if (_totalQuestionsError != null) {
+                  setState(() => _totalQuestionsError = null);
+                }
+              },
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _saving ? null : _save,
+                child: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Save Topic'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _EmptyPlaceholder extends StatelessWidget {
   final IconData icon;

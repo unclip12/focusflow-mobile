@@ -951,6 +951,22 @@ class DatabaseService {
     return rows.map(UWorldTopic.fromMap).toList();
   }
 
+  Future<UWorldTopic> insertUWorldTopic(UWorldTopic topic) async {
+    final db = await database;
+    final values = Map<String, dynamic>.from(topic.toMap())..remove('id');
+    final insertedId = await db.insert(tUworldTopics, values);
+    return UWorldTopic(
+      id: insertedId,
+      system: topic.system,
+      subtopic: topic.subtopic,
+      customTitle: topic.customTitle,
+      userDescription: topic.userDescription,
+      totalQuestions: topic.totalQuestions,
+      doneQuestions: topic.doneQuestions,
+      correctQuestions: topic.correctQuestions,
+    );
+  }
+
   Future<void> updateUWorldProgress(int id, int done, int correct) async {
     final db = await database;
     await db.update(

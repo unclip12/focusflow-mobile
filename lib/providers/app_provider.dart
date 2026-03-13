@@ -3224,6 +3224,12 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> addUWorldTopic(UWorldTopic topic) async {
+    final insertedTopic = await _db.insertUWorldTopic(topic);
+    uworldTopics.add(insertedTopic);
+    notifyListeners();
+  }
+
   Future<void> updateUWorldProgress(int id, int done, int correct) async {
     await _db.updateUWorldProgress(id, done, correct);
     await loadUWorldTopics();
