@@ -1683,7 +1683,7 @@ class _AllTabContentState extends State<_AllTabContent>
 
     for (final t in todos) {
       items.add(
-        _FullDayItem(type: 'todo', todoTitle: t.title, todoDone: t.done),
+        _FullDayItem(type: 'todo', todoTitle: t.title, todoDone: t.completed),
       );
     }
 

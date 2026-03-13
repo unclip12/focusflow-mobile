@@ -336,24 +336,26 @@ class _AddTodoSheetState extends State<_AddTodoSheet> {
           const SizedBox(height: 12),
 
           // Category
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Category:', style: TextStyle(
                 fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface,
               )),
-              const SizedBox(width: 8),
-              ...['Studies', 'Daily Life', 'Other'].map((cat) {
-                final selected = _category == cat;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: ChoiceChip(
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: ['Studies', 'Daily Life', 'Other'].map((cat) {
+                  final selected = _category == cat;
+                  return ChoiceChip(
                     label: Text(cat, style: const TextStyle(fontSize: 12)),
                     selected: selected,
                     onSelected: (_) => setState(() => _category = cat),
                     visualDensity: VisualDensity.compact,
-                  ),
-                );
-              }),
+                  );
+                }).toList(),
+              ),
             ],
           ),
           const SizedBox(height: 12),
