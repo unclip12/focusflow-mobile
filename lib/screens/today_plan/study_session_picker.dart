@@ -2,8 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/models/fa_page.dart';
+import 'package:focusflow_mobile/models/pathoma_chapter.dart';
+import 'package:focusflow_mobile/models/revision_item.dart';
 import 'package:focusflow_mobile/models/sketchy_video.dart';
 import 'package:focusflow_mobile/models/uworld_topic.dart';
 import 'package:intl/intl.dart';
@@ -12,6 +13,7 @@ import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/services/notification_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
+import 'package:provider/provider.dart';
 
 import 'study_flow_screen.dart';
 
@@ -77,11 +79,37 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
     if (block.plannedDurationMinutes > 0) {
       return block.plannedDurationMinutes;
     }
-    return StudyTask.estimateQueueDurationMinutes(_plannedQueueFromBlock(block));
+    return StudyTask.estimateQueueDurationMinutes(
+        _plannedQueueFromBlock(block));
   }
 
   int _plannedQueueItemCount(Block block) {
     return StudyTask.totalItemCount(_plannedQueueFromBlock(block));
+  }
+
+  List<StudyTask> _queueWithPlanningDefaults(Iterable<StudyTask> tasks) {
+    return tasks
+        .map(
+          (task) => task.copyWith(
+            plannedDurationMinutes:
+                task.plannedDurationMinutes ?? task.estimatedDurationMinutes,
+          ),
+        )
+        .toList();
+  }
+
+  String _buildTaskId({
+    required String type,
+    List<int> pageNumbers = const [],
+    List<int> topicIds = const [],
+  }) {
+    final parts = <String>[
+      type,
+      pageNumbers.join('-'),
+      topicIds.join('-'),
+      DateTime.now().microsecondsSinceEpoch.toString(),
+    ];
+    return parts.join('|');
   }
 
   String _buildStudySessionTitle(List<StudyTask> tasks) {
@@ -100,6 +128,17 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
     }
     if (tasks.any((task) => task.type == 'UWORLD')) {
       parts.add('UWorld');
+    }
+    if (tasks.any(
+      (task) => task.type == 'SKETCHY_MICRO' || task.type == 'SKETCHY_PHARM',
+    )) {
+      parts.add('Sketchy');
+    }
+    if (tasks.any((task) => task.type == 'PATHOMA')) {
+      parts.add('Pathoma');
+    }
+    if (parts.isEmpty && tasks.isNotEmpty) {
+      parts.add(tasks.first.label);
     }
 
     if (parts.isEmpty) {
@@ -136,6 +175,63 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
 
+  TimeOfDay? _timeOfDayFromString(String hhmm) {
+    final parts = hhmm.split(':');
+    if (parts.length != 2) {
+      return null;
+    }
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) {
+      return null;
+    }
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  DateTime _sessionStartDateTime(TimeOfDay time) {
+    final date = DateTime.tryParse(widget.dateKey) ?? DateTime.now();
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+  }
+
+  DateTime _blockStartDateTime(Block block) {
+    final date = DateTime.tryParse(block.date) ??
+        DateTime.tryParse(widget.dateKey) ??
+        DateTime.now();
+    final time = _timeOfDayFromString(block.plannedStartTime) ??
+        const TimeOfDay(hour: 9, minute: 0);
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+  }
+
+  String _plannedTaskWindowLabel(
+    DateTime sessionStart,
+    List<StudyTask> tasks,
+    int index,
+  ) {
+    var taskStart = sessionStart;
+    for (var i = 0; i < index; i++) {
+      taskStart = taskStart.add(
+        Duration(minutes: tasks[i].estimatedDurationMinutes),
+      );
+    }
+    final task = tasks[index];
+    final taskEnd = taskStart.add(
+      Duration(minutes: task.estimatedDurationMinutes),
+    );
+    return '${DateFormat('h:mm a').format(taskStart)} -> ${DateFormat('h:mm a').format(taskEnd)} • ${task.estimatedDurationMinutes} min';
+  }
+
   String _formatDurationLabel(int minutes) {
     final hours = minutes ~/ 60;
     final mins = minutes % 60;
@@ -150,6 +246,186 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
       0,
       (value, code) => ((value * 31) + code) & 0x7fffffff,
     );
+  }
+
+  Future<int?> _pickTaskDurationMinutes(
+    BuildContext dialogContext,
+    int initialMinutes,
+  ) async {
+    final controller = TextEditingController(text: initialMinutes.toString());
+    String? errorText;
+
+    final result = await showDialog<int>(
+      context: dialogContext,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              title: const Text('Task duration'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Set duration between 5 and 120 minutes.'),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: controller,
+                    keyboardType: TextInputType.number,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      labelText: 'Minutes',
+                      suffixText: 'min',
+                      errorText: errorText,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final minutes = int.tryParse(controller.text.trim());
+                    if (minutes == null || minutes < 5 || minutes > 120) {
+                      setDialogState(() {
+                        errorText = 'Enter a value from 5 to 120.';
+                      });
+                      return;
+                    }
+                    Navigator.of(dialogContext).pop(minutes);
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    controller.dispose();
+    return result;
+  }
+
+  RevisionItem? _findRevisionItem(AppProvider app, String revisionId) {
+    final index = app.revisionItems.indexWhere((item) => item.id == revisionId);
+    if (index < 0) {
+      return null;
+    }
+    return app.revisionItems[index];
+  }
+
+  List<_RevisionStatusSummary> _revisionStatusesForTask(
+    AppProvider app,
+    StudyTask task,
+  ) {
+    final revisions = <RevisionItem>[];
+    switch (task.type) {
+      case 'FA':
+        for (final page in task.pageNumbers) {
+          final item = _findRevisionItem(app, 'fa-page-$page');
+          if (item != null) {
+            revisions.add(item);
+          }
+        }
+        break;
+      case 'SKETCHY_MICRO':
+        for (final id in task.topicIds) {
+          final item = _findRevisionItem(app, 'sketchy-micro-$id');
+          if (item != null) {
+            revisions.add(item);
+          }
+        }
+        break;
+      case 'SKETCHY_PHARM':
+        for (final id in task.topicIds) {
+          final item = _findRevisionItem(app, 'sketchy-pharm-$id');
+          if (item != null) {
+            revisions.add(item);
+          }
+        }
+        break;
+      case 'PATHOMA':
+        for (final id in task.topicIds) {
+          final item = _findRevisionItem(app, 'pathoma-ch-$id');
+          if (item != null) {
+            revisions.add(item);
+          }
+        }
+        break;
+    }
+
+    return revisions
+        .map(_buildRevisionStatusSummary)
+        .whereType<_RevisionStatusSummary>()
+        .toList();
+  }
+
+  _RevisionStatusSummary? _buildRevisionStatusSummary(RevisionItem item) {
+    final scheduledAt = DateTime.tryParse(item.nextRevisionAt)?.toLocal();
+    if (scheduledAt == null) {
+      return null;
+    }
+
+    final now = DateTime.now();
+    final difference = scheduledAt.difference(now);
+    final dateLabel = DateFormat('d MMM yyyy').format(scheduledAt);
+    final timeLabel = DateFormat('h:mm a').format(scheduledAt);
+    if (difference.isNegative) {
+      return _RevisionStatusSummary(
+        text:
+            'Scheduled for $dateLabel at $timeLabel • Overdue by ${_formatRelativeTime(difference.abs())}',
+        overdue: true,
+      );
+    }
+
+    return _RevisionStatusSummary(
+      text:
+          'Scheduled for $dateLabel at $timeLabel • in ${_formatRelativeTime(difference)}',
+      overdue: false,
+    );
+  }
+
+  String _formatRelativeTime(Duration duration) {
+    if (duration.inHours >= 24) {
+      final days = duration.inDays;
+      final hours = duration.inHours.remainder(24);
+      if (hours == 0) {
+        return '$days day${days == 1 ? '' : 's'}';
+      }
+      return '$days day${days == 1 ? '' : 's'} $hours hour${hours == 1 ? '' : 's'}';
+    }
+
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    if (hours == 0) {
+      return '$minutes min';
+    }
+    if (minutes == 0) {
+      return '$hours hour${hours == 1 ? '' : 's'}';
+    }
+    return '$hours hour${hours == 1 ? '' : 's'} $minutes min';
+  }
+
+  List<_PlannedSessionQueueRowData> _plannedRowsForBlock(
+    AppProvider app,
+    Block block,
+  ) {
+    final queue = _plannedQueueFromBlock(block);
+    final sessionStart = _blockStartDateTime(block);
+    return queue.asMap().entries.map((entry) {
+      final index = entry.key;
+      final task = entry.value;
+      return _PlannedSessionQueueRowData(
+        icon: _iconForType(task.type),
+        title: task.label,
+        detail: task.detail,
+        timeLabel: _plannedTaskWindowLabel(sessionStart, queue, index),
+        revisionStatuses: _revisionStatusesForTask(app, task),
+      );
+    }).toList();
   }
 
   Future<void> _startPlannedSession(Block block) async {
@@ -194,19 +470,17 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
   }
 
   Future<void> _showPlanForLaterSheet() async {
-    final plannedQueue = StudyTask.plannableOnly(_queue);
-    if (plannedQueue.isEmpty) {
+    if (_queue.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No supported study items to plan (FA pages and UWorld only)'),
+          content: Text('Add at least one task to plan this study session.'),
         ),
       );
       return;
     }
 
-    final estimatedMinutes =
-        StudyTask.estimateQueueDurationMinutes(plannedQueue);
+    var plannedQueue = _queueWithPlanningDefaults(_queue);
     TimeOfDay selectedTime = TimeOfDay.now();
 
     await showModalBottomSheet(
@@ -217,6 +491,9 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
         final cs = Theme.of(sheetContext).colorScheme;
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
+            final estimatedMinutes =
+                StudyTask.estimateQueueDurationMinutes(plannedQueue);
+            final sessionStart = _sessionStartDateTime(selectedTime);
             return Container(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               decoration: BoxDecoration(
@@ -226,152 +503,223 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
               ),
               child: SafeArea(
                 top: false,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: cs.onSurface.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Plan for Later',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Estimated duration: ${_formatDurationLabel(estimatedMinutes)}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: cs.onSurface.withValues(alpha: 0.6),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Planned Queue',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 220),
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        itemCount: plannedQueue.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (_, index) {
-                          final task = plannedQueue[index];
-                          return Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: cs.surfaceContainerHighest
-                                  .withValues(alpha: 0.45),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
-                                _iconForType(task.type),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        task.label,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                          color: cs.onSurface,
-                                        ),
-                                      ),
-                                      Text(
-                                        task.detail,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color:
-                                              cs.onSurface.withValues(alpha: 0.55),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Scheduled Start',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        final picked = await showTimePicker(
-                          context: sheetContext,
-                          initialTime: selectedTime,
-                        );
-                        if (picked != null) {
-                          setSheetState(() {
-                            selectedTime = picked;
-                          });
-                        }
-                      },
-                      icon: const Icon(Icons.schedule_rounded, size: 18),
-                      label: Text(selectedTime.format(sheetContext)),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 14,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: () => _savePlannedSession(
-                          sheetContext,
-                          plannedQueue,
-                          selectedTime,
-                        ),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF8B5CF6),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: cs.onSurface.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
-                        child: const Text(
-                          'Save to Day Plan',
-                          style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Plan for Later',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurface,
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        'Estimated duration: ${_formatDurationLabel(estimatedMinutes)}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: cs.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Planned Queue',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Drag to reorder - top item starts first',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurface.withValues(alpha: 0.55),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 320),
+                        child: ReorderableListView.builder(
+                          shrinkWrap: true,
+                          buildDefaultDragHandles: false,
+                          itemCount: plannedQueue.length,
+                          onReorder: (oldIndex, newIndex) {
+                            setSheetState(() {
+                              if (newIndex > oldIndex) {
+                                newIndex -= 1;
+                              }
+                              final task = plannedQueue.removeAt(oldIndex);
+                              plannedQueue.insert(newIndex, task);
+                            });
+                          },
+                          itemBuilder: (_, index) {
+                            final task = plannedQueue[index];
+                            return Container(
+                              key: ValueKey(task.id),
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: cs.surfaceContainerHighest
+                                    .withValues(alpha: 0.45),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ReorderableDragStartListener(
+                                    index: index,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Icon(
+                                        Icons.drag_handle,
+                                        size: 20,
+                                        color: cs.onSurface
+                                            .withValues(alpha: 0.45),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  _iconForType(task.type),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          task.label,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            color: cs.onSurface,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          task.detail,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: cs.onSurface
+                                                .withValues(alpha: 0.55),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          _plannedTaskWindowLabel(
+                                            sessionStart,
+                                            plannedQueue,
+                                            index,
+                                          ),
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: cs.onSurface
+                                                .withValues(alpha: 0.6),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ActionChip(
+                                    label: Text(
+                                      '${task.estimatedDurationMinutes} min',
+                                    ),
+                                    onPressed: () async {
+                                      final minutes =
+                                          await _pickTaskDurationMinutes(
+                                        sheetContext,
+                                        task.estimatedDurationMinutes,
+                                      );
+                                      if (minutes == null) {
+                                        return;
+                                      }
+                                      setSheetState(() {
+                                        plannedQueue[index] = task.copyWith(
+                                          plannedDurationMinutes: minutes,
+                                        );
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Scheduled Start',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final picked = await showTimePicker(
+                            context: sheetContext,
+                            initialTime: selectedTime,
+                          );
+                          if (picked != null) {
+                            setSheetState(() {
+                              selectedTime = picked;
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.schedule_rounded, size: 18),
+                        label: Text(selectedTime.format(sheetContext)),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: () => _savePlannedSession(
+                            sheetContext,
+                            plannedQueue,
+                            selectedTime,
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF8B5CF6),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Text(
+                            'Save to Day Plan',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -607,13 +955,14 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                         final itemCount = _plannedQueueItemCount(block);
                         final durationMinutes =
                             _plannedQueueMinutesFromBlock(block);
-                        return _PlannedSessionCard(
+                        return _PlannedSessionDetailsCard(
                           title: block.title,
                           scheduledTime: _formatPlannedTime(
                             block.plannedStartTime,
                           ),
                           itemCount: itemCount,
                           durationLabel: _formatDurationLabel(durationMinutes),
+                          queueRows: _plannedRowsForBlock(app, block),
                           onStartNow: () => _startPlannedSession(block),
                         );
                       }),
@@ -720,6 +1069,15 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                       subtitle:
                           '${app.sketchyPharmVideos.where((v) => !v.watched).length} unwatched videos',
                       onTap: () => _showSketchyPicker(context, app, 'pharm'),
+                    ),
+                    const SizedBox(height: 10),
+                    _OptionCard(
+                      icon: Icons.ondemand_video_rounded,
+                      color: const Color(0xFFEF4444),
+                      title: 'Pathoma',
+                      subtitle:
+                          '${app.pathomaChapters.where((c) => !c.watched).length} unwatched chapters',
+                      onTap: () => _showPathomaPicker(context, app),
                     ),
                     const SizedBox(height: 20),
                     if (_queue.isNotEmpty) ...[
@@ -830,8 +1188,18 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
           color: Color(0xFFEC4899),
           size: 20,
         );
+      case 'PATHOMA':
+        return const Icon(
+          Icons.ondemand_video_rounded,
+          color: Color(0xFFEF4444),
+          size: 20,
+        );
       default:
-        return const Icon(Icons.school_rounded, size: 20);
+        return const Icon(
+          Icons.school_rounded,
+          color: Color(0xFF6366F1),
+          size: 20,
+        );
     }
   }
 
@@ -845,6 +1213,13 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
 
   String _uWorldTaskDetail(List<UWorldTopic> topics, int questionCount) {
     return '${topics.length} topics - $questionCount questions';
+  }
+
+  String _pathomaTaskDetail(List<PathomaChapter> chapters) {
+    if (chapters.length == 1) {
+      return 'Chapter ${chapters.first.chapter}';
+    }
+    return '${chapters.length} chapters';
   }
 
   void _startSession() {
@@ -983,6 +1358,10 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                                 ..sort();
                               setState(() {
                                 _queue.add(StudyTask(
+                                  id: _buildTaskId(
+                                    type: 'FA',
+                                    pageNumbers: selectedPages,
+                                  ),
                                   type: 'FA',
                                   label: 'FA Pages',
                                   detail: _faTaskDetail(selectedPages),
@@ -1190,6 +1569,12 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                           : () {
                               setState(() {
                                 _queue.add(StudyTask(
+                                  id: _buildTaskId(
+                                    type: 'UWORLD',
+                                    topicIds: selectedTopics
+                                        .map((topic) => topic.id!)
+                                        .toList(),
+                                  ),
                                   type: 'UWORLD',
                                   label: selectedSystem == null
                                       ? 'UWorld Questions'
@@ -1381,6 +1766,12 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                           : () {
                               setState(() {
                                 _queue.add(StudyTask(
+                                  id: _buildTaskId(
+                                    type: type == 'micro'
+                                        ? 'SKETCHY_MICRO'
+                                        : 'SKETCHY_PHARM',
+                                    topicIds: selectedVideos.toList(),
+                                  ),
                                   type: type == 'micro'
                                       ? 'SKETCHY_MICRO'
                                       : 'SKETCHY_PHARM',
@@ -1415,8 +1806,174 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
       },
     );
   }
+
+  void _showPathomaPicker(BuildContext context, AppProvider app) {
+    final cs = Theme.of(context).colorScheme;
+    final chapters = List<PathomaChapter>.from(app.pathomaChapters)
+      ..sort((a, b) => a.chapter.compareTo(b.chapter));
+    final selectedChapterIds = <int>{};
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            final selectedChapters = chapters
+                .where(
+                  (chapter) =>
+                      chapter.id != null &&
+                      selectedChapterIds.contains(chapter.id),
+                )
+                .toList()
+              ..sort((a, b) => a.chapter.compareTo(b.chapter));
+
+            return Container(
+              height: MediaQuery.of(ctx).size.height * 0.7,
+              decoration: BoxDecoration(
+                color: cs.surface,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 12, bottom: 8),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: cs.onSurface.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Pathoma',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          'Selected: ${selectedChapters.length}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: cs.onSurface.withValues(alpha: 0.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: chapters.length,
+                      itemBuilder: (ctx, i) {
+                        final chapter = chapters[i];
+                        final isSelected = chapter.id != null &&
+                            selectedChapterIds.contains(chapter.id);
+                        return CheckboxListTile(
+                          value: chapter.watched ? true : isSelected,
+                          onChanged: chapter.watched || chapter.id == null
+                              ? null
+                              : (value) {
+                                  setSheetState(() {
+                                    if (value == true) {
+                                      selectedChapterIds.add(chapter.id!);
+                                    } else {
+                                      selectedChapterIds.remove(chapter.id);
+                                    }
+                                  });
+                                },
+                          title: Text(
+                            'Chapter ${chapter.chapter}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              decoration: chapter.watched
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                              color: chapter.watched
+                                  ? cs.onSurface.withValues(alpha: 0.45)
+                                  : cs.onSurface,
+                            ),
+                          ),
+                          subtitle: Text(
+                            chapter.title,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: cs.onSurface.withValues(alpha: 0.5),
+                            ),
+                          ),
+                          dense: true,
+                          controlAffinity: ListTileControlAffinity.leading,
+                        );
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: selectedChapters.isEmpty
+                            ? null
+                            : () {
+                                setState(() {
+                                  _queue.add(
+                                    StudyTask(
+                                      id: _buildTaskId(
+                                        type: 'PATHOMA',
+                                        topicIds: selectedChapters
+                                            .map((chapter) => chapter.id!)
+                                            .toList(),
+                                      ),
+                                      type: 'PATHOMA',
+                                      label: 'Pathoma',
+                                      detail:
+                                          _pathomaTaskDetail(selectedChapters),
+                                      topicIds: selectedChapters
+                                          .map((chapter) => chapter.id!)
+                                          .toList(),
+                                    ),
+                                  );
+                                });
+                                Navigator.pop(ctx);
+                              },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFFEF4444),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          selectedChapters.isEmpty
+                              ? 'Select chapters'
+                              : 'Add ${selectedChapters.length} chapters to queue',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
+// ignore: unused_element
 class _PlannedSessionCard extends StatelessWidget {
   final String title;
   final String scheduledTime;
@@ -1496,6 +2053,198 @@ class _PlannedSessionCard extends StatelessWidget {
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RevisionStatusSummary {
+  final String text;
+  final bool overdue;
+
+  const _RevisionStatusSummary({
+    required this.text,
+    required this.overdue,
+  });
+}
+
+class _PlannedSessionQueueRowData {
+  final Widget icon;
+  final String title;
+  final String detail;
+  final String timeLabel;
+  final List<_RevisionStatusSummary> revisionStatuses;
+
+  const _PlannedSessionQueueRowData({
+    required this.icon,
+    required this.title,
+    required this.detail,
+    required this.timeLabel,
+    required this.revisionStatuses,
+  });
+}
+
+class _PlannedSessionDetailsCard extends StatelessWidget {
+  final String title;
+  final String scheduledTime;
+  final int itemCount;
+  final String durationLabel;
+  final List<_PlannedSessionQueueRowData> queueRows;
+  final VoidCallback onStartNow;
+
+  const _PlannedSessionDetailsCard({
+    required this.title,
+    required this.scheduledTime,
+    required this.itemCount,
+    required this.durationLabel,
+    required this.queueRows,
+    required this.onStartNow,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.schedule_rounded,
+                  color: Color(0xFF8B5CF6),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$scheduledTime • $itemCount item${itemCount == 1 ? '' : 's'} • $durationLabel',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurface.withValues(alpha: 0.55),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              FilledButton(
+                onPressed: onStartNow,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF8B5CF6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  'Start Now',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          if (queueRows.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ...queueRows.map(
+              (row) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: cs.surface.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        row.icon,
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                row.title,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: cs.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                row.detail,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: cs.onSurface.withValues(alpha: 0.55),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                row.timeLabel,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: cs.onSurface.withValues(alpha: 0.62),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (row.revisionStatuses.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      ...row.revisionStatuses.map(
+                        (revision) => Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            revision.text,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: revision.overdue
+                                  ? cs.error
+                                  : cs.onSurface.withValues(alpha: 0.58),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

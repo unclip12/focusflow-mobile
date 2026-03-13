@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:focusflow_mobile/models/fa_page.dart';
+import 'package:focusflow_mobile/models/pathoma_chapter.dart';
+import 'package:focusflow_mobile/models/sketchy_video.dart';
+import 'package:focusflow_mobile/models/time_log_entry.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/models/uworld_topic.dart';
@@ -9,25 +12,30 @@ import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/services/srs_service.dart';
+import 'package:focusflow_mobile/utils/constants.dart';
 
 class StudyTask {
+  final String id;
   final String type;
   final String label;
   final String detail;
   final List<int> pageNumbers;
   final List<int> topicIds;
   final int questionCount;
+  final int? plannedDurationMinutes;
 
   const StudyTask({
+    required this.id,
     required this.type,
     required this.label,
     required this.detail,
     this.pageNumbers = const [],
     this.topicIds = const [],
     this.questionCount = 0,
+    this.plannedDurationMinutes,
   });
 
-  bool get isPlannable => type == 'FA' || type == 'UWORLD';
+  bool get isPlannable => true;
 
   int get itemCount {
     switch (type) {
@@ -36,44 +44,100 @@ class StudyTask {
       case 'UWORLD':
         return topicIds.length;
       default:
-        return pageNumbers.isNotEmpty ? pageNumbers.length : topicIds.length;
+        if (pageNumbers.isNotEmpty) {
+          return pageNumbers.length;
+        }
+        if (topicIds.isNotEmpty) {
+          return topicIds.length;
+        }
+        return questionCount > 0 ? questionCount : 1;
     }
   }
 
   int get estimatedDurationMinutes {
+    if (plannedDurationMinutes != null) {
+      return plannedDurationMinutes!.clamp(5, 120);
+    }
+
+    final count = itemCount > 0 ? itemCount : 1;
     switch (type) {
       case 'FA':
-        return pageNumbers.length * 15;
+        return count * 15;
       case 'UWORLD':
-        return topicIds.length * 20;
+        return count * 20;
+      case 'SKETCHY_MICRO':
+      case 'SKETCHY_PHARM':
+        return count * 25;
+      case 'PATHOMA':
+        return count * 30;
       default:
-        return 0;
+        return count * 20;
     }
   }
 
   Map<String, dynamic> toJson() => {
+        'id': id,
         'type': type,
         'label': label,
         'detail': detail,
         'pageNumbers': pageNumbers,
         'topicIds': topicIds,
         'questionCount': questionCount,
+        if (plannedDurationMinutes != null)
+          'plannedDurationMinutes': plannedDurationMinutes,
       };
 
-  factory StudyTask.fromJson(Map<String, dynamic> json) => StudyTask(
-        type: json['type']?.toString() ?? '',
-        label: json['label']?.toString() ?? '',
-        detail: json['detail']?.toString() ?? '',
-        pageNumbers: json['pageNumbers'] != null
-            ? List<int>.from(json['pageNumbers'])
-            : const [],
-        topicIds:
-            json['topicIds'] != null ? List<int>.from(json['topicIds']) : const [],
-        questionCount: json['questionCount'] as int? ?? 0,
+  factory StudyTask.fromJson(Map<String, dynamic> json) {
+    final type = json['type']?.toString() ?? '';
+    final label = json['label']?.toString() ?? '';
+    final detail = json['detail']?.toString() ?? '';
+    final pageNumbers = _parseIntList(json['pageNumbers']);
+    final topicIds = _parseIntList(json['topicIds']);
+    final questionCount = json['questionCount'] as int? ?? 0;
+
+    return StudyTask(
+      id: json['id']?.toString() ??
+          _legacyId(
+            type: type,
+            label: label,
+            detail: detail,
+            pageNumbers: pageNumbers,
+            topicIds: topicIds,
+          ),
+      type: type,
+      label: label,
+      detail: detail,
+      pageNumbers: pageNumbers,
+      topicIds: topicIds,
+      questionCount: questionCount,
+      plannedDurationMinutes: json['plannedDurationMinutes'] as int?,
+    );
+  }
+
+  StudyTask copyWith({
+    String? id,
+    String? type,
+    String? label,
+    String? detail,
+    List<int>? pageNumbers,
+    List<int>? topicIds,
+    int? questionCount,
+    int? plannedDurationMinutes,
+  }) =>
+      StudyTask(
+        id: id ?? this.id,
+        type: type ?? this.type,
+        label: label ?? this.label,
+        detail: detail ?? this.detail,
+        pageNumbers: pageNumbers ?? this.pageNumbers,
+        topicIds: topicIds ?? this.topicIds,
+        questionCount: questionCount ?? this.questionCount,
+        plannedDurationMinutes:
+            plannedDurationMinutes ?? this.plannedDurationMinutes,
       );
 
   static List<StudyTask> plannableOnly(Iterable<StudyTask> tasks) {
-    return tasks.where((task) => task.isPlannable).toList();
+    return List<StudyTask>.from(tasks);
   }
 
   static int totalItemCount(Iterable<StudyTask> tasks) {
@@ -100,6 +164,33 @@ class StudyTask {
         .whereType<Map>()
         .map((task) => StudyTask.fromJson(Map<String, dynamic>.from(task)))
         .toList();
+  }
+
+  static List<int> _parseIntList(dynamic values) {
+    if (values is! List) {
+      return const <int>[];
+    }
+    return values
+        .map((value) => int.tryParse(value.toString()))
+        .whereType<int>()
+        .toList();
+  }
+
+  static String _legacyId({
+    required String type,
+    required String label,
+    required String detail,
+    required List<int> pageNumbers,
+    required List<int> topicIds,
+  }) {
+    final parts = <String>[
+      type,
+      label,
+      detail,
+      pageNumbers.join('-'),
+      topicIds.join('-'),
+    ];
+    return parts.join('|');
   }
 }
 
@@ -133,6 +224,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
   int _totalElapsed = 0;
   int _pageElapsed = 0;
   final List<_PageTiming> _pageTimings = [];
+  final Map<String, DateTime> _taskStartedAt = {};
 
   late final List<StudyTask> _queue;
   int _currentTaskIndex = 0;
@@ -162,6 +254,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
 
   bool get _isQueueFaTask => _currentTask?.type == 'FA';
   bool get _isQueueUWorldTask => _currentTask?.type == 'UWORLD';
+  bool get _isQueueStructuredTask => _isQueueFaTask || _isQueueUWorldTask;
 
   @override
   void initState() {
@@ -207,6 +300,9 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
     _isRevisionPage = false;
     _showAnkiPrompt = false;
     _ankiPendingPages.clear();
+    if (_isStudying) {
+      _startCurrentQueuedTaskIfNeeded();
+    }
   }
 
   void _startStudying() {
@@ -215,8 +311,17 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       _pageElapsed = 0;
     });
 
+    _startCurrentQueuedTaskIfNeeded();
     _ensureTimerRunning();
     _triggerQueuedFaRevisionGateIfNeeded();
+  }
+
+  void _startCurrentQueuedTaskIfNeeded() {
+    final task = _currentTask;
+    if (task == null) {
+      return;
+    }
+    _taskStartedAt.putIfAbsent(task.id, DateTime.now);
   }
 
   void _ensureTimerRunning() {
@@ -296,7 +401,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       _isRevisionPage = false;
       _isResolvingQueuedRevision = false;
     });
-    _moveToNextPage(triggerRevisionGate: false);
+    await _moveToNextPage(triggerRevisionGate: false);
 
     if (!mounted || !_isStudying) {
       return;
@@ -333,8 +438,9 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
               nextRevisionAt: scheduledAt.toIso8601String(),
             ) ??
             0;
-        final statusText =
-            isDueNow ? 'Due now' : 'Scheduled in $daysUntil day${daysUntil == 1 ? '' : 's'}';
+        final statusText = isDueNow
+            ? 'Due now'
+            : 'Scheduled in $daysUntil day${daysUntil == 1 ? '' : 's'}';
 
         return PopScope(
           canPop: false,
@@ -403,7 +509,8 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
-                                color: isDueNow ? cs.onErrorContainer : cs.primary,
+                                color:
+                                    isDueNow ? cs.onErrorContainer : cs.primary,
                               ),
                             ),
                           ),
@@ -457,7 +564,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
     return result ?? false;
   }
 
-  void _markPageDone() {
+  Future<void> _markPageDone() async {
     if (_hasQueuedTasks && !_isQueueFaTask) {
       return;
     }
@@ -498,10 +605,10 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       }
     }
 
-    _moveToNextPage();
+    await _moveToNextPage();
   }
 
-  void _moveToNextPage({bool triggerRevisionGate = true}) {
+  Future<void> _moveToNextPage({bool triggerRevisionGate = true}) async {
     if (_hasQueuedTasks && _isQueueFaTask) {
       final pages = _currentTask?.pageNumbers ?? const <int>[];
       final nextIndex = _currentTaskPageIndex + 1;
@@ -517,7 +624,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
         }
         return;
       }
-      _advanceQueue(triggerRevisionGate: triggerRevisionGate);
+      await _advanceQueue(triggerRevisionGate: triggerRevisionGate);
       return;
     }
 
@@ -537,7 +644,8 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
     });
   }
 
-  void _advanceQueue({bool triggerRevisionGate = true}) {
+  Future<void> _advanceQueue({bool triggerRevisionGate = true}) async {
+    await _completeCurrentQueuedTask();
     final nextTaskIndex = _currentTaskIndex + 1;
     if (nextTaskIndex >= _queue.length) {
       _endSession();
@@ -577,7 +685,44 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
     setState(() {
       _pageElapsed = 0;
     });
-    _advanceQueue();
+    await _advanceQueue();
+  }
+
+  Future<void> _completeQueuedSupplementalTask() async {
+    if (!_hasQueuedTasks || _isQueueStructuredTask) {
+      return;
+    }
+
+    HapticsService.medium();
+    final app = context.read<AppProvider>();
+    final task = _currentTask;
+    if (task == null) {
+      return;
+    }
+
+    final itemIds = task.topicIds.toSet();
+    for (final itemId in itemIds) {
+      switch (task.type) {
+        case 'SKETCHY_MICRO':
+          await app.advanceSketchyMicroRevision(itemId);
+          break;
+        case 'SKETCHY_PHARM':
+          await app.advanceSketchyPharmRevision(itemId);
+          break;
+        case 'PATHOMA':
+          await app.advancePathomaRevision(itemId);
+          break;
+      }
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _pageElapsed = 0;
+    });
+    await _advanceQueue();
   }
 
   void _doAnki() {
@@ -589,7 +734,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       _showAnkiPrompt = false;
       _ankiPendingPages.clear();
     });
-    _moveToNextPage();
+    unawaited(_moveToNextPage());
   }
 
   void _skipAnki() {
@@ -597,7 +742,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       _showAnkiPrompt = false;
       _ankiPendingPages.clear();
     });
-    _moveToNextPage();
+    unawaited(_moveToNextPage());
   }
 
   void _endSession() {
@@ -611,6 +756,71 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
     });
     widget.onComplete?.call();
     Navigator.pop(context);
+  }
+
+  Future<void> _completeCurrentQueuedTask() async {
+    final task = _currentTask;
+    if (task == null) {
+      return;
+    }
+
+    final completedAt = DateTime.now();
+    final startedAt = _taskStartedAt.remove(task.id) ?? completedAt;
+    final actualDurationSeconds =
+        completedAt.difference(startedAt).inSeconds.clamp(0, 24 * 60 * 60);
+    final durationMinutes =
+        (actualDurationSeconds / 60).ceil().clamp(1, 24 * 60);
+    final dateLabel = DateFormat('yyyy-MM-dd').format(completedAt.toLocal());
+
+    final entry = TimeLogEntry(
+      id: 'study-task-${task.id}-${completedAt.microsecondsSinceEpoch}',
+      date: dateLabel,
+      startTime: startedAt.toIso8601String(),
+      endTime: completedAt.toIso8601String(),
+      durationMinutes: durationMinutes,
+      category: _timeLogCategoryForTask(task),
+      source: TimeLogSource.todaysPlan,
+      activity: task.label,
+      linkedEntityId: task.id,
+      taskType: task.type,
+      taskId: task.id,
+      taskLabel: task.label,
+      actualDurationSeconds: actualDurationSeconds,
+      pageNumber: _timeLogPageNumber(task),
+      topics: _timeLogTopics(task),
+    );
+
+    await context.read<AppProvider>().upsertTimeLog(entry);
+  }
+
+  TimeLogCategory _timeLogCategoryForTask(StudyTask task) {
+    switch (task.type) {
+      case 'UWORLD':
+        return TimeLogCategory.qbank;
+      case 'SKETCHY_MICRO':
+      case 'SKETCHY_PHARM':
+      case 'PATHOMA':
+        return TimeLogCategory.video;
+      default:
+        return TimeLogCategory.study;
+    }
+  }
+
+  String? _timeLogPageNumber(StudyTask task) {
+    if (task.type != 'FA' || task.pageNumbers.isEmpty) {
+      return null;
+    }
+    if (task.pageNumbers.length == 1) {
+      return task.pageNumbers.first.toString();
+    }
+    return '${task.pageNumbers.first}-${task.pageNumbers.last}';
+  }
+
+  List<String>? _timeLogTopics(StudyTask task) {
+    if (task.type == 'FA' || task.topicIds.isEmpty) {
+      return null;
+    }
+    return task.topicIds.map((id) => id.toString()).toList();
   }
 
   String _fmtTime(int seconds) {
@@ -638,6 +848,106 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
     return topics;
   }
 
+  List<SketchyVideo> _selectedSketchyVideos(AppProvider app, String type) {
+    final selectedIds = _currentTask?.topicIds.toSet() ?? const <int>{};
+    if (selectedIds.isEmpty) {
+      return const <SketchyVideo>[];
+    }
+
+    final source = type == 'SKETCHY_PHARM'
+        ? app.sketchyPharmVideos
+        : app.sketchyMicroVideos;
+    final videos = source
+        .where((video) => video.id != null && selectedIds.contains(video.id))
+        .toList()
+      ..sort((a, b) => a.title.compareTo(b.title));
+    return videos;
+  }
+
+  List<PathomaChapter> _selectedPathomaChapters(AppProvider app) {
+    final selectedIds = _currentTask?.topicIds.toSet() ?? const <int>{};
+    if (selectedIds.isEmpty) {
+      return const <PathomaChapter>[];
+    }
+
+    final chapters = app.pathomaChapters
+        .where(
+            (chapter) => chapter.id != null && selectedIds.contains(chapter.id))
+        .toList()
+      ..sort((a, b) => a.chapter.compareTo(b.chapter));
+    return chapters;
+  }
+
+  List<_QueuedTaskListItem> _selectedSupplementalItems(AppProvider app) {
+    final task = _currentTask;
+    if (task == null) {
+      return const <_QueuedTaskListItem>[];
+    }
+
+    switch (task.type) {
+      case 'SKETCHY_MICRO':
+      case 'SKETCHY_PHARM':
+        return _selectedSketchyVideos(app, task.type)
+            .map(
+              (video) => _QueuedTaskListItem(
+                title: video.title,
+                subtitle: '${video.category} • ${video.subcategory}',
+              ),
+            )
+            .toList();
+      case 'PATHOMA':
+        return _selectedPathomaChapters(app)
+            .map(
+              (chapter) => _QueuedTaskListItem(
+                title: 'Chapter ${chapter.chapter}',
+                subtitle: chapter.title,
+              ),
+            )
+            .toList();
+      default:
+        if (task.topicIds.isEmpty) {
+          return const <_QueuedTaskListItem>[];
+        }
+        return task.topicIds
+            .map(
+              (id) => _QueuedTaskListItem(
+                title: task.label,
+                subtitle: 'Item ID $id',
+              ),
+            )
+            .toList();
+    }
+  }
+
+  IconData _iconForTaskType(String type) {
+    switch (type) {
+      case 'UWORLD':
+        return Icons.quiz_rounded;
+      case 'SKETCHY_MICRO':
+      case 'SKETCHY_PHARM':
+        return Icons.play_circle_fill_rounded;
+      case 'PATHOMA':
+        return Icons.ondemand_video_rounded;
+      default:
+        return Icons.menu_book_rounded;
+    }
+  }
+
+  Color _accentForTaskType(String type) {
+    switch (type) {
+      case 'UWORLD':
+        return const Color(0xFFF59E0B);
+      case 'SKETCHY_MICRO':
+        return const Color(0xFF0EA5E9);
+      case 'SKETCHY_PHARM':
+        return const Color(0xFF14B8A6);
+      case 'PATHOMA':
+        return const Color(0xFFEF4444);
+      default:
+        return const Color(0xFF8B5CF6);
+    }
+  }
+
   String _welcomeDescription() {
     final task = _currentTask;
     if (!_hasQueuedTasks || task == null) {
@@ -660,7 +970,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       return 'Queued task ${_currentTaskIndex + 1} of ${_queue.length}.\nStart ${task.detail}?';
     }
 
-    return 'Queued task ${_currentTaskIndex + 1} of ${_queue.length}.';
+    return 'Queued task ${_currentTaskIndex + 1} of ${_queue.length}.\nStart ${task.label}?';
   }
 
   String _welcomeBadgeText() {
@@ -678,7 +988,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       return '${task.questionCount} queued question${task.questionCount == 1 ? '' : 's'}';
     }
 
-    return task.detail;
+    return '${task.estimatedDurationMinutes} min planned';
   }
 
   String _faBannerText() {
@@ -736,6 +1046,22 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
         totalElapsedLabel: _fmtTime(_totalElapsed),
         taskElapsedLabel: _fmtTime(_pageElapsed),
         onComplete: _completeQueuedUWorldTask,
+        onEndSession: _endSession,
+      );
+    }
+
+    if (_hasQueuedTasks && !_isQueueFaTask) {
+      final task = _currentTask!;
+      return _QueuedGenericTaskView(
+        task: task,
+        items: _selectedSupplementalItems(app),
+        taskIndex: _currentTaskIndex,
+        totalTasks: _queue.length,
+        totalElapsedLabel: _fmtTime(_totalElapsed),
+        taskElapsedLabel: _fmtTime(_pageElapsed),
+        accentColor: _accentForTaskType(task.type),
+        icon: _iconForTaskType(task.type),
+        onComplete: _completeQueuedSupplementalTask,
         onEndSession: _endSession,
       );
     }
@@ -1361,6 +1687,278 @@ class _QueuedUWorldView extends StatelessWidget {
                           borderRadius: BorderRadius.circular(14),
                         ),
                         backgroundColor: const Color(0xFFF59E0B),
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QueuedTaskListItem {
+  final String title;
+  final String subtitle;
+
+  const _QueuedTaskListItem({
+    required this.title,
+    required this.subtitle,
+  });
+}
+
+class _QueuedGenericTaskView extends StatelessWidget {
+  final StudyTask task;
+  final List<_QueuedTaskListItem> items;
+  final int taskIndex;
+  final int totalTasks;
+  final String totalElapsedLabel;
+  final String taskElapsedLabel;
+  final Color accentColor;
+  final IconData icon;
+  final Future<void> Function() onComplete;
+  final VoidCallback onEndSession;
+
+  const _QueuedGenericTaskView({
+    required this.task,
+    required this.items,
+    required this.taskIndex,
+    required this.totalTasks,
+    required this.totalElapsedLabel,
+    required this.taskElapsedLabel,
+    required this.accentColor,
+    required this.icon,
+    required this.onComplete,
+    required this.onEndSession,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final detailText = task.detail.trim().isEmpty ? task.label : task.detail;
+    final itemLabel = task.itemCount == 1 ? 'item' : 'items';
+
+    return Scaffold(
+      backgroundColor: cs.surface,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(icon, size: 22, color: accentColor),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      task.label,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: onEndSession,
+                    child: const Text('End Session'),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    accentColor.withValues(alpha: 0.14),
+                    accentColor.withValues(alpha: 0.08),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.playlist_add_check_rounded, color: accentColor),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Task ${taskIndex + 1}/$totalTasks - ${task.itemCount} queued $itemLabel',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: accentColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  detailText,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: cs.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: items.isEmpty
+                  ? Center(
+                      child: Text(
+                        'Review the task details, then mark it done when finished.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: cs.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: cs.surfaceContainerHighest
+                                .withValues(alpha: 0.45),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: accentColor.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(icon, color: accentColor),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.title,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: cs.onSurface,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      item.subtitle,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: cs.onSurface
+                                            .withValues(alpha: 0.55),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Column(
+                        children: [
+                          Text(
+                            'This task',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: cs.onSurface.withValues(alpha: 0.5),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            taskElapsedLabel,
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                              color: accentColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 24),
+                        width: 1,
+                        height: 40,
+                        color: cs.onSurface.withValues(alpha: 0.1),
+                      ),
+                      Column(
+                        children: [
+                          Text(
+                            'Total',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: cs.onSurface.withValues(alpha: 0.5),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            totalElapsedLabel,
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                              color: cs.onSurface.withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: onComplete,
+                      icon: const Icon(Icons.check_rounded, size: 22),
+                      label: const Text(
+                        'Mark Done',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        backgroundColor: accentColor,
                         foregroundColor: Colors.white,
                       ),
                     ),

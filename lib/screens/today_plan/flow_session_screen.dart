@@ -781,6 +781,39 @@ class _StudySessionLaunchCard extends StatelessWidget {
     required this.onBegin,
   });
 
+  IconData _iconForTask(StudyTask task) {
+    switch (task.type) {
+      case 'FA':
+        return Icons.menu_book_rounded;
+      case 'UWORLD':
+        return Icons.quiz_rounded;
+      case 'SKETCHY_MICRO':
+      case 'SKETCHY_PHARM':
+        return Icons.play_circle_rounded;
+      case 'PATHOMA':
+        return Icons.ondemand_video_rounded;
+      default:
+        return Icons.school_rounded;
+    }
+  }
+
+  Color _colorForTask(StudyTask task) {
+    switch (task.type) {
+      case 'FA':
+        return const Color(0xFF8B5CF6);
+      case 'UWORLD':
+        return const Color(0xFFF59E0B);
+      case 'SKETCHY_MICRO':
+        return const Color(0xFF3B82F6);
+      case 'SKETCHY_PHARM':
+        return const Color(0xFFEC4899);
+      case 'PATHOMA':
+        return const Color(0xFFEF4444);
+      default:
+        return const Color(0xFF6366F1);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -856,13 +889,9 @@ class _StudySessionLaunchCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Icon(
-                              task.type == 'FA'
-                                  ? Icons.menu_book_rounded
-                                  : Icons.quiz_rounded,
+                              _iconForTask(task),
                               size: 20,
-                              color: task.type == 'FA'
-                                  ? const Color(0xFF8B5CF6)
-                                  : const Color(0xFFF59E0B),
+                              color: _colorForTask(task),
                             ),
                             const SizedBox(width: 10),
                             Expanded(

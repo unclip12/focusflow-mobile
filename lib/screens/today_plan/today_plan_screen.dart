@@ -4,6 +4,7 @@
 // Swipe-to-complete on block cards, completion celebration.
 // =============================================================
 
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:focusflow_mobile/services/notification_service.dart';
@@ -24,6 +25,7 @@ import 'flow_control_bar.dart';
 import 'flow_activity_card.dart';
 import 'package:focusflow_mobile/models/daily_flow.dart';
 import 'package:focusflow_mobile/screens/session/session_screen.dart';
+import 'study_flow_screen.dart';
 import 'track_now_screen.dart';
 
 class TodayPlanScreen extends StatefulWidget {
@@ -802,9 +804,8 @@ class _AllTabContentState extends State<_AllTabContent>
     }
 
     final plan = app.getDayPlan(widget.dateKey);
-    final blockIds = (plan?.blocks ?? const <Block>[])
-        .map((block) => block.id)
-        .toSet();
+    final blockIds =
+        (plan?.blocks ?? const <Block>[]).map((block) => block.id).toSet();
     for (final linkedId in activity.linkedTaskIds) {
       if (blockIds.contains(linkedId)) {
         return linkedId;
@@ -833,6 +834,257 @@ class _AllTabContentState extends State<_AllTabContent>
   DateTime? _tryParseIso(String? value) {
     if (value == null || value.isEmpty) return null;
     return DateTime.tryParse(value);
+  }
+
+  TimeOfDay? _tryParseHm(String? value) {
+    if (value == null || value.isEmpty) return null;
+    final parts = value.split(':');
+    if (parts.length != 2) {
+      return null;
+    }
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) {
+      return null;
+    }
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  String _formatHm(TimeOfDay value) {
+    return '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+  }
+
+  DateTime _combineDateAndTime(DateTime date, TimeOfDay time) {
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+  }
+
+  DateTime? _plannedDateTimeFromBlockTime(Block block, String hhmm) {
+    final time = _tryParseHm(hhmm);
+    if (time == null) {
+      return null;
+    }
+    return _combineDateAndTime(_dateFromKey(block.date), time);
+  }
+
+  List<StudyTask> _plannedStudySessionTasks(Block block) {
+    final notes = block.reflectionNotes;
+    if (notes == null || notes.isEmpty) {
+      return const <StudyTask>[];
+    }
+    try {
+      final decoded = jsonDecode(notes);
+      if (decoded is! Map<String, dynamic>) {
+        return const <StudyTask>[];
+      }
+      if (decoded['kind'] != 'planned_study_session') {
+        return const <StudyTask>[];
+      }
+      return StudyTask.fromJsonList(decoded['tasks']);
+    } catch (_) {
+      return const <StudyTask>[];
+    }
+  }
+
+  int _plannedStudySessionMinutes(Block block) {
+    final tasks = _plannedStudySessionTasks(block);
+    if (tasks.isNotEmpty) {
+      return StudyTask.estimateQueueDurationMinutes(tasks);
+    }
+
+    final notes = block.reflectionNotes;
+    if (notes != null && notes.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(notes);
+        if (decoded is Map<String, dynamic>) {
+          final minutes = decoded['estimatedDurationMinutes'] as int?;
+          if (minutes != null && minutes > 0) {
+            return minutes;
+          }
+        }
+      } catch (_) {
+        // Fall back to block duration.
+      }
+    }
+
+    return block.plannedDurationMinutes;
+  }
+
+  String _plannedStudySessionTitle(
+      List<StudyTask> tasks, String fallbackTitle) {
+    if (tasks.isEmpty) {
+      return fallbackTitle;
+    }
+
+    final parts = <String>[];
+    final faPages = tasks
+        .where((task) => task.type == 'FA')
+        .expand((task) => task.pageNumbers)
+        .toList()
+      ..sort();
+    if (faPages.isNotEmpty) {
+      if (faPages.length == 1) {
+        parts.add('FA p.${faPages.first}');
+      } else {
+        parts.add('FA pp.${faPages.first}-${faPages.last}');
+      }
+    }
+    if (tasks.any((task) => task.type == 'UWORLD')) {
+      parts.add('UWorld');
+    }
+    if (tasks.any(
+      (task) => task.type == 'SKETCHY_MICRO' || task.type == 'SKETCHY_PHARM',
+    )) {
+      parts.add('Sketchy');
+    }
+    if (tasks.any((task) => task.type == 'PATHOMA')) {
+      parts.add('Pathoma');
+    }
+    if (parts.isEmpty) {
+      return fallbackTitle;
+    }
+    return 'Study Session - ${parts.join(' + ')}';
+  }
+
+  String? _updatedPlannedStudySessionNotes(Block block, int queueMinutes) {
+    final notes = block.reflectionNotes;
+    if (notes == null || notes.isEmpty) {
+      return notes;
+    }
+
+    try {
+      final decoded = jsonDecode(notes);
+      if (decoded is! Map<String, dynamic>) {
+        return notes;
+      }
+      if (decoded['kind'] != 'planned_study_session') {
+        return notes;
+      }
+      final updated = Map<String, dynamic>.from(decoded)
+        ..['estimatedDurationMinutes'] = queueMinutes;
+      return jsonEncode(updated);
+    } catch (_) {
+      return notes;
+    }
+  }
+
+  DayPlan _buildDayPlanWithBlocks(
+    AppProvider app,
+    String dateKey,
+    List<Block> blocks,
+  ) {
+    final sortedBlocks = List<Block>.from(blocks)
+      ..sort((a, b) {
+        final startCompare = a.plannedStartTime.compareTo(b.plannedStartTime);
+        if (startCompare != 0) {
+          return startCompare;
+        }
+        return a.index.compareTo(b.index);
+      });
+    final reindexedBlocks = List<Block>.generate(
+      sortedBlocks.length,
+      (index) => sortedBlocks[index].copyWith(index: index, date: dateKey),
+    );
+    final existingPlan = app.getDayPlan(dateKey);
+    final totalStudyMinutes = reindexedBlocks
+        .where((entry) => entry.type != BlockType.breakBlock)
+        .fold<int>(0, (sum, entry) => sum + entry.plannedDurationMinutes);
+    final totalBreakMinutes = reindexedBlocks
+        .where((entry) => entry.type == BlockType.breakBlock)
+        .fold<int>(0, (sum, entry) => sum + entry.plannedDurationMinutes);
+
+    return existingPlan?.copyWith(
+          blocks: reindexedBlocks,
+          totalStudyMinutesPlanned: totalStudyMinutes,
+          totalBreakMinutes: totalBreakMinutes,
+        ) ??
+        DayPlan(
+          date: dateKey,
+          faPages: const [],
+          faPagesCount: 0,
+          videos: const [],
+          notesFromUser: '',
+          notesFromAI: '',
+          attachments: const [],
+          breaks: const [],
+          blocks: reindexedBlocks,
+          totalStudyMinutesPlanned: totalStudyMinutes,
+          totalBreakMinutes: totalBreakMinutes,
+        );
+  }
+
+  Future<void> _persistUpdatedBlock(
+    AppProvider app,
+    Block updatedBlock, {
+    required String sourceDateKey,
+    required String targetDateKey,
+  }) async {
+    if (sourceDateKey == targetDateKey) {
+      final currentBlocks = List<Block>.from(
+          app.getDayPlan(sourceDateKey)?.blocks ?? const <Block>[]);
+      final index =
+          currentBlocks.indexWhere((block) => block.id == updatedBlock.id);
+      if (index < 0) {
+        return;
+      }
+      currentBlocks[index] = updatedBlock.copyWith(date: targetDateKey);
+      await app.upsertDayPlan(
+        _buildDayPlanWithBlocks(app, targetDateKey, currentBlocks),
+      );
+      await app.syncFlowActivitiesFromDayPlan(targetDateKey);
+      return;
+    }
+
+    final sourceBlocks = List<Block>.from(
+        app.getDayPlan(sourceDateKey)?.blocks ?? const <Block>[]);
+    sourceBlocks.removeWhere((block) => block.id == updatedBlock.id);
+    await app.upsertDayPlan(
+      _buildDayPlanWithBlocks(app, sourceDateKey, sourceBlocks),
+    );
+
+    final targetBlocks = List<Block>.from(
+        app.getDayPlan(targetDateKey)?.blocks ?? const <Block>[])
+      ..add(updatedBlock.copyWith(date: targetDateKey));
+    await app.upsertDayPlan(
+      _buildDayPlanWithBlocks(app, targetDateKey, targetBlocks),
+    );
+
+    await app.syncFlowActivitiesFromDayPlan(sourceDateKey);
+    await app.syncFlowActivitiesFromDayPlan(targetDateKey);
+  }
+
+  DateTime _activityBaseDate(FlowActivity activity, Block? block) {
+    if (block != null) {
+      return _dateFromKey(block.date);
+    }
+    return _flowActivityDate(activity);
+  }
+
+  TimeOfDay? _activityStartTime(FlowActivity activity, Block? block) {
+    if (block != null) {
+      return _tryParseHm(block.plannedStartTime);
+    }
+    final start = _tryParseIso(activity.startedAt);
+    if (start == null) {
+      return null;
+    }
+    return TimeOfDay(hour: start.hour, minute: start.minute);
+  }
+
+  TimeOfDay? _activityEndTime(FlowActivity activity, Block? block) {
+    if (block != null) {
+      return _tryParseHm(block.plannedEndTime);
+    }
+    final end = _tryParseIso(activity.completedAt);
+    if (end == null) {
+      return null;
+    }
+    return TimeOfDay(hour: end.hour, minute: end.minute);
   }
 
   DateTime _flowActivityDate(FlowActivity activity) {
@@ -883,6 +1135,105 @@ class _AllTabContentState extends State<_AllTabContent>
 
     await app.removeFlowActivity(widget.dateKey, activity.id);
     await app.addFlowActivity(targetDateKey, updated);
+  }
+
+  Future<void> _moveOrUpdateBlockBackedActivity(
+    AppProvider app,
+    FlowActivity activity,
+    Block block, {
+    DateTime? date,
+    TimeOfDay? startTime,
+    TimeOfDay? endTime,
+  }) async {
+    final sourceDateKey = block.date;
+    final targetDate = date ?? _dateFromKey(block.date);
+    final targetDateKey = DateFormat('yyyy-MM-dd').format(targetDate);
+    final baseDate =
+        DateTime(targetDate.year, targetDate.month, targetDate.day);
+    final currentStart = _plannedDateTimeFromBlockTime(
+          block,
+          block.plannedStartTime,
+        ) ??
+        _combineDateAndTime(
+          baseDate,
+          const TimeOfDay(hour: 9, minute: 0),
+        );
+    final currentEnd = _plannedDateTimeFromBlockTime(
+          block,
+          block.plannedEndTime,
+        ) ??
+        currentStart.add(
+          Duration(minutes: max(block.plannedDurationMinutes, 15)),
+        );
+
+    var nextStart = date != null
+        ? _combineDateAndTime(
+            baseDate,
+            TimeOfDay(hour: currentStart.hour, minute: currentStart.minute),
+          )
+        : currentStart;
+    var nextEnd = date != null
+        ? _combineDateAndTime(
+            baseDate,
+            TimeOfDay(hour: currentEnd.hour, minute: currentEnd.minute),
+          )
+        : currentEnd;
+
+    var nextDurationMinutes = block.plannedDurationMinutes;
+    var nextTitle = block.title;
+    var nextNotes = block.reflectionNotes;
+
+    if (block.type == BlockType.studySession) {
+      final queueMinutes = max(_plannedStudySessionMinutes(block), 5);
+      if (startTime != null) {
+        nextStart = _combineDateAndTime(baseDate, startTime);
+        nextEnd = nextStart.add(Duration(minutes: queueMinutes));
+      } else if (endTime != null) {
+        nextEnd = _combineDateAndTime(baseDate, endTime);
+        nextStart = nextEnd.subtract(Duration(minutes: queueMinutes));
+      } else if (date != null) {
+        nextStart = _combineDateAndTime(
+          baseDate,
+          TimeOfDay(hour: currentStart.hour, minute: currentStart.minute),
+        );
+        nextEnd = nextStart.add(Duration(minutes: queueMinutes));
+      }
+      nextDurationMinutes = queueMinutes;
+      final tasks = _plannedStudySessionTasks(block);
+      nextTitle = _plannedStudySessionTitle(tasks, block.title);
+      nextNotes = _updatedPlannedStudySessionNotes(block, queueMinutes);
+    } else {
+      if (startTime != null) {
+        nextStart = _combineDateAndTime(baseDate, startTime);
+      }
+      if (endTime != null) {
+        nextEnd = _combineDateAndTime(baseDate, endTime);
+      }
+      nextDurationMinutes = max(
+        nextEnd.difference(nextStart).inMinutes,
+        block.plannedDurationMinutes,
+      );
+    }
+
+    final updatedBlock = block.copyWith(
+      date: targetDateKey,
+      plannedStartTime: _formatHm(
+        TimeOfDay(hour: nextStart.hour, minute: nextStart.minute),
+      ),
+      plannedEndTime: _formatHm(
+        TimeOfDay(hour: nextEnd.hour, minute: nextEnd.minute),
+      ),
+      plannedDurationMinutes: nextDurationMinutes,
+      title: nextTitle,
+      reflectionNotes: nextNotes,
+    );
+
+    await _persistUpdatedBlock(
+      app,
+      updatedBlock,
+      sourceDateKey: sourceDateKey,
+      targetDateKey: targetDateKey,
+    );
   }
 
   Block? _blockForActivity(FlowActivity activity) {
@@ -942,9 +1293,8 @@ class _AllTabContentState extends State<_AllTabContent>
   String? _actualSubtitleForActivity(FlowActivity activity) {
     final start = _tryParseIso(activity.startedAt);
     final end = _tryParseIso(activity.completedAt);
-    final durationMinutes = activity.durationSeconds != null
-        ? activity.durationSeconds! ~/ 60
-        : 0;
+    final durationMinutes =
+        activity.durationSeconds != null ? activity.durationSeconds! ~/ 60 : 0;
 
     if (!_isMeaningfulDateTime(start) ||
         !_isMeaningfulDateTime(end) ||
@@ -962,6 +1312,7 @@ class _AllTabContentState extends State<_AllTabContent>
     }
     return _actualSubtitleForActivity(activity);
   }
+
   Widget _dismissibleBackground() {
     return Container(
       alignment: Alignment.centerRight,
@@ -981,6 +1332,10 @@ class _AllTabContentState extends State<_AllTabContent>
     FlowActivity activity,
   ) async {
     final cs = Theme.of(context).colorScheme;
+    final block = _blockForActivity(activity);
+    final initialDate = _activityBaseDate(activity, block);
+    final initialStartTime = _activityStartTime(activity, block);
+    final initialEndTime = _activityEndTime(activity, block);
     await showModalBottomSheet(
       context: context,
       useSafeArea: true,
@@ -1009,13 +1364,25 @@ class _AllTabContentState extends State<_AllTabContent>
                   Navigator.pop(ctx);
                   final picked = await showDatePicker(
                     context: context,
-                    initialDate: _flowActivityDate(activity),
+                    initialDate: initialDate,
                     firstDate: DateTime(2024),
                     lastDate: DateTime(2027),
                   );
                   if (picked != null) {
-                    await _moveOrUpdateFlowActivity(app, activity,
-                        date: picked);
+                    if (block != null) {
+                      await _moveOrUpdateBlockBackedActivity(
+                        app,
+                        activity,
+                        block,
+                        date: picked,
+                      );
+                    } else {
+                      await _moveOrUpdateFlowActivity(
+                        app,
+                        activity,
+                        date: picked,
+                      );
+                    }
                   }
                 },
               ),
@@ -1024,16 +1391,26 @@ class _AllTabContentState extends State<_AllTabContent>
                 title: const Text('Edit Start Time'),
                 onTap: () async {
                   Navigator.pop(ctx);
-                  final current = _tryParseIso(activity.startedAt);
                   final picked = await showTimePicker(
                     context: context,
-                    initialTime: current != null
-                        ? TimeOfDay(hour: current.hour, minute: current.minute)
-                        : const TimeOfDay(hour: 9, minute: 0),
+                    initialTime:
+                        initialStartTime ?? const TimeOfDay(hour: 9, minute: 0),
                   );
                   if (picked != null) {
-                    await _moveOrUpdateFlowActivity(app, activity,
-                        startTime: picked);
+                    if (block != null) {
+                      await _moveOrUpdateBlockBackedActivity(
+                        app,
+                        activity,
+                        block,
+                        startTime: picked,
+                      );
+                    } else {
+                      await _moveOrUpdateFlowActivity(
+                        app,
+                        activity,
+                        startTime: picked,
+                      );
+                    }
                   }
                 },
               ),
@@ -1042,16 +1419,26 @@ class _AllTabContentState extends State<_AllTabContent>
                 title: const Text('Edit End Time'),
                 onTap: () async {
                   Navigator.pop(ctx);
-                  final current = _tryParseIso(activity.completedAt);
                   final picked = await showTimePicker(
                     context: context,
-                    initialTime: current != null
-                        ? TimeOfDay(hour: current.hour, minute: current.minute)
-                        : const TimeOfDay(hour: 10, minute: 0),
+                    initialTime:
+                        initialEndTime ?? const TimeOfDay(hour: 10, minute: 0),
                   );
                   if (picked != null) {
-                    await _moveOrUpdateFlowActivity(app, activity,
-                        endTime: picked);
+                    if (block != null) {
+                      await _moveOrUpdateBlockBackedActivity(
+                        app,
+                        activity,
+                        block,
+                        endTime: picked,
+                      );
+                    } else {
+                      await _moveOrUpdateFlowActivity(
+                        app,
+                        activity,
+                        endTime: picked,
+                      );
+                    }
                   }
                 },
               ),
@@ -1351,7 +1738,8 @@ class _AllTabContentState extends State<_AllTabContent>
                 subtitle: _fullDaySubtitleForActivity(activity),
                 onTap: () => _showFlowTaskActionsSheet(context, app, activity),
                 onComplete: activity.isActive || activity.isPaused
-                    ? () => app.completeFlowActivity(widget.dateKey, activity.id)
+                    ? () =>
+                        app.completeFlowActivity(widget.dateKey, activity.id)
                     : null,
                 onUndo: activity.isDone
                     ? () => app.undoFlowActivity(widget.dateKey, activity.id)
@@ -1431,6 +1819,7 @@ class _AllTabContentState extends State<_AllTabContent>
       },
     );
   }
+
   Widget _emptySegment(ColorScheme cs, String msg, IconData icon) {
     return Center(
       child: Column(
@@ -1650,11 +2039,12 @@ class _FullDayFlowCard extends StatelessWidget {
                     minHeight: 36,
                   ),
                 ),
-              if ((activity.isActive || activity.isPaused) && onComplete != null)
+              if ((activity.isActive || activity.isPaused) &&
+                  onComplete != null)
                 IconButton(
                   onPressed: onComplete,
-                  icon: const Icon(Icons.check_circle_outline_rounded,
-                      size: 22),
+                  icon:
+                      const Icon(Icons.check_circle_outline_rounded, size: 22),
                   color: const Color(0xFF10B981),
                   tooltip: 'Complete',
                   constraints: const BoxConstraints(
@@ -1669,6 +2059,7 @@ class _FullDayFlowCard extends StatelessWidget {
     );
   }
 }
+
 class _FullDayItem {
   final String type; // 'flow' | 'todo' | 'buying'
   final FlowActivity? flowActivity;
