@@ -19,17 +19,17 @@ class NotificationService {
   bool _initialised = false;
 
   // ── Notification IDs ──────────────────────────────────────────
-  static const int _timerDoneId        = 1001;
-  static const int _dailyRevisionId    = 2001;
-  static const int _streakRiskId       = 3001;
-  static const int _morningSummaryId   = 4001;
+  static const int _timerDoneId = 1001;
+  static const int _dailyRevisionId = 2001;
+  static const int _streakRiskId = 3001;
+  static const int _morningSummaryId = 4001;
 
   // ── Channel IDs ───────────────────────────────────────────────
-  static const String _chFocusTimer    = 'focus_timer';
-  static const String _chRevisionDue   = 'revision_due';
+  static const String _chFocusTimer = 'focus_timer';
+  static const String _chRevisionDue = 'revision_due';
   static const String _chStreakReminder = 'streak_reminder';
-  static const String _chDailySummary  = 'daily_summary';
-  static const String _chStudySession  = 'study_session';
+  static const String _chDailySummary = 'daily_summary';
+  static const String _chStudySession = 'study_session';
   static const String _chRoutineReminder = 'routine_reminder';
 
   // ── Android channels ─────────────────────────────────────────
@@ -86,8 +86,10 @@ class NotificationService {
     if (_initialised) return;
 
     tz_data.initializeTimeZones();
+    tz.setLocalLocation(tz.getLocation('Asia/Kolkata'));
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -101,9 +103,8 @@ class NotificationService {
     await _plugin.initialize(settings);
 
     // Create Android channels
-    final androidPlugin = _plugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
     await androidPlugin?.createNotificationChannel(_timerChannel);
     await androidPlugin?.createNotificationChannel(_revisionChannel);
     await androidPlugin?.createNotificationChannel(_streakChannel);
@@ -116,9 +117,8 @@ class NotificationService {
 
   /// Request notification permission (Android 13+).
   Future<bool> requestPermission() async {
-    final androidPlugin = _plugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
     final granted = await androidPlugin?.requestNotificationsPermission();
     return granted ?? true;
   }
@@ -243,7 +243,8 @@ class NotificationService {
     if (revisionCount == 0) return;
 
     final now = DateTime.now();
-    var scheduled = DateTime(now.year, now.month, now.day, time.hour, time.minute);
+    var scheduled =
+        DateTime(now.year, now.month, now.day, time.hour, time.minute);
     if (scheduled.isBefore(now)) {
       scheduled = scheduled.add(const Duration(days: 1));
     }
@@ -257,7 +258,8 @@ class NotificationService {
         android: AndroidNotificationDetails(
           _chRevisionDue,
           'Revision Reminders',
-          channelDescription: 'Daily reminders for overdue and upcoming revisions',
+          channelDescription:
+              'Daily reminders for overdue and upcoming revisions',
           importance: Importance.high,
           priority: Priority.high,
           icon: '@mipmap/ic_launcher',

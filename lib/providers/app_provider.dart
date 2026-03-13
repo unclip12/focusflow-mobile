@@ -4,6 +4,7 @@
 // =============================================================
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:focusflow_mobile/services/backup_service.dart';
@@ -270,6 +271,7 @@ class AppProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     faViewMode = prefs.getString('faViewMode') ?? 'cards';
     await _refreshRoutineReminderState();
+    await injectRoutinesIntoDayPlan(todayDateKey);
 
     // ── Seed sample notifications (in-memory only) ────────────────
     final now = DateTime.now();
@@ -811,6 +813,191 @@ class AppProvider extends ChangeNotifier {
     return _routineDateOnly(DateTime.now()).isAfter(endDate);
   }
 
+  bool _shouldInjectRoutineForDate(Routine routine, DateTime today) {
+    final reminderTime = routine.reminderTime;
+    if (reminderTime == null || reminderTime.isEmpty) return false;
+
+    switch (routine.recurrence) {
+      case null:
+      case 'daily':
+        return true;
+      case 'weekly':
+        return routine.reminderWeekday == today.weekday;
+      case 'until_date':
+        final endDate = _parseRoutineEndDate(routine.recurrenceEndDate);
+        if (endDate == null) return false;
+        return !today.isAfter(endDate);
+      default:
+        return false;
+    }
+  }
+
+  int? _minutesSinceMidnight(String hhmm) {
+    final parts = hhmm.split(':');
+    if (parts.length != 2) return null;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return null;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return (hour * 60) + minute;
+  }
+
+  String _formatMinutesSinceMidnight(int totalMinutes) {
+    final normalized = totalMinutes % (24 * 60);
+    final safeMinutes = normalized < 0 ? normalized + (24 * 60) : normalized;
+    final hour = safeMinutes ~/ 60;
+    final minute = safeMinutes % 60;
+    final hourStr = hour.toString().padLeft(2, '0');
+    final minuteStr = minute.toString().padLeft(2, '0');
+    return '$hourStr:$minuteStr';
+  }
+
+  String _calculateRoutineEndTime(String startTime, int durationMinutes) {
+    final startMinutes = _minutesSinceMidnight(startTime);
+    if (startMinutes == null) return startTime;
+    return _formatMinutesSinceMidnight(startMinutes + durationMinutes);
+  }
+
+  bool _isRoutineInjectedBlock(Block block) => block.id.startsWith('routine-');
+
+  Block _buildRoutineInjectedBlock(
+    Routine routine, {
+    required String date,
+    required int index,
+    Block? existing,
+  }) {
+    final plannedDurationMinutes =
+        routine.totalEstimatedMinutes > 0 ? routine.totalEstimatedMinutes : 30;
+    final plannedStartTime = routine.reminderTime!;
+    final plannedEndTime = _calculateRoutineEndTime(
+      plannedStartTime,
+      plannedDurationMinutes,
+    );
+    final title = '${routine.icon} ${routine.name}';
+
+    if (existing != null) {
+      return existing.copyWith(
+        index: index,
+        date: date,
+        plannedStartTime: plannedStartTime,
+        plannedEndTime: plannedEndTime,
+        type: BlockType.other,
+        title: title,
+        plannedDurationMinutes: plannedDurationMinutes,
+        actualNotes: 'source:routine',
+      );
+    }
+
+    return Block(
+      id: 'routine-${routine.id}',
+      index: index,
+      date: date,
+      plannedStartTime: plannedStartTime,
+      plannedEndTime: plannedEndTime,
+      type: BlockType.other,
+      title: title,
+      plannedDurationMinutes: plannedDurationMinutes,
+      status: BlockStatus.notStarted,
+      actualNotes: 'source:routine',
+    );
+  }
+
+  List<Block> _reindexBlocks(List<Block> blocks) {
+    return List<Block>.generate(
+      blocks.length,
+      (index) => blocks[index].copyWith(index: index),
+    );
+  }
+
+  DayPlan _buildMinimalDayPlan(String date, List<Block> blocks) {
+    return DayPlan(
+      date: date,
+      faPages: const [],
+      faPagesCount: 0,
+      videos: const [],
+      notesFromUser: '',
+      notesFromAI: '',
+      attachments: const [],
+      breaks: const [],
+      blocks: blocks,
+      totalStudyMinutesPlanned: 0,
+      totalBreakMinutes: 0,
+    );
+  }
+
+  bool _sameBlockLists(List<Block> left, List<Block> right) {
+    if (left.length != right.length) return false;
+    final leftJson = left.map((block) => block.toJson()).toList();
+    final rightJson = right.map((block) => block.toJson()).toList();
+    return jsonEncode(leftJson) == jsonEncode(rightJson);
+  }
+
+  Future<void> injectRoutinesIntoDayPlan(String date) async {
+    if (date != todayDateKey) return;
+
+    final today = _routineDateOnly(DateTime.now());
+    final eligibleRoutines = routines
+        .where((routine) => _shouldInjectRoutineForDate(routine, today))
+        .toList();
+    final eligibleById = <String, Routine>{
+      for (final routine in eligibleRoutines) routine.id: routine,
+    };
+
+    final existingPlan = getDayPlan(date);
+    final existingBlocks = List<Block>.from(existingPlan?.blocks ?? const []);
+    final reconciledBlocks = <Block>[];
+    final seenRoutineIds = <String>{};
+
+    for (final block in existingBlocks) {
+      if (!_isRoutineInjectedBlock(block)) {
+        reconciledBlocks.add(block);
+        continue;
+      }
+
+      final routineId = block.id.substring('routine-'.length);
+      final routine = eligibleById[routineId];
+      if (routine == null) {
+        continue;
+      }
+
+      seenRoutineIds.add(routineId);
+      reconciledBlocks.add(
+        _buildRoutineInjectedBlock(
+          routine,
+          date: date,
+          index: reconciledBlocks.length,
+          existing: block,
+        ),
+      );
+    }
+
+    for (final routine in eligibleRoutines) {
+      if (seenRoutineIds.contains(routine.id)) continue;
+      reconciledBlocks.add(
+        _buildRoutineInjectedBlock(
+          routine,
+          date: date,
+          index: reconciledBlocks.length,
+        ),
+      );
+    }
+
+    final normalizedExistingBlocks = _reindexBlocks(existingBlocks);
+    final normalizedReconciledBlocks = _reindexBlocks(reconciledBlocks);
+    if (_sameBlockLists(normalizedExistingBlocks, normalizedReconciledBlocks)) {
+      return;
+    }
+
+    if (existingPlan == null && normalizedReconciledBlocks.isEmpty) {
+      return;
+    }
+
+    final updatedPlan =
+        existingPlan?.copyWith(blocks: normalizedReconciledBlocks) ??
+            _buildMinimalDayPlan(date, normalizedReconciledBlocks);
+    await upsertDayPlan(updatedPlan);
+  }
+
   Future<void> _refreshRoutineReminderState() async {
     _pendingExpiredRoutinePrompts
       ..clear()
@@ -835,6 +1022,7 @@ class AppProvider extends ChangeNotifier {
       routines.add(routine);
     }
     await _refreshRoutineReminderState();
+    await injectRoutinesIntoDayPlan(todayDateKey);
     notifyListeners();
   }
 
