@@ -1944,7 +1944,7 @@ class _AddFAPageSheetState extends State<_AddFAPageSheet> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              initialValue: _subject,
+              value: _subject,
               decoration: const InputDecoration(
                 labelText: 'Subject',
                 border: OutlineInputBorder(),
@@ -1959,7 +1959,7 @@ class _AddFAPageSheetState extends State<_AddFAPageSheet> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              initialValue: _system,
+              value: _system,
               decoration: const InputDecoration(
                 labelText: 'System',
                 border: OutlineInputBorder(),
@@ -2133,7 +2133,7 @@ class _AddUWorldTopicSheetState extends State<_AddUWorldTopicSheet> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              initialValue: _system,
+              value: _system,
               decoration: const InputDecoration(
                 labelText: 'System',
                 border: OutlineInputBorder(),
@@ -2409,7 +2409,6 @@ class _BulkMarkSheetState extends State<_BulkMarkSheet> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            // ignore: deprecated_member_use
             value: _selectedStatus,
             decoration: const InputDecoration(
               labelText: 'Mark as',
