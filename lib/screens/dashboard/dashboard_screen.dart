@@ -1417,7 +1417,8 @@ class _AuroraPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final background = Paint()..color = DashboardColors.background(isDark);
+    final background = Paint()
+      ..color = isDark ? const Color(0xFF0E0E1A) : const Color(0xFFF0EFFF);
     canvas.drawRect(Offset.zero & size, background);
 
     final colors = DashboardColors.auroraBlobs(isDark);
@@ -1438,7 +1439,7 @@ class _AuroraPainter extends CustomPainter {
         center,
         radius,
         <Color>[
-          color.withValues(alpha: isDark ? 0.35 : 0.22),
+          color.withValues(alpha: isDark ? 0.50 : 0.30),
           color.withValues(alpha: isDark ? 0.12 : 0.08),
           color.withValues(alpha: 0),
         ],
