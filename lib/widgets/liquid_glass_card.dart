@@ -114,9 +114,15 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
         (isDark ? const Color(0xFF1E1E3A) : const Color(0xFFFFFFFF))
             .withValues(alpha: isDark ? 0.82 : 0.72);
     final borderColor =
-        const Color(0xFF6366F1).withValues(alpha: isDark ? 0.35 : 0.20);
+        const Color(0xFF6366F1).withValues(alpha: isDark ? 0.35 : 0.25);
+    final glowBaseColor = widget.glowColor ?? const Color(0xFF6366F1);
     final glowColor =
-        (widget.glowColor ?? const Color(0xFF6366F1)).withValues(alpha: 0.18);
+        glowBaseColor.withValues(alpha: isDark ? 0.18 : 0.12);
+    final glowShadow = BoxShadow(
+      color: glowColor,
+      blurRadius: isDark ? 24 : 20,
+      spreadRadius: isDark ? -4 : -2,
+    );
 
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(end: _visible ? 1 : 0),
@@ -146,50 +152,46 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
           onTapCancel: _handleTapEnd,
           onTapUp: _handleTapEnd,
           onTap: widget.onTap,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: widget.borderRadius,
-              boxShadow: <BoxShadow>[
-                BoxShadow(
-                  color: glowColor,
-                  blurRadius: 24,
-                  spreadRadius: -4,
+          child: ClipRRect(
+            borderRadius: widget.borderRadius,
+            child: Stack(
+              children: <Widget>[
+                Positioned.fill(
+                  child: BackdropFilter(
+                    filter: ui.ImageFilter.blur(
+                      sigmaX: 25,
+                      sigmaY: 25,
+                    ),
+                    child: Container(color: Colors.transparent),
+                  ),
                 ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: widget.borderRadius,
-              child: BackdropFilter(
-                filter: ui.ImageFilter.blur(
-                  sigmaX: 25,
-                  sigmaY: 25,
-                ),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final rippleAlignment = Alignment(
-                      ((constraints.maxWidth == 0
-                                  ? 0
-                                  : _rippleOrigin.dx / constraints.maxWidth) *
-                              2) -
-                          1,
-                      ((constraints.maxHeight == 0
-                                  ? 0
-                                  : _rippleOrigin.dy / constraints.maxHeight) *
-                              2) -
-                          1,
-                    );
+                Container(
+                  padding: widget.padding,
+                  decoration: BoxDecoration(
+                    color: background,
+                    borderRadius: widget.borderRadius,
+                    border: Border.all(
+                      color: borderColor,
+                      width: 1.5,
+                    ),
+                    boxShadow: <BoxShadow>[glowShadow],
+                  ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final rippleAlignment = Alignment(
+                        ((constraints.maxWidth == 0
+                                    ? 0
+                                    : _rippleOrigin.dx / constraints.maxWidth) *
+                                2) -
+                            1,
+                        ((constraints.maxHeight == 0
+                                    ? 0
+                                    : _rippleOrigin.dy / constraints.maxHeight) *
+                                2) -
+                            1,
+                      );
 
-                    return Container(
-                      padding: widget.padding,
-                      decoration: BoxDecoration(
-                        color: background,
-                        borderRadius: widget.borderRadius,
-                        border: Border.all(
-                          color: borderColor,
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Stack(
+                      return Stack(
                         fit: StackFit.passthrough,
                         children: <Widget>[
                           Positioned.fill(
@@ -294,11 +296,11 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
                           ),
                           widget.child,
                         ],
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),

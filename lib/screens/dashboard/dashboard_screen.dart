@@ -10,8 +10,12 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import 'package:focusflow_mobile/models/day_plan.dart';
+import 'package:focusflow_mobile/models/fa_page.dart';
+import 'package:focusflow_mobile/models/knowledge_base.dart';
+import 'package:focusflow_mobile/models/revision_item.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
+import 'package:focusflow_mobile/services/srs_service.dart';
 import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart' as du;
@@ -96,8 +100,11 @@ class _DashboardBody extends StatelessWidget {
 
     final todayPagesRead = app.getTodayPagesRead(dayStartHour);
     final dailyGoal = sp.dailyFAGoal;
+    final totalFAPages = app.faPages.isNotEmpty ? app.faPages.length : 676;
     final totalReadPages =
         app.faPages.where((page) => page.status != 'unread').length;
+    final ankiDonePages =
+        app.faPages.where((page) => page.status == 'anki_done').length;
     final unreadPages =
         app.faPages.where((page) => page.status == 'unread').length;
     final paceDayKeys = _readDayKeys(app, dayStartHour);
@@ -129,7 +136,8 @@ class _DashboardBody extends StatelessWidget {
 
     final todayPlan = app.getDayPlan(todayStr);
     final todayBlocks = todayPlan?.blocks ?? const <Block>[];
-    final dueRevisionCount = _dueRevisionCount(app, adjustedToday);
+    final dueRevisionItems = _dueRevisionItems(app, adjustedToday);
+    final dueRevisionCount = dueRevisionItems.length;
     final goalRows = _buildGoalRows(
       context: context,
       todayPagesRead: todayPagesRead,
@@ -143,6 +151,33 @@ class _DashboardBody extends StatelessWidget {
 
     final quotePool =
         kFocusQuotes.where((quote) => quote.trim().isNotEmpty).toList();
+    final weeklyStudyPoints = _buildWeeklyStudyPoints(app, adjustedToday);
+    final weeklyStudyTotalMinutes = weeklyStudyPoints.fold<int>(
+      0,
+      (sum, point) => sum + point.minutes,
+    );
+    final weeklyStudyAverageMinutes = weeklyStudyPoints.isEmpty
+        ? 0.0
+        : weeklyStudyTotalMinutes / weeklyStudyPoints.length;
+    final bestStudyDay = _bestStudyDay(weeklyStudyPoints);
+    final subjectTotals = _buildSubjectMinutes(app);
+    final topSubjects = subjectTotals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final topSubjectEntries = topSubjects.take(4).toList();
+    final maxSubjectMinutes =
+        topSubjectEntries.isNotEmpty ? topSubjectEntries.first.value : 1;
+    final faOverallAverage = _faOverallAverage(app.faPages, adjustedToday);
+    final faWeeklyAverage = _faRollingAverage(
+      app.faPages,
+      adjustedToday,
+      days: 7,
+    );
+    final faEta = _faEta(
+      totalPages: totalFAPages,
+      readPages: totalReadPages,
+      pagesPerDay: faWeeklyAverage,
+      today: adjustedToday,
+    );
 
     return _DashboardShell(
       isDark: isDark,
@@ -220,7 +255,6 @@ class _DashboardBody extends StatelessWidget {
               delay: const Duration(milliseconds: 240),
               child: _TimeBudgetCard(
                 sleepMinutes: sleepMinutes,
-                prayerMinutes: prayerMinutes,
                 studyMinutes: studyMinutes,
                 freeMinutes: freeMinutes,
                 isDark: isDark,
@@ -242,6 +276,59 @@ class _DashboardBody extends StatelessWidget {
                 quotes: quotePool.isEmpty
                     ? const <String>['Consistency beats intensity.']
                     : quotePool,
+                isDark: isDark,
+              ),
+            ),
+            const SizedBox(height: 16),
+            LiquidGlassCard(
+              delay: const Duration(milliseconds: 480),
+              child: _AnalyticsCard(
+                points: weeklyStudyPoints,
+                totalMinutes: weeklyStudyTotalMinutes,
+                averageMinutes: weeklyStudyAverageMinutes,
+                bestDay: bestStudyDay,
+                isDark: isDark,
+              ),
+            ),
+            const SizedBox(height: 16),
+            LiquidGlassCard(
+              delay: const Duration(milliseconds: 540),
+              child: _FATrackerCard(
+                readPages: totalReadPages,
+                ankiDone: ankiDonePages,
+                unreadPages: unreadPages,
+                totalPages: totalFAPages,
+                overallAverage: faOverallAverage,
+                weeklyAverage: faWeeklyAverage,
+                eta: faEta,
+                isDark: isDark,
+                onOpen: () => context.go('/tracker'),
+              ),
+            ),
+            const SizedBox(height: 16),
+            LiquidGlassCard(
+              delay: const Duration(milliseconds: 600),
+              child: _RevisionQueueCard(
+                dueCount: dueRevisionCount,
+                dueItems: dueRevisionItems.take(3).toList(),
+                onNavigate: () => context.go('/revision'),
+                isDark: isDark,
+              ),
+            ),
+            const SizedBox(height: 16),
+            LiquidGlassCard(
+              delay: const Duration(milliseconds: 660),
+              child: _ActivityDotsCard(
+                points: weeklyStudyPoints,
+                isDark: isDark,
+              ),
+            ),
+            const SizedBox(height: 16),
+            LiquidGlassCard(
+              delay: const Duration(milliseconds: 720),
+              child: _SubjectBreakdownCard(
+                topSubjects: topSubjectEntries,
+                maxMinutes: maxSubjectMinutes,
                 isDark: isDark,
               ),
             ),
@@ -314,6 +401,16 @@ class _DashboardLoadingScreenState extends State<_DashboardLoadingScreen>
           _shimmerBox(height: 214, borderRadius: 24),
           const SizedBox(height: 16),
           _shimmerBox(height: 124, borderRadius: 24),
+          const SizedBox(height: 16),
+          _shimmerBox(height: 228, borderRadius: 24),
+          const SizedBox(height: 16),
+          _shimmerBox(height: 176, borderRadius: 24),
+          const SizedBox(height: 16),
+          _shimmerBox(height: 168, borderRadius: 24),
+          const SizedBox(height: 16),
+          _shimmerBox(height: 154, borderRadius: 24),
+          const SizedBox(height: 16),
+          _shimmerBox(height: 180, borderRadius: 24),
         ],
       ),
     );
@@ -630,14 +727,12 @@ class _PaceInsightCard extends StatelessWidget {
 class _TimeBudgetCard extends StatelessWidget {
   const _TimeBudgetCard({
     required this.sleepMinutes,
-    required this.prayerMinutes,
     required this.studyMinutes,
     required this.freeMinutes,
     required this.isDark,
   });
 
   final int sleepMinutes;
-  final int prayerMinutes;
   final int studyMinutes;
   final int freeMinutes;
   final bool isDark;
@@ -652,22 +747,16 @@ class _TimeBudgetCard extends StatelessWidget {
         delay: Duration.zero,
       ),
       _BudgetSegmentData(
-        label: 'Prayer',
-        minutes: prayerMinutes,
-        color: DashboardColors.primary.withValues(alpha: 0.40),
-        delay: const Duration(milliseconds: 150),
-      ),
-      _BudgetSegmentData(
         label: 'Study',
         minutes: studyMinutes,
         color: DashboardColors.primary,
-        delay: const Duration(milliseconds: 300),
+        delay: const Duration(milliseconds: 180),
       ),
       _BudgetSegmentData(
         label: 'Free',
         minutes: freeMinutes,
         color: DashboardColors.primary.withValues(alpha: 0.15),
-        delay: const Duration(milliseconds: 450),
+        delay: const Duration(milliseconds: 360),
       ),
     ];
 
@@ -818,6 +907,920 @@ class _StreakCard extends StatelessWidget {
           quotes: quotes,
           isDark: isDark,
         ),
+      ],
+    );
+  }
+}
+
+class _AnalyticsCard extends StatelessWidget {
+  const _AnalyticsCard({
+    required this.points,
+    required this.totalMinutes,
+    required this.averageMinutes,
+    required this.bestDay,
+    required this.isDark,
+  });
+
+  final List<_WeeklyStudyPoint> points;
+  final int totalMinutes;
+  final double averageMinutes;
+  final _WeeklyStudyPoint? bestDay;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          'Analytics',
+          style: _inter(
+            size: 15,
+            weight: FontWeight.w600,
+            color: DashboardColors.textPrimary(isDark),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: _DashboardMetricPanel(
+                label: 'This week',
+                value: _formatHM(totalMinutes),
+                accent: DashboardColors.primary,
+                isDark: isDark,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _DashboardMetricPanel(
+                label: 'Avg / day',
+                value: _formatHM(averageMinutes.round()),
+                accent: DashboardColors.primaryLight,
+                isDark: isDark,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _DashboardMetricPanel(
+                label: 'Best day',
+                value: bestDay == null
+                    ? '--'
+                    : DateFormat('EEE').format(bestDay!.date),
+                accent: DashboardColors.primaryViolet,
+                isDark: isDark,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _WeeklyStudyBars(
+          points: points,
+          isDark: isDark,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          totalMinutes == 0 || bestDay == null
+              ? 'Start logging study sessions to unlock your 7-day trend.'
+              : '${DateFormat('EEEE').format(bestDay!.date)} led the week with '
+                  '${_formatHM(bestDay!.minutes)} logged.',
+          style: _inter(
+            size: 12,
+            weight: FontWeight.w400,
+            color: DashboardColors.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DashboardMetricPanel extends StatelessWidget {
+  const _DashboardMetricPanel({
+    required this.label,
+    required this.value,
+    required this.accent,
+    required this.isDark,
+  });
+
+  final String label;
+  final String value;
+  final Color accent;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: isDark ? 0.14 : 0.10),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: accent.withValues(alpha: isDark ? 0.25 : 0.18),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            label,
+            style: _inter(
+              size: 11,
+              weight: FontWeight.w500,
+              color: DashboardColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _inter(
+              size: 16,
+              weight: FontWeight.w700,
+              color: DashboardColors.textPrimary(isDark),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeeklyStudyBars extends StatelessWidget {
+  const _WeeklyStudyBars({
+    required this.points,
+    required this.isDark,
+  });
+
+  final List<_WeeklyStudyPoint> points;
+  final bool isDark;
+
+  static const List<Color> _barColors = <Color>[
+    DashboardColors.primaryLight,
+    DashboardColors.primary,
+    DashboardColors.primaryViolet,
+    DashboardColors.primaryLight,
+    DashboardColors.primary,
+    DashboardColors.primaryViolet,
+    DashboardColors.primary,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final maxMinutes = points.fold<int>(
+      0,
+      (max, point) => math.max(max, point.minutes),
+    );
+    final trackColor = isDark
+        ? Colors.white.withValues(alpha: 0.05)
+        : DashboardColors.primary.withValues(alpha: 0.06);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 10),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.03)
+            : Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : DashboardColors.primary.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: List<Widget>.generate(points.length, (index) {
+          final point = points[index];
+          final barColor = _barColors[index % _barColors.length];
+          final targetHeight = point.minutes == 0
+              ? 10.0
+              : math.max(18.0, (point.minutes / math.max(1, maxMinutes)) * 86);
+
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(right: index == points.length - 1 ? 0 : 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  SizedBox(
+                    height: 110,
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween<double>(end: targetHeight),
+                        duration: Duration(milliseconds: 500 + (index * 70)),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, value, child) {
+                          return Container(
+                            width: 16,
+                            height: value,
+                            decoration: BoxDecoration(
+                              color: point.minutes == 0
+                                  ? trackColor
+                                  : null,
+                              gradient: point.minutes == 0
+                                  ? null
+                                  : DashboardColors.progressGradient(barColor),
+                              borderRadius: BorderRadius.circular(999),
+                              boxShadow: point.minutes == 0
+                                  ? const <BoxShadow>[]
+                                  : <BoxShadow>[
+                                      BoxShadow(
+                                        color: barColor.withValues(alpha: 0.30),
+                                        blurRadius: 10,
+                                      ),
+                                    ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    DateFormat('E').format(point.date),
+                    style: _inter(
+                      size: 10,
+                      weight: FontWeight.w600,
+                      color: DashboardColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _formatShortHM(point.minutes),
+                    style: _inter(
+                      size: 10,
+                      weight: FontWeight.w500,
+                      color: DashboardColors.textPrimary(isDark),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _FATrackerCard extends StatelessWidget {
+  const _FATrackerCard({
+    required this.readPages,
+    required this.ankiDone,
+    required this.unreadPages,
+    required this.totalPages,
+    required this.overallAverage,
+    required this.weeklyAverage,
+    required this.eta,
+    required this.isDark,
+    required this.onOpen,
+  });
+
+  final int readPages;
+  final int ankiDone;
+  final int unreadPages;
+  final int totalPages;
+  final double overallAverage;
+  final double weeklyAverage;
+  final DateTime? eta;
+  final bool isDark;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final chipStyle = _inter(
+      size: 11,
+      weight: FontWeight.w500,
+      color: DashboardColors.textPrimary(isDark),
+    );
+    final progress = totalPages == 0 ? 0.0 : (readPages / totalPages) * 100;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                'FA Tracker',
+                style: _inter(
+                  size: 15,
+                  weight: FontWeight.w600,
+                  color: DashboardColors.textPrimary(isDark),
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: onOpen,
+              child: Text(
+                'Open',
+                style: _inter(
+                  size: 12,
+                  weight: FontWeight.w600,
+                  color: DashboardColors.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        AnimatedProgressBar(
+          progress: progress,
+          color: DashboardColors.primary,
+          delay: const Duration(milliseconds: 120),
+          height: 8,
+        ),
+        const SizedBox(height: 10),
+        Text(
+          '$readPages / $totalPages pages read',
+          style: _inter(
+            size: 14,
+            weight: FontWeight.w600,
+            color: DashboardColors.textPrimary(isDark),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: <Widget>[
+            _StatusChip(
+              label: '$ankiDone Anki done',
+              color: DashboardColors.success,
+              style: chipStyle,
+              isDark: isDark,
+            ),
+            _StatusChip(
+              label: '$unreadPages unread',
+              color: DashboardColors.warning,
+              style: chipStyle,
+              isDark: isDark,
+            ),
+            _StatusChip(
+              label: '${progress.toStringAsFixed(0)}% complete',
+              color: DashboardColors.primaryLight,
+              style: chipStyle,
+              isDark: isDark,
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: _DashboardMetricPanel(
+                label: 'Overall avg',
+                value: '${overallAverage.toStringAsFixed(1)} pg/day',
+                accent: DashboardColors.primary,
+                isDark: isDark,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _DashboardMetricPanel(
+                label: '7-day avg',
+                value: '${weeklyAverage.toStringAsFixed(1)} pg/day',
+                accent: DashboardColors.primaryViolet,
+                isDark: isDark,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _DashboardMetricPanel(
+                label: 'ETA',
+                value: eta == null ? '--' : _formatProjectionDate(eta),
+                accent: DashboardColors.primaryLight,
+                isDark: isDark,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _RevisionQueueCard extends StatelessWidget {
+  const _RevisionQueueCard({
+    required this.dueCount,
+    required this.dueItems,
+    required this.onNavigate,
+    required this.isDark,
+  });
+
+  final int dueCount;
+  final List<RevisionItem> dueItems;
+  final VoidCallback onNavigate;
+  final bool isDark;
+
+  void _showRevisionSheet(BuildContext context) {
+    final app = context.read<AppProvider>();
+    final hubItems = _buildRevisionQueueSheetItems(app);
+    final doNow = hubItems.where((item) => item.status == 'Do Now').toList();
+    final upcoming =
+        hubItems.where((item) => item.status == 'Upcoming').toList();
+    final visibleItems = doNow.isNotEmpty ? doNow : upcoming;
+    final title = doNow.isNotEmpty ? 'Do Now' : 'Upcoming';
+    final sheetIsDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.56,
+          minChildSize: 0.34,
+          maxChildSize: 0.90,
+          expand: false,
+          builder: (ctx, scrollCtrl) {
+            return Container(
+              decoration: BoxDecoration(
+                color: sheetIsDark ? const Color(0xFF161629) : Colors.white,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: Column(
+                children: <Widget>[
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12, bottom: 10),
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Text(
+                            '$title (${visibleItems.length})',
+                            style: _inter(
+                              size: 18,
+                              weight: FontWeight.w700,
+                              color: DashboardColors.textPrimary(sheetIsDark),
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(ctx).pop();
+                            onNavigate();
+                          },
+                          child: Text(
+                            'View All',
+                            style: _inter(
+                              size: 12,
+                              weight: FontWeight.w600,
+                              color: DashboardColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (visibleItems.isEmpty)
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          'No revisions queued right now.',
+                          style: _inter(
+                            size: 14,
+                            weight: FontWeight.w500,
+                            color: DashboardColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: ListView.separated(
+                        controller: scrollCtrl,
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                        itemCount: visibleItems.length,
+                        separatorBuilder: (_, __) => Divider(
+                          color: Colors.grey.withValues(alpha: 0.18),
+                          height: 1,
+                        ),
+                        itemBuilder: (context, index) {
+                          final item = visibleItems[index];
+                          final urgent = item.status == 'Do Now';
+                          return ListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 4),
+                            leading: CircleAvatar(
+                              radius: 18,
+                              backgroundColor: urgent
+                                  ? DashboardColors.warning.withValues(
+                                      alpha: 0.16,
+                                    )
+                                  : DashboardColors.primary.withValues(
+                                      alpha: 0.12,
+                                    ),
+                              child: Icon(
+                                urgent
+                                    ? Icons.priority_high_rounded
+                                    : Icons.schedule_rounded,
+                                color: urgent
+                                    ? DashboardColors.warning
+                                    : DashboardColors.primary,
+                                size: 18,
+                              ),
+                            ),
+                            title: Text(
+                              _revisionDisplayTitle(item),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: _inter(
+                                size: 14,
+                                weight: FontWeight.w600,
+                                color:
+                                    DashboardColors.textPrimary(sheetIsDark),
+                              ),
+                            ),
+                            subtitle: Text(
+                              _revisionDisplaySubtitle(item),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: _inter(
+                                size: 12,
+                                weight: FontWeight.w400,
+                                color: DashboardColors.textSecondary,
+                              ),
+                            ),
+                            trailing: Text(
+                              item.status,
+                              style: _inter(
+                                size: 11,
+                                weight: FontWeight.w600,
+                                color: urgent
+                                    ? DashboardColors.warning
+                                    : DashboardColors.primary,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                'Revision Queue',
+                style: _inter(
+                  size: 15,
+                  weight: FontWeight.w600,
+                  color: DashboardColors.textPrimary(isDark),
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () => _showRevisionSheet(context),
+              child: Text(
+                'Open',
+                style: _inter(
+                  size: 12,
+                  weight: FontWeight.w600,
+                  color: DashboardColors.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          dueCount == 0 ? 'All caught up' : '$dueCount items due today',
+          style: _inter(
+            size: 22,
+            weight: FontWeight.w800,
+            color: dueCount == 0
+                ? DashboardColors.success
+                : DashboardColors.warning,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          dueCount == 0
+              ? 'Nothing urgent is waiting in your revision stack.'
+              : 'Review the next items before the queue stacks up.',
+          style: _inter(
+            size: 12,
+            weight: FontWeight.w400,
+            color: DashboardColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (dueItems.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: DashboardColors.success.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: DashboardColors.success.withValues(alpha: 0.18),
+              ),
+            ),
+            child: Text(
+              'No revisions due today.',
+              style: _inter(
+                size: 13,
+                weight: FontWeight.w500,
+                color: DashboardColors.textPrimary(isDark),
+              ),
+            ),
+          )
+        else
+          ...dueItems.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: isDark ? 0.03 : 0.14),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: isDark ? 0.07 : 0.18),
+                    ),
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      Icon(
+                        Icons.replay_circle_filled_rounded,
+                        color: DashboardColors.warning,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              _revisionDisplayTitle(item),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: _inter(
+                                size: 13,
+                                weight: FontWeight.w600,
+                                color: DashboardColors.textPrimary(isDark),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _revisionDisplaySubtitle(item),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: _inter(
+                                size: 11,
+                                weight: FontWeight.w400,
+                                color: DashboardColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )),
+      ],
+    );
+  }
+}
+
+class _ActivityDotsCard extends StatelessWidget {
+  const _ActivityDotsCard({
+    required this.points,
+    required this.isDark,
+  });
+
+  final List<_WeeklyStudyPoint> points;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxMinutes = points.fold<int>(
+      0,
+      (max, point) => math.max(max, point.minutes),
+    );
+    final activeDays = points.where((point) => point.minutes > 0).length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          'Last 7 Days',
+          style: _inter(
+            size: 15,
+            weight: FontWeight.w600,
+            color: DashboardColors.textPrimary(isDark),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '$activeDays of 7 days active',
+          style: _inter(
+            size: 12,
+            weight: FontWeight.w400,
+            color: DashboardColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List<Widget>.generate(points.length, (index) {
+            final point = points[index];
+            final isToday = index == points.length - 1;
+            final intensity = maxMinutes == 0
+                ? 0.0
+                : point.minutes / math.max(1, maxMinutes);
+            final outerColor = point.minutes == 0
+                ? (isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : DashboardColors.primary.withValues(alpha: 0.06))
+                : DashboardColors.primary.withValues(
+                    alpha: isDark ? 0.12 + (intensity * 0.18) : 0.10,
+                  );
+            final innerSize =
+                point.minutes == 0 ? 8.0 : 10 + (intensity * 6);
+
+            return Expanded(
+              child: Column(
+                children: <Widget>[
+                  Text(
+                    DateFormat('E').format(point.date).substring(0, 1),
+                    style: _inter(
+                      size: 11,
+                      weight: isToday ? FontWeight.w700 : FontWeight.w500,
+                      color: isToday
+                          ? DashboardColors.primary
+                          : DashboardColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: outerColor,
+                      border: isToday
+                          ? Border.all(
+                              color: DashboardColors.primary,
+                              width: 1.5,
+                            )
+                          : null,
+                    ),
+                    child: Center(
+                      child: Container(
+                        width: innerSize,
+                        height: innerSize,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: point.minutes == 0
+                              ? Colors.white.withValues(
+                                  alpha: isDark ? 0.15 : 0.35,
+                                )
+                              : DashboardColors.primaryLight.withValues(
+                                  alpha: 0.85,
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _formatShortHM(point.minutes),
+                    style: _inter(
+                      size: 10,
+                      weight: FontWeight.w500,
+                      color: DashboardColors.textPrimary(isDark),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+}
+
+class _SubjectBreakdownCard extends StatelessWidget {
+  const _SubjectBreakdownCard({
+    required this.topSubjects,
+    required this.maxMinutes,
+    required this.isDark,
+  });
+
+  final List<MapEntry<String, int>> topSubjects;
+  final int maxMinutes;
+  final bool isDark;
+
+  static const List<Color> _subjectColors = <Color>[
+    DashboardColors.primary,
+    DashboardColors.primaryViolet,
+    DashboardColors.primaryLight,
+    DashboardColors.success,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          'Time by Subject',
+          style: _inter(
+            size: 15,
+            weight: FontWeight.w600,
+            color: DashboardColors.textPrimary(isDark),
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (topSubjects.isEmpty)
+          Text(
+            'Start logging study sessions to see your subject split.',
+            style: _inter(
+              size: 13,
+              weight: FontWeight.w400,
+              color: DashboardColors.textSecondary,
+            ),
+          )
+        else
+          ...List<Widget>.generate(topSubjects.length, (index) {
+            final entry = topSubjects[index];
+            final color = _subjectColors[index % _subjectColors.length];
+            final progress = (entry.value / math.max(1, maxMinutes)) * 100;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: index == topSubjects.length - 1 ? 0 : 12,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: Text(
+                          entry.key,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: _inter(
+                            size: 13,
+                            weight: FontWeight.w600,
+                            color: DashboardColors.textPrimary(isDark),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        _formatHM(entry.value),
+                        style: _inter(
+                          size: 12,
+                          weight: FontWeight.w500,
+                          color: DashboardColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  AnimatedProgressBar(
+                    progress: progress,
+                    color: color,
+                    delay: Duration(milliseconds: 150 + (index * 70)),
+                    height: 6,
+                  ),
+                ],
+              ),
+            );
+          }),
       ],
     );
   }
@@ -1676,6 +2679,79 @@ class _BudgetSegmentData {
   final Duration delay;
 }
 
+class _WeeklyStudyPoint {
+  const _WeeklyStudyPoint({
+    required this.date,
+    required this.minutes,
+  });
+
+  final DateTime date;
+  final int minutes;
+}
+
+class _RevisionQueueSheetItem {
+  const _RevisionQueueSheetItem({
+    required this.id,
+    required this.source,
+    required this.title,
+    required this.parentTitle,
+    required this.pageNumber,
+    required this.nextRevisionAt,
+    required this.currentRevisionIndex,
+    required this.status,
+  });
+
+  final String id;
+  final String source;
+  final String title;
+  final String parentTitle;
+  final String pageNumber;
+  final String nextRevisionAt;
+  final int currentRevisionIndex;
+  final String status;
+
+  factory _RevisionQueueSheetItem.fromRevisionItem(RevisionItem item) {
+    return _RevisionQueueSheetItem(
+      id: item.id,
+      source: item.source,
+      title: item.title,
+      parentTitle: item.parentTitle,
+      pageNumber: item.pageNumber,
+      nextRevisionAt: item.nextRevisionAt,
+      currentRevisionIndex: item.currentRevisionIndex,
+      status: '',
+    );
+  }
+
+  factory _RevisionQueueSheetItem.fromKnowledgeBaseEntry(
+    KnowledgeBaseEntry item,
+  ) {
+    return _RevisionQueueSheetItem(
+      id: 'kb-${item.pageNumber}',
+      source: 'KB',
+      title: item.title,
+      parentTitle: item.subject,
+      pageNumber: item.pageNumber,
+      nextRevisionAt: item.nextRevisionAt ?? '',
+      currentRevisionIndex: item.currentRevisionIndex,
+      status: '',
+    );
+  }
+
+  _RevisionQueueSheetItem copyWith({String? status}) {
+    return _RevisionQueueSheetItem(
+      id: id,
+      source: source,
+      title: title,
+      parentTitle: parentTitle,
+      pageNumber: pageNumber,
+      nextRevisionAt: nextRevisionAt,
+      currentRevisionIndex: currentRevisionIndex,
+      status: status ?? this.status,
+    );
+  }
+}
+
 class _AuroraBlob {
   const _AuroraBlob(
     this.x,
@@ -1856,7 +2932,137 @@ int _clockMinutes(String value) {
   return (hours * 60) + minutes;
 }
 
-int _dueRevisionCount(AppProvider app, DateTime adjustedToday) {
+List<_WeeklyStudyPoint> _buildWeeklyStudyPoints(
+  AppProvider app,
+  DateTime adjustedToday,
+) {
+  const studyCategories = <TimeLogCategory>{
+    TimeLogCategory.study,
+    TimeLogCategory.revision,
+    TimeLogCategory.qbank,
+    TimeLogCategory.anki,
+    TimeLogCategory.video,
+    TimeLogCategory.noteTaking,
+  };
+
+  final totals = <String, int>{};
+  for (final log in app.timeLogs) {
+    if (!studyCategories.contains(log.category)) continue;
+    totals[log.date] = (totals[log.date] ?? 0) + log.durationMinutes;
+  }
+  for (final entry in app.studyEntries) {
+    totals[entry.date] = (totals[entry.date] ?? 0) + (entry.durationMinutes ?? 0);
+  }
+
+  final normalizedToday = DateTime(
+    adjustedToday.year,
+    adjustedToday.month,
+    adjustedToday.day,
+  );
+  return List<_WeeklyStudyPoint>.generate(7, (index) {
+    final date = normalizedToday.subtract(Duration(days: 6 - index));
+    return _WeeklyStudyPoint(
+      date: date,
+      minutes: totals[du.AppDateUtils.formatDate(date)] ?? 0,
+    );
+  });
+}
+
+_WeeklyStudyPoint? _bestStudyDay(List<_WeeklyStudyPoint> points) {
+  if (points.isEmpty) return null;
+  _WeeklyStudyPoint? best;
+  for (final point in points) {
+    if (best == null || point.minutes > best.minutes) {
+      best = point;
+    }
+  }
+  if (best == null || best.minutes == 0) return null;
+  return best;
+}
+
+Map<String, int> _buildSubjectMinutes(AppProvider app) {
+  const studyCategories = <TimeLogCategory>{
+    TimeLogCategory.study,
+    TimeLogCategory.revision,
+    TimeLogCategory.qbank,
+    TimeLogCategory.anki,
+    TimeLogCategory.video,
+    TimeLogCategory.noteTaking,
+  };
+
+  final subjectMinutes = <String, int>{};
+  for (final log in app.timeLogs) {
+    if (!studyCategories.contains(log.category)) continue;
+    final key = log.activity.trim().isNotEmpty ? log.activity.trim() : 'Other';
+    subjectMinutes[key] = (subjectMinutes[key] ?? 0) + log.durationMinutes;
+  }
+  for (final entry in app.studyEntries) {
+    final key = entry.taskName.trim().isNotEmpty ? entry.taskName.trim() : 'Other';
+    subjectMinutes[key] =
+        (subjectMinutes[key] ?? 0) + (entry.durationMinutes ?? 0);
+  }
+  return subjectMinutes;
+}
+
+double _faOverallAverage(List<FAPage> faPages, DateTime today) {
+  final readPages = faPages.where((page) => page.status != 'unread').length;
+  if (readPages == 0) return 0;
+
+  final readDates = faPages
+      .map((page) => page.firstReadAt)
+      .whereType<String>()
+      .map(DateTime.tryParse)
+      .whereType<DateTime>()
+      .toList()
+    ..sort();
+  if (readDates.isEmpty) return 0;
+
+  final firstReadDay = DateTime(
+    readDates.first.year,
+    readDates.first.month,
+    readDates.first.day,
+  );
+  final normalizedToday = DateTime(today.year, today.month, today.day);
+  final totalDays =
+      math.max(1, normalizedToday.difference(firstReadDay).inDays + 1);
+  return readPages / totalDays;
+}
+
+double _faRollingAverage(
+  List<FAPage> faPages,
+  DateTime today, {
+  required int days,
+}) {
+  final normalizedToday = DateTime(today.year, today.month, today.day);
+  final windowStart = normalizedToday.subtract(Duration(days: days - 1));
+  var pagesRead = 0;
+
+  for (final page in faPages) {
+    final firstReadAt = page.firstReadAt;
+    final parsed = firstReadAt == null ? null : DateTime.tryParse(firstReadAt);
+    if (parsed == null) continue;
+    final normalized = DateTime(parsed.year, parsed.month, parsed.day);
+    if (!normalized.isBefore(windowStart) && !normalized.isAfter(normalizedToday)) {
+      pagesRead++;
+    }
+  }
+
+  return pagesRead / days;
+}
+
+DateTime? _faEta({
+  required int totalPages,
+  required int readPages,
+  required double pagesPerDay,
+  required DateTime today,
+}) {
+  final remainingPages = math.max(0, totalPages - readPages);
+  if (remainingPages == 0) return today;
+  if (pagesPerDay <= 0) return null;
+  return today.add(Duration(days: (remainingPages / pagesPerDay).ceil()));
+}
+
+List<RevisionItem> _dueRevisionItems(AppProvider app, DateTime adjustedToday) {
   final dayEnd = DateTime(
     adjustedToday.year,
     adjustedToday.month,
@@ -1865,10 +3071,82 @@ int _dueRevisionCount(AppProvider app, DateTime adjustedToday) {
     59,
     59,
   );
-  return app.revisionItems.where((item) {
+  final dueItems = app.revisionItems.where((item) {
     final due = DateTime.tryParse(item.nextRevisionAt);
     return due != null && !due.isAfter(dayEnd);
-  }).length;
+  }).toList()
+    ..sort((a, b) => a.nextRevisionAt.compareTo(b.nextRevisionAt));
+  return dueItems;
+}
+
+List<_RevisionQueueSheetItem> _buildRevisionQueueSheetItems(AppProvider app) {
+  final items = <_RevisionQueueSheetItem>[
+    for (final revision in app.revisionItems)
+      _RevisionQueueSheetItem.fromRevisionItem(revision),
+  ];
+
+  for (final kb in app.knowledgeBase) {
+    if (kb.nextRevisionAt == null || kb.nextRevisionAt!.isEmpty) {
+      continue;
+    }
+    final alreadyTracked = app.revisionItems.any(
+      (revision) => revision.id == 'kb-${kb.pageNumber}',
+    );
+    if (!alreadyTracked) {
+      items.add(_RevisionQueueSheetItem.fromKnowledgeBaseEntry(kb));
+    }
+  }
+
+  return items
+      .map((item) => item.copyWith(status: _revisionQueueStatus(item)))
+      .where((item) => item.status.isNotEmpty)
+      .toList()
+    ..sort((a, b) => a.nextRevisionAt.compareTo(b.nextRevisionAt));
+}
+
+String _revisionQueueStatus(_RevisionQueueSheetItem item) {
+  if (SrsService.isDueNow(nextRevisionAt: item.nextRevisionAt)) {
+    return 'Do Now';
+  }
+  if (SrsService.isDueWithinDays(
+    nextRevisionAt: item.nextRevisionAt,
+    days: 7,
+  )) {
+    return 'Upcoming';
+  }
+  return '';
+}
+
+String _revisionDisplayTitle(Object item) {
+  if (item is RevisionItem) {
+    if (item.source == 'FA' && item.pageNumber.isNotEmpty) {
+      return 'FA Page ${item.pageNumber}';
+    }
+    return item.title.trim().isNotEmpty ? item.title : 'Revision item';
+  }
+  if (item is _RevisionQueueSheetItem) {
+    if (item.source == 'FA' && item.pageNumber.isNotEmpty) {
+      return 'FA Page ${item.pageNumber}';
+    }
+    return item.title.trim().isNotEmpty ? item.title : 'Revision item';
+  }
+  return 'Revision item';
+}
+
+String _revisionDisplaySubtitle(Object item) {
+  if (item is RevisionItem) {
+    if (item.parentTitle.trim().isNotEmpty) {
+      return '${item.parentTitle} • Rev ${item.currentRevisionIndex}';
+    }
+    return 'Rev ${item.currentRevisionIndex}';
+  }
+  if (item is _RevisionQueueSheetItem) {
+    if (item.parentTitle.trim().isNotEmpty) {
+      return '${item.parentTitle} • Rev ${item.currentRevisionIndex}';
+    }
+    return 'Rev ${item.currentRevisionIndex}';
+  }
+  return '';
 }
 
 List<_GoalProgressData> _buildGoalRows({
@@ -1911,17 +3189,6 @@ List<_GoalProgressData> _buildGoalRows({
           block.status == BlockStatus.done)
       .length;
 
-  final plannedQbankBlocks =
-      todayBlocks.where((block) => block.type == BlockType.qbank).length;
-  final completedQbankBlocks = todayBlocks
-      .where((block) =>
-          block.type == BlockType.qbank && block.status == BlockStatus.done)
-      .length;
-
-  final hasRevisionSignal = plannedRevisionBlocks > 0 ||
-      completedRevisionBlocks > 0 ||
-      dueRevisionCount > 0;
-
   final goals = <_GoalProgressData>[
     _goalData(
       label: 'FA Pages',
@@ -1933,7 +3200,7 @@ List<_GoalProgressData> _buildGoalRows({
       onTap: () => context.go('/tracker'),
     ),
     _goalData(
-      label: 'Anki Session',
+      label: 'Anki',
       icon: Icons.psychology_alt_rounded,
       current: currentAnki,
       target: 1,
@@ -1942,35 +3209,25 @@ List<_GoalProgressData> _buildGoalRows({
       onTap: () => context.go('/todays-plan'),
     ),
     _goalData(
-      label: 'Videos',
-      icon: Icons.ondemand_video_rounded,
+      label: 'Sketchy Micro',
+      icon: Icons.science_rounded,
       current: completedVideoBlocks,
       target: videoTarget,
       color: DashboardColors.primaryLight,
       progressDelay: const Duration(milliseconds: 780),
       onTap: () => context.go('/todays-plan'),
     ),
-    hasRevisionSignal
-        ? _goalData(
-            label: 'Revision',
-            icon: Icons.replay_rounded,
-            current: plannedRevisionBlocks > 0 ? completedRevisionBlocks : 0,
-            target: plannedRevisionBlocks > 0
-                ? plannedRevisionBlocks
-                : dueRevisionCount,
-            color: DashboardColors.warning,
-            progressDelay: const Duration(milliseconds: 840),
-            onTap: () => context.go('/revision'),
-          )
-        : _goalData(
-            label: 'QBank',
-            icon: Icons.quiz_rounded,
-            current: completedQbankBlocks,
-            target: plannedQbankBlocks,
-            color: DashboardColors.primaryViolet,
-            progressDelay: const Duration(milliseconds: 840),
-            onTap: () => context.go('/todays-plan'),
-          ),
+    _goalData(
+      label: 'Revision',
+      icon: Icons.replay_rounded,
+      current: plannedRevisionBlocks > 0 ? completedRevisionBlocks : 0,
+      target: plannedRevisionBlocks > 0
+          ? plannedRevisionBlocks
+          : dueRevisionCount,
+      color: DashboardColors.warning,
+      progressDelay: const Duration(milliseconds: 840),
+      onTap: () => context.go('/revision'),
+    ),
   ];
 
   return goals;
@@ -2004,6 +3261,23 @@ _GoalProgressData _goalData({
     progressDelay: progressDelay,
     onTap: onTap,
   );
+}
+
+String _formatHM(int minutes) {
+  if (minutes <= 0) return '0m';
+  final hours = minutes ~/ 60;
+  final remainingMinutes = minutes % 60;
+  if (hours == 0) return '${remainingMinutes}m';
+  if (remainingMinutes == 0) return '${hours}h';
+  return '${hours}h ${remainingMinutes}m';
+}
+
+String _formatShortHM(int minutes) {
+  if (minutes <= 0) return '0m';
+  final hours = minutes ~/ 60;
+  final remainingMinutes = minutes % 60;
+  if (hours > 0) return '${hours}h';
+  return '${remainingMinutes}m';
 }
 
 String _formatProjectionDate(DateTime? date) {
