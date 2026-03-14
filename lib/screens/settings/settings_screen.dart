@@ -1,4 +1,4 @@
-﻿// =============================================================
+// =============================================================
 // SettingsScreen â€” grouped settings list via AppScaffold
 // Sections: Appearance, Notifications, Menu, Data, About
 // Android rules: resizeToAvoidBottomInset: true on Scaffolds,
@@ -6,6 +6,7 @@
 // =============================================================
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -13,8 +14,10 @@ import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/models/app_settings.dart';
 import 'package:focusflow_mobile/services/backup_service.dart';
+import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/widgets/app_scaffold.dart';
+import 'package:focusflow_mobile/widgets/liquid_glass_card.dart';
 import 'package:focusflow_mobile/screens/settings/theme_picker_card.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -34,24 +37,15 @@ class SettingsScreen extends StatelessWidget {
           // ═══════════════════════════════════════════════════════
           // EXAM DATES
           // ═══════════════════════════════════════════════════════
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Text('Exam Dates',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: cs.onSurfaceVariant,
-                )),
-          ),
+          _GlassSectionHeader(title: 'Exam Dates'),
           const SizedBox(height: 8),
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          LiquidGlassCard(
             child: Column(
               children: [
-                ListTile(
-                  title: const Text('FMGE'),
-                  subtitle: Text(_formatDateLabel(sp.fmgeDate)),
-                  trailing: const Icon(Icons.edit_calendar_rounded),
+                _GlassListTile(
+                  title: 'FMGE',
+                  subtitle: _formatDateLabel(sp.fmgeDate),
+                  trailing: Icon(Icons.edit_calendar_rounded, color: DashboardColors.primaryLight, size: 20),
                   onTap: () async {
                     final picked = await showDatePicker(
                       context: context,
@@ -64,11 +58,11 @@ class SettingsScreen extends StatelessWidget {
                     }
                   },
                 ),
-                const Divider(height: 1),
-                ListTile(
-                  title: const Text('USMLE Step 1'),
-                  subtitle: Text(_formatDateLabel(sp.step1Date)),
-                  trailing: const Icon(Icons.edit_calendar_rounded),
+                Divider(height: 1, color: DashboardColors.glassBorder(Theme.of(context).brightness == Brightness.dark)),
+                _GlassListTile(
+                  title: 'USMLE Step 1',
+                  subtitle: _formatDateLabel(sp.step1Date),
+                  trailing: Icon(Icons.edit_calendar_rounded, color: DashboardColors.primaryLight, size: 20),
                   onTap: () async {
                     final picked = await showDatePicker(
                       context: context,
@@ -89,27 +83,14 @@ class SettingsScreen extends StatelessWidget {
           // ═══════════════════════════════════════════════════════
           // DAILY GOALS
           // ═══════════════════════════════════════════════════════
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Text('Daily Goals',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: cs.onSurfaceVariant,
-                )),
-          ),
+          _GlassSectionHeader(title: 'Daily Goals'),
           const SizedBox(height: 8),
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          LiquidGlassCard(
             child: Column(
               children: [
-                ListTile(
-                  title: const Text('FA Pages / Day'),
-                  trailing: Chip(
-                    label: Text('${sp.dailyFAGoal} pages',
-                        style: TextStyle(color: cs.onPrimaryContainer)),
-                    backgroundColor: cs.primaryContainer,
-                  ),
+                _GlassListTile(
+                  title: 'FA Pages / Day',
+                  trailing: _GlassChip(label: '${sp.dailyFAGoal} pages'),
                   onTap: () => _showSliderDialog(
                     context: context,
                     title: 'FA Pages / Day',
@@ -121,14 +102,10 @@ class SettingsScreen extends StatelessWidget {
                     onConfirm: (val) => sp.setDailyFAGoal(val.round()),
                   ),
                 ),
-                const Divider(height: 1),
-                ListTile(
-                  title: const Text('Anki Cards / Day'),
-                  trailing: Chip(
-                    label: Text('${sp.ankiBatchSize} cards',
-                        style: TextStyle(color: cs.onPrimaryContainer)),
-                    backgroundColor: cs.primaryContainer,
-                  ),
+                Divider(height: 1, color: DashboardColors.glassBorder(Theme.of(context).brightness == Brightness.dark)),
+                _GlassListTile(
+                  title: 'Anki Cards / Day',
+                  trailing: _GlassChip(label: '${sp.ankiBatchSize} cards'),
                   onTap: () => _showSliderDialog(
                     context: context,
                     title: 'Anki Cards / Day',
@@ -148,24 +125,15 @@ class SettingsScreen extends StatelessWidget {
           // ═══════════════════════════════════════════════════════
           // DAILY SCHEDULE
           // ═══════════════════════════════════════════════════════
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Text('Daily Schedule',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: cs.onSurfaceVariant,
-                )),
-          ),
+          _GlassSectionHeader(title: 'Daily Schedule'),
           const SizedBox(height: 8),
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          LiquidGlassCard(
             child: Column(
               children: [
-                ListTile(
-                  title: const Text('Wake Time'),
-                  subtitle: Text(_formatTimeLabel(sp.wakeTime)),
-                  trailing: const Icon(Icons.wb_sunny_rounded, color: Colors.amber),
+                _GlassListTile(
+                  title: 'Wake Time',
+                  subtitle: _formatTimeLabel(sp.wakeTime),
+                  trailing: const Icon(Icons.wb_sunny_rounded, color: Colors.amber, size: 20),
                   onTap: () async {
                     final parts = sp.wakeTime.split(':');
                     final initial = TimeOfDay(
@@ -178,11 +146,11 @@ class SettingsScreen extends StatelessWidget {
                     }
                   },
                 ),
-                const Divider(height: 1),
-                ListTile(
-                  title: const Text('Sleep Time'),
-                  subtitle: Text(_formatTimeLabel(sp.sleepTime)),
-                  trailing: const Icon(Icons.bedtime_rounded, color: Colors.indigo),
+                Divider(height: 1, color: DashboardColors.glassBorder(Theme.of(context).brightness == Brightness.dark)),
+                _GlassListTile(
+                  title: 'Sleep Time',
+                  subtitle: _formatTimeLabel(sp.sleepTime),
+                  trailing: const Icon(Icons.bedtime_rounded, color: Colors.indigo, size: 20),
                   onTap: () async {
                     final parts = sp.sleepTime.split(':');
                     final initial = TimeOfDay(
@@ -203,27 +171,17 @@ class SettingsScreen extends StatelessWidget {
           // ═══════════════════════════════════════════════════════
           // STREAK & DAY BOUNDARY
           // ═══════════════════════════════════════════════════════
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Text('Streak & Day Boundary',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: cs.onSurfaceVariant,
-                )),
-          ),
+          _GlassSectionHeader(title: 'Streak & Day Boundary'),
           const SizedBox(height: 8),
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          LiquidGlassCard(
             child: Column(
               children: [
-                ListTile(
-                  leading: Icon(Icons.schedule_rounded, color: cs.primary),
-                  title: const Text('Day Start Time'),
-                  subtitle: Text(
-                    '${sp.dayStartHour == 0 ? 12 : sp.dayStartHour > 12 ? sp.dayStartHour - 12 : sp.dayStartHour}:00 ${sp.dayStartHour < 12 ? 'AM' : 'PM'}',
-                  ),
-                  trailing: const Icon(Icons.chevron_right_rounded),
+                _GlassListTile(
+                  icon: Icons.schedule_rounded,
+                  iconColor: DashboardColors.primary,
+                  title: 'Day Start Time',
+                  subtitle: '${sp.dayStartHour == 0 ? 12 : sp.dayStartHour > 12 ? sp.dayStartHour - 12 : sp.dayStartHour}:00 ${sp.dayStartHour < 12 ? 'AM' : 'PM'}',
+                  trailing: Icon(Icons.chevron_right_rounded, color: DashboardColors.textSecondary, size: 20),
                   onTap: () => _showSliderDialog(
                     context: context,
                     title: 'Day Start Hour',
@@ -235,16 +193,14 @@ class SettingsScreen extends StatelessWidget {
                     onConfirm: (val) => sp.setDayStartHour(val.round()),
                   ),
                 ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.auto_awesome_rounded, color: Colors.amber),
-                  title: const Text('Auto Use Credits'),
-                  subtitle: const Text(
-                    'Auto-redeem credit points to save streak',
-                  ),
+                Divider(height: 1, color: DashboardColors.glassBorder(Theme.of(context).brightness == Brightness.dark)),
+                _GlassListTile(
+                  icon: Icons.auto_awesome_rounded,
+                  iconColor: Colors.amber,
+                  title: 'Auto Use Credits',
+                  subtitle: 'Auto-redeem credit points to save streak',
                   trailing: Switch.adaptive(
                     value: sp.streakAutoCredit,
-                    activeTrackColor: cs.primary,
                     onChanged: (v) => sp.setStreakAutoCredit(v),
                   ),
                 ),
@@ -253,92 +209,83 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           // BOTTOM NAV PINS
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Text('Navigation',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: cs.onSurfaceVariant,
-                )),
-          ),
+          _GlassSectionHeader(title: 'Navigation'),
           const SizedBox(height: 8),
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text('Pinned Tabs',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          )),
-                      const Spacer(),
-                      Text('Max 4 tabs',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: cs.onSurface.withValues(alpha: 0.4),
-                          )),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: sp.pinnedTabs.map((id) {
-                      final label = kPinnableScreenLabels[id] ?? id;
-                      return FilterChip(
-                        label: Text(label,
-                            style: TextStyle(color: cs.onPrimaryContainer)),
-                        selected: true,
-                        selectedColor: cs.primaryContainer,
-                        onSelected: (_) {
-                          if (sp.pinnedTabs.length > 1) {
-                            final updated = sp.pinnedTabs.where((t) => t != id).toList();
-                            sp.setPinnedTabs(updated);
-                          }
+          LiquidGlassCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text('Pinned Tabs',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: DashboardColors.textPrimary(Theme.of(context).brightness == Brightness.dark),
+                        )),
+                    const Spacer(),
+                    Text('Max 4 tabs',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: DashboardColors.textSecondary,
+                        )),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: sp.pinnedTabs.map((id) {
+                    final label = kPinnableScreenLabels[id] ?? id;
+                    return FilterChip(
+                      label: Text(label),
+                      selected: true,
+                      onSelected: (_) {
+                        if (sp.pinnedTabs.length > 1) {
+                          final updated = sp.pinnedTabs.where((t) => t != id).toList();
+                          sp.setPinnedTabs(updated);
+                        }
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add tab'),
+                  onPressed: sp.pinnedTabs.length >= 4
+                      ? null
+                      : () {
+                          final unpinned = kPinnableScreenLabels.entries
+                              .where((e) => !sp.pinnedTabs.contains(e.key))
+                              .toList();
+                          showModalBottomSheet(
+                            context: context,
+                            enableDrag: false,
+                            useSafeArea: true,
+                            builder: (_) => ListView(
+                              shrinkWrap: true,
+                              children: unpinned.map((e) {
+                                return ListTile(
+                                  title: Text(e.value),
+                                  onTap: () {
+                                    sp.setPinnedTabs([...sp.pinnedTabs, e.key]);
+                                    Navigator.pop(context);
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                          );
                         },
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add tab'),
-                    onPressed: sp.pinnedTabs.length >= 4
-                        ? null
-                        : () {
-                            final unpinned = kPinnableScreenLabels.entries
-                                .where((e) => !sp.pinnedTabs.contains(e.key))
-                                .toList();
-                            showModalBottomSheet(
-                              context: context,
-                              enableDrag: false,
-                              useSafeArea: true,
-                              builder: (_) => ListView(
-                                shrinkWrap: true,
-                                children: unpinned.map((e) {
-                                  return ListTile(
-                                    title: Text(e.value),
-                                    onTap: () {
-                                      sp.setPinnedTabs([...sp.pinnedTabs, e.key]);
-                                      Navigator.pop(context);
-                                    },
-                                  );
-                                }).toList(),
-                              ),
-                            );
-                          },
-                  ),
-                  const SizedBox(height: 8),
-                  Text('Tap a chip to unpin · Changes apply on restart',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: cs.onSurface.withValues(alpha: 0.35),
-                      )),
-                ],
-              ),
+                ),
+                const SizedBox(height: 8),
+                Text('Tap a chip to unpin · Changes apply on restart',
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      color: DashboardColors.textSecondary,
+                    )),
+              ],
             ),
           ),
           const SizedBox(height: 20),
@@ -346,11 +293,11 @@ class SettingsScreen extends StatelessWidget {
           // =============================================================
           // APPEARANCE
           // =============================================================
-          _SectionHeader(title: 'Appearance'),
+          _GlassSectionHeader(title: 'Appearance'),
           const SizedBox(height: 8),
 
           // â”€â”€ Theme picker (horizontal scroll) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-          _SectionCard(
+          LiquidGlassCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -394,7 +341,7 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 8),
 
           // â”€â”€ Font size slider â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-          _SectionCard(
+          LiquidGlassCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -466,7 +413,7 @@ class SettingsScreen extends StatelessWidget {
           // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // NOTIFICATIONS
           // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          _SectionHeader(title: 'Notifications'),
+          _GlassSectionHeader(title: 'Notifications'),
           const SizedBox(height: 8),
 
           _SettingsTile(
@@ -522,7 +469,7 @@ class SettingsScreen extends StatelessWidget {
           // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // MENU CONFIGURATION
           // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          _SectionHeader(title: 'Menu'),
+          _GlassSectionHeader(title: 'Menu'),
           const SizedBox(height: 8),
           _MenuReorderSection(sp: sp),
           const SizedBox(height: 20),
@@ -530,41 +477,40 @@ class SettingsScreen extends StatelessWidget {
           // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // BACKUP & RESTORE
           // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          _SectionHeader(title: 'Backup & Restore'),
+          _GlassSectionHeader(title: 'Backup & Restore'),
           const SizedBox(height: 8),
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          LiquidGlassCard(
             child: Column(
               children: [
                 // Row 1 — Last Backup
-                ListTile(
-                  leading: Icon(Icons.history_rounded, color: cs.primary),
-                  title: const Text('Last Backup'),
-                  subtitle: FutureBuilder<DateTime?>(
+                _GlassListTile(
+                  icon: Icons.history_rounded,
+                  iconColor: DashboardColors.primary,
+                  title: 'Last Backup',
+                  subtitleWidget: FutureBuilder<DateTime?>(
                     future: BackupService.lastBackupTime(),
                     builder: (context, snap) {
                       if (snap.connectionState == ConnectionState.waiting) {
-                        return const Text('Checking…');
+                        return Text('Checking…', style: GoogleFonts.inter(fontSize: 12, color: DashboardColors.textSecondary));
                       }
                       final dt = snap.data;
-                      if (dt == null) return const Text('No backup yet');
+                      if (dt == null) return Text('No backup yet', style: GoogleFonts.inter(fontSize: 12, color: DashboardColors.textSecondary));
                       final now = DateTime.now();
-                      final isToday = dt.year == now.year &&
-                          dt.month == now.month &&
-                          dt.day == now.day;
+                      final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
                       final formatted = isToday
                           ? 'Today at ${DateFormat.jm().format(dt)}'
                           : '${DateFormat('MMM d').format(dt)} at ${DateFormat.jm().format(dt)}';
-                      return Text(formatted);
+                      return Text(formatted, style: GoogleFonts.inter(fontSize: 12, color: DashboardColors.textSecondary));
                     },
                   ),
                 ),
-                const Divider(height: 1),
+                Divider(height: 1, color: DashboardColors.glassBorder(Theme.of(context).brightness == Brightness.dark)),
                 // Row 2 — Backup Now
-                ListTile(
-                  leading: const Icon(Icons.backup_rounded, color: Colors.green),
-                  title: const Text('Backup Now'),
-                  trailing: const Icon(Icons.chevron_right_rounded),
+                _GlassListTile(
+                  icon: Icons.backup_rounded,
+                  iconColor: DashboardColors.success,
+                  title: 'Backup Now',
+                  trailing: Icon(Icons.chevron_right_rounded, color: DashboardColors.textSecondary, size: 20),
                   onTap: () async {
                     showDialog(
                       context: context,
@@ -600,12 +546,12 @@ class SettingsScreen extends StatelessWidget {
                     }
                   },
                 ),
-                const Divider(height: 1),
-                // Row 3 — Restore from Backup
-                ListTile(
-                  leading: const Icon(Icons.restore_rounded, color: Colors.orange),
-                  title: const Text('Restore from Backup'),
-                  trailing: const Icon(Icons.chevron_right_rounded),
+                Divider(height: 1, color: DashboardColors.glassBorder(Theme.of(context).brightness == Brightness.dark)),
+                _GlassListTile(
+                  icon: Icons.restore_rounded,
+                  iconColor: DashboardColors.warning,
+                  title: 'Restore from Backup',
+                  trailing: Icon(Icons.chevron_right_rounded, color: DashboardColors.textSecondary, size: 20),
                   onTap: () {
                     showDialog(
                       context: context,
@@ -682,9 +628,9 @@ class SettingsScreen extends StatelessWidget {
           // ABOUT
           // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // ── STUDY PLAN ─────────────────────────────────────────
-          _SectionHeader(title: 'Study Plan'),
+          _GlassSectionHeader(title: 'Study Plan'),
           const SizedBox(height: 8),
-          _SectionCard(
+          LiquidGlassCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -741,9 +687,9 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
-          _SectionHeader(title: 'About'),
+          _GlassSectionHeader(title: 'About'),
           const SizedBox(height: 8),
-          _SectionCard(
+          LiquidGlassCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -879,44 +825,141 @@ class SettingsScreen extends StatelessWidget {
 // HELPER WIDGETS
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-class _SectionHeader extends StatelessWidget {
+class _GlassSectionHeader extends StatelessWidget {
   final String title;
-  const _SectionHeader({required this.title});
+  const _GlassSectionHeader({required this.title});
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: Theme.of(context)
-                .colorScheme
-                .onSurface
-                .withValues(alpha: 0.5),
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, top: 16, bottom: 0),
+      child: Row(
+        children: [
+          Container(
+            width: 3, height: 16,
+            decoration: BoxDecoration(
+              color: DashboardColors.primary,
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
+          const SizedBox(width: 8),
+          Text(
+            title.toUpperCase(),
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+              color: DashboardColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _SectionCard extends StatelessWidget {
-  final Widget child;
-  const _SectionCard({required this.child});
+class _GlassListTile extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final Widget? subtitleWidget;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final IconData? icon;
+  final Color? iconColor;
+
+  const _GlassListTile({
+    required this.title,
+    this.subtitle,
+    this.subtitleWidget,
+    this.trailing,
+    this.onTap,
+    this.icon,
+    this.iconColor,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: cs.onSurface.withValues(alpha: 0.06)),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            if (icon != null) ...[
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: (iconColor ?? DashboardColors.primary).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 16, color: iconColor ?? DashboardColors.primary),
+              ),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: DashboardColors.textPrimary(isDark),
+                    ),
+                  ),
+                  if (subtitle != null)
+                    Text(
+                      subtitle!,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: DashboardColors.textSecondary,
+                      ),
+                    ),
+                  if (subtitleWidget != null) subtitleWidget!,
+                ],
+              ),
+            ),
+            if (trailing != null) trailing!,
+          ],
+        ),
       ),
-      child: child,
     );
   }
 }
+
+class _GlassChip extends StatelessWidget {
+  final String label;
+  const _GlassChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: DashboardColors.primary.withValues(alpha: isDark ? 0.15 : 0.10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: DashboardColors.primary.withValues(alpha: 0.20),
+          width: 0.5,
+        ),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: DashboardColors.primaryLight,
+        ),
+      ),
+    );
+  }
+}
+
+
 
 class _SettingsTile extends StatelessWidget {
   final IconData icon;

@@ -6,8 +6,11 @@
 
 import 'dart:convert';
 import 'dart:math';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:focusflow_mobile/services/notification_service.dart';
+import 'package:focusflow_mobile/utils/app_colors.dart';
+import 'package:focusflow_mobile/widgets/aurora_background.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/models/routine.dart';
@@ -308,9 +311,16 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
 
     final activeTrackNow = app.getActiveTrackNow(_dateKey);
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      body: SafeArea(
+      backgroundColor: DashboardColors.background(isDark),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: AuroraBackground(isDark: isDark),
+          ),
+          SafeArea(
         bottom: false,
         child: Stack(
           children: [
@@ -385,40 +395,48 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                       SliverPersistentHeader(
                         pinned: true,
                         delegate: _SliverAppBarDelegate(
-                          Container(
-                            color: Theme.of(context).colorScheme.surface,
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Container(
-                              margin:
-                                  const EdgeInsets.symmetric(horizontal: 16),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .surfaceContainerHighest
-                                    .withValues(alpha: 0.3),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: TabBar(
-                                controller: _tabCtrl,
-                                labelStyle: const TextStyle(
-                                    fontSize: 12, fontWeight: FontWeight.w700),
-                                unselectedLabelStyle: const TextStyle(
-                                    fontSize: 12, fontWeight: FontWeight.w500),
-                                indicatorSize: TabBarIndicatorSize.tab,
-                                dividerColor: Colors.transparent,
-                                indicator: BoxDecoration(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .primary
-                                      .withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(10),
+                          ClipRRect(
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                              child: Container(
+                                color: isDark
+                                    ? const Color(0xFF0E0E1A).withValues(alpha: 0.70)
+                                    : Colors.white.withValues(alpha: 0.60),
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? Colors.white.withValues(alpha: 0.06)
+                                        : Colors.white.withValues(alpha: 0.40),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: isDark
+                                          ? DashboardColors.glassBorderDark
+                                          : DashboardColors.glassBorderLight,
+                                      width: 0.5,
+                                    ),
+                                  ),
+                                  child: TabBar(
+                                    controller: _tabCtrl,
+                                    labelStyle: const TextStyle(
+                                        fontSize: 12, fontWeight: FontWeight.w700),
+                                    unselectedLabelStyle: const TextStyle(
+                                        fontSize: 12, fontWeight: FontWeight.w500),
+                                    indicatorSize: TabBarIndicatorSize.tab,
+                                    dividerColor: Colors.transparent,
+                                    indicator: BoxDecoration(
+                                      color: DashboardColors.primary.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    tabs: const [
+                                      Tab(text: 'All', height: 36),
+                                      Tab(text: 'To-Do', height: 36),
+                                      Tab(text: 'Buying', height: 36),
+                                      Tab(text: 'Routines', height: 36),
+                                    ],
+                                  ),
                                 ),
-                                tabs: const [
-                                  Tab(text: 'All', height: 36),
-                                  Tab(text: 'To-Do', height: 36),
-                                  Tab(text: 'Buying', height: 36),
-                                  Tab(text: 'Routines', height: 36),
-                                ],
                               ),
                             ),
                           ),
@@ -468,6 +486,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
           ],
         ),
       ),
+        ], // outer Stack children
+      ), // outer Stack (aurora wrapper)
     );
   }
 
