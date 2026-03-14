@@ -112,7 +112,7 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final background =
         (isDark ? const Color(0xFF1E1E3A) : const Color(0xFFFFFFFF))
-            .withValues(alpha: isDark ? 0.82 : 0.72);
+            .withValues(alpha: isDark ? 0.92 : 0.88);
     final borderColor =
         const Color(0xFF6366F1).withValues(alpha: isDark ? 0.35 : 0.25);
     final glowBaseColor = widget.glowColor ?? const Color(0xFF6366F1);
@@ -156,15 +156,16 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
             borderRadius: widget.borderRadius,
             child: Stack(
               children: <Widget>[
-                Positioned.fill(
-                  child: BackdropFilter(
-                    filter: ui.ImageFilter.blur(
-                      sigmaX: 25,
-                      sigmaY: 25,
-                    ),
-                    child: Container(color: Colors.transparent),
-                  ),
-                ),
+                // if (defaultTargetPlatform == TargetPlatform.iOS)
+                //   Positioned.fill(
+                //     child: BackdropFilter(
+                //       filter: ui.ImageFilter.blur(
+                //         sigmaX: 25,
+                //         sigmaY: 25,
+                //       ),
+                //       child: Container(color: Colors.transparent),
+                //     ),
+                //   ),
                 Container(
                   padding: widget.padding,
                   decoration: BoxDecoration(
@@ -203,11 +204,11 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
                                     end: Alignment.bottomRight,
                                     colors: <Color>[
                                       Colors.white.withValues(
-                                        alpha: isDark ? 0.10 : 0.22,
+                                        alpha: isDark ? 0.15 : 0.35,
                                       ),
                                       Colors.transparent,
-                                      DashboardColors.primary.withValues(
-                                        alpha: isDark ? 0.08 : 0.05,
+                                      const Color(0xFF6366F1).withValues(
+                                        alpha: isDark ? 0.10 : 0.06,
                                       ),
                                     ],
                                   ),
