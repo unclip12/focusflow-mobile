@@ -68,3 +68,6 @@ git_log.txt
 
 node_modules/
 scripts/
+
+# Figma design reference — local only, not part of Flutter app
+Ultra-Premium iOS App Redesign/
