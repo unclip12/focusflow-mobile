@@ -13,3 +13,6 @@
 
 ## Flutter Local Notifications plugin
 -keep class com.dexterous.** { *; }
+
+## Suppress missing Play Core classes (used by Flutter deferred components but not needed)
+-dontwarn com.google.android.play.core.**
