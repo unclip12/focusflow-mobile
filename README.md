@@ -39,7 +39,7 @@ This app is built entirely using **AI-assisted development**. No manual code wri
 - Codex has full filesystem access in a sandboxed local clone
 - Every change is committed with a descriptive message — history is traceable
 - `flutter analyze` with 0 errors is mandatory before every commit
-- Perplexity approves Codex’s plan before execution ("Approved. Proceed.")
+- Perplexity approves Codex's plan before execution ("Approved. Proceed.")
 
 ### Prompt Review Process
 When Codex shows a plan before executing, Arsh shares it with Perplexity. Perplexity checks it and replies with either:
@@ -199,8 +199,8 @@ lib/
 - Called from: `startFlow()`, `AddTaskSheet`, tracker `_AddToTaskSheet`
 - Ends with `notifyListeners()` for immediate UI rebuild
 
-### Prompt 5 — Show Today’s Tracker Tasks (Codex)
-- Today’s tracker tasks visible in Today Plan UI
+### Prompt 5 — Show Today's Tracker Tasks (Codex)
+- Today's tracker tasks visible in Today Plan UI
 
 ### Prompt 6 — Fix Track Now Session Flow (Codex)
 - Resume existing active session instead of pushing a fresh one
@@ -224,10 +224,10 @@ lib/
 ### Prompt 13 — Full Day Plan Duplicate Fix (Codex)
 - Removed second list builder rendering blocks twice in Full Day Plan tab
 - Start/end time + duration now shown as subtitle on top cards only
-- “Add Activity” button moved into Start Flow box area
+- "Add Activity" button moved into Start Flow box area
 
 ### Prompt 14 — Start Study Session Box (Codex)
-- “Start Study Session” box added next to “Start Flow” in Today Plan
+- "Start Study Session" box added next to "Start Flow" in Today Plan
 - Both boxes equal size, same card style, side by side in a Row
 
 ### Prompt 17 — Routine Reminders + Recurrence + Expiry (Codex)
@@ -236,18 +236,18 @@ lib/
 - `RoutineEditorSheet`: reminder time picker, Daily/Weekly/Until Date segmented control
   - Weekly: single-select Mon–Sun chips (v1, single `reminderWeekday` stored)
   - Until Date: date picker stored as `YYYY-MM-DD`
-  - Reminder “Off” clears all reminder fields
+  - Reminder "Off" clears all reminder fields
 - `NotificationService`: `scheduleRoutineReminder()`, `cancelRoutineReminder()`, `rescheduleAllRoutineReminders()`
   - Daily: repeats with `DateTimeComponents.time`
   - Weekly: repeats with `DateTimeComponents.dayOfWeekAndTime`
   - Until Date: daily repeating, auto-cancelled on next app open after expiry
   - Prayer notification IDs (1000–1004) protected — not wiped by routine reschedule
 - Expiry dialog shown from `TodayPlanScreen` post-frame for `until_date` routines past end date
-  - “Update” opens editor prefilled, “Dismiss” skips
+  - "Update" opens editor prefilled, "Dismiss" skips
 - Routine card shows reminder time (🔔 6:00 AM) + recurrence badge (Daily/Weekly/Until dd MMM)
 
 ### Prompt 17B — Auto-inject Routines into DayPlan + Timezone Fix (Codex)
-- `AppProvider.injectRoutinesIntoDayPlan(date)` — reconciles routine-derived blocks in today’s DayPlan
+- `AppProvider.injectRoutinesIntoDayPlan(date)` — reconciles routine-derived blocks in today's DayPlan
   - Eligible routines (with `reminderTime`) inject a `routine-{id}` Block automatically
   - Daily: injects every day; Weekly: only on matching weekday; Until Date: only while active
   - Existing block updated in place on routine edit (preserves runtime status/actual times)
@@ -256,6 +256,17 @@ lib/
   - Block uses `actualNotes = 'source:routine'` as source marker (no new model field needed)
 - Called from `loadAll()` and `upsertRoutine()` automatically
 - `NotificationService.init()`: added `tz.setLocalLocation(tz.getLocation('Asia/Kolkata'))` — fixes notifications firing at UTC instead of IST
+
+### Prompt 18 — Add FA Pages + UWorld Topics to Library (Codex)
+- FA Pages add sheet: page number, subject, system, title, notes → `app.upsertFAPage()`
+- UWorld Topics add sheet: topic name, system, total questions → `app.addUWorldTopic()`
+- Validation: required fields, no duplicate FA page numbers, green/red SnackBar feedback
+- Existing KB Entry sheet unchanged
+
+### Prompt 19 — Dashboard Analytics (Codex)
+- 4 analytics cards added to Dashboard: Today's Time Breakdown, Planned vs Actual this week, Top 5 Activities, Daily Avg Study Time (30d)
+- All client-side from existing `timeLogs` + `dayPlans` — no new dependencies, no schema changes
+- All cards use app theme colors (dark mode safe), graceful empty states
 
 ### .github Infrastructure (March 12, 2026)
 - Added `.github/agents/` AI agent suite (5 agents + README)
@@ -266,22 +277,8 @@ lib/
 
 ## 🔴 Pending / Next Up
 
-### Prompt 18 — Add FA Pages + UWorld Topics to Library
-**Status: Not started | Reasoning: High | Files: 2–3**
-
-FA Pages add sheet: page number, subject, system, title, notes → `app.upsertFAPage()`
-UWorld Topics add sheet: topic name, system, total questions → `app.addUWorldTopic()`
-Validation: required fields, no duplicate FA page numbers, green/red SnackBar feedback.
-Do NOT touch existing KB Entry sheet. Do NOT change DB schema.
-
-### Prompt 19 — Dashboard Analytics
-**Status: Not started | Reasoning: High | Files: dashboard + app_provider.dart**
-
-4 cards: Today’s Time Breakdown, Planned vs Actual this week, Top 5 Activities, Daily Avg Study Time (30d).
-All client-side from existing `timeLogs` + `dayPlans`. No new dependencies, no schema changes.
-
-### Prompt 11 — Backup Black Screen Fix
-**Status: Deferred | Reasoning: High | Files: backup_service.dart, backup_screen.dart**
+### Prompt 11 — Backup Screen UX Fix
+**Status: Deferred — will do later | Reasoning: High | Files: backup_service.dart, backup_screen.dart**
 
 Add `_isLoading` state + `CircularProgressIndicator`, wrap all calls in `try/catch`,
 show SnackBar on success/error, call `AppProvider.loadAll()` after restore.
@@ -304,53 +301,53 @@ show SnackBar on success/error, call `AppProvider.loadAll()` after restore.
 - [ ] Force-close app and reopen → reminder settings still saved correctly
 - [ ] Set a reminder for 1 min from now → notification fires at correct IST time (not UTC)
 - [ ] `until_date` routine past its end date → expiry dialog shown on Today Plan open
-  - Tap “Update” → editor opens prefilled
-  - Tap “Dismiss” → dialog gone, no crash
+  - Tap "Update" → editor opens prefilled
+  - Tap "Dismiss" → dialog gone, no crash
 - [ ] Prayer routines still fire at correct times (not broken by routine notification reschedule)
 
 ---
 
 ### After Prompt 17B — Auto-inject into DayPlan
 
-- [ ] Routine with Daily reminder → block `routine-{id}` appears in today’s Full Day Plan at correct time
+- [ ] Routine with Daily reminder → block `routine-{id}` appears in today's Full Day Plan at correct time
 - [ ] Block shows correct title (icon + name), planned start time, and duration
 - [ ] Force-close and reopen → block is NOT duplicated in the plan
-- [ ] Edit routine’s reminder time → existing block in plan updates time immediately (no duplicate)
-- [ ] Edit routine’s name → block title updates immediately
+- [ ] Edit routine's reminder time → existing block in plan updates time immediately (no duplicate)
+- [ ] Edit routine's name → block title updates immediately
 - [ ] Weekly routine → block only appears on matching weekday, not other days
 - [ ] `until_date` routine on valid day → block injects; on expired date → block removed from plan
-- [ ] Remove reminder from routine → `routine-{id}` block removed from today’s plan
+- [ ] Remove reminder from routine → `routine-{id}` block removed from today's plan
 - [ ] Manually complete the routine block in plan → status stays DONE after re-inject (not reset)
-- [ ] Open tomorrow’s plan → routine block NOT injected there (today only)
+- [ ] Open tomorrow's plan → routine block NOT injected there (today only)
 - [ ] Notification at set time fires at correct IST time (timezone fix verified)
 
 ---
 
 ### After Prompt 18 — Add FA Pages + UWorld Topics
 
-- [ ] Open FA tracker screen → “+” button visible
-- [ ] Tap “+” → bottom sheet opens with page number, subject, system, title, notes fields
+- [ ] Open FA tracker screen → "+" button visible
+- [ ] Tap "+" → bottom sheet opens with page number, subject, system, title, notes fields
 - [ ] Save with empty page number → sheet does NOT close, shows validation error
 - [ ] Save with valid page number → sheet closes, green SnackBar, page appears in list
-- [ ] Try saving same page number again → red SnackBar “Page already exists”, no duplicate added
+- [ ] Try saving same page number again → red SnackBar "Page already exists", no duplicate added
 - [ ] Force-close and reopen → newly added FA page still in list (persisted to DB)
-- [ ] Open UWorld tracker screen → “+” button visible
-- [ ] Tap “+” → bottom sheet opens with topic name, system, total questions fields
+- [ ] Open UWorld tracker screen → "+" button visible
+- [ ] Tap "+" → bottom sheet opens with topic name, system, total questions fields
 - [ ] Save with empty topic name → validation error shown
 - [ ] Save valid topic → sheet closes, green SnackBar, topic appears in UWorld list
 - [ ] Force-close and reopen → newly added UWorld topic still in list
-- [ ] KnowledgeBaseScreen existing “Add KB Entry” sheet → unchanged and still works
+- [ ] KnowledgeBaseScreen existing "Add KB Entry" sheet → unchanged and still works
 
 ---
 
 ### After Prompt 19 — Dashboard Analytics
 
-- [ ] Open Dashboard → new “Analytics” section visible below existing stats
-- [ ] Card 1 (Today’s Time Breakdown): shows categories with time if logs exist; shows “No activity logged today” if none
+- [ ] Open Dashboard → new "Analytics" section visible below existing stats
+- [ ] Card 1 (Today's Time Breakdown): shows categories with time if logs exist; shows "No activity logged today" if none
 - [ ] Card 2 (Planned vs Actual): shows rows for each day Mon–today with planned and actual minutes
 - [ ] Card 2: days with no blocks show 0 or are skipped gracefully (no crash)
 - [ ] Card 3 (Top 5 Activities): shows ranked list with duration; shows empty state if no logs this week
-- [ ] Card 4 (Daily Average): shows formatted “Avg X h Y m / study day”; no divide-by-zero crash if 0 study days
+- [ ] Card 4 (Daily Average): shows formatted "Avg X h Y m / study day"; no divide-by-zero crash if 0 study days
 - [ ] All cards use app theme colors (no hardcoded white/black that breaks dark mode)
 - [ ] Scroll Dashboard to bottom without layout overflow or jank
 
@@ -358,10 +355,10 @@ show SnackBar on success/error, call `AppProvider.loadAll()` after restore.
 
 ### After Prompt 11 — Backup Screen Fix
 
-- [ ] Tap “Backup Now” → loading spinner shown immediately (no black screen)
+- [ ] Tap "Backup Now" → loading spinner shown immediately (no black screen)
 - [ ] Backup completes → spinner dismissed, green SnackBar with file path
 - [ ] Backup with no write access (simulate) → red SnackBar with error message, no freeze
-- [ ] Tap “Restore” → file picker opens, pick a valid backup file
+- [ ] Tap "Restore" → file picker opens, pick a valid backup file
 - [ ] Restore completes → spinner dismissed, green SnackBar, app data reloaded
 - [ ] Restore with corrupted file → red SnackBar with error, no crash, app still usable
 - [ ] Navigate away during backup → no memory leak / setState after dispose error in console
