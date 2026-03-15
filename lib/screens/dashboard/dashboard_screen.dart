@@ -1452,10 +1452,13 @@ class _DashboardMetricPanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: accent.withValues(alpha: isDark ? 0.08 : 0.06),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: accent.withValues(alpha: isDark ? 0.12 : 0.10),
+        border: Border(
+          left: BorderSide(
+            color: accent.withValues(alpha: 0.45),
+            width: 2.5,
+          ),
         ),
       ),
       child: Column(
@@ -1518,15 +1521,8 @@ class _WeeklyStudyBars extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 16, 12, 10),
       decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.02)
-            : Colors.white.withValues(alpha: 0.08),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.04)
-              : DashboardColors.primary.withValues(alpha: 0.05),
-        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -1981,7 +1977,7 @@ class _RevisionQueueCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: DashboardColors.success.withValues(alpha: 0.10),
+              color: Colors.transparent,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: DashboardColors.success.withValues(alpha: 0.18),
@@ -2414,9 +2410,12 @@ class _RotatingQuoteCardState extends State<_RotatingQuoteCard> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: DashboardColors.quoteCardFill,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: DashboardColors.quoteCardBorder),
+        border: Border.all(
+          color: DashboardColors.primary
+              .withValues(alpha: widget.isDark ? 0.12 : 0.08),
+        ),
       ),
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 500),
