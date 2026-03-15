@@ -1,4 +1,4 @@
-﻿// =============================================================
+// =============================================================
 // KBEntryCard â€” compact card for Knowledge Base list items
 // Shows: pageNumber, topic, subject chip, system chip,
 //        mastery progress bar, next revision date badge.
@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:focusflow_mobile/models/knowledge_base.dart';
 import 'package:focusflow_mobile/services/srs_service.dart';
 import 'package:focusflow_mobile/core/theme/app_colors.dart';
+import 'package:focusflow_mobile/utils/app_colors.dart';
 
 class KBEntryCard extends StatelessWidget {
   final KnowledgeBaseEntry entry;
@@ -19,6 +20,7 @@ class KBEntryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     // â”€â”€ Mastery computation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const String mode = 'strict';
@@ -26,12 +28,13 @@ class KBEntryCard extends StatelessWidget {
     final int masteredCount = entry.currentRevisionIndex.clamp(0, totalSteps);
     final double masteryRatio =
         totalSteps > 0 ? masteredCount / totalSteps : 0.0;
-    final bool isMastered =
-        SrsService.isMastered(revisionIndex: entry.currentRevisionIndex, mode: mode);
+    final bool isMastered = SrsService.isMastered(
+        revisionIndex: entry.currentRevisionIndex, mode: mode);
 
     // â”€â”€ Next revision badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     final now = DateTime.now();
-    final bool isOverdue = SrsService.isDueNow(nextRevisionAt: entry.nextRevisionAt);
+    final bool isOverdue =
+        SrsService.isDueNow(nextRevisionAt: entry.nextRevisionAt);
     final DateTime? nextDate = entry.nextRevisionAt != null
         ? DateTime.tryParse(entry.nextRevisionAt!)
         : null;
@@ -70,9 +73,14 @@ class KBEntryCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: cs.surface,
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: cs.onSurface.withValues(alpha: 0.06)),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.07)
+                : DashboardColors.primary.withValues(alpha: 0.08),
+            width: 0.5,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
