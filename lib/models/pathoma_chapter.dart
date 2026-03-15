@@ -28,7 +28,7 @@ class PathomaChapter {
   factory PathomaChapter.fromMap(Map<String, dynamic> m) => PathomaChapter(
         id: m['id'] as int?,
         chapter: m['chapter'] as int,
-        title: m['title'] as String,
+        title: m['title'] as String? ?? '',
         watched: (m['watched'] as int) == 1,
       );
 }

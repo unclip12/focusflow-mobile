@@ -16,11 +16,11 @@ class UWorldSession {
   });
 
   factory UWorldSession.fromJson(Map<String, dynamic> j) => UWorldSession(
-        id: j['id'] as String,
-        subject: j['subject'] as String,
+        id: j['id'] as String? ?? '',
+        subject: j['subject'] as String? ?? '',
         done: j['done'] as int? ?? 0,
         correct: j['correct'] as int? ?? 0,
-        date: j['date'] as String,
+        date: j['date'] as String? ?? '',
         notes: j['notes'] as String?,
       );
 

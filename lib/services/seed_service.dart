@@ -28,7 +28,8 @@ class SeedService {
       final existingPages = await db.getAllFAPages();
       final existingData = <int, Map<String, dynamic>>{};
       for (final row in existingPages) {
-        final data = jsonDecode(row['data'] as String) as Map<String, dynamic>;
+        final data =
+            jsonDecode(row['data'] as String? ?? '{}') as Map<String, dynamic>;
         final pn = data['pageNum'] as int?;
         if (pn != null) {
           existingData[pn] = data;
@@ -51,7 +52,7 @@ class SeedService {
         if (topics.isNotEmpty) {
           final firstTopic = topics[0] as Map<String, dynamic>?;
           if (firstTopic != null && firstTopic['t'] != null) {
-            title = firstTopic['t'] as String;
+            title = firstTopic['t'] as String? ?? 'Untitled';
           }
         }
 

@@ -18,9 +18,9 @@ class PathomaItem {
   });
 
   factory PathomaItem.fromJson(Map<String, dynamic> j) => PathomaItem(
-        id: j['id'] as String,
+        id: j['id'] as String? ?? '',
         chapter: j['chapter'] as int,
-        title: j['title'] as String,
+        title: j['title'] as String? ?? '',
         subject: j['subject'] as String? ?? 'General',
         customTitle: j['customTitle'] as String?,
         userDescription: j['userDescription'] as String?,

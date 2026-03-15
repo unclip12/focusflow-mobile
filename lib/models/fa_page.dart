@@ -53,7 +53,7 @@ class FAPage {
 
   factory FAPage.fromJson(Map<String, dynamic> j) => FAPage(
         pageNum: j['pageNum'] as int,
-        subject: j['subject'] as String,
+        subject: j['subject'] as String? ?? '',
         system: j['system'] as String? ?? 'General',
         title: j['title'] as String? ?? '',
         customTitle: j['customTitle'] as String?,

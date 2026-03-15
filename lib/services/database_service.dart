@@ -432,7 +432,8 @@ class DatabaseService {
       limit: 1,
     );
     if (rows.isEmpty) return null;
-    return jsonDecode(rows.first['data'] as String) as Map<String, dynamic>;
+    return jsonDecode(rows.first['data'] as String? ?? '{}')
+        as Map<String, dynamic>;
   }
 
   /// Get all rows from a table, decoded from JSON.
@@ -441,7 +442,7 @@ class DatabaseService {
     final rows = await db.query(table);
     return rows
         .map((r) =>
-            jsonDecode(r['data'] as String) as Map<String, dynamic>)
+            jsonDecode(r['data'] as String? ?? '{}') as Map<String, dynamic>)
         .toList();
   }
 
@@ -459,7 +460,7 @@ class DatabaseService {
     );
     return rows
         .map((r) =>
-            jsonDecode(r['data'] as String) as Map<String, dynamic>)
+            jsonDecode(r['data'] as String? ?? '{}') as Map<String, dynamic>)
         .toList();
   }
 
@@ -670,7 +671,7 @@ class DatabaseService {
         await db.query(tMentorMessages, orderBy: 'timestamp ASC');
     return rows
         .map((r) =>
-            jsonDecode(r['data'] as String) as Map<String, dynamic>)
+            jsonDecode(r['data'] as String? ?? '{}') as Map<String, dynamic>)
         .toList();
   }
 
@@ -742,7 +743,7 @@ class DatabaseService {
     final rows = await db.query(tHistory, orderBy: 'timestamp DESC');
     return rows
         .map((r) =>
-            jsonDecode(r['data'] as String) as Map<String, dynamic>)
+            jsonDecode(r['data'] as String? ?? '{}') as Map<String, dynamic>)
         .toList();
   }
 

@@ -18,9 +18,9 @@ class SketchyItem {
   });
 
   factory SketchyItem.fromJson(Map<String, dynamic> j) => SketchyItem(
-        id: j['id'] as String,
-        name: j['name'] as String,
-        type: j['type'] as String,
+        id: j['id'] as String? ?? '',
+        name: j['name'] as String? ?? '',
+        type: j['type'] as String? ?? '',
         category: j['category'] as String? ?? 'General',
         customTitle: j['customTitle'] as String?,
         userDescription: j['userDescription'] as String?,

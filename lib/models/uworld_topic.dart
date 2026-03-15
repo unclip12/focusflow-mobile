@@ -49,8 +49,8 @@ class UWorldTopic {
 
   factory UWorldTopic.fromMap(Map<String, dynamic> m) => UWorldTopic(
         id: m['id'] as int?,
-        system: m['system'] as String,
-        subtopic: m['subtopic'] as String,
+        system: m['system'] as String? ?? '',
+        subtopic: m['subtopic'] as String? ?? '',
         customTitle: m['customTitle'] as String?,
         userDescription: m['userDescription'] as String?,
         totalQuestions: m['total_questions'] as int,

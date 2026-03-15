@@ -31,9 +31,9 @@ class SketchyVideo {
 
   factory SketchyVideo.fromMap(Map<String, dynamic> m) => SketchyVideo(
         id: m['id'] as int?,
-        category: m['category'] as String,
-        subcategory: m['subcategory'] as String,
-        title: m['title'] as String,
+        category: m['category'] as String? ?? '',
+        subcategory: m['subcategory'] as String? ?? '',
+        title: m['title'] as String? ?? '',
         watched: (m['watched'] as int) == 1,
       );
 }

@@ -25,17 +25,18 @@ class LibraryNote {
 
   factory LibraryNote.fromJson(Map<String, dynamic> json) {
     return LibraryNote(
-      id: json['id'] as String,
-      itemId: json['itemId'] as String,
-      itemType: json['itemType'] as String,
+      id: json['id'] as String? ?? '',
+      itemId: json['itemId'] as String? ?? '',
+      itemType: json['itemType'] as String? ?? '',
       noteText: json['noteText'] as String? ?? '',
       tags: json['tags'] != null
-          ? List<String>.from(jsonDecode(json['tags'] as String))
+          ? List<String>.from(jsonDecode(json['tags'] as String? ?? '[]'))
           : [],
       attachmentPaths: json['attachmentPaths'] != null
-          ? List<String>.from(jsonDecode(json['attachmentPaths'] as String))
+          ? List<String>.from(
+              jsonDecode(json['attachmentPaths'] as String? ?? '[]'))
           : [],
-      createdAt: json['createdAt'] as String,
+      createdAt: json['createdAt'] as String? ?? '',
     );
   }
 
