@@ -503,18 +503,46 @@ class _GreetingSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final todayFormatted = DateFormat('EEEE, d MMMM').format(DateTime.now());
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
+        // Date label
         Text(
-          '$greeting, $displayName',
+          todayFormatted.toUpperCase(),
           style: _inter(
-            size: 30,
-            weight: FontWeight.w700,
-            color: DashboardColors.textPrimary(isDark),
+            size: 11,
+            weight: FontWeight.w600,
+            color: DashboardColors.primary.withValues(alpha: 0.7),
+            letterSpacing: 1.2,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
+        // Greeting with gradient name
+        RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: '$greeting, ',
+                style: _inter(
+                  size: 28,
+                  weight: FontWeight.w600,
+                  color: DashboardColors.textPrimary(isDark),
+                ),
+              ),
+              TextSpan(
+                text: displayName,
+                style: _inter(
+                  size: 28,
+                  weight: FontWeight.w800,
+                  color: DashboardColors.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
         ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 20),
           child: Row(
@@ -532,6 +560,21 @@ class _GreetingSection extends StatelessWidget {
               ),
               const _BlinkingCursor(),
             ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Subtle gradient divider
+        Container(
+          height: 1.5,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(1),
+            gradient: LinearGradient(
+              colors: [
+                DashboardColors.primary.withValues(alpha: 0.4),
+                DashboardColors.primaryViolet.withValues(alpha: 0.2),
+                Colors.transparent,
+              ],
+            ),
           ),
         ),
       ],
@@ -1014,10 +1057,10 @@ class _DashboardMetricPanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: accent.withValues(alpha: isDark ? 0.14 : 0.10),
+        color: accent.withValues(alpha: isDark ? 0.08 : 0.06),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: accent.withValues(alpha: isDark ? 0.25 : 0.18),
+          color: accent.withValues(alpha: isDark ? 0.12 : 0.10),
         ),
       ),
       child: Column(
@@ -1081,13 +1124,13 @@ class _WeeklyStudyBars extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 16, 12, 10),
       decoration: BoxDecoration(
         color: isDark
-            ? Colors.white.withValues(alpha: 0.03)
-            : Colors.white.withValues(alpha: 0.18),
+            ? Colors.white.withValues(alpha: 0.02)
+            : Colors.white.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : DashboardColors.primary.withValues(alpha: 0.08),
+              ? Colors.white.withValues(alpha: 0.04)
+              : DashboardColors.primary.withValues(alpha: 0.05),
         ),
       ),
       child: Row(

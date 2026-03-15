@@ -214,8 +214,17 @@ class MainShell extends StatelessWidget {
           backgroundColor: DashboardColors.background(isDark),
           body: Stack(
             children: [
-              // ── Main content ──────────────────────────────
-              Positioned.fill(child: child),
+              // ── Main content with extra bottom padding for floating nav ──
+              Positioned.fill(
+                child: MediaQuery(
+                  data: MediaQuery.of(context).copyWith(
+                    padding: MediaQuery.of(context).padding.copyWith(
+                      bottom: MediaQuery.of(context).padding.bottom + 80,
+                    ),
+                  ),
+                  child: child,
+                ),
+              ),
 
               // ── Floating glass bottom nav ─────────────────
               Positioned(
@@ -291,8 +300,8 @@ class _GlassBottomNav extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: isDark
-                ? const Color(0xFF0E0E1A).withValues(alpha: 0.65)
-                : Colors.white.withValues(alpha: 0.55),
+                ? const Color(0xFF0E0E1A).withValues(alpha: 0.40)
+                : Colors.white.withValues(alpha: 0.35),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color: isDark

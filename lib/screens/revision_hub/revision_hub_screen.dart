@@ -139,34 +139,55 @@ class _RevisionHubScreenState extends State<RevisionHubScreen>
         : 0;
 
     return AppScaffold(
-      screenName: 'Revision Hub',
+      screenName: '',
+      showHeader: false,
       streakCount: 0,
-      actions: [
-        // Search toggle
-        _GlassIconButton(
-          icon: _showSearch ? Icons.close_rounded : Icons.search_rounded,
-          onTap: _toggleSearch,
-          isDark: isDark,
-        ),
-        const SizedBox(width: 6),
-        // Sort menu
-        _SortMenuButton(
-          currentSort: _sortBy,
-          isDark: isDark,
-          onChanged: (s) => setState(() => _sortBy = s),
-        ),
-      ],
       body: DefaultTabController(
         length: 3,
         child: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) => [
-            // ── Stats Header ────────────────────────────────────
+            // ── Safe area top padding ──────────────────────────
             SliverToBoxAdapter(
-              child: _StatsHeader(
-                totalDue: totalDue,
-                totalItems: totalItems,
-                masteryPercent: masteryPercent,
-                isDark: isDark,
+              child: SizedBox(height: MediaQuery.of(context).padding.top + 8),
+            ),
+
+            // ── Stats + Controls Row ────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 3 stat cards
+                    Expanded(
+                      child: _StatsHeader(
+                        totalDue: totalDue,
+                        totalItems: totalItems,
+                        masteryPercent: masteryPercent,
+                        isDark: isDark,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Vertical search & sort
+                    Column(
+                      children: [
+                        _GlassIconButton(
+                          icon: _showSearch
+                              ? Icons.close_rounded
+                              : Icons.search_rounded,
+                          onTap: _toggleSearch,
+                          isDark: isDark,
+                        ),
+                        const SizedBox(height: 6),
+                        _SortMenuButton(
+                          currentSort: _sortBy,
+                          isDark: isDark,
+                          onChanged: (s) => setState(() => _sortBy = s),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
 
@@ -494,10 +515,8 @@ class _StatsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-      child: Row(
-        children: [
+    return Row(
+      children: [
           Expanded(
             child: _StatCard(
               icon: Icons.warning_amber_rounded,
@@ -531,7 +550,6 @@ class _StatsHeader extends StatelessWidget {
             ),
           ),
         ],
-      ),
     );
   }
 }
