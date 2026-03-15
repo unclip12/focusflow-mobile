@@ -20,19 +20,20 @@ This app is built entirely using **AI-assisted development**. No manual code wri
    - Codex reads all relevant files, writes/edits code, runs `flutter analyze`, fixes errors, then shows a diff.
    - Arsh reviews the diff, clicks **Commit** to push to `main`.
    - Codex sometimes asks clarifying questions before planning — Arsh answers, Perplexity helps interpret.
-   - Codex runs on **GPT-5.4, High** setting.
+   - Codex runs on **GPT-5.4, Medium** reasoning setting.
 
-3. **Antigravity (previous execution layer)**
-   - Used in earlier batches (A–C). Claude Opus and Gemini ran directly against the local repo.
-   - Still available as fallback for complex multi-file logic if needed.
+3. **Antigravity (UI overhaul layer — March 2026)**
+   - Claude Opus 4.6 running via Antigravity used for the full Ultra-Premium iOS design system overhaul.
+   - Handles large-scale multi-file visual redesigns (12+ screens, ~10,000+ lines).
+   - Perplexity writes the phased redesign prompts, Arsh submits to Antigravity, reviews diffs, commits.
 
 4. **Two AI models used:**
    - **GPT-5.4 via Codex** — Current primary. Complex logic, multi-file wiring, provider integration.
-   - **Claude Opus / Gemini via Antigravity** — Used in earlier batches. Claude for logic, Gemini for UI polish.
+   - **Claude Opus 4.6 via Antigravity** — UI overhaul, design system application, large visual refactors.
 
-5. **Testing** — Arsh tests on a real Android device via `flutter run`. Bugs reported back to Perplexity, which reads the repo again and writes a new targeted fix prompt.
+5. **Testing** — Arsh tests on a real Android device via signed release APK (GitHub Actions CI). Bugs reported back to Perplexity, which reads the repo again and writes a new targeted fix prompt.
 
-6. **Loop:** Plan (Perplexity) → Prompt → Codex executes → Review diff → Commit → Test → Debug → Repeat.
+6. **Loop:** Plan (Perplexity) → Prompt → Codex/Antigravity executes → Review diff → Commit → CI builds signed APK → Test on device → Debug → Repeat.
 
 ### Why This Works
 - Perplexity reads the live repo via GitHub MCP before every prompt — context always fresh
@@ -128,7 +129,8 @@ lib/
 │   ├── constants.dart            # kDefaultMenuOrder, kBodySystems, kFocusQuotes, etc.
 │   └── focus_batch_calculator.dart
 └── widgets/
-    └── app_scaffold.dart         # Shared scaffold with sidebar nav
+    ├── app_scaffold.dart         # Shared scaffold with aurora background + sidebar nav
+    └── liquid_glass_card.dart    # Shared frosted glass card widget (Android-safe, no BackdropFilter)
 
 .github/
 ├── agents/                       # AI agent system prompts (paste into Claude/Gemini/GPT)
@@ -273,9 +275,51 @@ lib/
 - Added `.github/DEVELOPMENT.md`, `.github/SECURITY.md`, issue templates
 - `.gitignore` fully hardened, repo scanned — zero secrets found
 
+### Android Glass Card Fix + Dashboard Restore (Codex, March 14, 2026)
+- `liquid_glass_card.dart`: replaced `BackdropFilter` with Android-safe painted frosted glass
+  - `BackdropFilter` commented out (preserved for future iOS use)
+  - Dark fill opacity increased to `0.92`, light fill to `0.88`
+  - Stronger inner gradient overlay simulates frost/depth without GPU blur dependency
+  - All shimmer, ripple, tap-scale, border, glow shadow behavior preserved
+- `dashboard_screen.dart`: restored all 11 dashboard sections in correct order
+  - Greeting, Exam Countdown, Your Pace, Time Budget, Goals, Streak
+  - Analytics, FA Tracker, Revision Queue, Last 7 Days, Time by Subject
+  - Time Budget shows only Sleep / Study / Free segments
+  - Goals shows exactly FA Pages / Anki / Sketchy Micro / Revision
+  - All 5 restored sections use private helpers, no public API changes
+
+### CI/CD — Signed Release APK (March 14, 2026)
+- Generated Android release keystore (`focusflow.jks`) stored securely outside repo
+- Added 4 GitHub Actions secrets: `KEYSTORE_BASE64`, `KEY_STORE_PASSWORD`, `KEY_PASSWORD`, `KEY_ALIAS`
+- Updated `flutter_check.yml` to build and upload a signed release APK on every push to `main`
+- Updated `android/app/build.gradle` with `signingConfigs.release` block reading from env vars
+- Artifact: `focusflow-signed-release-apk` available for 7 days after each CI run
+
+### Ultra-Premium iOS Design System Overhaul (Antigravity / Claude Opus 4.6, March 14–15, 2026)
+- Full app visual redesign based on Figma Ultra-Premium iOS reference
+- Design tokens applied globally:
+  - Background: `#0E0E1A` (dark) / `#F8F7FF` (light)
+  - Accent: `#6366F1 → #818CF8 → #8B5CF6 → #A78BFA`
+  - Glass card: `rgba(255,255,255,0.08)` + indigo border
+  - Font: Inter, weights 400–800
+  - Animations: spring physics, shimmer sweeps, tap ripples
+- Phases completed:
+  - **Phase 1**: `app_scaffold.dart`, `main_shell.dart`, `app_theme.dart` — aurora background on all screens, frosted glass bottom nav, dark theme tokens
+  - **Phase 2**: `settings_screen.dart` — LiquidGlassCard sections, glass toggles, glass +/- steppers, appearance picker
+  - **Phase 3**: `today_plan_screen.dart` + related cards — glass prayer/study blocks, indigo accents
+  - **Phase 4**: `analytics_screen.dart` — glass charts, indigo palette, subject radial donuts, heatmap
+  - **Phase 5**: `revision_hub_screen.dart`, `time_log_screen.dart`, `import_screen.dart`, `fa_logger_screen.dart`, tracker screens, `knowledge_base_screen.dart`, `backup_screen.dart`, `splash_screen.dart`
+- All functionality, data models, providers, and navigation routes unchanged
+- Both dark and light mode supported throughout
+
 ---
 
 ## 🔴 Pending / Next Up
+
+### Phase 6 — Dashboard Visual Audit (Antigravity)
+**Status: Pending**
+Audit and fix dashboard visual inconsistencies after the full app redesign.
+Verify glass card opacity, border colors, aurora rendering in both light/dark modes.
 
 ### Prompt 11 — Backup Screen UX Fix
 **Status: Deferred — will do later | Reasoning: High | Files: backup_service.dart, backup_screen.dart**
@@ -287,9 +331,35 @@ show SnackBar on success/error, call `AppProvider.loadAll()` after restore.
 
 ## 📱 Device Test Checklists
 
-> Run these on a real Android device after each commit. Mark ✅ pass or ❌ fail and report fails to Perplexity.
+> Run these on a real Android device after each commit. Download signed release APK from GitHub Actions artifacts. Mark ✅ pass or ❌ fail and report fails to Perplexity.
 
 ---
+
+### After Glass Card Fix + Dashboard Restore (March 14, 2026)
+
+- [ ] Dashboard loads without crash (no `basic.dart` assertion error)
+- [ ] All 11 dashboard sections visible and scrollable
+- [ ] Time Budget shows Sleep / Study / Free only (no Prayer segment)
+- [ ] Goals shows FA Pages / Anki / Sketchy Micro / Revision only
+- [ ] Glass cards look frosted/opaque in dark mode (not flat/transparent)
+- [ ] Glass cards look frosted in light mode
+- [ ] Shimmer animation visible sweeping across cards
+- [ ] Tap ripple effect works on cards
+- [ ] FA Tracker card taps → navigates to tracker screen
+- [ ] Revision Queue card shows due count and top items
+
+### After Ultra-Premium Redesign (March 14–15, 2026)
+
+- [ ] Every screen has aurora background (`#0E0E1A` dark / `#F8F7FF` light)
+- [ ] Bottom nav: frosted glass background, indigo glow dot on active tab, smooth icon scale animation
+- [ ] Settings: glass card sections, glass toggles, glass +/- steppers
+- [ ] Today's Plan: glass prayer blocks with dashed indigo border, gradient study blocks
+- [ ] Analytics: indigo charts, subject radial donuts, study heatmap
+- [ ] Revision Hub: glass cards, progress bar, mode toggle pill
+- [ ] All existing functionality works (no broken taps, no missing data)
+- [ ] No overflow errors on any screen
+- [ ] Light mode: frosted-light design on all screens
+- [ ] Splash screen: aurora background, animated indigo glow logo
 
 ### After Prompt 17 — Routine Reminders
 
@@ -305,8 +375,6 @@ show SnackBar on success/error, call `AppProvider.loadAll()` after restore.
   - Tap "Dismiss" → dialog gone, no crash
 - [ ] Prayer routines still fire at correct times (not broken by routine notification reschedule)
 
----
-
 ### After Prompt 17B — Auto-inject into DayPlan
 
 - [ ] Routine with Daily reminder → block `routine-{id}` appears in today's Full Day Plan at correct time
@@ -320,8 +388,6 @@ show SnackBar on success/error, call `AppProvider.loadAll()` after restore.
 - [ ] Manually complete the routine block in plan → status stays DONE after re-inject (not reset)
 - [ ] Open tomorrow's plan → routine block NOT injected there (today only)
 - [ ] Notification at set time fires at correct IST time (timezone fix verified)
-
----
 
 ### After Prompt 18 — Add FA Pages + UWorld Topics
 
@@ -338,8 +404,6 @@ show SnackBar on success/error, call `AppProvider.loadAll()` after restore.
 - [ ] Force-close and reopen → newly added UWorld topic still in list
 - [ ] KnowledgeBaseScreen existing "Add KB Entry" sheet → unchanged and still works
 
----
-
 ### After Prompt 19 — Dashboard Analytics
 
 - [ ] Open Dashboard → new "Analytics" section visible below existing stats
@@ -350,8 +414,6 @@ show SnackBar on success/error, call `AppProvider.loadAll()` after restore.
 - [ ] Card 4 (Daily Average): shows formatted "Avg X h Y m / study day"; no divide-by-zero crash if 0 study days
 - [ ] All cards use app theme colors (no hardcoded white/black that breaks dark mode)
 - [ ] Scroll Dashboard to bottom without layout overflow or jank
-
----
 
 ### After Prompt 11 — Backup Screen Fix
 
@@ -374,6 +436,7 @@ show SnackBar on success/error, call `AppProvider.loadAll()` after restore.
 - **Do NOT** rewrite `database_service.dart` or model files unless explicitly instructed
 - **Do NOT** use SAF URIs (`content://`) with `dart:io File()` — use `getApplicationDocumentsDirectory()` instead
 - **Do NOT** commit `google-services.json`, `firebase_options.dart`, `*.jks`, `.env`, or any secrets
+- **Do NOT** use `BackdropFilter` for glass effects — Android does not blur `CustomPaint` backgrounds reliably. Use high-opacity fill + gradient overlay instead (see `liquid_glass_card.dart`)
 - Use `context.watch<AppProvider>()` in `build()` methods
 - Use `context.read<AppProvider>()` in event handlers
 - `AppProvider.loadAll()` is called once in `main.dart` — do not call it elsewhere
@@ -382,6 +445,7 @@ show SnackBar on success/error, call `AppProvider.loadAll()` after restore.
 - Backup files always saved to `Documents/FocusFlow` — never use user-picked SAF folder as a `dart:io` path
 - Notifications always use `Asia/Kolkata` timezone — `tz.setLocalLocation(tz.getLocation('Asia/Kolkata'))` is set in `NotificationService.init()`
 - Routine-derived DayPlan blocks use id prefix `routine-{routineId}` and `actualNotes = 'source:routine'`
+- Signed release APK is built automatically by CI on every push to `main` — download from GitHub Actions artifacts (`focusflow-signed-release-apk`)
 
 ---
 
