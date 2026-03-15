@@ -45,7 +45,8 @@ class _FAPageDetailSheetState extends State<FAPageDetailSheet>
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Mark as Unread?'),
-          content: const Text('This will clear the read history for this page.'),
+          content:
+              const Text('This will clear the read history for this page.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
@@ -227,7 +228,12 @@ class _HistoryTab extends StatelessWidget {
 
     return ListView(
       controller: scrollController,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.of(context).padding.bottom + 20,
+      ),
       children: [
         _detailRow('Status', page.status.toUpperCase(), cs),
         _detailRow('Subtopics', '$readSubs / ${subtopics.length} done', cs),
@@ -341,7 +347,8 @@ class _NotesTabState extends State<_NotesTab> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.note_alt_rounded,
-                          size: 48, color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
+                          size: 48,
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
                       const SizedBox(height: 16),
                       Text(
                         'No notes yet',
@@ -351,7 +358,12 @@ class _NotesTabState extends State<_NotesTab> {
                   ),
                 )
               : ListView.separated(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    16,
+                    16,
+                    MediaQuery.of(context).padding.bottom + 20,
+                  ),
                   itemCount: _notes!.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, i) {
@@ -361,7 +373,8 @@ class _NotesTabState extends State<_NotesTab> {
                       color: cs.surfaceContainerLow,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
+                        side: BorderSide(
+                            color: cs.outlineVariant.withValues(alpha: 0.3)),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
@@ -383,8 +396,10 @@ class _NotesTabState extends State<_NotesTab> {
                                           label: Text(t),
                                           visualDensity: VisualDensity.compact,
                                           padding: EdgeInsets.zero,
-                                          labelStyle: const TextStyle(fontSize: 11),
-                                          backgroundColor: cs.secondaryContainer,
+                                          labelStyle:
+                                              const TextStyle(fontSize: 11),
+                                          backgroundColor:
+                                              cs.secondaryContainer,
                                           side: BorderSide.none,
                                         ))
                                     .toList(),
@@ -397,7 +412,8 @@ class _NotesTabState extends State<_NotesTab> {
                                 runSpacing: 8,
                                 children: note.attachmentPaths.map((path) {
                                   return Chip(
-                                    avatar: const Icon(Icons.attachment_rounded, size: 14),
+                                    avatar: const Icon(Icons.attachment_rounded,
+                                        size: 14),
                                     label: Text(path.split('/').last),
                                     visualDensity: VisualDensity.compact,
                                   );
@@ -415,7 +431,9 @@ class _NotesTabState extends State<_NotesTab> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: cs.surface,
-            border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3))),
+            border: Border(
+                top: BorderSide(
+                    color: cs.outlineVariant.withValues(alpha: 0.3))),
           ),
           child: SizedBox(
             width: double.infinity,

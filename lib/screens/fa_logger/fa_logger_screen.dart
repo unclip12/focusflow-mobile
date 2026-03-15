@@ -33,8 +33,8 @@ class _FALoggerScreenState extends State<FALoggerScreen> {
     // Only show entries that have been studied (have a lastStudiedAt)
     var list = all.where((e) => e.lastStudiedAt != null).toList();
     // Sort by most recently studied
-    list.sort((a, b) =>
-        (b.lastStudiedAt ?? '').compareTo(a.lastStudiedAt ?? ''));
+    list.sort(
+        (a, b) => (b.lastStudiedAt ?? '').compareTo(a.lastStudiedAt ?? ''));
     if (_query.isEmpty) return list;
     final q = _query.toLowerCase();
     return list
@@ -76,12 +76,10 @@ class _FALoggerScreenState extends State<FALoggerScreen> {
                     color: cs.onSurface.withValues(alpha: 0.35),
                   ),
                   icon: Icon(Icons.search_rounded,
-                      size: 20,
-                      color: cs.onSurface.withValues(alpha: 0.35)),
+                      size: 20, color: cs.onSurface.withValues(alpha: 0.35)),
                   border: InputBorder.none,
                   isDense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
               ),
             ),
@@ -92,13 +90,15 @@ class _FALoggerScreenState extends State<FALoggerScreen> {
             child: items.isEmpty
                 ? _EmptyState(hasQuery: _query.isNotEmpty)
                 : ListView.separated(
-                    padding:
-                        EdgeInsets.fromLTRB(16, 6, 16, MediaQuery.of(context).padding.bottom + 16),
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      6,
+                      16,
+                      MediaQuery.of(context).padding.bottom + 72 + 24,
+                    ),
                     itemCount: items.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: 10),
-                    itemBuilder: (_, i) =>
-                        _FAEntryCard(entry: items[i]),
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (_, i) => _FAEntryCard(entry: items[i]),
                   ),
           ),
         ],
@@ -159,8 +159,7 @@ class _FAEntryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: BorderRadius.circular(14),
-        border:
-            Border.all(color: cs.onSurface.withValues(alpha: 0.06)),
+        border: Border.all(color: cs.onSurface.withValues(alpha: 0.06)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -178,8 +177,7 @@ class _FAEntryCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF6366F1)
-                      .withValues(alpha: 0.1),
+                  color: const Color(0xFF6366F1).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.menu_book_rounded,
@@ -192,16 +190,15 @@ class _FAEntryCard extends StatelessWidget {
                   children: [
                     Text(
                       pageLabel,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700),
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w700),
                     ),
                     if (entry.title.isNotEmpty &&
                         entry.title != 'FA Page ${entry.pageNumber}')
                       Text(
                         entry.title,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color:
-                              cs.onSurface.withValues(alpha: 0.5),
+                          color: cs.onSurface.withValues(alpha: 0.5),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -231,10 +228,8 @@ class _FAEntryCard extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: coverage / 100,
                     minHeight: 6,
-                    backgroundColor:
-                        cs.onSurface.withValues(alpha: 0.08),
-                    valueColor:
-                        AlwaysStoppedAnimation(coverageColor),
+                    backgroundColor: cs.onSurface.withValues(alpha: 0.08),
+                    valueColor: AlwaysStoppedAnimation(coverageColor),
                   ),
                 ),
               ),
@@ -265,8 +260,7 @@ class _FAEntryCard extends StatelessWidget {
                         ),
                         child: Text(
                           t,
-                          style:
-                              theme.textTheme.labelSmall?.copyWith(
+                          style: theme.textTheme.labelSmall?.copyWith(
                             color: cs.primary,
                             fontSize: 10,
                           ),
@@ -304,17 +298,13 @@ class _EmptyState extends StatelessWidget {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: const Color(0xFF6366F1)
-                    .withValues(alpha: 0.08),
+                color: const Color(0xFF6366F1).withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                hasQuery
-                    ? Icons.search_off_rounded
-                    : Icons.menu_book_outlined,
+                hasQuery ? Icons.search_off_rounded : Icons.menu_book_outlined,
                 size: 32,
-                color: const Color(0xFF6366F1)
-                    .withValues(alpha: 0.5),
+                color: const Color(0xFF6366F1).withValues(alpha: 0.5),
               ),
             ),
             const SizedBox(height: 14),

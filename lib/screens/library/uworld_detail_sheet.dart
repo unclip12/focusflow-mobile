@@ -233,13 +233,19 @@ class _ProgressTabState extends State<_ProgressTab> {
 
     return ListView(
       controller: widget.scrollController,
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.fromLTRB(
+        24,
+        24,
+        24,
+        MediaQuery.of(context).padding.bottom + 20,
+      ),
       children: [
         // Row 1: Done
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Questions done:', style: TextStyle(fontSize: 16, color: cs.onSurface)),
+            Text('Questions done:',
+                style: TextStyle(fontSize: 16, color: cs.onSurface)),
             Row(
               children: [
                 IconButton.filledTonal(
@@ -252,11 +258,14 @@ class _ProgressTabState extends State<_ProgressTab> {
                   child: Text(
                     '$_done',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w400),
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w400),
                   ),
                 ),
                 IconButton.filledTonal(
-                  onPressed: _done < topic.totalQuestions ? () => _updateDone(1) : null,
+                  onPressed: _done < topic.totalQuestions
+                      ? () => _updateDone(1)
+                      : null,
                   icon: const Icon(Icons.add),
                   iconSize: 20,
                 ),
@@ -265,12 +274,13 @@ class _ProgressTabState extends State<_ProgressTab> {
           ],
         ),
         const SizedBox(height: 16),
-        
+
         // Row 2: Correct
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Correct:', style: TextStyle(fontSize: 16, color: cs.onSurface)),
+            Text('Correct:',
+                style: TextStyle(fontSize: 16, color: cs.onSurface)),
             Row(
               children: [
                 IconButton.filledTonal(
@@ -283,7 +293,8 @@ class _ProgressTabState extends State<_ProgressTab> {
                   child: Text(
                     '$_correct',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w400),
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w400),
                   ),
                 ),
                 IconButton.filledTonal(
@@ -361,7 +372,8 @@ class _NotesTabState extends State<_NotesTab> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.note_alt_rounded,
-                          size: 48, color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
+                          size: 48,
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
                       const SizedBox(height: 16),
                       Text(
                         'No notes yet',
@@ -371,7 +383,12 @@ class _NotesTabState extends State<_NotesTab> {
                   ),
                 )
               : ListView.separated(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    16,
+                    16,
+                    MediaQuery.of(context).padding.bottom + 20,
+                  ),
                   itemCount: _notes!.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, i) {
@@ -381,7 +398,8 @@ class _NotesTabState extends State<_NotesTab> {
                       color: cs.surfaceContainerLow,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
+                        side: BorderSide(
+                            color: cs.outlineVariant.withValues(alpha: 0.3)),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
@@ -403,8 +421,10 @@ class _NotesTabState extends State<_NotesTab> {
                                           label: Text(t),
                                           visualDensity: VisualDensity.compact,
                                           padding: EdgeInsets.zero,
-                                          labelStyle: const TextStyle(fontSize: 11),
-                                          backgroundColor: cs.secondaryContainer,
+                                          labelStyle:
+                                              const TextStyle(fontSize: 11),
+                                          backgroundColor:
+                                              cs.secondaryContainer,
                                           side: BorderSide.none,
                                         ))
                                     .toList(),
@@ -417,7 +437,8 @@ class _NotesTabState extends State<_NotesTab> {
                                 runSpacing: 8,
                                 children: note.attachmentPaths.map((path) {
                                   return Chip(
-                                    avatar: const Icon(Icons.attachment_rounded, size: 14),
+                                    avatar: const Icon(Icons.attachment_rounded,
+                                        size: 14),
                                     label: Text(path.split('/').last),
                                     visualDensity: VisualDensity.compact,
                                   );
@@ -435,7 +456,9 @@ class _NotesTabState extends State<_NotesTab> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: cs.surface,
-            border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3))),
+            border: Border(
+                top: BorderSide(
+                    color: cs.outlineVariant.withValues(alpha: 0.3))),
           ),
           child: SizedBox(
             width: double.infinity,

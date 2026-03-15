@@ -127,8 +127,7 @@ class _RevisionHubScreenState extends State<RevisionHubScreen>
 
     // Stats
     final totalDue = allItems
-        .where(
-            (i) => SrsService.isDueNow(nextRevisionAt: i.nextRevisionAt))
+        .where((i) => SrsService.isDueNow(nextRevisionAt: i.nextRevisionAt))
         .length;
     final totalItems = allItems.length;
     final masteryPercent = totalItems > 0
@@ -231,12 +230,24 @@ class _RevisionHubScreenState extends State<RevisionHubScreen>
           ],
           body: TabBarView(
             children: [
-              _buildList(dueItems, 'All caught up!',
-                  'No revisions due right now', Icons.check_circle_outline_rounded, isDark),
-              _buildList(upcomingItems, 'Nothing upcoming',
-                  'No revisions due in the next 7 days', Icons.event_available_rounded, isDark),
-              _buildList(allSorted, 'No revisions yet',
-                  'Study some content to create revision items', Icons.library_books_rounded, isDark),
+              _buildList(
+                  dueItems,
+                  'All caught up!',
+                  'No revisions due right now',
+                  Icons.check_circle_outline_rounded,
+                  isDark),
+              _buildList(
+                  upcomingItems,
+                  'Nothing upcoming',
+                  'No revisions due in the next 7 days',
+                  Icons.event_available_rounded,
+                  isDark),
+              _buildList(
+                  allSorted,
+                  'No revisions yet',
+                  'Study some content to create revision items',
+                  Icons.library_books_rounded,
+                  isDark),
             ],
           ),
         ),
@@ -254,12 +265,10 @@ class _RevisionHubScreenState extends State<RevisionHubScreen>
         };
       case 'progress':
         return (a, b) {
-          final aP = a.totalSteps > 0
-              ? a.currentRevisionIndex / a.totalSteps
-              : 0.0;
-          final bP = b.totalSteps > 0
-              ? b.currentRevisionIndex / b.totalSteps
-              : 0.0;
+          final aP =
+              a.totalSteps > 0 ? a.currentRevisionIndex / a.totalSteps : 0.0;
+          final bP =
+              b.totalSteps > 0 ? b.currentRevisionIndex / b.totalSteps : 0.0;
           return bP.compareTo(aP); // highest progress first
         };
       case 'last_studied':
@@ -276,10 +285,19 @@ class _RevisionHubScreenState extends State<RevisionHubScreen>
   Widget _buildList(List<RevisionDisplayItem> items, String emptyTitle,
       String emptySubtitle, IconData emptyIcon, bool isDark) {
     if (items.isEmpty) {
-      return _EmptyTab(icon: emptyIcon, title: emptyTitle, subtitle: emptySubtitle, isDark: isDark);
+      return _EmptyTab(
+          icon: emptyIcon,
+          title: emptyTitle,
+          subtitle: emptySubtitle,
+          isDark: isDark);
     }
     return ListView.builder(
-      padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).padding.bottom + 16),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        MediaQuery.of(context).padding.bottom + 72 + 24,
+      ),
       itemCount: items.length,
       itemBuilder: (_, i) => UnifiedRevisionCard(
         item: items[i],
@@ -376,25 +394,39 @@ class RevisionDisplayItem {
 
   String get sourceLabel {
     switch (source) {
-      case 'FA': return 'First Aid';
-      case 'SKETCHY_MICRO': return 'Sketchy Micro';
-      case 'SKETCHY_PHARM': return 'Sketchy Pharm';
-      case 'PATHOMA': return 'Pathoma';
-      case 'UWORLD': return 'UWorld';
-      case 'KB': return 'Knowledge Base';
-      default: return source;
+      case 'FA':
+        return 'First Aid';
+      case 'SKETCHY_MICRO':
+        return 'Sketchy Micro';
+      case 'SKETCHY_PHARM':
+        return 'Sketchy Pharm';
+      case 'PATHOMA':
+        return 'Pathoma';
+      case 'UWORLD':
+        return 'UWorld';
+      case 'KB':
+        return 'Knowledge Base';
+      default:
+        return source;
     }
   }
 
   IconData get sourceIcon {
     switch (source) {
-      case 'FA': return Icons.menu_book_rounded;
-      case 'SKETCHY_MICRO': return Icons.biotech_rounded;
-      case 'SKETCHY_PHARM': return Icons.medication_rounded;
-      case 'PATHOMA': return Icons.science_rounded;
-      case 'UWORLD': return Icons.quiz_rounded;
-      case 'KB': return Icons.library_books_rounded;
-      default: return Icons.book_rounded;
+      case 'FA':
+        return Icons.menu_book_rounded;
+      case 'SKETCHY_MICRO':
+        return Icons.biotech_rounded;
+      case 'SKETCHY_PHARM':
+        return Icons.medication_rounded;
+      case 'PATHOMA':
+        return Icons.science_rounded;
+      case 'UWORLD':
+        return Icons.quiz_rounded;
+      case 'KB':
+        return Icons.library_books_rounded;
+      default:
+        return Icons.book_rounded;
     }
   }
 
@@ -413,13 +445,20 @@ class RevisionDisplayItem {
 
   Color get sourceColor {
     switch (source) {
-      case 'FA': return const Color(0xFF3B82F6);
-      case 'SKETCHY_MICRO': return const Color(0xFF10B981);
-      case 'SKETCHY_PHARM': return const Color(0xFF8B5CF6);
-      case 'PATHOMA': return const Color(0xFFEC4899);
-      case 'UWORLD': return const Color(0xFFF59E0B);
-      case 'KB': return const Color(0xFF14B8A6);
-      default: return const Color(0xFF6B7280);
+      case 'FA':
+        return const Color(0xFF3B82F6);
+      case 'SKETCHY_MICRO':
+        return const Color(0xFF10B981);
+      case 'SKETCHY_PHARM':
+        return const Color(0xFF8B5CF6);
+      case 'PATHOMA':
+        return const Color(0xFFEC4899);
+      case 'UWORLD':
+        return const Color(0xFFF59E0B);
+      case 'KB':
+        return const Color(0xFF14B8A6);
+      default:
+        return const Color(0xFF6B7280);
     }
   }
 
@@ -517,39 +556,39 @@ class _StatsHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-          Expanded(
-            child: _StatCard(
-              icon: Icons.warning_amber_rounded,
-              iconColor: totalDue > 0
-                  ? const Color(0xFFEF4444)
-                  : const Color(0xFF10B981),
-              label: 'Due Now',
-              value: '$totalDue',
-              isDark: isDark,
-              pulse: totalDue > 0,
-            ),
+        Expanded(
+          child: _StatCard(
+            icon: Icons.warning_amber_rounded,
+            iconColor: totalDue > 0
+                ? const Color(0xFFEF4444)
+                : const Color(0xFF10B981),
+            label: 'Due Now',
+            value: '$totalDue',
+            isDark: isDark,
+            pulse: totalDue > 0,
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _StatCard(
-              icon: Icons.layers_rounded,
-              iconColor: DashboardColors.primary,
-              label: 'Total',
-              value: '$totalItems',
-              isDark: isDark,
-            ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _StatCard(
+            icon: Icons.layers_rounded,
+            iconColor: DashboardColors.primary,
+            label: 'Total',
+            value: '$totalItems',
+            isDark: isDark,
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _StatCard(
-              icon: Icons.trending_up_rounded,
-              iconColor: const Color(0xFF8B5CF6),
-              label: 'Mastery',
-              value: '$masteryPercent%',
-              isDark: isDark,
-            ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _StatCard(
+            icon: Icons.trending_up_rounded,
+            iconColor: const Color(0xFF8B5CF6),
+            label: 'Mastery',
+            value: '$masteryPercent%',
+            isDark: isDark,
           ),
-        ],
+        ),
+      ],
     );
   }
 }
@@ -618,9 +657,8 @@ class _StatCardState extends State<_StatCard>
     return AnimatedBuilder(
       animation: _pulseController,
       builder: (context, child) {
-        final glowAlpha = widget.pulse
-            ? 0.08 + (_pulseController.value * 0.15)
-            : 0.0;
+        final glowAlpha =
+            widget.pulse ? 0.08 + (_pulseController.value * 0.15) : 0.0;
 
         return ClipRRect(
           borderRadius: BorderRadius.circular(16),
@@ -635,8 +673,7 @@ class _StatCardState extends State<_StatCard>
                 boxShadow: widget.pulse
                     ? [
                         BoxShadow(
-                          color: widget.iconColor
-                              .withValues(alpha: glowAlpha),
+                          color: widget.iconColor.withValues(alpha: glowAlpha),
                           blurRadius: 16,
                           spreadRadius: -2,
                         ),
@@ -844,8 +881,7 @@ class _SortMenuButton extends StatelessWidget {
     );
   }
 
-  PopupMenuItem<String> _buildItem(
-      String value, String label, IconData icon) {
+  PopupMenuItem<String> _buildItem(String value, String label, IconData icon) {
     final isSelected = currentSort == value;
     return PopupMenuItem<String>(
       value: value,
@@ -900,13 +936,20 @@ class _SourceFilterBar extends StatelessWidget {
     final totalCount = counts.values.fold(0, (a, b) => a + b);
 
     final filters = <_FilterDef>[
-      _FilterDef('ALL', 'All', totalCount, DashboardColors.primary, Icons.dashboard_rounded),
-      _FilterDef('FA', 'FA', counts['FA'] ?? 0, const Color(0xFF3B82F6), Icons.menu_book_rounded),
-      _FilterDef('SKETCHY_MICRO', 'Sketchy M', counts['SKETCHY_MICRO'] ?? 0, const Color(0xFF10B981), Icons.biotech_rounded),
-      _FilterDef('SKETCHY_PHARM', 'Sketchy P', counts['SKETCHY_PHARM'] ?? 0, const Color(0xFF8B5CF6), Icons.medication_rounded),
-      _FilterDef('PATHOMA', 'Pathoma', counts['PATHOMA'] ?? 0, const Color(0xFFEC4899), Icons.science_rounded),
-      _FilterDef('UWORLD', 'UWorld', counts['UWORLD'] ?? 0, const Color(0xFFF59E0B), Icons.quiz_rounded),
-      _FilterDef('KB', 'KB', counts['KB'] ?? 0, const Color(0xFF14B8A6), Icons.library_books_rounded),
+      _FilterDef('ALL', 'All', totalCount, DashboardColors.primary,
+          Icons.dashboard_rounded),
+      _FilterDef('FA', 'FA', counts['FA'] ?? 0, const Color(0xFF3B82F6),
+          Icons.menu_book_rounded),
+      _FilterDef('SKETCHY_MICRO', 'Sketchy M', counts['SKETCHY_MICRO'] ?? 0,
+          const Color(0xFF10B981), Icons.biotech_rounded),
+      _FilterDef('SKETCHY_PHARM', 'Sketchy P', counts['SKETCHY_PHARM'] ?? 0,
+          const Color(0xFF8B5CF6), Icons.medication_rounded),
+      _FilterDef('PATHOMA', 'Pathoma', counts['PATHOMA'] ?? 0,
+          const Color(0xFFEC4899), Icons.science_rounded),
+      _FilterDef('UWORLD', 'UWorld', counts['UWORLD'] ?? 0,
+          const Color(0xFFF59E0B), Icons.quiz_rounded),
+      _FilterDef('KB', 'KB', counts['KB'] ?? 0, const Color(0xFF14B8A6),
+          Icons.library_books_rounded),
     ];
 
     return SizedBox(
@@ -937,7 +980,8 @@ class _SourceFilterBar extends StatelessWidget {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeOutCubic,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? f.color.withValues(alpha: isDark ? 0.18 : 0.12)
@@ -949,8 +993,10 @@ class _SourceFilterBar extends StatelessWidget {
                     color: isSelected
                         ? f.color.withValues(alpha: 0.45)
                         : isDark
-                            ? DashboardColors.glassBorderDark.withValues(alpha: 0.3)
-                            : DashboardColors.glassBorderLight.withValues(alpha: 0.4),
+                            ? DashboardColors.glassBorderDark
+                                .withValues(alpha: 0.3)
+                            : DashboardColors.glassBorderLight
+                                .withValues(alpha: 0.4),
                     width: isSelected ? 1 : 0.5,
                   ),
                   boxShadow: isSelected
@@ -989,7 +1035,8 @@ class _SourceFilterBar extends StatelessWidget {
                       f.label,
                       style: TextStyle(
                         fontSize: 11,
-                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.w500,
                         color: isSelected
                             ? f.color
                             : DashboardColors.textPrimary(isDark)
@@ -1083,8 +1130,10 @@ class _GlassTabBar extends StatelessWidget {
               indicator: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    DashboardColors.primary.withValues(alpha: isDark ? 0.2 : 0.15),
-                    DashboardColors.primaryViolet.withValues(alpha: isDark ? 0.15 : 0.10),
+                    DashboardColors.primary
+                        .withValues(alpha: isDark ? 0.2 : 0.15),
+                    DashboardColors.primaryViolet
+                        .withValues(alpha: isDark ? 0.15 : 0.10),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(12),
@@ -1096,10 +1145,10 @@ class _GlassTabBar extends StatelessWidget {
               indicatorSize: TabBarIndicatorSize.tab,
               dividerColor: Colors.transparent,
               labelColor: DashboardColors.primary,
-              unselectedLabelColor: DashboardColors.textPrimary(isDark)
-                  .withValues(alpha: 0.4),
-              labelStyle: const TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w600),
+              unselectedLabelColor:
+                  DashboardColors.textPrimary(isDark).withValues(alpha: 0.4),
+              labelStyle:
+                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               splashBorderRadius: BorderRadius.circular(12),
               tabs: [
                 _tabWithBadge('Due', dueCount, const Color(0xFFEF4444)),
@@ -1125,8 +1174,7 @@ class _GlassTabBar extends StatelessWidget {
           if (count > 0) ...[
             const SizedBox(width: 5),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
               decoration: BoxDecoration(
                 color: badgeColor != const Color(0xFFEF4444)
                     ? badgeColor.withValues(alpha: 0.25)
@@ -1181,7 +1229,8 @@ class _EmptyTab extends StatelessWidget {
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [
-                  DashboardColors.primary.withValues(alpha: isDark ? 0.15 : 0.10),
+                  DashboardColors.primary
+                      .withValues(alpha: isDark ? 0.15 : 0.10),
                   Colors.transparent,
                 ],
                 radius: 0.8,
@@ -1210,7 +1259,8 @@ class _EmptyTab extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
-                color: DashboardColors.textPrimary(isDark).withValues(alpha: 0.35),
+                color:
+                    DashboardColors.textPrimary(isDark).withValues(alpha: 0.35),
               ),
             ),
           ),

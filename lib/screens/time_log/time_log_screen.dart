@@ -63,7 +63,12 @@ class TimeLogScreen extends StatelessWidget {
       body: logs.isEmpty
           ? _EmptyState()
           : ListView.builder(
-              padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).padding.bottom + 16),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                8,
+                16,
+                MediaQuery.of(context).padding.bottom + 72 + 24,
+              ),
               itemCount: dates.length,
               itemBuilder: (context, i) {
                 final date = dates[i];

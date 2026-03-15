@@ -23,8 +23,10 @@ class RoutinesTab extends StatelessWidget {
     final todayLogs = app.getRoutineLogsForDate(dateKey);
 
     // Split into prayer & custom
-    final prayerRoutines = routines.where((r) => r.id.startsWith('prayer_')).toList();
-    final customRoutines = routines.where((r) => !r.id.startsWith('prayer_')).toList();
+    final prayerRoutines =
+        routines.where((r) => r.id.startsWith('prayer_')).toList();
+    final customRoutines =
+        routines.where((r) => !r.id.startsWith('prayer_')).toList();
 
     return Column(
       children: [
@@ -58,8 +60,8 @@ class RoutinesTab extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.repeat_rounded, size: 48,
-                          color: cs.primary.withValues(alpha: 0.25)),
+                      Icon(Icons.repeat_rounded,
+                          size: 48, color: cs.primary.withValues(alpha: 0.25)),
                       const SizedBox(height: 12),
                       Text(
                         'No routines yet',
@@ -91,7 +93,12 @@ class RoutinesTab extends StatelessWidget {
                   ),
                 )
               : ListView(
-                  padding: EdgeInsets.fromLTRB(16, 4, 16, MediaQuery.of(context).padding.bottom + 16),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    4,
+                    16,
+                    MediaQuery.of(context).padding.bottom + 72 + 24,
+                  ),
                   children: [
                     // ── Study Session Card ────────────
                     _StudySessionCard(dateKey: dateKey),
@@ -115,9 +122,11 @@ class RoutinesTab extends StatelessWidget {
                             ),
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 1),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF059669).withValues(alpha: 0.1),
+                                color: const Color(0xFF059669)
+                                    .withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
@@ -133,7 +142,8 @@ class RoutinesTab extends StatelessWidget {
                         ),
                       ),
                       ...prayerRoutines.map((r) {
-                        final wasRun = todayLogs.any((l) => l.routineId == r.id && l.completed);
+                        final wasRun = todayLogs
+                            .any((l) => l.routineId == r.id && l.completed);
                         return _RoutineCard(
                           routine: r,
                           wasRunToday: wasRun,
@@ -163,7 +173,8 @@ class RoutinesTab extends StatelessWidget {
                             ),
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 1),
                               decoration: BoxDecoration(
                                 color: cs.primary.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(4),
@@ -181,7 +192,8 @@ class RoutinesTab extends StatelessWidget {
                         ),
                       ),
                       ...customRoutines.map((r) {
-                        final wasRun = todayLogs.any((l) => l.routineId == r.id && l.completed);
+                        final wasRun = todayLogs
+                            .any((l) => l.routineId == r.id && l.completed);
                         return _RoutineCard(
                           routine: r,
                           wasRunToday: wasRun,
@@ -210,6 +222,7 @@ class RoutinesTab extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -316,7 +329,8 @@ class _RoutineCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
-                  child: Text(routine.icon, style: const TextStyle(fontSize: 22)),
+                  child:
+                      Text(routine.icon, style: const TextStyle(fontSize: 22)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -339,9 +353,11 @@ class _RoutineCard extends StatelessWidget {
                         ),
                         if (wasRunToday)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                              color: const Color(0xFF10B981)
+                                  .withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: const Text(
@@ -384,7 +400,8 @@ class _RoutineCard extends StatelessWidget {
                             ),
                           if (recurrenceLabel != null)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
                                 color: routineColor.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(999),
@@ -421,13 +438,16 @@ class _RoutineCard extends StatelessWidget {
                 ],
                 onSelected: (v) {
                   switch (v) {
-                    case 'start': onStart();
-                    case 'edit': onEdit();
-                    case 'delete': onDelete();
+                    case 'start':
+                      onStart();
+                    case 'edit':
+                      onEdit();
+                    case 'delete':
+                      onDelete();
                   }
                 },
-                icon: Icon(Icons.more_vert_rounded, size: 20,
-                    color: cs.onSurface.withValues(alpha: 0.3)),
+                icon: Icon(Icons.more_vert_rounded,
+                    size: 20, color: cs.onSurface.withValues(alpha: 0.3)),
               ),
             ],
           ),
@@ -458,6 +478,7 @@ class _StudySessionCard extends StatelessWidget {
           showModalBottomSheet(
             context: context,
             isScrollControlled: true,
+            useSafeArea: true,
             backgroundColor: Colors.transparent,
             builder: (_) => StudySessionPicker(dateKey: dateKey),
           );
@@ -482,7 +503,8 @@ class _StudySessionCard extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 48, height: 48,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(14),

@@ -190,7 +190,12 @@ class _DashboardBody extends StatelessWidget {
           physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),
           ),
-          padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(context).padding.bottom + 24),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            12,
+            20,
+            MediaQuery.of(context).padding.bottom + 72 + 24,
+          ),
           children: <Widget>[
             _FadeSlideIn(
               delay: Duration.zero,
@@ -397,7 +402,12 @@ class _DashboardLoadingScreenState extends State<_DashboardLoadingScreen>
       isDark: widget.isDark,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          12,
+          20,
+          MediaQuery.of(context).padding.bottom + 72 + 24,
+        ),
         children: <Widget>[
           _shimmerBox(
             height: 56,
@@ -750,9 +760,8 @@ class _DailyProgressHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final progress = dailyGoal > 0
-        ? (pagesRead / dailyGoal).clamp(0.0, 1.0)
-        : 0.0;
+    final progress =
+        dailyGoal > 0 ? (pagesRead / dailyGoal).clamp(0.0, 1.0) : 0.0;
     final studyH = studyMinutes ~/ 60;
     final studyM = studyMinutes % 60;
 
@@ -1530,7 +1539,8 @@ class _WeeklyStudyBars extends StatelessWidget {
 
           return Expanded(
             child: Padding(
-              padding: EdgeInsets.only(right: index == points.length - 1 ? 0 : 8),
+              padding:
+                  EdgeInsets.only(right: index == points.length - 1 ? 0 : 8),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
@@ -1547,9 +1557,7 @@ class _WeeklyStudyBars extends StatelessWidget {
                             width: 16,
                             height: value,
                             decoration: BoxDecoration(
-                              color: point.minutes == 0
-                                  ? trackColor
-                                  : null,
+                              color: point.minutes == 0 ? trackColor : null,
                               gradient: point.minutes == 0
                                   ? null
                                   : DashboardColors.progressGradient(barColor),
@@ -1836,7 +1844,12 @@ class _RevisionQueueCard extends StatelessWidget {
                     Expanded(
                       child: ListView.separated(
                         controller: scrollCtrl,
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                        padding: EdgeInsets.fromLTRB(
+                          16,
+                          0,
+                          16,
+                          MediaQuery.of(ctx).padding.bottom + 20,
+                        ),
                         itemCount: visibleItems.length,
                         separatorBuilder: (_, __) => Divider(
                           color: Colors.grey.withValues(alpha: 0.18),
@@ -1874,8 +1887,7 @@ class _RevisionQueueCard extends StatelessWidget {
                               style: _inter(
                                 size: 14,
                                 weight: FontWeight.w600,
-                                color:
-                                    DashboardColors.textPrimary(sheetIsDark),
+                                color: DashboardColors.textPrimary(sheetIsDark),
                               ),
                             ),
                             subtitle: Text(
@@ -1994,7 +2006,8 @@ class _RevisionQueueCard extends StatelessWidget {
                     color: Colors.transparent,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: isDark ? 0.07 : 0.18),
+                      color:
+                          Colors.white.withValues(alpha: isDark ? 0.07 : 0.18),
                     ),
                   ),
                   child: Row(
@@ -2085,9 +2098,8 @@ class _ActivityDotsCard extends StatelessWidget {
           children: List<Widget>.generate(points.length, (index) {
             final point = points[index];
             final isToday = index == points.length - 1;
-            final intensity = maxMinutes == 0
-                ? 0.0
-                : point.minutes / math.max(1, maxMinutes);
+            final intensity =
+                maxMinutes == 0 ? 0.0 : point.minutes / math.max(1, maxMinutes);
             final outerColor = point.minutes == 0
                 ? (isDark
                     ? Colors.white.withValues(alpha: 0.05)
@@ -2095,8 +2107,7 @@ class _ActivityDotsCard extends StatelessWidget {
                 : DashboardColors.primary.withValues(
                     alpha: isDark ? 0.12 + (intensity * 0.18) : 0.10,
                   );
-            final innerSize =
-                point.minutes == 0 ? 8.0 : 10 + (intensity * 6);
+            final innerSize = point.minutes == 0 ? 8.0 : 10 + (intensity * 6);
 
             return Expanded(
               child: Column(
@@ -2787,8 +2798,6 @@ class _SparklinePainter extends CustomPainter {
   }
 }
 
-
-
 class _TypewriterText extends StatefulWidget {
   const _TypewriterText({
     required this.text,
@@ -3265,7 +3274,8 @@ List<_WeeklyStudyPoint> _buildWeeklyStudyPoints(
     totals[log.date] = (totals[log.date] ?? 0) + log.durationMinutes;
   }
   for (final entry in app.studyEntries) {
-    totals[entry.date] = (totals[entry.date] ?? 0) + (entry.durationMinutes ?? 0);
+    totals[entry.date] =
+        (totals[entry.date] ?? 0) + (entry.durationMinutes ?? 0);
   }
 
   final normalizedToday = DateTime(
@@ -3311,7 +3321,8 @@ Map<String, int> _buildSubjectMinutes(AppProvider app) {
     subjectMinutes[key] = (subjectMinutes[key] ?? 0) + log.durationMinutes;
   }
   for (final entry in app.studyEntries) {
-    final key = entry.taskName.trim().isNotEmpty ? entry.taskName.trim() : 'Other';
+    final key =
+        entry.taskName.trim().isNotEmpty ? entry.taskName.trim() : 'Other';
     subjectMinutes[key] =
         (subjectMinutes[key] ?? 0) + (entry.durationMinutes ?? 0);
   }
@@ -3356,7 +3367,8 @@ double _faRollingAverage(
     final parsed = firstReadAt == null ? null : DateTime.tryParse(firstReadAt);
     if (parsed == null) continue;
     final normalized = DateTime(parsed.year, parsed.month, parsed.day);
-    if (!normalized.isBefore(windowStart) && !normalized.isAfter(normalizedToday)) {
+    if (!normalized.isBefore(windowStart) &&
+        !normalized.isAfter(normalizedToday)) {
       pagesRead++;
     }
   }
@@ -3535,9 +3547,8 @@ List<_GoalProgressData> _buildGoalRows({
       label: 'Revision',
       icon: Icons.replay_rounded,
       current: plannedRevisionBlocks > 0 ? completedRevisionBlocks : 0,
-      target: plannedRevisionBlocks > 0
-          ? plannedRevisionBlocks
-          : dueRevisionCount,
+      target:
+          plannedRevisionBlocks > 0 ? plannedRevisionBlocks : dueRevisionCount,
       color: DashboardColors.warning,
       progressDelay: const Duration(milliseconds: 840),
       onTap: () => context.go('/revision'),

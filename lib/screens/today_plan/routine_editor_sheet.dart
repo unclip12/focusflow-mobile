@@ -51,7 +51,15 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
     0xFFF97316,
     0xFF3B82F6,
   ];
-  static const _weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  static const _weekdayLabels = [
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+    'Sun'
+  ];
 
   @override
   void initState() {
@@ -70,7 +78,9 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
 
     if (_reminderTime != null &&
         _recurrence == 'weekly' &&
-        (_reminderWeekday == null || _reminderWeekday! < 1 || _reminderWeekday! > 7)) {
+        (_reminderWeekday == null ||
+            _reminderWeekday! < 1 ||
+            _reminderWeekday! > 7)) {
       _reminderWeekday = DateTime.now().weekday;
     }
   }
@@ -103,7 +113,8 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
     return '$hour:$minute';
   }
 
-  DateTime _dateOnly(DateTime value) => DateTime(value.year, value.month, value.day);
+  DateTime _dateOnly(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
 
   DateTime? _parseStoredDate(String? ymd) {
     if (ymd == null || ymd.isEmpty) return null;
@@ -176,7 +187,8 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
     final selected = _parseStoredDate(_recurrenceEndDate);
     final picked = await showDatePicker(
       context: context,
-      initialDate: selected != null && !selected.isBefore(today) ? selected : today,
+      initialDate:
+          selected != null && !selected.isBefore(today) ? selected : today,
       firstDate: today,
       lastDate: today.add(const Duration(days: 3650)),
     );
@@ -202,7 +214,8 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
               autofocus: true,
               decoration: InputDecoration(
                 hintText: 'Step title',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
             const SizedBox(height: 8),
@@ -211,7 +224,8 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
                 hintText: 'Estimated minutes (optional)',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 isDense: true,
               ),
             ),
@@ -330,7 +344,9 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          _reminderTime == null ? 'No reminder' : 'Tap to change time',
+                          _reminderTime == null
+                              ? 'No reminder'
+                              : 'Tap to change time',
                           style: TextStyle(
                             fontSize: 12,
                             color: cs.onSurface.withValues(alpha: 0.55),
@@ -340,11 +356,15 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
                     ),
                   ),
                   Text(
-                    _reminderTime == null ? 'No reminder' : _formatReminderTime(_reminderTime!),
+                    _reminderTime == null
+                        ? 'No reminder'
+                        : _formatReminderTime(_reminderTime!),
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: _reminderTime == null ? cs.onSurface.withValues(alpha: 0.5) : cs.primary,
+                      color: _reminderTime == null
+                          ? cs.onSurface.withValues(alpha: 0.5)
+                          : cs.primary,
                     ),
                   ),
                 ],
@@ -435,7 +455,8 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: cs.outlineVariant),
@@ -481,7 +502,14 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
       minChildSize: 0.5,
       expand: false,
       builder: (context, scroll) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          0,
+          20,
+          MediaQuery.of(context).viewInsets.bottom +
+              MediaQuery.of(context).padding.bottom +
+              20,
+        ),
         child: Column(
           children: [
             const SizedBox(height: 12),
@@ -503,17 +531,16 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
               ),
             ),
             const SizedBox(height: 16),
-
             TextField(
               controller: _nameCtrl,
               decoration: InputDecoration(
                 labelText: 'Routine name',
                 hintText: 'e.g., Morning Routine',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
             const SizedBox(height: 12),
-
             SizedBox(
               height: 40,
               child: ListView(
@@ -526,10 +553,14 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
                       width: 40,
                       margin: const EdgeInsets.only(right: 6),
                       decoration: BoxDecoration(
-                        color: selected ? cs.primary.withValues(alpha: 0.15) : Colors.transparent,
+                        color: selected
+                            ? cs.primary.withValues(alpha: 0.15)
+                            : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: selected ? cs.primary : cs.onSurface.withValues(alpha: 0.1),
+                          color: selected
+                              ? cs.primary
+                              : cs.onSurface.withValues(alpha: 0.1),
                         ),
                       ),
                       child: Center(
@@ -541,7 +572,6 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
               ),
             ),
             const SizedBox(height: 10),
-
             SizedBox(
               height: 32,
               child: ListView(
@@ -563,7 +593,8 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
                         boxShadow: selected
                             ? [
                                 BoxShadow(
-                                  color: Color(colorValue).withValues(alpha: 0.5),
+                                  color:
+                                      Color(colorValue).withValues(alpha: 0.5),
                                   blurRadius: 8,
                                 ),
                               ]
@@ -571,7 +602,8 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
                       ),
                       child: selected
                           ? const Center(
-                              child: Icon(Icons.check_rounded, size: 16, color: Colors.white),
+                              child: Icon(Icons.check_rounded,
+                                  size: 16, color: Colors.white),
                             )
                           : null,
                     ),
@@ -580,12 +612,10 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
               ),
             ),
             const SizedBox(height: 16),
-
             _buildReminderCard(cs),
             const SizedBox(height: 12),
             _buildRepeatCard(cs),
             if (_reminderTime != null) const SizedBox(height: 16),
-
             Row(
               children: [
                 Text(
@@ -612,7 +642,6 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
                 ),
               ],
             ),
-
             Expanded(
               child: _steps.isEmpty
                   ? Center(
@@ -626,6 +655,9 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
                     )
                   : ReorderableListView.builder(
                       scrollController: scroll,
+                      padding: EdgeInsets.only(
+                        bottom: MediaQuery.of(context).padding.bottom + 20,
+                      ),
                       itemCount: _steps.length,
                       onReorder: (oldIndex, newIndex) {
                         setState(() {
@@ -640,7 +672,8 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
                           key: Key(step.id),
                           leading: CircleAvatar(
                             radius: 14,
-                            backgroundColor: Color(_color).withValues(alpha: 0.15),
+                            backgroundColor:
+                                Color(_color).withValues(alpha: 0.15),
                             child: Text(
                               '${index + 1}',
                               style: TextStyle(
@@ -675,7 +708,8 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
                                   size: 18,
                                   color: cs.error.withValues(alpha: 0.6),
                                 ),
-                                onPressed: () => setState(() => _steps.removeAt(index)),
+                                onPressed: () =>
+                                    setState(() => _steps.removeAt(index)),
                               ),
                               Icon(
                                 Icons.drag_handle_rounded,
@@ -689,22 +723,22 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
                       },
                     ),
             ),
-
             const SizedBox(height: 8),
-
             SizedBox(
               width: double.infinity,
               child: FilledButton(
                 onPressed: _save,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
                   backgroundColor: Color(_color),
                   foregroundColor: Colors.white,
                 ),
                 child: Text(
                   isEdit ? 'Save Changes' : 'Create Routine',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700),
                 ),
               ),
             ),

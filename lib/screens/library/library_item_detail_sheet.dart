@@ -227,7 +227,12 @@ class _ProgressTab extends StatelessWidget {
 
     return ListView(
       controller: scrollController,
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.fromLTRB(
+        24,
+        24,
+        24,
+        MediaQuery.of(context).padding.bottom + 20,
+      ),
       children: [
         SwitchListTile(
           value: item.watched,
@@ -240,7 +245,9 @@ class _ProgressTab extends StatelessWidget {
           },
           title: const Text('Mark as Watched'),
           subtitle: Text(
-            item.watched ? 'You have watched this.' : 'You have not watched this yet.',
+            item.watched
+                ? 'You have watched this.'
+                : 'You have not watched this yet.',
             style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
           ),
           activeTrackColor: cs.primary,
@@ -298,7 +305,8 @@ class _NotesTabState extends State<_NotesTab> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.note_alt_rounded,
-                          size: 48, color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
+                          size: 48,
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
                       const SizedBox(height: 16),
                       Text(
                         'No notes yet',
@@ -308,7 +316,12 @@ class _NotesTabState extends State<_NotesTab> {
                   ),
                 )
               : ListView.separated(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    16,
+                    16,
+                    MediaQuery.of(context).padding.bottom + 20,
+                  ),
                   itemCount: _notes!.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, i) {
@@ -318,7 +331,8 @@ class _NotesTabState extends State<_NotesTab> {
                       color: cs.surfaceContainerLow,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
+                        side: BorderSide(
+                            color: cs.outlineVariant.withValues(alpha: 0.3)),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
@@ -340,8 +354,10 @@ class _NotesTabState extends State<_NotesTab> {
                                           label: Text(t),
                                           visualDensity: VisualDensity.compact,
                                           padding: EdgeInsets.zero,
-                                          labelStyle: const TextStyle(fontSize: 11),
-                                          backgroundColor: cs.secondaryContainer,
+                                          labelStyle:
+                                              const TextStyle(fontSize: 11),
+                                          backgroundColor:
+                                              cs.secondaryContainer,
                                           side: BorderSide.none,
                                         ))
                                     .toList(),
@@ -354,9 +370,13 @@ class _NotesTabState extends State<_NotesTab> {
                                 runSpacing: 8,
                                 children: note.attachmentPaths.map((path) {
                                   return GestureDetector(
-                                    onTap: () => AttachmentHelper.openAttachment(context, path),
+                                    onTap: () =>
+                                        AttachmentHelper.openAttachment(
+                                            context, path),
                                     child: Chip(
-                                      avatar: Icon(AttachmentHelper.getIcon(path), size: 14),
+                                      avatar: Icon(
+                                          AttachmentHelper.getIcon(path),
+                                          size: 14),
                                       label: Text(path.split('/').last),
                                       visualDensity: VisualDensity.compact,
                                     ),
@@ -375,7 +395,9 @@ class _NotesTabState extends State<_NotesTab> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: cs.surface,
-            border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3))),
+            border: Border(
+                top: BorderSide(
+                    color: cs.outlineVariant.withValues(alpha: 0.3))),
           ),
           child: SizedBox(
             width: double.infinity,

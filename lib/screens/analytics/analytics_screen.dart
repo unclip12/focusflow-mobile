@@ -27,7 +27,12 @@ class AnalyticsScreen extends StatelessWidget {
     return AppScaffold(
       screenName: 'Analytics',
       body: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 16),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          16,
+          16,
+          MediaQuery.of(context).padding.bottom + 72 + 24,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -181,10 +186,8 @@ class _FAProgressCard extends StatelessWidget {
     final readCount = app.faPages
         .where((p) => p.status == 'read' || p.status == 'anki_done')
         .length;
-    final ankiCount =
-        app.faPages.where((p) => p.status == 'anki_done').length;
-    final remainCount =
-        app.faPages.where((p) => p.status == 'unread').length;
+    final ankiCount = app.faPages.where((p) => p.status == 'anki_done').length;
+    final remainCount = app.faPages.where((p) => p.status == 'unread').length;
 
     final pct = totalPages > 0 ? (readCount / totalPages * 100) : 0.0;
     final progress = totalPages > 0 ? readCount / totalPages : 0.0;
@@ -210,12 +213,10 @@ class _FAProgressCard extends StatelessWidget {
           children: [
             _StatChip(label: '$readCount Read', color: cs.primary),
             const SizedBox(width: 8),
-            _StatChip(
-                label: '$ankiCount Anki Done', color: Colors.deepPurple),
+            _StatChip(label: '$ankiCount Anki Done', color: Colors.deepPurple),
             const SizedBox(width: 8),
             _StatChip(
-                label: '$remainCount Remaining',
-                color: cs.onSurfaceVariant),
+                label: '$remainCount Remaining', color: cs.onSurfaceVariant),
           ],
         ),
         const SizedBox(height: 12),
@@ -268,12 +269,12 @@ class _FAProgressCard extends StatelessWidget {
                 ),
               ),
               titlesData: FlTitlesData(
-                topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false)),
-                rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false)),
-                leftTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false)),
+                topTitles:
+                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles:
+                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                leftTitles:
+                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
@@ -383,7 +384,9 @@ class _StudyTimeCard extends StatelessWidget {
     final avgMins = days.isNotEmpty ? weekTotal ~/ 7 : 0;
 
     final maxMins = days.fold<int>(
-        0, (m, d) => (dayMins[_dateKey(d)] ?? 0) > m ? (dayMins[_dateKey(d)] ?? 0) : m);
+        0,
+        (m, d) =>
+            (dayMins[_dateKey(d)] ?? 0) > m ? (dayMins[_dateKey(d)] ?? 0) : m);
     final yMax = maxMins < 30 ? 60.0 : (maxMins * 1.3).ceilToDouble();
 
     return _SectionCard(
@@ -407,12 +410,12 @@ class _StudyTimeCard extends StatelessWidget {
                 ),
               ),
               titlesData: FlTitlesData(
-                topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false)),
-                rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false)),
-                leftTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false)),
+                topTitles:
+                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles:
+                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                leftTitles:
+                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
@@ -561,8 +564,7 @@ class _SubjectBreakdownCard extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: frac.clamp(0.0, 1.0),
                       minHeight: 10,
-                      backgroundColor:
-                          cs.onSurface.withValues(alpha: 0.07),
+                      backgroundColor: cs.onSurface.withValues(alpha: 0.07),
                       valueColor: AlwaysStoppedAnimation(color),
                     ),
                   ),
@@ -608,8 +610,8 @@ class _UWorldCard extends StatelessWidget {
               child: Text(
                 'No UWorld sessions logged yet',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: cs.onSurface.withValues(alpha: 0.4),
-                ),
+                      color: cs.onSurface.withValues(alpha: 0.4),
+                    ),
               ),
             ),
           ),
@@ -633,16 +635,14 @@ class _UWorldCard extends StatelessWidget {
         // Overall stats row
         Row(
           children: [
-            _StatChip(
-                label: 'Total Qs: $totalQs', color: Colors.orange),
+            _StatChip(label: 'Total Qs: $totalQs', color: Colors.orange),
             const SizedBox(width: 8),
             _StatChip(
                 label: 'Overall: ${overallPct.toStringAsFixed(0)}%',
                 color: Colors.orange),
             const SizedBox(width: 8),
             _StatChip(
-                label: 'Sessions: ${sessions.length}',
-                color: Colors.orange),
+                label: 'Sessions: ${sessions.length}', color: Colors.orange),
           ],
         ),
         const SizedBox(height: 16),
@@ -655,8 +655,8 @@ class _UWorldCard extends StatelessWidget {
               child: Text(
                 'Log more sessions to see trend',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: cs.onSurface.withValues(alpha: 0.4),
-                ),
+                      color: cs.onSurface.withValues(alpha: 0.4),
+                    ),
               ),
             ),
           )
@@ -703,8 +703,7 @@ class _UWorldCard extends StatelessWidget {
                             '${i + 1}',
                             style: TextStyle(
                               fontSize: 10,
-                              color:
-                                  cs.onSurface.withValues(alpha: 0.45),
+                              color: cs.onSurface.withValues(alpha: 0.45),
                             ),
                           ),
                         );
@@ -726,8 +725,7 @@ class _UWorldCard extends StatelessWidget {
                   LineChartBarData(
                     spots: List.generate(recent.length, (i) {
                       final s = recent[i];
-                      final pct =
-                          s.done > 0 ? s.correct / s.done * 100 : 0.0;
+                      final pct = s.done > 0 ? s.correct / s.done * 100 : 0.0;
                       return FlSpot(i.toDouble(), pct);
                     }),
                     isCurved: true,
@@ -736,8 +734,7 @@ class _UWorldCard extends StatelessWidget {
                     barWidth: 2.5,
                     dotData: FlDotData(
                       show: true,
-                      getDotPainter: (_, __, ___, ____) =>
-                          FlDotCirclePainter(
+                      getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
                         radius: 3,
                         color: Colors.orange,
                         strokeWidth: 0,

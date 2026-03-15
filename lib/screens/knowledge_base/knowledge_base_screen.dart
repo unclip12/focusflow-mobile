@@ -52,20 +52,17 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
     }
 
     if (_selectedSubject != null) {
-      filtered =
-          filtered.where((e) => e.subject == _selectedSubject).toList();
+      filtered = filtered.where((e) => e.subject == _selectedSubject).toList();
     }
 
     if (_selectedSystem != null) {
-      filtered =
-          filtered.where((e) => e.system == _selectedSystem).toList();
+      filtered = filtered.where((e) => e.system == _selectedSystem).toList();
     }
 
     switch (_masteryFilter) {
       case _MasteryFilter.due:
         filtered = filtered
-            .where((e) =>
-                SrsService.isDueNow(nextRevisionAt: e.nextRevisionAt))
+            .where((e) => SrsService.isDueNow(nextRevisionAt: e.nextRevisionAt))
             .toList();
         break;
       case _MasteryFilter.mastered:
@@ -95,108 +92,110 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
         children: [
           Column(
             children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (v) => setState(() => _searchQuery = v),
-              style: theme.textTheme.bodyMedium,
-              decoration: InputDecoration(
-                hintText: 'Search pages, topics, subjects…',
-                hintStyle: theme.textTheme.bodyMedium
-                    ?.copyWith(color: cs.onSurface.withValues(alpha: 0.35)),
-                prefixIcon: Icon(Icons.search_rounded,
-                    size: 20, color: cs.onSurface.withValues(alpha: 0.4)),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(Icons.close_rounded,
-                            size: 18,
-                            color: cs.onSurface.withValues(alpha: 0.4)),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      )
-                    : null,
-                filled: true,
-                fillColor: Colors.transparent,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (v) => setState(() => _searchQuery = v),
+                  style: theme.textTheme.bodyMedium,
+                  decoration: InputDecoration(
+                    hintText: 'Search pages, topics, subjects…',
+                    hintStyle: theme.textTheme.bodyMedium
+                        ?.copyWith(color: cs.onSurface.withValues(alpha: 0.35)),
+                    prefixIcon: Icon(Icons.search_rounded,
+                        size: 20, color: cs.onSurface.withValues(alpha: 0.4)),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.close_rounded,
+                                size: 18,
+                                color: cs.onSurface.withValues(alpha: 0.4)),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: Colors.transparent,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          _FilterBar(
-            selectedSubject: _selectedSubject,
-            selectedSystem: _selectedSystem,
-            masteryFilter: _masteryFilter,
-            onSubjectChanged: (v) =>
-                setState(() => _selectedSubject = v == _selectedSubject ? null : v),
-            onSystemChanged: (v) =>
-                setState(() => _selectedSystem = v == _selectedSystem ? null : v),
-            onMasteryChanged: (v) => setState(() => _masteryFilter = v),
-          ),
-          const SizedBox(height: 4),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Row(
-              children: [
-                Text(
-                  '\${filtered.length} entries',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: cs.onSurface.withValues(alpha: 0.45),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          Expanded(
-            child: filtered.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.search_off_rounded,
-                            size: 48,
-                            color: cs.onSurface.withValues(alpha: 0.2)),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No entries found',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: cs.onSurface.withValues(alpha: 0.35),
-                          ),
-                        ),
-                      ],
+              const SizedBox(height: 8),
+              _FilterBar(
+                selectedSubject: _selectedSubject,
+                selectedSystem: _selectedSystem,
+                masteryFilter: _masteryFilter,
+                onSubjectChanged: (v) => setState(
+                    () => _selectedSubject = v == _selectedSubject ? null : v),
+                onSystemChanged: (v) => setState(
+                    () => _selectedSystem = v == _selectedSystem ? null : v),
+                onMasteryChanged: (v) => setState(() => _masteryFilter = v),
+              ),
+              const SizedBox(height: 4),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Row(
+                  children: [
+                    Text(
+                      '\${filtered.length} entries',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: cs.onSurface.withValues(alpha: 0.45),
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  )
-                : ListView.builder(
-                    padding: EdgeInsets.fromLTRB(
-                        16, 4, 16, MediaQuery.of(context).padding.bottom + 16),
-                    itemCount: filtered.length,
-                    itemBuilder: (context, i) {
-                      final entry = filtered[i];
-                      return KBEntryCard(
-                        entry: entry,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  KBEntryDetailScreen(pageNumber: entry.pageNumber),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: filtered.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.search_off_rounded,
+                                size: 48,
+                                color: cs.onSurface.withValues(alpha: 0.2)),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No entries found',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: cs.onSurface.withValues(alpha: 0.35),
+                              ),
                             ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: EdgeInsets.fromLTRB(
+                          16,
+                          4,
+                          16,
+                          MediaQuery.of(context).padding.bottom + 72 + 24,
+                        ),
+                        itemCount: filtered.length,
+                        itemBuilder: (context, i) {
+                          final entry = filtered[i];
+                          return KBEntryCard(
+                            entry: entry,
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => KBEntryDetailScreen(
+                                      pageNumber: entry.pageNumber),
+                                ),
+                              );
+                            },
                           );
                         },
-                      );
-                    },
-                  ),
-          ),
+                      ),
+              ),
             ],
           ),
           Positioned(
@@ -216,6 +215,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) => const _AddKBEntrySheet(),
     );
@@ -261,13 +261,11 @@ class _FilterBar extends StatelessWidget {
                 onTap: () => onMasteryChanged(mf),
               ),
             ),
-
           Container(
             width: 1,
             margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
             color: cs.onSurface.withValues(alpha: 0.1),
           ),
-
           for (final subj in kFmgeSubjects)
             Padding(
               padding: const EdgeInsets.only(right: 6),
@@ -277,13 +275,11 @@ class _FilterBar extends StatelessWidget {
                 onTap: () => onSubjectChanged(subj),
               ),
             ),
-
           Container(
             width: 1,
             margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
             color: cs.onSurface.withValues(alpha: 0.1),
           ),
-
           for (final sys in kBodySystems)
             Padding(
               padding: const EdgeInsets.only(right: 6),
@@ -350,7 +346,7 @@ class _AddKBEntrySheet extends StatefulWidget {
 }
 
 class _AddKBEntrySheetState extends State<_AddKBEntrySheet> {
-  final _pageCtrl  = TextEditingController();
+  final _pageCtrl = TextEditingController();
   final _titleCtrl = TextEditingController();
   String? _subject;
   String? _system;
@@ -392,8 +388,12 @@ class _AddKBEntrySheetState extends State<_AddKBEntrySheet> {
     final cs = theme.colorScheme;
     return Container(
       padding: EdgeInsets.only(
-        left: 20, right: 20, top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        left: 20,
+        right: 20,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).padding.bottom +
+            20,
       ),
       decoration: BoxDecoration(
         color: cs.surface,
@@ -406,7 +406,8 @@ class _AddKBEntrySheetState extends State<_AddKBEntrySheet> {
           children: [
             Center(
               child: Container(
-                width: 36, height: 4,
+                width: 36,
+                height: 4,
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
                   color: cs.onSurface.withValues(alpha: 0.15),
@@ -423,8 +424,8 @@ class _AddKBEntrySheetState extends State<_AddKBEntrySheet> {
               decoration: InputDecoration(
                 labelText: 'Page number',
                 hintText: 'e.g. 180',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
               keyboardType: TextInputType.number,
             ),
@@ -434,8 +435,8 @@ class _AddKBEntrySheetState extends State<_AddKBEntrySheet> {
               decoration: InputDecoration(
                 labelText: 'Topic / Title',
                 hintText: 'e.g. TORCH Infections',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
               textCapitalization: TextCapitalization.sentences,
             ),
@@ -445,8 +446,8 @@ class _AddKBEntrySheetState extends State<_AddKBEntrySheet> {
               value: _subject,
               decoration: InputDecoration(
                 labelText: 'Subject',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
               items: kFmgeSubjects
                   .map((s) => DropdownMenuItem(value: s, child: Text(s)))
@@ -459,8 +460,8 @@ class _AddKBEntrySheetState extends State<_AddKBEntrySheet> {
               value: _system,
               decoration: InputDecoration(
                 labelText: 'System',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
               items: kBodySystems
                   .map((s) => DropdownMenuItem(value: s, child: Text(s)))

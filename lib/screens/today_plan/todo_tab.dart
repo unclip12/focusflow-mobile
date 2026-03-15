@@ -63,8 +63,8 @@ class TodoTab extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.checklist_rounded, size: 48,
-                          color: cs.primary.withValues(alpha: 0.25)),
+                      Icon(Icons.checklist_rounded,
+                          size: 48, color: cs.primary.withValues(alpha: 0.25)),
                       const SizedBox(height: 12),
                       Text(
                         'No to-do items yet',
@@ -85,9 +85,15 @@ class TodoTab extends StatelessWidget {
                   ),
                 )
               : ListView(
-                  padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).padding.bottom + 16),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    8,
+                    16,
+                    MediaQuery.of(context).padding.bottom + 72 + 24,
+                  ),
                   children: _categories.map((cat) {
-                    final catItems = todos.where((t) => t.category == cat).toList();
+                    final catItems =
+                        todos.where((t) => t.category == cat).toList();
                     if (catItems.isEmpty) return const SizedBox.shrink();
                     final color = _categoryColors[cat]!;
                     return Column(
@@ -119,19 +125,19 @@ class TodoTab extends StatelessWidget {
                           ),
                         ),
                         ...catItems.map((item) => _TodoItemTile(
-                          item: item,
-                          color: color,
-                          onToggle: () {
-                            final updated = item.copyWith(
-                              completed: !item.completed,
-                              completedAt: !item.completed
-                                  ? DateTime.now().toIso8601String()
-                                  : null,
-                            );
-                            app.upsertTodoItem(updated);
-                          },
-                          onDelete: () => app.deleteTodoItem(item.id),
-                        )),
+                              item: item,
+                              color: color,
+                              onToggle: () {
+                                final updated = item.copyWith(
+                                  completed: !item.completed,
+                                  completedAt: !item.completed
+                                      ? DateTime.now().toIso8601String()
+                                      : null,
+                                );
+                                app.upsertTodoItem(updated);
+                              },
+                              onDelete: () => app.deleteTodoItem(item.id),
+                            )),
                         const SizedBox(height: 4),
                       ],
                     );
@@ -146,6 +152,7 @@ class TodoTab extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -199,7 +206,8 @@ class _TodoItemTile extends StatelessWidget {
             value: item.completed,
             onChanged: (_) => onToggle(),
             activeColor: color,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
           ),
           title: Text(
             item.title,
@@ -215,7 +223,8 @@ class _TodoItemTile extends StatelessWidget {
           subtitle: _buildSubtitle(cs),
           trailing: item.scheduledTime != null
               ? Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
@@ -237,12 +246,14 @@ class _TodoItemTile extends StatelessWidget {
 
   Widget? _buildSubtitle(ColorScheme cs) {
     final parts = <String>[];
-    if (item.estimatedMinutes != null) parts.add('~${item.estimatedMinutes} min');
+    if (item.estimatedMinutes != null)
+      parts.add('~${item.estimatedMinutes} min');
     if (item.notes != null && item.notes!.isNotEmpty) parts.add(item.notes!);
     if (parts.isEmpty) return null;
     return Text(
       parts.join(' • '),
-      style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.4)),
+      style:
+          TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.4)),
     );
   }
 }
@@ -302,7 +313,9 @@ class _AddTodoSheetState extends State<_AddTodoSheet> {
         left: 20,
         right: 20,
         top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).padding.bottom +
+            20,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -310,7 +323,8 @@ class _AddTodoSheetState extends State<_AddTodoSheet> {
         children: [
           Center(
             child: Container(
-              width: 32, height: 4,
+              width: 32,
+              height: 4,
               decoration: BoxDecoration(
                 color: cs.onSurface.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(4),
@@ -318,9 +332,12 @@ class _AddTodoSheetState extends State<_AddTodoSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          Text('Add To-Do', style: TextStyle(
-            fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface,
-          )),
+          Text('Add To-Do',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+              )),
           const SizedBox(height: 16),
 
           // Title
@@ -330,7 +347,8 @@ class _AddTodoSheetState extends State<_AddTodoSheet> {
             decoration: InputDecoration(
               labelText: 'Task',
               hintText: 'e.g., Review Anatomy notes',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
           const SizedBox(height: 12),
@@ -339,9 +357,12 @@ class _AddTodoSheetState extends State<_AddTodoSheet> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Category:', style: TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface,
-              )),
+              Text('Category:',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
+                  )),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 6,
@@ -380,7 +401,8 @@ class _AddTodoSheetState extends State<_AddTodoSheet> {
                     style: const TextStyle(fontSize: 13),
                   ),
                   style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
               ),
@@ -392,7 +414,8 @@ class _AddTodoSheetState extends State<_AddTodoSheet> {
                   onChanged: (v) => _estimatedMinutes = int.tryParse(v),
                   decoration: InputDecoration(
                     labelText: 'Minutes',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
                     isDense: true,
                   ),
                 ),
@@ -406,7 +429,8 @@ class _AddTodoSheetState extends State<_AddTodoSheet> {
             controller: _notesCtrl,
             decoration: InputDecoration(
               labelText: 'Notes (optional)',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               isDense: true,
             ),
           ),
@@ -418,9 +442,11 @@ class _AddTodoSheetState extends State<_AddTodoSheet> {
               onPressed: _save,
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
               ),
-              child: const Text('Add Task', style: TextStyle(fontWeight: FontWeight.w700)),
+              child: const Text('Add Task',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
             ),
           ),
         ],

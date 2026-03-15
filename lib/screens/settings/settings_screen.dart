@@ -32,7 +32,12 @@ class SettingsScreen extends StatelessWidget {
     return AppScaffold(
       screenName: 'Settings',
       body: ListView(
-        padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).padding.bottom + 16),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          MediaQuery.of(context).padding.bottom + 72 + 24,
+        ),
         children: [
           // ═══════════════════════════════════════════════════════
           // EXAM DATES
@@ -45,11 +50,13 @@ class SettingsScreen extends StatelessWidget {
                 _GlassListTile(
                   title: 'FMGE',
                   subtitle: _formatDateLabel(sp.fmgeDate),
-                  trailing: Icon(Icons.edit_calendar_rounded, color: DashboardColors.primaryLight, size: 20),
+                  trailing: Icon(Icons.edit_calendar_rounded,
+                      color: DashboardColors.primaryLight, size: 20),
                   onTap: () async {
                     final picked = await showDatePicker(
                       context: context,
-                      initialDate: DateTime.tryParse(sp.fmgeDate) ?? DateTime(2026, 6, 28),
+                      initialDate: DateTime.tryParse(sp.fmgeDate) ??
+                          DateTime(2026, 6, 28),
                       firstDate: DateTime.now(),
                       lastDate: DateTime(2028),
                     );
@@ -58,15 +65,20 @@ class SettingsScreen extends StatelessWidget {
                     }
                   },
                 ),
-                Divider(height: 1, color: DashboardColors.glassBorder(Theme.of(context).brightness == Brightness.dark)),
+                Divider(
+                    height: 1,
+                    color: DashboardColors.glassBorder(
+                        Theme.of(context).brightness == Brightness.dark)),
                 _GlassListTile(
                   title: 'USMLE Step 1',
                   subtitle: _formatDateLabel(sp.step1Date),
-                  trailing: Icon(Icons.edit_calendar_rounded, color: DashboardColors.primaryLight, size: 20),
+                  trailing: Icon(Icons.edit_calendar_rounded,
+                      color: DashboardColors.primaryLight, size: 20),
                   onTap: () async {
                     final picked = await showDatePicker(
                       context: context,
-                      initialDate: DateTime.tryParse(sp.step1Date) ?? DateTime(2026, 6, 15),
+                      initialDate: DateTime.tryParse(sp.step1Date) ??
+                          DateTime(2026, 6, 15),
                       firstDate: DateTime.now(),
                       lastDate: DateTime(2028),
                     );
@@ -102,7 +114,10 @@ class SettingsScreen extends StatelessWidget {
                     onConfirm: (val) => sp.setDailyFAGoal(val.round()),
                   ),
                 ),
-                Divider(height: 1, color: DashboardColors.glassBorder(Theme.of(context).brightness == Brightness.dark)),
+                Divider(
+                    height: 1,
+                    color: DashboardColors.glassBorder(
+                        Theme.of(context).brightness == Brightness.dark)),
                 _GlassListTile(
                   title: 'Anki Cards / Day',
                   trailing: _GlassChip(label: '${sp.ankiBatchSize} cards'),
@@ -133,33 +148,44 @@ class SettingsScreen extends StatelessWidget {
                 _GlassListTile(
                   title: 'Wake Time',
                   subtitle: _formatTimeLabel(sp.wakeTime),
-                  trailing: const Icon(Icons.wb_sunny_rounded, color: Colors.amber, size: 20),
+                  trailing: const Icon(Icons.wb_sunny_rounded,
+                      color: Colors.amber, size: 20),
                   onTap: () async {
                     final parts = sp.wakeTime.split(':');
                     final initial = TimeOfDay(
                       hour: int.tryParse(parts[0]) ?? 6,
-                      minute: int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0,
+                      minute:
+                          int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0,
                     );
-                    final picked = await showTimePicker(context: context, initialTime: initial);
+                    final picked = await showTimePicker(
+                        context: context, initialTime: initial);
                     if (picked != null) {
-                      sp.setWakeTime('${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}');
+                      sp.setWakeTime(
+                          '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}');
                     }
                   },
                 ),
-                Divider(height: 1, color: DashboardColors.glassBorder(Theme.of(context).brightness == Brightness.dark)),
+                Divider(
+                    height: 1,
+                    color: DashboardColors.glassBorder(
+                        Theme.of(context).brightness == Brightness.dark)),
                 _GlassListTile(
                   title: 'Sleep Time',
                   subtitle: _formatTimeLabel(sp.sleepTime),
-                  trailing: const Icon(Icons.bedtime_rounded, color: Colors.indigo, size: 20),
+                  trailing: const Icon(Icons.bedtime_rounded,
+                      color: Colors.indigo, size: 20),
                   onTap: () async {
                     final parts = sp.sleepTime.split(':');
                     final initial = TimeOfDay(
                       hour: int.tryParse(parts[0]) ?? 23,
-                      minute: int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0,
+                      minute:
+                          int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0,
                     );
-                    final picked = await showTimePicker(context: context, initialTime: initial);
+                    final picked = await showTimePicker(
+                        context: context, initialTime: initial);
                     if (picked != null) {
-                      sp.setSleepTime('${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}');
+                      sp.setSleepTime(
+                          '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}');
                     }
                   },
                 ),
@@ -180,8 +206,10 @@ class SettingsScreen extends StatelessWidget {
                   icon: Icons.schedule_rounded,
                   iconColor: DashboardColors.primary,
                   title: 'Day Start Time',
-                  subtitle: '${sp.dayStartHour == 0 ? 12 : sp.dayStartHour > 12 ? sp.dayStartHour - 12 : sp.dayStartHour}:00 ${sp.dayStartHour < 12 ? 'AM' : 'PM'}',
-                  trailing: Icon(Icons.chevron_right_rounded, color: DashboardColors.textSecondary, size: 20),
+                  subtitle:
+                      '${sp.dayStartHour == 0 ? 12 : sp.dayStartHour > 12 ? sp.dayStartHour - 12 : sp.dayStartHour}:00 ${sp.dayStartHour < 12 ? 'AM' : 'PM'}',
+                  trailing: Icon(Icons.chevron_right_rounded,
+                      color: DashboardColors.textSecondary, size: 20),
                   onTap: () => _showSliderDialog(
                     context: context,
                     title: 'Day Start Hour',
@@ -193,7 +221,10 @@ class SettingsScreen extends StatelessWidget {
                     onConfirm: (val) => sp.setDayStartHour(val.round()),
                   ),
                 ),
-                Divider(height: 1, color: DashboardColors.glassBorder(Theme.of(context).brightness == Brightness.dark)),
+                Divider(
+                    height: 1,
+                    color: DashboardColors.glassBorder(
+                        Theme.of(context).brightness == Brightness.dark)),
                 _GlassListTile(
                   icon: Icons.auto_awesome_rounded,
                   iconColor: Colors.amber,
@@ -222,7 +253,8 @@ class SettingsScreen extends StatelessWidget {
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: DashboardColors.textPrimary(Theme.of(context).brightness == Brightness.dark),
+                          color: DashboardColors.textPrimary(
+                              Theme.of(context).brightness == Brightness.dark),
                         )),
                     const Spacer(),
                     Text('Max 4 tabs',
@@ -243,7 +275,8 @@ class SettingsScreen extends StatelessWidget {
                       selected: true,
                       onSelected: (_) {
                         if (sp.pinnedTabs.length > 1) {
-                          final updated = sp.pinnedTabs.where((t) => t != id).toList();
+                          final updated =
+                              sp.pinnedTabs.where((t) => t != id).toList();
                           sp.setPinnedTabs(updated);
                         }
                       },
@@ -266,6 +299,10 @@ class SettingsScreen extends StatelessWidget {
                             useSafeArea: true,
                             builder: (_) => ListView(
                               shrinkWrap: true,
+                              padding: EdgeInsets.only(
+                                bottom:
+                                    MediaQuery.of(context).padding.bottom + 20,
+                              ),
                               children: unpinned.map((e) {
                                 return ListTile(
                                   title: Text(e.value),
@@ -356,8 +393,7 @@ class SettingsScreen extends StatelessWidget {
                         )),
                     const Spacer(),
                     Text(
-                      sp.fontSize[0].toUpperCase() +
-                          sp.fontSize.substring(1),
+                      sp.fontSize[0].toUpperCase() + sp.fontSize.substring(1),
                       style: theme.textTheme.labelMedium?.copyWith(
                         color: cs.primary,
                         fontWeight: FontWeight.w600,
@@ -491,42 +527,61 @@ class SettingsScreen extends StatelessWidget {
                     future: BackupService.lastBackupTime(),
                     builder: (context, snap) {
                       if (snap.connectionState == ConnectionState.waiting) {
-                        return Text('Checking…', style: GoogleFonts.inter(fontSize: 12, color: DashboardColors.textSecondary));
+                        return Text('Checking…',
+                            style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: DashboardColors.textSecondary));
                       }
                       final dt = snap.data;
-                      if (dt == null) return Text('No backup yet', style: GoogleFonts.inter(fontSize: 12, color: DashboardColors.textSecondary));
+                      if (dt == null)
+                        return Text('No backup yet',
+                            style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: DashboardColors.textSecondary));
                       final now = DateTime.now();
-                      final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+                      final isToday = dt.year == now.year &&
+                          dt.month == now.month &&
+                          dt.day == now.day;
                       final formatted = isToday
                           ? 'Today at ${DateFormat.jm().format(dt)}'
                           : '${DateFormat('MMM d').format(dt)} at ${DateFormat.jm().format(dt)}';
-                      return Text(formatted, style: GoogleFonts.inter(fontSize: 12, color: DashboardColors.textSecondary));
+                      return Text(formatted,
+                          style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: DashboardColors.textSecondary));
                     },
                   ),
                 ),
-                Divider(height: 1, color: DashboardColors.glassBorder(Theme.of(context).brightness == Brightness.dark)),
+                Divider(
+                    height: 1,
+                    color: DashboardColors.glassBorder(
+                        Theme.of(context).brightness == Brightness.dark)),
                 // Row 2 — Backup Now
                 _GlassListTile(
                   icon: Icons.backup_rounded,
                   iconColor: DashboardColors.success,
                   title: 'Backup Now',
-                  trailing: Icon(Icons.chevron_right_rounded, color: DashboardColors.textSecondary, size: 20),
+                  trailing: Icon(Icons.chevron_right_rounded,
+                      color: DashboardColors.textSecondary, size: 20),
                   onTap: () async {
                     showDialog(
                       context: context,
                       barrierDismissible: false,
-                      builder: (_) => const Center(child: CircularProgressIndicator()),
+                      builder: (_) =>
+                          const Center(child: CircularProgressIndicator()),
                     );
                     try {
                       final app = context.read<AppProvider>();
                       final savedPath = await BackupService.saveBackup(
                           BackupService.buildBackupData(app));
-                      if (context.mounted) Navigator.pop(context); // close dialog
-                      
+                      if (context.mounted)
+                        Navigator.pop(context); // close dialog
+
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('✅ Backup saved to ${savedPath.split('/').last}'),
+                            content: Text(
+                                '✅ Backup saved to ${savedPath.split('/').last}'),
                             behavior: SnackBarBehavior.floating,
                           ),
                         );
@@ -534,7 +589,8 @@ class SettingsScreen extends StatelessWidget {
                         (context as Element).markNeedsBuild();
                       }
                     } catch (e) {
-                      if (context.mounted) Navigator.pop(context); // close dialog
+                      if (context.mounted)
+                        Navigator.pop(context); // close dialog
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -546,12 +602,16 @@ class SettingsScreen extends StatelessWidget {
                     }
                   },
                 ),
-                Divider(height: 1, color: DashboardColors.glassBorder(Theme.of(context).brightness == Brightness.dark)),
+                Divider(
+                    height: 1,
+                    color: DashboardColors.glassBorder(
+                        Theme.of(context).brightness == Brightness.dark)),
                 _GlassListTile(
                   icon: Icons.restore_rounded,
                   iconColor: DashboardColors.warning,
                   title: 'Restore from Backup',
-                  trailing: Icon(Icons.chevron_right_rounded, color: DashboardColors.textSecondary, size: 20),
+                  trailing: Icon(Icons.chevron_right_rounded,
+                      color: DashboardColors.textSecondary, size: 20),
                   onTap: () {
                     showDialog(
                       context: context,
@@ -569,13 +629,14 @@ class SettingsScreen extends StatelessWidget {
                           FilledButton(
                             onPressed: () async {
                               Navigator.pop(ctx); // close alert
-                              
+
                               showDialog(
                                 context: context,
                                 barrierDismissible: false,
-                                builder: (_) => const Center(child: CircularProgressIndicator()),
+                                builder: (_) => const Center(
+                                    child: CircularProgressIndicator()),
                               );
-                              
+
                               try {
                                 final data = await BackupService.loadBackup();
                                 if (!context.mounted) return;
@@ -595,13 +656,15 @@ class SettingsScreen extends StatelessWidget {
                                   Navigator.pop(context); // close loader
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('✅ Data restored from backup'),
+                                      content:
+                                          Text('✅ Data restored from backup'),
                                       behavior: SnackBarBehavior.floating,
                                     ),
                                   );
                                 }
                               } catch (e) {
-                                if (context.mounted) Navigator.pop(context); // close loader
+                                if (context.mounted)
+                                  Navigator.pop(context); // close loader
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
@@ -736,8 +799,8 @@ class SettingsScreen extends StatelessWidget {
   }
 
   // â”€â”€ Time picker helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  Future<void> _pickTime(
-      BuildContext context, String current, ValueChanged<String> onPicked) async {
+  Future<void> _pickTime(BuildContext context, String current,
+      ValueChanged<String> onPicked) async {
     final parts = current.split(':');
     final initial = TimeOfDay(
       hour: int.tryParse(parts[0]) ?? 22,
@@ -836,7 +899,8 @@ class _GlassSectionHeader extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 3, height: 16,
+            width: 3,
+            height: 16,
             decoration: BoxDecoration(
               color: DashboardColors.primary,
               borderRadius: BorderRadius.circular(2),
@@ -891,10 +955,12 @@ class _GlassListTile extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: (iconColor ?? DashboardColors.primary).withValues(alpha: 0.12),
+                  color: (iconColor ?? DashboardColors.primary)
+                      .withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, size: 16, color: iconColor ?? DashboardColors.primary),
+                child: Icon(icon,
+                    size: 16, color: iconColor ?? DashboardColors.primary),
               ),
               const SizedBox(width: 12),
             ],
@@ -958,8 +1024,6 @@ class _GlassChip extends StatelessWidget {
     );
   }
 }
-
-
 
 class _SettingsTile extends StatelessWidget {
   final IconData icon;
@@ -1065,8 +1129,6 @@ class _TimeTile extends StatelessWidget {
   }
 }
 
-
-
 class _DetailRow extends StatelessWidget {
   final String label;
   final String value;
@@ -1144,8 +1206,7 @@ class _MenuReorderSectionState extends State<_MenuReorderSection> {
 
   void _toggleVisibility(int index) {
     setState(() {
-      _items[index] =
-          _items[index].copyWith(visible: !_items[index].visible);
+      _items[index] = _items[index].copyWith(visible: !_items[index].visible);
     });
     widget.sp.updateMenuConfig(_items);
   }
@@ -1178,13 +1239,11 @@ class _MenuReorderSectionState extends State<_MenuReorderSection> {
         },
         itemBuilder: (context, index) {
           final item = _items[index];
-          final label =
-              kMenuItemLabels[item.id] ?? item.id;
+          final label = kMenuItemLabels[item.id] ?? item.id;
 
           return Container(
             key: ValueKey(item.id),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               border: index < _items.length - 1
                   ? Border(
@@ -1200,8 +1259,7 @@ class _MenuReorderSectionState extends State<_MenuReorderSection> {
                 ReorderableDragStartListener(
                   index: index,
                   child: Icon(Icons.drag_handle_rounded,
-                      size: 20,
-                      color: cs.onSurface.withValues(alpha: 0.25)),
+                      size: 20, color: cs.onSurface.withValues(alpha: 0.25)),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1253,7 +1311,8 @@ class _ChangelogItem extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 5, right: 6),
             child: Container(
-              width: 4, height: 4,
+              width: 4,
+              height: 4,
               decoration: BoxDecoration(
                 color: cs.primary.withValues(alpha: 0.5),
                 shape: BoxShape.circle,
@@ -1264,9 +1323,9 @@ class _ChangelogItem extends StatelessWidget {
             child: Text(
               text,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontSize: 11,
-                color: cs.onSurface.withValues(alpha: 0.6),
-              ),
+                    fontSize: 11,
+                    color: cs.onSurface.withValues(alpha: 0.6),
+                  ),
             ),
           ),
         ],

@@ -20,8 +20,22 @@ import 'package:focusflow_mobile/utils/focus_batch_calculator.dart';
 // ── Task type enums ──────────────────────────────────────────────
 enum ExamType { usmle, fmge }
 
-enum UsmleTaskType { faPages, videoLecture, qbankSession, ankiReview, revision, other }
-enum FmgeTaskType { cerebellumLecture, fmgeQbank, subjectReading, revision, other }
+enum UsmleTaskType {
+  faPages,
+  videoLecture,
+  qbankSession,
+  ankiReview,
+  revision,
+  other
+}
+
+enum FmgeTaskType {
+  cerebellumLecture,
+  fmgeQbank,
+  subjectReading,
+  revision,
+  other
+}
 
 // ── Chip data ────────────────────────────────────────────────────
 class _TaskTypeChip {
@@ -31,20 +45,24 @@ class _TaskTypeChip {
 }
 
 const _usmleChips = <UsmleTaskType, _TaskTypeChip>{
-  UsmleTaskType.faPages:       _TaskTypeChip('FA Pages', Icons.menu_book_rounded),
-  UsmleTaskType.videoLecture:  _TaskTypeChip('Video Lecture', Icons.play_circle_rounded),
-  UsmleTaskType.qbankSession:  _TaskTypeChip('Qbank Session', Icons.quiz_rounded),
-  UsmleTaskType.ankiReview:    _TaskTypeChip('Anki Review', Icons.style_rounded),
-  UsmleTaskType.revision:      _TaskTypeChip('Revision', Icons.replay_rounded),
-  UsmleTaskType.other:         _TaskTypeChip('Other', Icons.more_horiz_rounded),
+  UsmleTaskType.faPages: _TaskTypeChip('FA Pages', Icons.menu_book_rounded),
+  UsmleTaskType.videoLecture:
+      _TaskTypeChip('Video Lecture', Icons.play_circle_rounded),
+  UsmleTaskType.qbankSession:
+      _TaskTypeChip('Qbank Session', Icons.quiz_rounded),
+  UsmleTaskType.ankiReview: _TaskTypeChip('Anki Review', Icons.style_rounded),
+  UsmleTaskType.revision: _TaskTypeChip('Revision', Icons.replay_rounded),
+  UsmleTaskType.other: _TaskTypeChip('Other', Icons.more_horiz_rounded),
 };
 
 const _fmgeChips = <FmgeTaskType, _TaskTypeChip>{
-  FmgeTaskType.cerebellumLecture: _TaskTypeChip('Cerebellum Lecture', Icons.video_library_rounded),
-  FmgeTaskType.fmgeQbank:         _TaskTypeChip('FMGE Qbank', Icons.quiz_rounded),
-  FmgeTaskType.subjectReading:    _TaskTypeChip('Subject Reading', Icons.menu_book_rounded),
-  FmgeTaskType.revision:          _TaskTypeChip('Revision', Icons.replay_rounded),
-  FmgeTaskType.other:             _TaskTypeChip('Other', Icons.more_horiz_rounded),
+  FmgeTaskType.cerebellumLecture:
+      _TaskTypeChip('Cerebellum Lecture', Icons.video_library_rounded),
+  FmgeTaskType.fmgeQbank: _TaskTypeChip('FMGE Qbank', Icons.quiz_rounded),
+  FmgeTaskType.subjectReading:
+      _TaskTypeChip('Subject Reading', Icons.menu_book_rounded),
+  FmgeTaskType.revision: _TaskTypeChip('Revision', Icons.replay_rounded),
+  FmgeTaskType.other: _TaskTypeChip('Other', Icons.more_horiz_rounded),
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -67,14 +85,14 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   UsmleTaskType? _usmleType;
   FmgeTaskType? _fmgeType;
 
-  final _pageCtrl       = TextEditingController();
-  final _topicCtrl      = TextEditingController();
-  final _titleCtrl      = TextEditingController();
-  final _notesCtrl      = TextEditingController();
-  final _deckCtrl       = TextEditingController();
-  final _durationCtrl   = TextEditingController();
-  final _questionCtrl   = TextEditingController();
-  final _cardsCtrl      = TextEditingController();
+  final _pageCtrl = TextEditingController();
+  final _topicCtrl = TextEditingController();
+  final _titleCtrl = TextEditingController();
+  final _notesCtrl = TextEditingController();
+  final _deckCtrl = TextEditingController();
+  final _durationCtrl = TextEditingController();
+  final _questionCtrl = TextEditingController();
+  final _cardsCtrl = TextEditingController();
 
   String? _selectedSystem;
   String? _selectedSubject;
@@ -157,7 +175,8 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         case UsmleTaskType.videoLecture:
           return _topicCtrl.text.isNotEmpty ? _topicCtrl.text : 'Video Lecture';
         case UsmleTaskType.qbankSession:
-          return 'Qbank ${_selectedPlatform ?? ''} ${_questionCtrl.text}Q'.trim();
+          return 'Qbank ${_selectedPlatform ?? ''} ${_questionCtrl.text}Q'
+              .trim();
         case UsmleTaskType.ankiReview:
           return 'Anki ${_deckCtrl.text}'.trim();
         case UsmleTaskType.revision:
@@ -172,7 +191,8 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         case FmgeTaskType.cerebellumLecture:
           return 'Cerebellum ${_topicCtrl.text}'.trim();
         case FmgeTaskType.fmgeQbank:
-          return 'FMGE Qbank ${_selectedPlatform ?? ''} ${_questionCtrl.text}Q'.trim();
+          return 'FMGE Qbank ${_selectedPlatform ?? ''} ${_questionCtrl.text}Q'
+              .trim();
         case FmgeTaskType.subjectReading:
           return '${_selectedSubject ?? ''} ${_topicCtrl.text}'.trim();
         case FmgeTaskType.revision:
@@ -188,22 +208,35 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   BlockType get _blockType {
     if (_exam == ExamType.usmle) {
       switch (_usmleType) {
-        case UsmleTaskType.faPages:      return BlockType.revisionFa;
-        case UsmleTaskType.videoLecture: return BlockType.video;
-        case UsmleTaskType.qbankSession: return BlockType.qbank;
-        case UsmleTaskType.ankiReview:   return BlockType.anki;
-        case UsmleTaskType.revision:     return BlockType.revisionFa;
-        case UsmleTaskType.other:        return BlockType.other;
-        case null:                       return BlockType.other;
+        case UsmleTaskType.faPages:
+          return BlockType.revisionFa;
+        case UsmleTaskType.videoLecture:
+          return BlockType.video;
+        case UsmleTaskType.qbankSession:
+          return BlockType.qbank;
+        case UsmleTaskType.ankiReview:
+          return BlockType.anki;
+        case UsmleTaskType.revision:
+          return BlockType.revisionFa;
+        case UsmleTaskType.other:
+          return BlockType.other;
+        case null:
+          return BlockType.other;
       }
     } else {
       switch (_fmgeType) {
-        case FmgeTaskType.cerebellumLecture: return BlockType.video;
-        case FmgeTaskType.fmgeQbank:         return BlockType.qbank;
-        case FmgeTaskType.subjectReading:    return BlockType.other;
-        case FmgeTaskType.revision:          return BlockType.fmgeRevision;
-        case FmgeTaskType.other:             return BlockType.other;
-        case null:                           return BlockType.other;
+        case FmgeTaskType.cerebellumLecture:
+          return BlockType.video;
+        case FmgeTaskType.fmgeQbank:
+          return BlockType.qbank;
+        case FmgeTaskType.subjectReading:
+          return BlockType.other;
+        case FmgeTaskType.revision:
+          return BlockType.fmgeRevision;
+        case FmgeTaskType.other:
+          return BlockType.other;
+        case null:
+          return BlockType.other;
       }
     }
   }
@@ -211,8 +244,10 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   List<FocusBatch> get _focusBatches {
     if (_startTime == null || _endTime == null) return [];
     final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day, _startTime!.hour, _startTime!.minute);
-    var end = DateTime(now.year, now.month, now.day, _endTime!.hour, _endTime!.minute);
+    final start = DateTime(
+        now.year, now.month, now.day, _startTime!.hour, _startTime!.minute);
+    var end = DateTime(
+        now.year, now.month, now.day, _endTime!.hour, _endTime!.minute);
     if (end.isBefore(start)) end = end.add(const Duration(days: 1));
     return calculateFocusBatches(start, end);
   }
@@ -224,7 +259,11 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     final picked = await showTimePicker(context: context, initialTime: initial);
     if (picked != null && mounted) {
       setState(() {
-        if (isStart) { _startTime = picked; } else { _endTime = picked; }
+        if (isStart) {
+          _startTime = picked;
+        } else {
+          _endTime = picked;
+        }
       });
     }
   }
@@ -251,7 +290,8 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Already Studied'),
-          content: Text('You have already studied $_taskTitle.\nDid you mean to schedule this for Revision instead?'),
+          content: Text(
+              'You have already studied $_taskTitle.\nDid you mean to schedule this for Revision instead?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -274,14 +314,17 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     bool isKnown = true;
     if (_exam == ExamType.usmle && _usmleType == UsmleTaskType.faPages) {
       if (_trackerInfo == null) isKnown = false;
-    } else if (_exam == ExamType.usmle && _usmleType == UsmleTaskType.videoLecture) {
+    } else if (_exam == ExamType.usmle &&
+        _usmleType == UsmleTaskType.videoLecture) {
       if (_selectedSource == 'Sketchy') {
         final title = _topicCtrl.text.trim().toLowerCase();
-        isKnown = app.sketchyMicroVideos.any((v) => v.title.toLowerCase() == title) ||
-                  app.sketchyPharmVideos.any((v) => v.title.toLowerCase() == title);
+        isKnown = app.sketchyMicroVideos
+                .any((v) => v.title.toLowerCase() == title) ||
+            app.sketchyPharmVideos.any((v) => v.title.toLowerCase() == title);
       } else if (_selectedSource == 'Pathoma') {
         final title = _topicCtrl.text.trim().toLowerCase();
-        isKnown = app.pathomaChapters.any((c) => c.title.toLowerCase() == title);
+        isKnown =
+            app.pathomaChapters.any((c) => c.title.toLowerCase() == title);
       }
     }
 
@@ -290,7 +333,8 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Unknown Task'),
-          content: Text('The task "$_taskTitle" cannot be found in your Library.\nWould you like to add it to your Library for better tracking?'),
+          content: Text(
+              'The task "$_taskTitle" cannot be found in your Library.\nWould you like to add it to your Library for better tracking?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -303,14 +347,16 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
           ],
         ),
       );
-      
+
       if (addLib == true) {
         if (!mounted) return;
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please use the Library tab to add custom items first.')),
+          const SnackBar(
+              content: Text(
+                  'Please use the Library tab to add custom items first.')),
         );
-        return; 
+        return;
       }
     }
 
@@ -344,7 +390,8 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         plannedEndTime: _formatTimeOfDay(_endTime!),
         type: _blockType,
         title: title,
-        plannedDurationMinutes: _endTime!.hour * 60 + _endTime!.minute -
+        plannedDurationMinutes: _endTime!.hour * 60 +
+            _endTime!.minute -
             (_startTime!.hour * 60 + _startTime!.minute),
         status: BlockStatus.notStarted,
       ));
@@ -379,26 +426,28 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       }
     }
 
-    final focusBlockCount = newBlocks.where((b) => b.type != BlockType.breakBlock).length;
+    final focusBlockCount =
+        newBlocks.where((b) => b.type != BlockType.breakBlock).length;
     final allBlocks = [...existingBlocks, ...newBlocks];
 
-    final plan = existing?.copyWith(blocks: allBlocks) ?? DayPlan(
-      date: widget.dateKey,
-      faPages: const [],
-      faPagesCount: 0,
-      videos: const [],
-      notesFromUser: '',
-      notesFromAI: '',
-      attachments: const [],
-      breaks: const [],
-      blocks: allBlocks,
-      totalStudyMinutesPlanned: allBlocks
-          .where((b) => b.type != BlockType.breakBlock)
-          .fold<int>(0, (sum, b) => sum + b.plannedDurationMinutes),
-      totalBreakMinutes: allBlocks
-          .where((b) => b.type == BlockType.breakBlock)
-          .fold<int>(0, (sum, b) => sum + b.plannedDurationMinutes),
-    );
+    final plan = existing?.copyWith(blocks: allBlocks) ??
+        DayPlan(
+          date: widget.dateKey,
+          faPages: const [],
+          faPagesCount: 0,
+          videos: const [],
+          notesFromUser: '',
+          notesFromAI: '',
+          attachments: const [],
+          breaks: const [],
+          blocks: allBlocks,
+          totalStudyMinutesPlanned: allBlocks
+              .where((b) => b.type != BlockType.breakBlock)
+              .fold<int>(0, (sum, b) => sum + b.plannedDurationMinutes),
+          totalBreakMinutes: allBlocks
+              .where((b) => b.type == BlockType.breakBlock)
+              .fold<int>(0, (sum, b) => sum + b.plannedDurationMinutes),
+        );
 
     await app.upsertDayPlan(plan);
 
@@ -422,15 +471,24 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
 
   String _blockTypeIcon(BlockType type) {
     switch (type) {
-      case BlockType.studySession:  return '🎓';
-      case BlockType.revisionFa:   return '📚';
-      case BlockType.video:         return '🎬';
-      case BlockType.qbank:         return '📝';
-      case BlockType.anki:          return '🃏';
-      case BlockType.fmgeRevision:  return '📖';
-      case BlockType.breakBlock:    return '☕';
-      case BlockType.mixed:         return '🔀';
-      case BlockType.other:         return '⚡';
+      case BlockType.studySession:
+        return '🎓';
+      case BlockType.revisionFa:
+        return '📚';
+      case BlockType.video:
+        return '🎬';
+      case BlockType.qbank:
+        return '📝';
+      case BlockType.anki:
+        return '🃏';
+      case BlockType.fmgeRevision:
+        return '📖';
+      case BlockType.breakBlock:
+        return '☕';
+      case BlockType.mixed:
+        return '🔀';
+      case BlockType.other:
+        return '⚡';
     }
   }
 
@@ -441,7 +499,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+    final bottomPadding = MediaQuery.of(context).viewInsets.bottom +
+        MediaQuery.of(context).padding.bottom +
+        20;
 
     return Container(
       constraints: BoxConstraints(
@@ -458,14 +518,14 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
           children: [
             const SizedBox(height: 8),
             Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
                 color: cs.onSurface.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(height: 12),
-
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -477,9 +537,11 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                     ),
                   Expanded(
                     child: Text(
-                      _step == 0 ? 'What are you studying today?'
-                          : _step == 1 ? 'Choose task type'
-                          : 'Task details',
+                      _step == 0
+                          ? 'What are you studying today?'
+                          : _step == 1
+                              ? 'Choose task type'
+                              : 'Task details',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -494,7 +556,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
               ),
             ),
             const SizedBox(height: 8),
-
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -547,17 +608,25 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   Widget _buildTaskTypeSelector(ThemeData theme, ColorScheme cs) {
     if (_exam == ExamType.usmle) {
       return _buildChipList<UsmleTaskType>(
-        theme, cs,
+        theme,
+        cs,
         chips: _usmleChips,
         selected: _usmleType,
-        onSelect: (t) => setState(() { _usmleType = t; _step = 2; }),
+        onSelect: (t) => setState(() {
+          _usmleType = t;
+          _step = 2;
+        }),
       );
     } else {
       return _buildChipList<FmgeTaskType>(
-        theme, cs,
+        theme,
+        cs,
         chips: _fmgeChips,
         selected: _fmgeType,
-        onSelect: (t) => setState(() { _fmgeType = t; _step = 2; }),
+        onSelect: (t) => setState(() {
+          _fmgeType = t;
+          _step = 2;
+        }),
       );
     }
   }
@@ -577,8 +646,8 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         children: chips.entries.map((e) {
           final isSelected = e.key == selected;
           return ActionChip(
-            avatar: Icon(e.value.icon, size: 18,
-                color: isSelected ? cs.onPrimary : cs.primary),
+            avatar: Icon(e.value.icon,
+                size: 18, color: isSelected ? cs.onPrimary : cs.primary),
             label: Text(e.value.label),
             backgroundColor: isSelected ? cs.primary : cs.surface,
             labelStyle: TextStyle(
@@ -587,7 +656,8 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
               fontSize: 13,
             ),
             side: BorderSide(
-              color: isSelected ? cs.primary : cs.outline.withValues(alpha: 0.3),
+              color:
+                  isSelected ? cs.primary : cs.outline.withValues(alpha: 0.3),
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -664,7 +734,8 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         label: const Text('Save Task'),
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
     ));
@@ -679,7 +750,10 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   List<Widget> _buildFaPagesFields(ColorScheme cs) {
     final app = context.read<AppProvider>();
     return [
-      _field(label: 'Page number(s)', hint: 'e.g. 45 or 45-48', controller: _pageCtrl),
+      _field(
+          label: 'Page number(s)',
+          hint: 'e.g. 45 or 45-48',
+          controller: _pageCtrl),
 
       // ── Tracker info card (auto-populated) ──────────────────
       if (_trackerInfo != null) ...[
@@ -695,13 +769,19 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         onChanged: (v) => setState(() => _selectedSystem = v),
       ),
       const SizedBox(height: 12),
-      Text('Study mode', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: cs.onSurface.withValues(alpha:0.6))),
+      Text('Study mode',
+          style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface.withValues(alpha: 0.6))),
       const SizedBox(height: 4),
       Row(
         children: [
-          _radioChip('Full page', _studyMode == 'full', () => setState(() => _studyMode = 'full'), cs),
+          _radioChip('Full page', _studyMode == 'full',
+              () => setState(() => _studyMode = 'full'), cs),
           const SizedBox(width: 8),
-          _radioChip('Specific subtopics', _studyMode == 'specific', () => setState(() => _studyMode = 'specific'), cs),
+          _radioChip('Specific subtopics', _studyMode == 'specific',
+              () => setState(() => _studyMode = 'specific'), cs),
         ],
       ),
       if (_studyMode == 'specific') ...[
@@ -712,22 +792,29 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
             final subtopics = _trackerInfo!['subtopics'] as List;
             if (subtopics.isNotEmpty) {
               return Wrap(
-                spacing: 6, runSpacing: 6,
+                spacing: 6,
+                runSpacing: 6,
                 children: subtopics.map((s) {
                   final name = s.name as String;
                   final alreadyRead = s.status != 'unread';
                   return FilterChip(
-                    label: Text(name, style: TextStyle(
-                      fontSize: 12,
-                      decoration: alreadyRead ? TextDecoration.lineThrough : null,
-                    )),
+                    label: Text(name,
+                        style: TextStyle(
+                          fontSize: 12,
+                          decoration:
+                              alreadyRead ? TextDecoration.lineThrough : null,
+                        )),
                     selected: _selectedSubtopics.contains(name),
                     onSelected: (sel) => setState(() {
-                      sel ? _selectedSubtopics.add(name) : _selectedSubtopics.remove(name);
+                      sel
+                          ? _selectedSubtopics.add(name)
+                          : _selectedSubtopics.remove(name);
                     }),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                     avatar: alreadyRead
-                        ? const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF10B981))
+                        ? const Icon(Icons.check_circle_rounded,
+                            size: 14, color: Color(0xFF10B981))
                         : null,
                   );
                 }).toList(),
@@ -735,25 +822,35 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
             }
           }
           final page = _pageCtrl.text.trim();
-          final kbEntry = app.knowledgeBase.cast<KnowledgeBaseEntry?>().firstWhere(
-            (e) => e!.pageNumber == page,
-            orElse: () => null,
-          );
+          final kbEntry =
+              app.knowledgeBase.cast<KnowledgeBaseEntry?>().firstWhere(
+                    (e) => e!.pageNumber == page,
+                    orElse: () => null,
+                  );
           final topicNames = kbEntry?.topics.map((t) => t.name).toList() ?? [];
           if (topicNames.isNotEmpty) {
             return Wrap(
-              spacing: 6, runSpacing: 6,
-              children: topicNames.map((t) => FilterChip(
-                label: Text(t, style: const TextStyle(fontSize: 12)),
-                selected: _selectedSubtopics.contains(t),
-                onSelected: (sel) => setState(() {
-                  sel ? _selectedSubtopics.add(t) : _selectedSubtopics.remove(t);
-                }),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              )).toList(),
+              spacing: 6,
+              runSpacing: 6,
+              children: topicNames
+                  .map((t) => FilterChip(
+                        label: Text(t, style: const TextStyle(fontSize: 12)),
+                        selected: _selectedSubtopics.contains(t),
+                        onSelected: (sel) => setState(() {
+                          sel
+                              ? _selectedSubtopics.add(t)
+                              : _selectedSubtopics.remove(t);
+                        }),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ))
+                  .toList(),
             );
           } else {
-            return _field(label: 'Subtopics', hint: 'Enter subtopic names', controller: _topicCtrl);
+            return _field(
+                label: 'Subtopics',
+                hint: 'Enter subtopic names',
+                controller: _topicCtrl);
           }
         }),
       ],
@@ -775,7 +872,8 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     final isStudied = status != 'unread';
     final statusLabel = isStudied ? '✅ Already Studied' : '📖 Not Yet Studied';
     final modeLabel = _isRevision ? 'Revision' : 'First Study';
-    final modeColor = _isRevision ? const Color(0xFFF59E0B) : const Color(0xFF10B981);
+    final modeColor =
+        _isRevision ? const Color(0xFFF59E0B) : const Color(0xFF10B981);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -794,36 +892,53 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
               Expanded(
                 child: Text(
                   'Page ${info['pageNum']} — $title',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: cs.onSurface),
-                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          Text('$subject • $system', style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.5))),
+          Text('$subject • $system',
+              style: TextStyle(
+                  fontSize: 11, color: cs.onSurface.withValues(alpha: 0.5))),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 6,
             children: [
-              _infoPill(statusLabel, isStudied ? const Color(0xFF10B981) : const Color(0xFF6366F1)),
+              _infoPill(
+                  statusLabel,
+                  isStudied
+                      ? const Color(0xFF10B981)
+                      : const Color(0xFF6366F1)),
               _infoPill('$readCount/$totalSubs subtopics', cs.primary),
               if (revCount > 0)
-                _infoPill('R$revCount revision${revCount > 1 ? 's' : ''}', const Color(0xFF8B5CF6)),
+                _infoPill('R$revCount revision${revCount > 1 ? 's' : ''}',
+                    const Color(0xFF8B5CF6)),
               if (lastRevisedAt != null)
-                _infoPill('Last: ${_shortDate(lastRevisedAt)}', cs.onSurface.withValues(alpha: 0.5)),
+                _infoPill('Last: ${_shortDate(lastRevisedAt)}',
+                    cs.onSurface.withValues(alpha: 0.5)),
             ],
           ),
           const SizedBox(height: 10),
           // Study / Revise toggle
           Row(
             children: [
-              Text('Mode: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: cs.onSurface.withValues(alpha: 0.6))),
+              Text('Mode: ',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface.withValues(alpha: 0.6))),
               GestureDetector(
                 onTap: () => setState(() => _isRevision = !_isRevision),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: modeColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
@@ -833,16 +948,23 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        _isRevision ? Icons.replay_rounded : Icons.menu_book_rounded,
-                        size: 14, color: modeColor,
+                        _isRevision
+                            ? Icons.replay_rounded
+                            : Icons.menu_book_rounded,
+                        size: 14,
+                        color: modeColor,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         modeLabel,
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: modeColor),
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: modeColor),
                       ),
                       const SizedBox(width: 4),
-                      Icon(Icons.swap_horiz_rounded, size: 14, color: modeColor.withValues(alpha: 0.5)),
+                      Icon(Icons.swap_horiz_rounded,
+                          size: 14, color: modeColor.withValues(alpha: 0.5)),
                     ],
                   ),
                 ),
@@ -861,7 +983,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Text(text, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color)),
+      child: Text(text,
+          style: TextStyle(
+              fontSize: 10, fontWeight: FontWeight.w600, color: color)),
     );
   }
 
@@ -876,18 +1000,39 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
 
   List<Widget> _buildVideoFields(ColorScheme cs, {required bool isUsmle}) {
     final sources = isUsmle
-        ? ['Boards & Beyond', 'Sketchy', 'Pathoma', 'Dirty Medicine', 'Ninja Nerd', 'YouTube', 'Other']
+        ? [
+            'Boards & Beyond',
+            'Sketchy',
+            'Pathoma',
+            'Dirty Medicine',
+            'Ninja Nerd',
+            'YouTube',
+            'Other'
+          ]
         : ['Cerebellum', 'Marrow', 'PrepLadder', 'YouTube', 'Other'];
     return [
-      _dropdown(label: 'Source', value: _selectedSource, items: sources,
+      _dropdown(
+          label: 'Source',
+          value: _selectedSource,
+          items: sources,
           onChanged: (v) => setState(() => _selectedSource = v)),
       const SizedBox(height: 12),
-      _field(label: 'Topic / Title', hint: 'e.g. Cardiology – Valvular Disease', controller: _topicCtrl),
+      _field(
+          label: 'Topic / Title',
+          hint: 'e.g. Cardiology – Valvular Disease',
+          controller: _topicCtrl),
       const SizedBox(height: 12),
-      _dropdown(label: 'System', value: _selectedSystem, items: kBodySystems,
+      _dropdown(
+          label: 'System',
+          value: _selectedSystem,
+          items: kBodySystems,
           onChanged: (v) => setState(() => _selectedSystem = v)),
       const SizedBox(height: 12),
-      _field(label: 'Duration (minutes)', hint: 'e.g. 45', controller: _durationCtrl, isNumber: true),
+      _field(
+          label: 'Duration (minutes)',
+          hint: 'e.g. 45',
+          controller: _durationCtrl,
+          isNumber: true),
     ];
   }
 
@@ -898,24 +1043,44 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     final systems = isUsmle ? kBodySystems : kFmgeSubjects;
     final systemLabel = isUsmle ? 'Subject / System' : 'Subject';
     return [
-      _dropdown(label: 'Platform', value: _selectedPlatform, items: platforms,
+      _dropdown(
+          label: 'Platform',
+          value: _selectedPlatform,
+          items: platforms,
           onChanged: (v) => setState(() => _selectedPlatform = v)),
       const SizedBox(height: 12),
-      _dropdown(label: systemLabel, value: isUsmle ? _selectedSystem : _selectedSubject,
+      _dropdown(
+          label: systemLabel,
+          value: isUsmle ? _selectedSystem : _selectedSubject,
           items: systems,
           onChanged: (v) => setState(() {
-            if (isUsmle) { _selectedSystem = v; } else { _selectedSubject = v; }
-          })),
+                if (isUsmle) {
+                  _selectedSystem = v;
+                } else {
+                  _selectedSubject = v;
+                }
+              })),
       const SizedBox(height: 12),
-      _field(label: 'Number of questions', hint: 'e.g. 40', controller: _questionCtrl, isNumber: true),
+      _field(
+          label: 'Number of questions',
+          hint: 'e.g. 40',
+          controller: _questionCtrl,
+          isNumber: true),
     ];
   }
 
   List<Widget> _buildAnkiFields(ColorScheme cs) {
     return [
-      _field(label: 'Deck name', hint: 'e.g. AnKing Step 1', controller: _deckCtrl),
+      _field(
+          label: 'Deck name',
+          hint: 'e.g. AnKing Step 1',
+          controller: _deckCtrl),
       const SizedBox(height: 12),
-      _field(label: 'Estimated cards', hint: 'e.g. 200', controller: _cardsCtrl, isNumber: true),
+      _field(
+          label: 'Estimated cards',
+          hint: 'e.g. 200',
+          controller: _cardsCtrl,
+          isNumber: true),
     ];
   }
 
@@ -932,11 +1097,13 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
           alignment: Alignment.center,
           child: Column(
             children: [
-              Icon(Icons.check_circle_outline_rounded, size: 48,
-                  color: cs.primary.withValues(alpha: 0.4)),
+              Icon(Icons.check_circle_outline_rounded,
+                  size: 48, color: cs.primary.withValues(alpha: 0.4)),
               const SizedBox(height: 12),
               Text('No pages due today 🎉',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600,
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
                       color: cs.onSurface.withValues(alpha: 0.5))),
             ],
           ),
@@ -945,44 +1112,64 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     }
 
     return [
-      Text('Pages due for revision', style: TextStyle(fontSize: 12,
-          fontWeight: FontWeight.w600, color: cs.onSurface.withValues(alpha: 0.6))),
+      Text('Pages due for revision',
+          style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface.withValues(alpha: 0.6))),
       const SizedBox(height: 8),
       ...duePages.map((e) => CheckboxListTile(
-        dense: true,
-        contentPadding: EdgeInsets.zero,
-        title: Text('Page ${e.pageNumber} – ${e.title}',
-            style: const TextStyle(fontSize: 13)),
-        value: _selectedRevisionPages.contains(e.pageNumber),
-        onChanged: (v) => setState(() {
-          if (v == true) {
-            _selectedRevisionPages.add(e.pageNumber);
-          } else {
-            _selectedRevisionPages.remove(e.pageNumber);
-          }
-        }),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      )),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: Text('Page ${e.pageNumber} – ${e.title}',
+                style: const TextStyle(fontSize: 13)),
+            value: _selectedRevisionPages.contains(e.pageNumber),
+            onChanged: (v) => setState(() {
+              if (v == true) {
+                _selectedRevisionPages.add(e.pageNumber);
+              } else {
+                _selectedRevisionPages.remove(e.pageNumber);
+              }
+            }),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          )),
     ];
   }
 
   List<Widget> _buildCerebellumFields(ColorScheme cs) {
     return [
-      _dropdown(label: 'Subject', value: _selectedSubject, items: kFmgeSubjects,
+      _dropdown(
+          label: 'Subject',
+          value: _selectedSubject,
+          items: kFmgeSubjects,
           onChanged: (v) => setState(() => _selectedSubject = v)),
       const SizedBox(height: 12),
-      _field(label: 'Topic / Lecture name', hint: 'e.g. Anatomy Lec 5', controller: _topicCtrl),
+      _field(
+          label: 'Topic / Lecture name',
+          hint: 'e.g. Anatomy Lec 5',
+          controller: _topicCtrl),
       const SizedBox(height: 12),
-      _field(label: 'Duration (minutes)', hint: 'e.g. 60', controller: _durationCtrl, isNumber: true),
+      _field(
+          label: 'Duration (minutes)',
+          hint: 'e.g. 60',
+          controller: _durationCtrl,
+          isNumber: true),
     ];
   }
 
   List<Widget> _buildSubjectReadingFields(ColorScheme cs) {
     return [
-      _dropdown(label: 'Subject', value: _selectedSubject, items: kFmgeSubjects,
+      _dropdown(
+          label: 'Subject',
+          value: _selectedSubject,
+          items: kFmgeSubjects,
           onChanged: (v) => setState(() => _selectedSubject = v)),
       const SizedBox(height: 12),
-      _field(label: 'Topic', hint: 'e.g. CNS pharmacology', controller: _topicCtrl),
+      _field(
+          label: 'Topic',
+          hint: 'e.g. CNS pharmacology',
+          controller: _topicCtrl),
     ];
   }
 
@@ -990,7 +1177,11 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     return [
       _field(label: 'Title', hint: 'e.g. Review notes', controller: _titleCtrl),
       const SizedBox(height: 12),
-      _field(label: 'Notes', hint: 'Optional notes…', controller: _notesCtrl, maxLines: 3),
+      _field(
+          label: 'Notes',
+          hint: 'Optional notes…',
+          controller: _notesCtrl,
+          maxLines: 3),
     ];
   }
 
@@ -999,15 +1190,20 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       const SizedBox(height: 16),
       Row(
         children: [
-          Expanded(child: _timeTile('Start time', _startTime, () => _pickTime(true), cs)),
+          Expanded(
+              child: _timeTile(
+                  'Start time', _startTime, () => _pickTime(true), cs)),
           const SizedBox(width: 12),
-          Expanded(child: _timeTile('End time', _endTime, () => _pickTime(false), cs)),
+          Expanded(
+              child:
+                  _timeTile('End time', _endTime, () => _pickTime(false), cs)),
         ],
       ),
     ];
   }
 
-  Widget _timeTile(String label, TimeOfDay? time, VoidCallback onTap, ColorScheme cs) {
+  Widget _timeTile(
+      String label, TimeOfDay? time, VoidCallback onTap, ColorScheme cs) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -1023,11 +1219,18 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.5))),
+                Text(label,
+                    style: TextStyle(
+                        fontSize: 10,
+                        color: cs.onSurface.withValues(alpha: 0.5))),
                 Text(
                   time != null ? _formatTimeOfDay(time) : '– : –',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600,
-                      color: time != null ? cs.onSurface : cs.onSurface.withValues(alpha: 0.3)),
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: time != null
+                          ? cs.onSurface
+                          : cs.onSurface.withValues(alpha: 0.3)),
                 ),
               ],
             ),
@@ -1037,13 +1240,16 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     );
   }
 
-  Widget _buildBatchPreview(ThemeData theme, ColorScheme cs, List<FocusBatch> batches) {
+  Widget _buildBatchPreview(
+      ThemeData theme, ColorScheme cs, List<FocusBatch> batches) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Suggested Focus Plan',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+          style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
               color: cs.onSurface.withValues(alpha: 0.6)),
         ),
         const SizedBox(height: 8),
@@ -1051,12 +1257,12 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: batches.map((b) {
-              final color = b.isBreak
-                  ? const Color(0xFFF59E0B)
-                  : const Color(0xFF6366F1);
+              final color =
+                  b.isBreak ? const Color(0xFFF59E0B) : const Color(0xFF6366F1);
               return Container(
                 margin: const EdgeInsets.only(right: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
@@ -1064,7 +1270,8 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                 ),
                 child: Text(
                   '${b.label} ${b.durationMinutes}m',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
+                  style: TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w600, color: color),
                 ),
               );
             }).toList(),
@@ -1089,7 +1296,8 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         labelText: label,
         hintText: hint,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         isDense: true,
       ),
       style: const TextStyle(fontSize: 14),
@@ -1110,21 +1318,27 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       decoration: InputDecoration(
         labelText: label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         isDense: true,
       ),
-      items: items.map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 14)))).toList(),
+      items: items
+          .map((s) => DropdownMenuItem(
+              value: s, child: Text(s, style: const TextStyle(fontSize: 14))))
+          .toList(),
       onChanged: onChanged,
     );
   }
 
-  Widget _radioChip(String label, bool selected, VoidCallback onTap, ColorScheme cs) {
+  Widget _radioChip(
+      String label, bool selected, VoidCallback onTap, ColorScheme cs) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? cs.primary.withValues(alpha: 0.1) : Colors.transparent,
+          color:
+              selected ? cs.primary.withValues(alpha: 0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: selected ? cs.primary : cs.outline.withValues(alpha: 0.3),
@@ -1134,12 +1348,21 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
-              size: 16, color: selected ? cs.primary : cs.onSurface.withValues(alpha: 0.4),
+              selected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_off_rounded,
+              size: 16,
+              color:
+                  selected ? cs.primary : cs.onSurface.withValues(alpha: 0.4),
             ),
             const SizedBox(width: 6),
-            Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-                color: selected ? cs.primary : cs.onSurface.withValues(alpha: 0.7))),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: selected
+                        ? cs.primary
+                        : cs.onSurface.withValues(alpha: 0.7))),
           ],
         ),
       ),
@@ -1174,7 +1397,10 @@ class _ExamCard extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [color.withValues(alpha: 0.08), color.withValues(alpha: 0.18)],
+            colors: [
+              color.withValues(alpha: 0.08),
+              color.withValues(alpha: 0.18)
+            ],
           ),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: color.withValues(alpha: 0.25)),

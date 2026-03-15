@@ -152,21 +152,23 @@ class _FALogSheetState extends State<_FALogSheet> {
           mode: mode,
         );
 
-        final updatedEntry = (existing ?? KnowledgeBaseEntry(
-          pageNumber: pageStr,
-          title: 'FA Page $pageStr',
-          subject: '',
-          system: '',
-          revisionCount: 0,
-          currentRevisionIndex: 0,
-          ankiTotal: 0,
-          ankiCovered: 0,
-          videoLinks: const [],
-          tags: const [],
-          notes: '',
-          logs: const [],
-          topics: const [],
-        )).copyWith(
+        final updatedEntry = (existing ??
+                KnowledgeBaseEntry(
+                  pageNumber: pageStr,
+                  title: 'FA Page $pageStr',
+                  subject: '',
+                  system: '',
+                  revisionCount: 0,
+                  currentRevisionIndex: 0,
+                  ankiTotal: 0,
+                  ankiCovered: 0,
+                  videoLinks: const [],
+                  tags: const [],
+                  notes: '',
+                  logs: const [],
+                  topics: const [],
+                ))
+            .copyWith(
           lastStudiedAt: studiedAt.toIso8601String(),
           firstStudiedAt:
               existing?.firstStudiedAt ?? studiedAt.toIso8601String(),
@@ -226,7 +228,14 @@ class _FALogSheetState extends State<_FALogSheet> {
       expand: false,
       builder: (_, scrollCtrl) => SingleChildScrollView(
         controller: scrollCtrl,
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          12,
+          20,
+          MediaQuery.of(context).viewInsets.bottom +
+              MediaQuery.of(context).padding.bottom +
+              20,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -342,8 +351,7 @@ class _FALogSheetState extends State<_FALogSheet> {
                 runSpacing: 6,
                 children: _subtopicChips
                     .map((t) => Chip(
-                          label:
-                              Text(t, style: const TextStyle(fontSize: 12)),
+                          label: Text(t, style: const TextStyle(fontSize: 12)),
                           deleteIcon: const Icon(Icons.close, size: 14),
                           onDeleted: () =>
                               setState(() => _subtopicChips.remove(t)),
@@ -445,17 +453,14 @@ class _FALogSheetState extends State<_FALogSheet> {
       GestureDetector(
         onTap: onTap,
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: cs.onSurface.withValues(alpha: 0.04),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
-              Icon(icon,
-                  size: 18,
-                  color: cs.onSurface.withValues(alpha: 0.5)),
+              Icon(icon, size: 18, color: cs.onSurface.withValues(alpha: 0.5)),
               const SizedBox(width: 10),
               Text(
                 text,

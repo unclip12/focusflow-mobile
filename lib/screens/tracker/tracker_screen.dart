@@ -108,6 +108,7 @@ class _TrackerScreenState extends State<TrackerScreen>
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -136,9 +137,8 @@ class _TrackerScreenState extends State<TrackerScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_selectionMode
-            ? '${_selectedItems.length} selected'
-            : 'Library'),
+        title: Text(
+            _selectionMode ? '${_selectedItems.length} selected' : 'Library'),
         leading: _selectionMode
             ? IconButton(
                 icon: const Icon(Icons.close_rounded),
@@ -216,13 +216,16 @@ class _TrackerScreenState extends State<TrackerScreen>
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
               decoration: BoxDecoration(
                 color: cs.surfaceContainerHigh,
-                border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3))),
+                border: Border(
+                    top: BorderSide(
+                        color: cs.outlineVariant.withValues(alpha: 0.3))),
               ),
               child: SafeArea(
                 top: false,
                 child: Row(
                   children: [
-                    Icon(Icons.check_circle_rounded, size: 20, color: cs.primary),
+                    Icon(Icons.check_circle_rounded,
+                        size: 20, color: cs.primary),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -238,8 +241,10 @@ class _TrackerScreenState extends State<TrackerScreen>
                       onPressed: () {
                         showModalBottomSheet<void>(
                           context: context,
+                          useSafeArea: true,
                           shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                            borderRadius:
+                                BorderRadius.vertical(top: Radius.circular(20)),
                           ),
                           builder: (_) => _AddToTaskSheet(
                             selectedItems: Set<String>.from(_selectedItems),
@@ -250,8 +255,10 @@ class _TrackerScreenState extends State<TrackerScreen>
                       icon: const Icon(Icons.add_task_rounded, size: 18),
                       label: const Text('Add to Task'),
                       style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
                   ],
@@ -266,6 +273,7 @@ class _TrackerScreenState extends State<TrackerScreen>
                 showModalBottomSheet<void>(
                   context: context,
                   isScrollControlled: true,
+                  useSafeArea: true,
                   shape: const RoundedRectangleBorder(
                     borderRadius:
                         BorderRadius.vertical(top: Radius.circular(20)),
@@ -316,8 +324,7 @@ class _FATabState extends State<_FATab> {
         final sorted = List<FAPage>.from(app.faPages)
           ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
 
-        final readCount =
-            sorted.where((p) => p.status != 'unread').length;
+        final readCount = sorted.where((p) => p.status != 'unread').length;
         final totalPages = sorted.length;
 
         return Column(
@@ -343,14 +350,11 @@ class _FATabState extends State<_FATab> {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
-                            value: totalPages > 0
-                                ? readCount / totalPages
-                                : 0,
+                            value: totalPages > 0 ? readCount / totalPages : 0,
                             minHeight: 6,
-                            backgroundColor:
-                                cs.surfaceContainerHighest,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.green),
+                            backgroundColor: cs.surfaceContainerHighest,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.green),
                           ),
                         ),
                       ],
@@ -441,13 +445,14 @@ class _PageGridView extends StatelessWidget {
     }
 
     return ListView.builder(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 16),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).padding.bottom + 72 + 24,
+      ),
       itemCount: groupOrder.length,
       itemBuilder: (context, i) {
         final subject = groupOrder[i];
         final pages = grouped[subject]!;
-        final readCount =
-            pages.where((p) => p.status != 'unread').length;
+        final readCount = pages.where((p) => p.status != 'unread').length;
         final cs = Theme.of(context).colorScheme;
 
         return Column(
@@ -490,7 +495,8 @@ class _PageGridView extends StatelessWidget {
                       app: app,
                       selectionMode: selectionMode,
                       isSelected: selectedItems.contains('fa:${page.pageNum}'),
-                      onToggleSelect: () => onToggleSelect('fa:${page.pageNum}'),
+                      onToggleSelect: () =>
+                          onToggleSelect('fa:${page.pageNum}'),
                     ),
                   );
                 }).toList(),
@@ -546,7 +552,8 @@ class _LiquidFillPageBox extends StatelessWidget {
     const boxSize = 56.0;
 
     return GestureDetector(
-      onTap: selectionMode ? onToggleSelect : () => _showSubtopicPicker(context),
+      onTap:
+          selectionMode ? onToggleSelect : () => _showSubtopicPicker(context),
       onLongPress: selectionMode ? null : () => _showFADetailSheet(context),
       child: SizedBox(
         width: boxSize,
@@ -575,9 +582,7 @@ class _LiquidFillPageBox extends StatelessWidget {
                 boxShadow: percent >= 1.0 || isFullyRead
                     ? [
                         BoxShadow(
-                          color: (isAnkiDone
-                                  ? Colors.purple
-                                  : Colors.green)
+                          color: (isAnkiDone ? Colors.purple : Colors.green)
                               .withValues(alpha: 0.3),
                           blurRadius: 8,
                           spreadRadius: 1,
@@ -618,9 +623,8 @@ class _LiquidFillPageBox extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: percent > 0 && percent < 1.0
-                      ? cs.onSurface
-                      : textColor,
+                  color:
+                      percent > 0 && percent < 1.0 ? cs.onSurface : textColor,
                 ),
               ),
             ),
@@ -631,8 +635,8 @@ class _LiquidFillPageBox extends StatelessWidget {
                 top: 2,
                 right: 2,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 4, vertical: 1),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                   decoration: BoxDecoration(
                     color: cs.primary,
                     borderRadius: BorderRadius.circular(6),
@@ -694,6 +698,7 @@ class _LiquidFillPageBox extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -712,8 +717,8 @@ class _LiquidFillPageBox extends StatelessWidget {
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Mark as Unread?'),
-          content: const Text(
-              'This will clear the read history for this page.'),
+          content:
+              const Text('This will clear the read history for this page.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
@@ -783,8 +788,7 @@ class _SubtopicPickerSheetState extends State<_SubtopicPickerSheet> {
     }
   }
 
-  bool get _allSelected =>
-      _subtopics.every((s) => _selected.contains(s.id));
+  bool get _allSelected => _subtopics.every((s) => _selected.contains(s.id));
 
   void _toggleAll() {
     setState(() {
@@ -809,9 +813,7 @@ class _SubtopicPickerSheetState extends State<_SubtopicPickerSheet> {
     // Find newly selected (unread → read)
     final newlySelected = <int>[];
     for (final s in _subtopics) {
-      if (s.id != null &&
-          _selected.contains(s.id!) &&
-          s.status == 'unread') {
+      if (s.id != null && _selected.contains(s.id!) && s.status == 'unread') {
         newlySelected.add(s.id!);
       }
     }
@@ -828,13 +830,20 @@ class _SubtopicPickerSheetState extends State<_SubtopicPickerSheet> {
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
-          20, 16, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+        20,
+        16,
+        20,
+        MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).padding.bottom +
+            20,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Center(
             child: Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
                 color: cs.outlineVariant,
                 borderRadius: BorderRadius.circular(2),
@@ -874,6 +883,9 @@ class _SubtopicPickerSheetState extends State<_SubtopicPickerSheet> {
           Flexible(
             child: ListView.builder(
               shrinkWrap: true,
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).padding.bottom + 20,
+              ),
               itemCount: _subtopics.length,
               itemBuilder: (context, i) {
                 final st = _subtopics[i];
@@ -898,19 +910,14 @@ class _SubtopicPickerSheetState extends State<_SubtopicPickerSheet> {
                     st.name,
                     style: TextStyle(
                       fontSize: 13,
-                      decoration: alreadyRead
-                          ? TextDecoration.lineThrough
-                          : null,
-                      color: alreadyRead
-                          ? cs.onSurfaceVariant
-                          : cs.onSurface,
+                      decoration:
+                          alreadyRead ? TextDecoration.lineThrough : null,
+                      color: alreadyRead ? cs.onSurfaceVariant : cs.onSurface,
                     ),
                   ),
                   subtitle: alreadyRead
                       ? Text(
-                          st.status == 'anki_done'
-                              ? 'Anki ✓'
-                              : 'Read ✓',
+                          st.status == 'anki_done' ? 'Anki ✓' : 'Read ✓',
                           style: TextStyle(
                             fontSize: 10,
                             color: st.status == 'anki_done'
@@ -964,7 +971,9 @@ class _SubtopicListView extends StatelessWidget {
     }
 
     return ListView.builder(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 16),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).padding.bottom + 72 + 24,
+      ),
       itemCount: subtopics.length,
       itemBuilder: (context, i) {
         final st = subtopics[i];
@@ -1088,7 +1097,8 @@ class _SketchyTab extends StatelessWidget {
               Tab(text: 'Pharm'),
             ],
             labelColor: Theme.of(context).colorScheme.primary,
-            unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
+            unselectedLabelColor:
+                Theme.of(context).colorScheme.onSurfaceVariant,
             indicatorColor: Theme.of(context).colorScheme.primary,
           ),
           Expanded(
@@ -1194,7 +1204,9 @@ class _SketchyVideoList extends StatelessWidget {
         // Grouped list
         Expanded(
           child: ListView(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 16),
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).padding.bottom + 72 + 24,
+            ),
             children: categories.map((cat) {
               final subcategories = grouped[cat]!;
               return Column(
@@ -1214,8 +1226,7 @@ class _SketchyVideoList extends StatelessWidget {
                   ...subcategories.entries.map((entry) {
                     final subcat = entry.key;
                     final items = entry.value;
-                    final subWatched =
-                        items.where((v) => v.watched).length;
+                    final subWatched = items.where((v) => v.watched).length;
                     return ExpansionTile(
                       title: Text(subcat),
                       subtitle: Text(
@@ -1239,19 +1250,26 @@ class _SketchyVideoList extends StatelessWidget {
                             ),
                             subtitle: v.watched
                                 ? Text('Watched ✓',
-                                    style: TextStyle(fontSize: 10, color: cs.primary))
+                                    style: TextStyle(
+                                        fontSize: 10, color: cs.primary))
                                 : null,
                             controlAffinity: ListTileControlAffinity.leading,
                             activeColor: cs.primary,
                           );
                         }
-                        
+
                         // Status color / label based on revision progress
                         final app = context.read<AppProvider>();
-                        final isMicro = v.category.toLowerCase().contains('micro');
-                        final skRevId = isMicro ? 'sketchy-micro-${v.id}' : 'sketchy-pharm-${v.id}';
-                        final skRevIdx = app.revisionItems.indexWhere((r) => r.id == skRevId);
-                        final skRevCount = skRevIdx >= 0 ? app.revisionItems[skRevIdx].currentRevisionIndex : 0;
+                        final isMicro =
+                            v.category.toLowerCase().contains('micro');
+                        final skRevId = isMicro
+                            ? 'sketchy-micro-${v.id}'
+                            : 'sketchy-pharm-${v.id}';
+                        final skRevIdx = app.revisionItems
+                            .indexWhere((r) => r.id == skRevId);
+                        final skRevCount = skRevIdx >= 0
+                            ? app.revisionItems[skRevIdx].currentRevisionIndex
+                            : 0;
 
                         Color statusColor;
                         String statusLabel;
@@ -1333,11 +1351,14 @@ class _SketchyVideoList extends StatelessWidget {
                                   : null,
                               borderRadius: BorderRadius.circular(8),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
                                   color: statusColor.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                                  border: Border.all(
+                                      color:
+                                          statusColor.withValues(alpha: 0.3)),
                                 ),
                                 child: Text(
                                   statusLabel,
@@ -1355,7 +1376,8 @@ class _SketchyVideoList extends StatelessWidget {
                                 isScrollControlled: true,
                                 useSafeArea: true,
                                 shape: const RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                                  borderRadius: BorderRadius.vertical(
+                                      top: Radius.circular(20)),
                                 ),
                                 builder: (_) => LibraryItemDetailSheet(
                                   app: context.read<AppProvider>(),
@@ -1441,7 +1463,9 @@ class _PathomaTab extends StatelessWidget {
             ),
             Expanded(
               child: ListView.builder(
-                padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 16),
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).padding.bottom + 72 + 24,
+                ),
                 itemCount: chapters.length,
                 itemBuilder: (context, i) {
                   final ch = chapters[i];
@@ -1461,24 +1485,27 @@ class _PathomaTab extends StatelessWidget {
                       activeColor: cs.primary,
                     );
                   }
-                  
-                   // Status color / label based on revision progress
-                   final skRevId = 'pathoma-ch-${ch.id}';
-                   final ptRevIdx = app.revisionItems.indexWhere((r) => r.id == skRevId);
-                   final ptRevCount = ptRevIdx >= 0 ? app.revisionItems[ptRevIdx].currentRevisionIndex : 0;
 
-                   Color statusColor;
-                   String statusLabel;
-                   if (!ch.watched) {
-                     statusColor = Colors.red.shade700;
-                     statusLabel = 'Unwatched';
-                   } else if (ptRevCount > 0) {
-                     statusColor = Colors.blue;
-                     statusLabel = 'Rev $ptRevCount';
-                   } else {
-                     statusColor = Colors.green;
-                     statusLabel = 'Watched ✓';
-                   }
+                  // Status color / label based on revision progress
+                  final skRevId = 'pathoma-ch-${ch.id}';
+                  final ptRevIdx =
+                      app.revisionItems.indexWhere((r) => r.id == skRevId);
+                  final ptRevCount = ptRevIdx >= 0
+                      ? app.revisionItems[ptRevIdx].currentRevisionIndex
+                      : 0;
+
+                  Color statusColor;
+                  String statusLabel;
+                  if (!ch.watched) {
+                    statusColor = Colors.red.shade700;
+                    statusLabel = 'Unwatched';
+                  } else if (ptRevCount > 0) {
+                    statusColor = Colors.blue;
+                    statusLabel = 'Rev $ptRevCount';
+                  } else {
+                    statusColor = Colors.green;
+                    statusLabel = 'Watched ✓';
+                  }
 
                   return Slidable(
                     key: ValueKey('pathoma_${ch.id}'),
@@ -1530,11 +1557,13 @@ class _PathomaTab extends StatelessWidget {
                             : null,
                         borderRadius: BorderRadius.circular(8),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: statusColor.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                            border: Border.all(
+                                color: statusColor.withValues(alpha: 0.3)),
                           ),
                           child: Text(
                             statusLabel,
@@ -1552,7 +1581,8 @@ class _PathomaTab extends StatelessWidget {
                           isScrollControlled: true,
                           useSafeArea: true,
                           shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                            borderRadius:
+                                BorderRadius.vertical(top: Radius.circular(20)),
                           ),
                           builder: (_) => LibraryItemDetailSheet(
                             app: app,
@@ -1572,7 +1602,6 @@ class _PathomaTab extends StatelessWidget {
     );
   }
 }
-
 
 // ═══════════════════════════════════════════════════════════════
 // TAB 4 — UWorld
@@ -1602,19 +1631,20 @@ class _UWorldTab extends StatelessWidget {
         }
 
         final cs = Theme.of(context).colorScheme;
-        
+
         // Calculate totals
         int totalDone = 0;
         int totalQs = 0;
         int totalCorrect = 0;
-        
+
         for (final t in topics) {
           totalDone += t.doneQuestions;
           totalQs += t.totalQuestions;
           totalCorrect += t.correctQuestions;
         }
-        
-        final overallPct = totalDone > 0 ? (totalCorrect * 100 ~/ totalDone) : 0;
+
+        final overallPct =
+            totalDone > 0 ? (totalCorrect * 100 ~/ totalDone) : 0;
         final overallProgress = totalQs > 0 ? totalDone / totalQs : 0.0;
 
         // Group by system
@@ -1622,7 +1652,7 @@ class _UWorldTab extends StatelessWidget {
         for (final t in topics) {
           grouped.putIfAbsent(t.system, () => []).add(t);
         }
-        
+
         // Ensure consistent order (e.g. general principles first, then alphabetical)
         final systems = grouped.keys.toList()
           ..sort((a, b) {
@@ -1676,26 +1706,29 @@ class _UWorldTab extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             // Body - ListView of Systems
             Expanded(
               child: ListView.builder(
-                padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 16),
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).padding.bottom + 72 + 24,
+                ),
                 itemCount: systems.length,
                 itemBuilder: (context, i) {
                   final sys = systems[i];
                   final subs = grouped[sys]!;
                   final subtopicCount = subs.length;
-                  
+
                   int sysDone = 0;
                   int sysTotal = 0;
                   for (final s in subs) {
                     sysDone += s.doneQuestions;
                     sysTotal += s.totalQuestions;
                   }
-                  
+
                   return ExpansionTile(
-                    title: Text(sys, style: const TextStyle(fontWeight: FontWeight.w400)),
+                    title: Text(sys,
+                        style: const TextStyle(fontWeight: FontWeight.w400)),
                     subtitle: Text(
                       '$subtopicCount ${subtopicCount == 1 ? 'subtopic' : 'subtopics'}',
                       style: TextStyle(
@@ -1713,11 +1746,11 @@ class _UWorldTab extends StatelessWidget {
                       ),
                     ),
                     children: subs.map((sub) {
-                      final subPct = sub.doneQuestions > 0 
+                      final subPct = sub.doneQuestions > 0
                           ? (sub.correctQuestions * 100 ~/ sub.doneQuestions)
                           : 0;
-                      final subProgress = sub.totalQuestions > 0 
-                          ? sub.doneQuestions / sub.totalQuestions 
+                      final subProgress = sub.totalQuestions > 0
+                          ? sub.doneQuestions / sub.totalQuestions
                           : 0.0;
                       final key = 'uworld:${sub.id}';
                       final isUwSelected = selectedItems.contains(key);
@@ -1727,18 +1760,21 @@ class _UWorldTab extends StatelessWidget {
                           dense: true,
                           value: isUwSelected,
                           onChanged: (_) => onToggleSelect(key),
-                          title: Text(sub.subtopic, style: const TextStyle(fontSize: 13)),
+                          title: Text(sub.subtopic,
+                              style: const TextStyle(fontSize: 13)),
                           subtitle: Text(
                             '${sub.doneQuestions}/${sub.totalQuestions} done · $subPct%',
-                            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                            style: TextStyle(
+                                fontSize: 11, color: cs.onSurfaceVariant),
                           ),
                           controlAffinity: ListTileControlAffinity.leading,
                           activeColor: cs.primary,
                         );
                       }
-                          
+
                       return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 4),
                         title: Text(
                           sub.subtopic,
                           style: const TextStyle(fontSize: 14),
@@ -1764,7 +1800,8 @@ class _UWorldTab extends StatelessWidget {
                                     value: subProgress,
                                     minHeight: 4,
                                     backgroundColor: cs.surfaceContainerHighest,
-                                    valueColor: AlwaysStoppedAnimation<Color>(cs.primary.withValues(alpha: 0.7)),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        cs.primary.withValues(alpha: 0.7)),
                                   ),
                                 ),
                               ),
@@ -1901,7 +1938,9 @@ class _AddFAPageSheetState extends State<_AddFAPageSheet> {
         24,
         16,
         24,
-        24 + MediaQuery.of(context).viewInsets.bottom,
+        MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).padding.bottom +
+            20,
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -2046,8 +2085,7 @@ class _AddUWorldTopicSheetState extends State<_AddUWorldTopicSheet> {
     final totalQuestions = int.tryParse(totalQuestionsText);
 
     setState(() {
-      _topicNameError =
-          topicName.isEmpty ? 'Topic name is required' : null;
+      _topicNameError = topicName.isEmpty ? 'Topic name is required' : null;
       _totalQuestionsError =
           totalQuestionsText.isEmpty || totalQuestions == null
               ? 'Enter a valid total questions value'
@@ -2090,7 +2128,9 @@ class _AddUWorldTopicSheetState extends State<_AddUWorldTopicSheet> {
         24,
         16,
         24,
-        24 + MediaQuery.of(context).viewInsets.bottom,
+        MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).padding.bottom +
+            20,
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -2237,13 +2277,13 @@ class _BulkMarkSheetState extends State<_BulkMarkSheet> {
   void initState() {
     super.initState();
     final app = context.read<AppProvider>();
-    final unreadPages = app.faPages
-        .where((p) => p.status == 'unread')
-        .toList()
+    final unreadPages = app.faPages.where((p) => p.status == 'unread').toList()
       ..sort((a, b) => a.pageNum.compareTo(b.pageNum));
-    final lowestUnread = unreadPages.isNotEmpty ? unreadPages.first.pageNum : 31;
+    final lowestUnread =
+        unreadPages.isNotEmpty ? unreadPages.first.pageNum : 31;
     _fromCtrl = TextEditingController(text: '$lowestUnread');
-    _toCtrl = TextEditingController(text: '${(lowestUnread + 9).clamp(31, 706)}');
+    _toCtrl =
+        TextEditingController(text: '${(lowestUnread + 9).clamp(31, 706)}');
   }
 
   @override
@@ -2293,7 +2333,9 @@ class _BulkMarkSheetState extends State<_BulkMarkSheet> {
     if (!mounted) return;
     Navigator.of(context).pop();
 
-    final statusLabel = _selectedStatus == 'read' ? 'Read' : (_selectedStatus == 'anki_done' ? 'Anki Done' : 'Unread');
+    final statusLabel = _selectedStatus == 'read'
+        ? 'Read'
+        : (_selectedStatus == 'anki_done' ? 'Anki Done' : 'Unread');
     if (count >= 10) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -2318,7 +2360,9 @@ class _BulkMarkSheetState extends State<_BulkMarkSheet> {
         24,
         16,
         24,
-        24 + MediaQuery.of(context).viewInsets.bottom,
+        MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).padding.bottom +
+            20,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -2480,9 +2524,9 @@ class _AddToTaskSheet extends StatelessWidget {
           final pageNum = int.tryParse(id);
           if (pageNum != null) {
             final page = app.faPages.cast<FAPage?>().firstWhere(
-              (p) => p!.pageNum == pageNum,
-              orElse: () => null,
-            );
+                  (p) => p!.pageNum == pageNum,
+                  orElse: () => null,
+                );
             title = page != null
                 ? 'FA Page $pageNum — ${page.title}'
                 : 'FA Page $pageNum';
@@ -2495,11 +2539,14 @@ class _AddToTaskSheet extends StatelessWidget {
           final videoId = int.tryParse(id);
           SketchyVideo? video;
           if (videoId != null) {
-            final allVideos = [...app.sketchyMicroVideos, ...app.sketchyPharmVideos];
+            final allVideos = [
+              ...app.sketchyMicroVideos,
+              ...app.sketchyPharmVideos
+            ];
             video = allVideos.cast<SketchyVideo?>().firstWhere(
-              (v) => v!.id == videoId,
-              orElse: () => null,
-            );
+                  (v) => v!.id == videoId,
+                  orElse: () => null,
+                );
           }
           title = video != null ? 'Sketchy: ${video.title}' : 'Sketchy Video';
           break;
@@ -2509,9 +2556,9 @@ class _AddToTaskSheet extends StatelessWidget {
           PathomaChapter? ch;
           if (chId != null) {
             ch = app.pathomaChapters.cast<PathomaChapter?>().firstWhere(
-              (c) => c!.id == chId,
-              orElse: () => null,
-            );
+                  (c) => c!.id == chId,
+                  orElse: () => null,
+                );
           }
           title = ch != null
               ? 'Pathoma Ch${ch.chapter}: ${ch.title}'
@@ -2523,13 +2570,12 @@ class _AddToTaskSheet extends StatelessWidget {
           UWorldTopic? topic;
           if (uwId != null) {
             topic = app.uworldTopics.cast<UWorldTopic?>().firstWhere(
-              (t) => t!.id == uwId,
-              orElse: () => null,
-            );
+                  (t) => t!.id == uwId,
+                  orElse: () => null,
+                );
           }
-          title = topic != null
-              ? 'UWorld: ${topic.subtopic}'
-              : 'UWorld Questions';
+          title =
+              topic != null ? 'UWorld: ${topic.subtopic}' : 'UWorld Questions';
           break;
         default:
           blockType = BlockType.other;
@@ -2551,19 +2597,20 @@ class _AddToTaskSheet extends StatelessWidget {
     }
 
     final allBlocks = [...existingBlocks, ...newBlocks];
-    final plan = existing?.copyWith(blocks: allBlocks) ?? DayPlan(
-      date: dateKey,
-      faPages: const [],
-      faPagesCount: 0,
-      videos: const [],
-      notesFromUser: '',
-      notesFromAI: '',
-      attachments: const [],
-      breaks: const [],
-      blocks: allBlocks,
-      totalStudyMinutesPlanned: 0,
-      totalBreakMinutes: 0,
-    );
+    final plan = existing?.copyWith(blocks: allBlocks) ??
+        DayPlan(
+          date: dateKey,
+          faPages: const [],
+          faPagesCount: 0,
+          videos: const [],
+          notesFromUser: '',
+          notesFromAI: '',
+          attachments: const [],
+          breaks: const [],
+          blocks: allBlocks,
+          totalStudyMinutesPlanned: 0,
+          totalBreakMinutes: 0,
+        );
 
     await app.upsertDayPlan(plan);
     await app.syncFlowActivitiesFromDayPlan(dateKey);
@@ -2592,21 +2639,31 @@ class _AddToTaskSheet extends StatelessWidget {
     // Count items by type
     int faCount = 0, sketchyCount = 0, pathomaCount = 0, uworldCount = 0;
     for (final key in selectedItems) {
-      if (key.startsWith('fa:')) faCount++;
-      else if (key.startsWith('sketchy:')) sketchyCount++;
-      else if (key.startsWith('pathoma:')) pathomaCount++;
+      if (key.startsWith('fa:'))
+        faCount++;
+      else if (key.startsWith('sketchy:'))
+        sketchyCount++;
+      else if (key.startsWith('pathoma:'))
+        pathomaCount++;
       else if (key.startsWith('uworld:')) uworldCount++;
     }
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
-          20, 16, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+        20,
+        16,
+        20,
+        MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).padding.bottom +
+            20,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Center(
             child: Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
                 color: cs.outlineVariant,
                 borderRadius: BorderRadius.circular(2),
@@ -2796,7 +2853,9 @@ class _FACardView extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     return ListView.builder(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 16),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).padding.bottom + 72 + 24,
+      ),
       itemCount: groupOrder.length,
       itemBuilder: (context, i) {
         final subject = groupOrder[i];
@@ -2836,7 +2895,8 @@ class _FACardView extends StatelessWidget {
               final isFullyRead = page.status != 'unread';
               final isAnkiDone = page.status == 'anki_done';
               final subtopics = app.getSubtopicsForPage(page.pageNum);
-              final readSubs = subtopics.where((s) => s.status != 'unread').length;
+              final readSubs =
+                  subtopics.where((s) => s.status != 'unread').length;
               final key = 'fa:${page.pageNum}';
               final isSelected = selectedItems.contains(key);
 
@@ -2857,7 +2917,8 @@ class _FACardView extends StatelessWidget {
               }
 
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 child: Slidable(
                   key: ValueKey(page.pageNum),
                   endActionPane: ActionPane(
@@ -2890,21 +2951,22 @@ class _FACardView extends StatelessWidget {
                     borderRadius: BorderRadius.circular(14),
                     child: InkWell(
                       onTap: selectionMode
-                        ? () => onToggleSelect(key)
-                        : () {
-                            showModalBottomSheet(
-                              context: context,
-                              isScrollControlled: true,
-                              useSafeArea: true,
-                              shape: const RoundedRectangleBorder(
-                                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                              ),
-                              builder: (_) => FAPageDetailSheet(
-                                app: app,
-                                pageNum: page.pageNum,
-                              ),
-                            );
-                          },
+                          ? () => onToggleSelect(key)
+                          : () {
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                useSafeArea: true,
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.vertical(
+                                      top: Radius.circular(20)),
+                                ),
+                                builder: (_) => FAPageDetailSheet(
+                                  app: app,
+                                  pageNum: page.pageNum,
+                                ),
+                              );
+                            },
                       borderRadius: BorderRadius.circular(14),
                       child: Container(
                         padding: const EdgeInsets.all(14),
@@ -2924,7 +2986,9 @@ class _FACardView extends StatelessWidget {
                                 isSelected
                                     ? Icons.check_circle_rounded
                                     : Icons.radio_button_unchecked_rounded,
-                                color: isSelected ? cs.primary : cs.onSurfaceVariant,
+                                color: isSelected
+                                    ? cs.primary
+                                    : cs.onSurfaceVariant,
                                 size: 22,
                               ),
                               const SizedBox(width: 12),
@@ -2980,7 +3044,10 @@ class _FACardView extends StatelessWidget {
                             const SizedBox(width: 8),
                             // Status badge (now a button to advance)
                             InkWell(
-                              onTap: selectionMode ? null : () => app.advanceFAPageRevision(page.pageNum),
+                              onTap: selectionMode
+                                  ? null
+                                  : () =>
+                                      app.advanceFAPageRevision(page.pageNum),
                               borderRadius: BorderRadius.circular(8),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
@@ -2988,7 +3055,9 @@ class _FACardView extends StatelessWidget {
                                 decoration: BoxDecoration(
                                   color: statusColor.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                                  border: Border.all(
+                                      color:
+                                          statusColor.withValues(alpha: 0.3)),
                                 ),
                                 child: Text(
                                   statusLabel,

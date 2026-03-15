@@ -128,6 +128,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -321,171 +322,183 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
             child: AuroraBackground(isDark: isDark),
           ),
           SafeArea(
-        bottom: false,
-        child: Stack(
-          children: [
-            Column(
+            bottom: false,
+            child: Stack(
               children: [
-                // ── Active Track Now Banner (if running) ─────────────
-                if (activeTrackNow != null && activeTrackNow.startedAt != null)
-                  GestureDetector(
-                    onTap: _openTrackNow,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 10),
-                      color: const Color(0xFFEF4444).withValues(alpha: 0.1),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.timer_outlined,
-                              color: Color(0xFFEF4444), size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Tracking: ${activeTrackNow.label}',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFFEF4444),
+                Column(
+                  children: [
+                    // ── Active Track Now Banner (if running) ─────────────
+                    if (activeTrackNow != null &&
+                        activeTrackNow.startedAt != null)
+                      GestureDetector(
+                        onTap: _openTrackNow,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
+                          color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.timer_outlined,
+                                  color: Color(0xFFEF4444), size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Tracking: ${activeTrackNow.label}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFFEF4444),
+                                  ),
+                                ),
                               ),
-                            ),
+                              const Icon(Icons.open_in_full_rounded,
+                                  color: Color(0xFFEF4444), size: 16),
+                            ],
                           ),
-                          const Icon(Icons.open_in_full_rounded,
-                              color: Color(0xFFEF4444), size: 16),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                // ── NestedScrollView for scrollable header ───────────
-                Expanded(
-                  child: NestedScrollView(
-                    headerSliverBuilder: (context, _) => [
-                      SliverToBoxAdapter(
-                        child: Column(
-                          children: [
-                            // ── Date navigation & Track Now button ───
-                            _DateHeader(
-                              date: _selectedDate,
-                              isToday: _isToday,
-                              streakCount: streak,
-                              onPrev: _prevDay,
-                              onNext: _nextDay,
-                              onDateTap: () async {
-                                final picked = await showDatePicker(
-                                  context: context,
-                                  initialDate: _selectedDate,
-                                  firstDate: DateTime(2024),
-                                  lastDate: DateTime(2027),
-                                );
-                                if (picked != null) {
-                                  _setStateIfMounted(
-                                    () => _selectedDate = picked,
-                                  );
-                                }
-                              },
-                              onTrackNow: _openTrackNow,
-                            ),
-
-                            // ── Activity Selector (all dates) ─────────
-                            ActivitySelector(dateKey: _dateKey),
-                          ],
                         ),
                       ),
-                      // ── Tab bar (Pinned) ────────────────────────────
-                      SliverPersistentHeader(
-                        pinned: true,
-                        delegate: _SliverAppBarDelegate(
-                          ClipRRect(
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                              child: Container(
-                                color: isDark
-                                    ? const Color(0xFF0E0E1A).withValues(alpha: 0.70)
-                                    : Colors.white.withValues(alpha: 0.60),
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                                  decoration: BoxDecoration(
+
+                    // ── NestedScrollView for scrollable header ───────────
+                    Expanded(
+                      child: NestedScrollView(
+                        headerSliverBuilder: (context, _) => [
+                          SliverToBoxAdapter(
+                            child: Column(
+                              children: [
+                                // ── Date navigation & Track Now button ───
+                                _DateHeader(
+                                  date: _selectedDate,
+                                  isToday: _isToday,
+                                  streakCount: streak,
+                                  onPrev: _prevDay,
+                                  onNext: _nextDay,
+                                  onDateTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: _selectedDate,
+                                      firstDate: DateTime(2024),
+                                      lastDate: DateTime(2027),
+                                    );
+                                    if (picked != null) {
+                                      _setStateIfMounted(
+                                        () => _selectedDate = picked,
+                                      );
+                                    }
+                                  },
+                                  onTrackNow: _openTrackNow,
+                                ),
+
+                                // ── Activity Selector (all dates) ─────────
+                                ActivitySelector(dateKey: _dateKey),
+                              ],
+                            ),
+                          ),
+                          // ── Tab bar (Pinned) ────────────────────────────
+                          SliverPersistentHeader(
+                            pinned: true,
+                            delegate: _SliverAppBarDelegate(
+                              ClipRRect(
+                                child: BackdropFilter(
+                                  filter:
+                                      ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                                  child: Container(
                                     color: isDark
-                                        ? Colors.white.withValues(alpha: 0.06)
-                                        : Colors.white.withValues(alpha: 0.40),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: isDark
-                                          ? DashboardColors.glassBorderDark
-                                          : DashboardColors.glassBorderLight,
-                                      width: 0.5,
+                                        ? const Color(0xFF0E0E1A)
+                                            .withValues(alpha: 0.70)
+                                        : Colors.white.withValues(alpha: 0.60),
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Container(
+                                      margin: const EdgeInsets.symmetric(
+                                          horizontal: 16),
+                                      decoration: BoxDecoration(
+                                        color: isDark
+                                            ? Colors.white
+                                                .withValues(alpha: 0.06)
+                                            : Colors.white
+                                                .withValues(alpha: 0.40),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: isDark
+                                              ? DashboardColors.glassBorderDark
+                                              : DashboardColors
+                                                  .glassBorderLight,
+                                          width: 0.5,
+                                        ),
+                                      ),
+                                      child: TabBar(
+                                        controller: _tabCtrl,
+                                        labelStyle: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700),
+                                        unselectedLabelStyle: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500),
+                                        indicatorSize: TabBarIndicatorSize.tab,
+                                        dividerColor: Colors.transparent,
+                                        indicator: BoxDecoration(
+                                          color: DashboardColors.primary
+                                              .withValues(alpha: 0.12),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                        tabs: const [
+                                          Tab(text: 'All', height: 36),
+                                          Tab(text: 'To-Do', height: 36),
+                                          Tab(text: 'Buying', height: 36),
+                                          Tab(text: 'Routines', height: 36),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                  child: TabBar(
-                                    controller: _tabCtrl,
-                                    labelStyle: const TextStyle(
-                                        fontSize: 12, fontWeight: FontWeight.w700),
-                                    unselectedLabelStyle: const TextStyle(
-                                        fontSize: 12, fontWeight: FontWeight.w500),
-                                    indicatorSize: TabBarIndicatorSize.tab,
-                                    dividerColor: Colors.transparent,
-                                    indicator: BoxDecoration(
-                                      color: DashboardColors.primary.withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    tabs: const [
-                                      Tab(text: 'All', height: 36),
-                                      Tab(text: 'To-Do', height: 36),
-                                      Tab(text: 'Buying', height: 36),
-                                      Tab(text: 'Routines', height: 36),
-                                    ],
                                   ),
                                 ),
                               ),
                             ),
                           ),
+                        ],
+                        body: TabBarView(
+                          controller: _tabCtrl,
+                          children: [
+                            // ═ ALL TAB ═ (existing block timeline)
+                            _AllTabContent(
+                              plan: plan,
+                              realBlocks: realBlocks,
+                              displayBlocks: displayBlocks,
+                              plannedMinutes: plannedMinutes,
+                              availableMinutes: availableMinutes,
+                              isToday: _isToday,
+                              isOverflow: isOverflow,
+                              dateKey: _dateKey,
+                              onCompleteBlock: (b) =>
+                                  _completeBlock(app, plan!, b),
+                              onStartBlock: (b) => _startBlock(app, plan!, b),
+                              onSkipBlock: (b) => _skipBlock(app, plan!, b),
+                            ),
+
+                            // ═ TO-DO TAB ═
+                            TodoTab(dateKey: _dateKey),
+
+                            // ═ BUYING TAB ═
+                            BuyingTab(dateKey: _dateKey),
+
+                            // ═ ROUTINES TAB ═
+                            RoutinesTab(dateKey: _dateKey),
+                          ],
                         ),
                       ),
-                    ],
-                    body: TabBarView(
-                      controller: _tabCtrl,
-                      children: [
-                        // ═ ALL TAB ═ (existing block timeline)
-                        _AllTabContent(
-                          plan: plan,
-                          realBlocks: realBlocks,
-                          displayBlocks: displayBlocks,
-                          plannedMinutes: plannedMinutes,
-                          availableMinutes: availableMinutes,
-                          isToday: _isToday,
-                          isOverflow: isOverflow,
-                          dateKey: _dateKey,
-                          onCompleteBlock: (b) => _completeBlock(app, plan!, b),
-                          onStartBlock: (b) => _startBlock(app, plan!, b),
-                          onSkipBlock: (b) => _skipBlock(app, plan!, b),
-                        ),
-
-                        // ═ TO-DO TAB ═
-                        TodoTab(dateKey: _dateKey),
-
-                        // ═ BUYING TAB ═
-                        BuyingTab(dateKey: _dateKey),
-
-                        // ═ ROUTINES TAB ═
-                        RoutinesTab(dateKey: _dateKey),
-                      ],
                     ),
-                  ),
+                  ],
                 ),
+
+                // ── Celebration overlay ──────────────────────────────────
+                if (_completedBlockId != null)
+                  _CelebrationOverlay(
+                    onComplete: () {
+                      _setStateIfMounted(() => _completedBlockId = null);
+                    },
+                  ),
               ],
             ),
-
-            // ── Celebration overlay ──────────────────────────────────
-            if (_completedBlockId != null)
-              _CelebrationOverlay(
-                onComplete: () {
-                  _setStateIfMounted(() => _completedBlockId = null);
-                },
-              ),
-          ],
-        ),
-      ),
+          ),
         ], // outer Stack children
       ), // outer Stack (aurora wrapper)
     );
@@ -614,6 +627,7 @@ class _AllTabContentState extends State<_AllTabContent>
             showModalBottomSheet(
               context: context,
               isScrollControlled: true,
+              useSafeArea: true,
               backgroundColor: Colors.transparent,
               builder: (_) => AddTaskSheet(dateKey: widget.dateKey),
             );
@@ -776,7 +790,12 @@ class _AllTabContentState extends State<_AllTabContent>
     final entries = _timeOfDayEntries(_groupByTimeOfDay(activities));
     final activityIndexes = _activityIndexes(allActivities);
     return ListView.builder(
-      padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.of(context).padding.bottom + 16),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        0,
+        16,
+        MediaQuery.of(context).padding.bottom + 72 + 24,
+      ),
       itemCount: entries.length,
       itemBuilder: (context, index) {
         final entry = entries[index];
@@ -1620,7 +1639,12 @@ class _AllTabContentState extends State<_AllTabContent>
         ),
       );
     return ListView.builder(
-      padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.of(context).padding.bottom + 16),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        0,
+        16,
+        MediaQuery.of(context).padding.bottom + 72 + 24,
+      ),
       itemCount: entries.length,
       itemBuilder: (context, index) {
         final entry = entries[index];
@@ -1796,7 +1820,12 @@ class _AllTabContentState extends State<_AllTabContent>
     }
 
     return ReorderableListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        4,
+        16,
+        MediaQuery.of(context).padding.bottom + 72 + 24,
+      ),
       itemCount: items.length,
       onReorder: (oldIdx, newIdx) {
         if (oldIdx < allActivities.length && newIdx <= allActivities.length) {

@@ -77,10 +77,10 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
     final dateStr = AppDateUtils.todayKey();
     final id = 'tl_${now.millisecondsSinceEpoch}';
 
-    final startDt = DateTime(now.year, now.month, now.day,
-        _startTime.hour, _startTime.minute);
-    final endDt = DateTime(
-        now.year, now.month, now.day, _endTime.hour, _endTime.minute);
+    final startDt = DateTime(
+        now.year, now.month, now.day, _startTime.hour, _startTime.minute);
+    final endDt =
+        DateTime(now.year, now.month, now.day, _endTime.hour, _endTime.minute);
 
     final entry = TimeLogEntry(
       id: id,
@@ -114,7 +114,9 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
         left: 20,
         right: 20,
         top: 12,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).padding.bottom +
+            20,
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -132,25 +134,22 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
                 ),
               ),
             ),
-
             Text('Add Time Log',
                 style: theme.textTheme.titleLarge
                     ?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 20),
-
             TextField(
               controller: _activityController,
               decoration: InputDecoration(
                 labelText: 'Activity',
                 hintText: 'e.g. FA Pages 101-105',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 prefixIcon: const Icon(Icons.edit_rounded, size: 20),
               ),
               textCapitalization: TextCapitalization.sentences,
             ),
             const SizedBox(height: 16),
-
             Row(
               children: [
                 Expanded(
@@ -192,14 +191,13 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
               ],
             ),
             const SizedBox(height: 16),
-
             DropdownButtonFormField<TimeLogCategory>(
               // ignore: deprecated_member_use
               value: _category,
               decoration: InputDecoration(
                 labelText: 'Category',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 prefixIcon: const Icon(Icons.category_rounded, size: 20),
               ),
               items: TimeLogCategory.values
@@ -213,20 +211,18 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
               },
             ),
             const SizedBox(height: 16),
-
             TextField(
               controller: _notesController,
               decoration: InputDecoration(
                 labelText: 'Notes (optional)',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 prefixIcon: const Icon(Icons.notes_rounded, size: 20),
               ),
               maxLines: 2,
               textCapitalization: TextCapitalization.sentences,
             ),
             const SizedBox(height: 24),
-
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
@@ -249,20 +245,34 @@ class _AddTimeLogSheetState extends State<AddTimeLogSheet> {
 
   String _categoryDisplayName(TimeLogCategory c) {
     switch (c) {
-      case TimeLogCategory.study:         return 'Study';
-      case TimeLogCategory.revision:      return 'Revision';
-      case TimeLogCategory.qbank:         return 'QBank';
-      case TimeLogCategory.anki:          return 'Anki';
-      case TimeLogCategory.video:         return 'Video';
-      case TimeLogCategory.prayer:        return 'Prayer';
-      case TimeLogCategory.noteTaking:    return 'Note Taking';
-      case TimeLogCategory.breakTime:     return 'Break';
-      case TimeLogCategory.personal:      return 'Personal';
-      case TimeLogCategory.sleep:         return 'Sleep';
-      case TimeLogCategory.entertainment: return 'Entertainment';
-      case TimeLogCategory.outing:        return 'Outing';
-      case TimeLogCategory.life:          return 'Life';
-      case TimeLogCategory.other:         return 'Other';
+      case TimeLogCategory.study:
+        return 'Study';
+      case TimeLogCategory.revision:
+        return 'Revision';
+      case TimeLogCategory.qbank:
+        return 'QBank';
+      case TimeLogCategory.anki:
+        return 'Anki';
+      case TimeLogCategory.video:
+        return 'Video';
+      case TimeLogCategory.prayer:
+        return 'Prayer';
+      case TimeLogCategory.noteTaking:
+        return 'Note Taking';
+      case TimeLogCategory.breakTime:
+        return 'Break';
+      case TimeLogCategory.personal:
+        return 'Personal';
+      case TimeLogCategory.sleep:
+        return 'Sleep';
+      case TimeLogCategory.entertainment:
+        return 'Entertainment';
+      case TimeLogCategory.outing:
+        return 'Outing';
+      case TimeLogCategory.life:
+        return 'Life';
+      case TimeLogCategory.other:
+        return 'Other';
     }
   }
 }
@@ -296,8 +306,7 @@ class _TimePicker extends StatelessWidget {
           children: [
             Text(label,
                 style: TextStyle(
-                    fontSize: 10,
-                    color: cs.onSurface.withValues(alpha: 0.45))),
+                    fontSize: 10, color: cs.onSurface.withValues(alpha: 0.45))),
             const SizedBox(height: 2),
             Text(time,
                 style: theme.textTheme.bodyLarge

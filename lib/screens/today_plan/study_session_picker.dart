@@ -434,6 +434,7 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         final cs = Theme.of(sheetContext).colorScheme;
@@ -443,7 +444,12 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                 StudyTask.estimateQueueDurationMinutes(plannedQueue);
             final sessionStart = _sessionStartDateTime(selectedTime);
             return Container(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              padding: EdgeInsets.fromLTRB(
+                20,
+                12,
+                20,
+                MediaQuery.of(sheetContext).padding.bottom + 20,
+              ),
               decoration: BoxDecoration(
                 color: cs.surface,
                 borderRadius:
@@ -504,6 +510,10 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxHeight: 320),
                         child: ReorderableListView.builder(
+                          padding: EdgeInsets.only(
+                            bottom:
+                                MediaQuery.of(sheetContext).padding.bottom + 20,
+                          ),
                           shrinkWrap: true,
                           buildDefaultDragHandles: false,
                           itemCount: plannedQueue.length,
@@ -889,7 +899,12 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
               Expanded(
                 child: ListView(
                   controller: scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    0,
+                    16,
+                    MediaQuery.of(context).padding.bottom + 20,
+                  ),
                   children: [
                     if (plannedBlocks.isNotEmpty) ...[
                       Text(
@@ -1203,6 +1218,7 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return StatefulBuilder(builder: (ctx, setSheetState) {
@@ -1250,7 +1266,12 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                 ),
                 Expanded(
                   child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      0,
+                      16,
+                      MediaQuery.of(ctx).padding.bottom + 20,
+                    ),
                     itemCount: pages.length,
                     itemBuilder: (ctx, i) {
                       final page = pages[i];
@@ -1357,6 +1378,7 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return StatefulBuilder(builder: (ctx, setSheetState) {
@@ -1468,7 +1490,12 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                 ),
                 Expanded(
                   child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      0,
+                      16,
+                      MediaQuery.of(ctx).padding.bottom + 20,
+                    ),
                     itemCount: topics.length,
                     itemBuilder: (ctx, i) {
                       final topic = topics[i];
@@ -1585,6 +1612,7 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return StatefulBuilder(builder: (ctx, setSheetState) {
@@ -1652,7 +1680,12 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                 if (selectedCategory != null)
                   Expanded(
                     child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        0,
+                        16,
+                        MediaQuery.of(ctx).padding.bottom + 20,
+                      ),
                       itemCount: categoryVideos.length,
                       itemBuilder: (ctx, i) {
                         final video = categoryVideos[i];
@@ -1766,6 +1799,7 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return StatefulBuilder(
@@ -1823,7 +1857,12 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                   ),
                   Expanded(
                     child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        0,
+                        16,
+                        MediaQuery.of(ctx).padding.bottom + 20,
+                      ),
                       itemCount: chapters.length,
                       itemBuilder: (ctx, i) {
                         final chapter = chapters[i];
@@ -2027,8 +2066,7 @@ class _TaskDurationDialogState extends State<_TaskDurationDialog> {
   @override
   void initState() {
     super.initState();
-    _controller =
-        TextEditingController(text: widget.initialMinutes.toString());
+    _controller = TextEditingController(text: widget.initialMinutes.toString());
   }
 
   @override

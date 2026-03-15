@@ -40,7 +40,8 @@ class BuyingTab extends StatelessWidget {
                 TextButton.icon(
                   onPressed: () => _openShoppingFlow(context),
                   icon: const Icon(Icons.shopping_bag_rounded, size: 16),
-                  label: const Text('Go Shopping', style: TextStyle(fontSize: 12)),
+                  label:
+                      const Text('Go Shopping', style: TextStyle(fontSize: 12)),
                 ),
               TextButton.icon(
                 onPressed: () => _showAddItem(context),
@@ -94,7 +95,12 @@ class BuyingTab extends StatelessWidget {
                   ),
                 )
               : ListView.builder(
-                  padding: EdgeInsets.fromLTRB(16, 4, 16, MediaQuery.of(context).padding.bottom + 16),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    4,
+                    16,
+                    MediaQuery.of(context).padding.bottom + 72 + 24,
+                  ),
                   itemCount: items.length,
                   itemBuilder: (context, i) {
                     final item = items[i];
@@ -116,13 +122,15 @@ class BuyingTab extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: item.checked
                               ? const Color(0xFF10B981).withValues(alpha: 0.05)
-                              : cs.surfaceContainerHighest.withValues(alpha: 0.3),
+                              : cs.surfaceContainerHighest
+                                  .withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: CheckboxListTile(
                           value: item.checked,
                           onChanged: (_) {
-                            app.upsertBuyingItem(item.copyWith(checked: !item.checked));
+                            app.upsertBuyingItem(
+                                item.copyWith(checked: !item.checked));
                           },
                           activeColor: const Color(0xFF10B981),
                           checkboxShape: RoundedRectangleBorder(
@@ -133,7 +141,9 @@ class BuyingTab extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
-                              decoration: item.checked ? TextDecoration.lineThrough : null,
+                              decoration: item.checked
+                                  ? TextDecoration.lineThrough
+                                  : null,
                               color: item.checked
                                   ? cs.onSurface.withValues(alpha: 0.4)
                                   : cs.onSurface,
@@ -142,9 +152,11 @@ class BuyingTab extends StatelessWidget {
                           subtitle: _buildSubtitle(item, cs),
                           secondary: item.quantity != null
                               ? Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
+                                    color: const Color(0xFFF59E0B)
+                                        .withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
@@ -175,14 +187,15 @@ class BuyingTab extends StatelessWidget {
     if (parts.isEmpty) return null;
     return Text(
       parts.join(' • '),
-      style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.4)),
+      style:
+          TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.4)),
     );
   }
 
   void _openShoppingFlow(BuildContext context) {
     showDialog(
       context: context,
-      useSafeArea: false,
+      useSafeArea: true,
       builder: (_) => ShoppingFlowOverlay(dateKey: dateKey),
     );
   }
@@ -191,6 +204,7 @@ class BuyingTab extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -251,8 +265,12 @@ class _AddBuyingSheetState extends State<_AddBuyingSheet> {
 
     return Padding(
       padding: EdgeInsets.only(
-        left: 20, right: 20, top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).padding.bottom +
+            20,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -260,7 +278,8 @@ class _AddBuyingSheetState extends State<_AddBuyingSheet> {
         children: [
           Center(
             child: Container(
-              width: 32, height: 4,
+              width: 32,
+              height: 4,
               decoration: BoxDecoration(
                 color: cs.onSurface.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(4),
@@ -268,33 +287,35 @@ class _AddBuyingSheetState extends State<_AddBuyingSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          Text('Add Item', style: TextStyle(
-            fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface,
-          )),
+          Text('Add Item',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+              )),
           const SizedBox(height: 16),
-
           TextField(
             controller: _nameCtrl,
             autofocus: true,
             decoration: InputDecoration(
               labelText: 'Item name',
               hintText: 'e.g., Milk',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
           const SizedBox(height: 12),
-
           TextField(
             controller: _shopCtrl,
             decoration: InputDecoration(
               labelText: 'Shop (optional)',
               hintText: 'e.g., DMart',
               prefixIcon: const Icon(Icons.store_rounded, size: 18),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
           const SizedBox(height: 12),
-
           Row(
             children: [
               Expanded(
@@ -303,7 +324,8 @@ class _AddBuyingSheetState extends State<_AddBuyingSheet> {
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
                     labelText: 'Qty',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
                     isDense: true,
                   ),
                 ),
@@ -316,7 +338,8 @@ class _AddBuyingSheetState extends State<_AddBuyingSheet> {
                   value: _unit,
                   decoration: InputDecoration(
                     labelText: 'Unit',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
                     isDense: true,
                   ),
                   items: ['kg', 'g', 'L', 'ml', 'pcs', 'pkt']
@@ -328,28 +351,29 @@ class _AddBuyingSheetState extends State<_AddBuyingSheet> {
             ],
           ),
           const SizedBox(height: 12),
-
           TextField(
             controller: _notesCtrl,
             decoration: InputDecoration(
               labelText: 'Notes (optional)',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               isDense: true,
             ),
           ),
           const SizedBox(height: 16),
-
           SizedBox(
             width: double.infinity,
             child: FilledButton(
               onPressed: _save,
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
                 backgroundColor: const Color(0xFFF59E0B),
                 foregroundColor: Colors.white,
               ),
-              child: const Text('Add Item', style: TextStyle(fontWeight: FontWeight.w700)),
+              child: const Text('Add Item',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
             ),
           ),
         ],
