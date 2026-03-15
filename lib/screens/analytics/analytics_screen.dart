@@ -27,7 +27,7 @@ class AnalyticsScreen extends StatelessWidget {
     return AppScaffold(
       screenName: 'Analytics',
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

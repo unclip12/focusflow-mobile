@@ -279,7 +279,7 @@ class _RevisionHubScreenState extends State<RevisionHubScreen>
       return _EmptyTab(icon: emptyIcon, title: emptyTitle, subtitle: emptySubtitle, isDark: isDark);
     }
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+      padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).padding.bottom + 16),
       itemCount: items.length,
       itemBuilder: (_, i) => UnifiedRevisionCard(
         item: items[i],

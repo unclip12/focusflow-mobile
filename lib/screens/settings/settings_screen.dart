@@ -32,7 +32,7 @@ class SettingsScreen extends StatelessWidget {
     return AppScaffold(
       screenName: 'Settings',
       body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).padding.bottom + 16),
         children: [
           // ═══════════════════════════════════════════════════════
           // EXAM DATES

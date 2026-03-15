@@ -190,7 +190,7 @@ class _DashboardBody extends StatelessWidget {
           physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),
           ),
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+          padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(context).padding.bottom + 24),
           children: <Widget>[
             _FadeSlideIn(
               delay: Duration.zero,
@@ -202,13 +202,35 @@ class _DashboardBody extends StatelessWidget {
                 isDark: isDark,
               ),
             ),
+            const SizedBox(height: 14),
+            // ── Quick Actions Row ─────────────────────────────
+            _FadeSlideIn(
+              delay: const Duration(milliseconds: 40),
+              beginOffset: const Offset(0, 16),
+              child: _QuickActionsRow(isDark: isDark),
+            ),
+            const SizedBox(height: 16),
+            // ── Daily Progress Hero ───────────────────────────
+            LiquidGlassCard(
+              hero: true,
+              delay: const Duration(milliseconds: 60),
+              glowColor: DashboardColors.primary.withValues(alpha: 0.18),
+              child: _DailyProgressHero(
+                pagesRead: todayPagesRead,
+                dailyGoal: dailyGoal,
+                studyMinutes: studyMinutes,
+                dueRevisions: dueRevisionCount,
+                streak: app.streakData.currentStreak,
+                isDark: isDark,
+              ),
+            ),
             const SizedBox(height: 16),
             Row(
               children: <Widget>[
                 Expanded(
                   child: LiquidGlassCard(
                     hero: true,
-                    delay: const Duration(milliseconds: 60),
+                    delay: const Duration(milliseconds: 100),
                     glowColor: DashboardColors.primary.withValues(alpha: 0.25),
                     child: _CountdownCard(
                       label: 'FMGE',
@@ -224,7 +246,7 @@ class _DashboardBody extends StatelessWidget {
                 Expanded(
                   child: LiquidGlassCard(
                     hero: true,
-                    delay: const Duration(milliseconds: 120),
+                    delay: const Duration(milliseconds: 140),
                     glowColor:
                         DashboardColors.primaryViolet.withValues(alpha: 0.25),
                     child: _CountdownCard(
@@ -241,7 +263,7 @@ class _DashboardBody extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             LiquidGlassCard(
-              delay: const Duration(milliseconds: 180),
+              delay: const Duration(milliseconds: 200),
               child: _PaceInsightCard(
                 pace: pagesPerDay,
                 projectedCompletionDate: projectedCompletionDate,
@@ -263,7 +285,7 @@ class _DashboardBody extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             LiquidGlassCard(
-              delay: const Duration(milliseconds: 300),
+              delay: const Duration(milliseconds: 280),
               child: _GoalsCard(
                 goals: goalRows,
                 isDark: isDark,
@@ -271,7 +293,7 @@ class _DashboardBody extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             LiquidGlassCard(
-              delay: const Duration(milliseconds: 420),
+              delay: const Duration(milliseconds: 320),
               child: _StreakCard(
                 streak: app.streakData.currentStreak,
                 quotes: quotePool.isEmpty
@@ -282,7 +304,7 @@ class _DashboardBody extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             LiquidGlassCard(
-              delay: const Duration(milliseconds: 480),
+              delay: const Duration(milliseconds: 360),
               child: _AnalyticsCard(
                 points: weeklyStudyPoints,
                 totalMinutes: weeklyStudyTotalMinutes,
@@ -293,7 +315,7 @@ class _DashboardBody extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             LiquidGlassCard(
-              delay: const Duration(milliseconds: 540),
+              delay: const Duration(milliseconds: 400),
               child: _FATrackerCard(
                 readPages: totalReadPages,
                 ankiDone: ankiDonePages,
@@ -308,7 +330,7 @@ class _DashboardBody extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             LiquidGlassCard(
-              delay: const Duration(milliseconds: 600),
+              delay: const Duration(milliseconds: 440),
               child: _RevisionQueueCard(
                 dueCount: dueRevisionCount,
                 dueItems: dueRevisionItems.take(3).toList(),
@@ -318,7 +340,7 @@ class _DashboardBody extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             LiquidGlassCard(
-              delay: const Duration(milliseconds: 660),
+              delay: const Duration(milliseconds: 480),
               child: _ActivityDotsCard(
                 points: weeklyStudyPoints,
                 isDark: isDark,
@@ -326,7 +348,7 @@ class _DashboardBody extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             LiquidGlassCard(
-              delay: const Duration(milliseconds: 720),
+              delay: const Duration(milliseconds: 520),
               child: _SubjectBreakdownCard(
                 topSubjects: topSubjectEntries,
                 maxMinutes: maxSubjectMinutes,
@@ -508,17 +530,30 @@ class _GreetingSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        // Date label
-        Text(
-          todayFormatted.toUpperCase(),
-          style: _inter(
-            size: 11,
-            weight: FontWeight.w600,
-            color: DashboardColors.primary.withValues(alpha: 0.7),
-            letterSpacing: 1.2,
-          ),
+        // Date label with subtle dot separator
+        Row(
+          children: <Widget>[
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: DashboardColors.primary,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              todayFormatted.toUpperCase(),
+              style: _inter(
+                size: 11,
+                weight: FontWeight.w600,
+                color: DashboardColors.primary.withValues(alpha: 0.7),
+                letterSpacing: 1.4,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         // Greeting with gradient name
         RichText(
           text: TextSpan(
@@ -526,15 +561,15 @@ class _GreetingSection extends StatelessWidget {
               TextSpan(
                 text: '$greeting, ',
                 style: _inter(
-                  size: 28,
-                  weight: FontWeight.w600,
+                  size: 26,
+                  weight: FontWeight.w500,
                   color: DashboardColors.textPrimary(isDark),
                 ),
               ),
               TextSpan(
                 text: displayName,
                 style: _inter(
-                  size: 28,
+                  size: 26,
                   weight: FontWeight.w800,
                   color: DashboardColors.primary,
                 ),
@@ -542,7 +577,7 @@ class _GreetingSection extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 20),
           child: Row(
@@ -552,7 +587,7 @@ class _GreetingSection extends StatelessWidget {
                 child: _TypewriterText(
                   text: subtitle,
                   style: _inter(
-                    size: 14,
+                    size: 13,
                     weight: FontWeight.w400,
                     color: DashboardColors.textSecondary,
                   ),
@@ -580,6 +615,357 @@ class _GreetingSection extends StatelessWidget {
       ],
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// QUICK ACTIONS ROW — glass shortcut buttons
+// ══════════════════════════════════════════════════════════════════
+
+class _QuickActionsRow extends StatelessWidget {
+  const _QuickActionsRow({required this.isDark});
+
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        _QuickActionButton(
+          icon: Icons.menu_book_rounded,
+          label: 'Study',
+          color: DashboardColors.primary,
+          isDark: isDark,
+          onTap: () => context.go('/today'),
+        ),
+        const SizedBox(width: 10),
+        _QuickActionButton(
+          icon: Icons.timer_rounded,
+          label: 'Track Now',
+          color: DashboardColors.primaryViolet,
+          isDark: isDark,
+          onTap: () => context.go('/time'),
+        ),
+        const SizedBox(width: 10),
+        _QuickActionButton(
+          icon: Icons.replay_rounded,
+          label: 'Revisions',
+          color: const Color(0xFFF59E0B),
+          isDark: isDark,
+          onTap: () => context.go('/revision'),
+        ),
+        const SizedBox(width: 10),
+        _QuickActionButton(
+          icon: Icons.insights_rounded,
+          label: 'Analytics',
+          color: DashboardColors.primaryLight,
+          isDark: isDark,
+          onTap: () => context.go('/analytics'),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickActionButton extends StatelessWidget {
+  const _QuickActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? color.withValues(alpha: 0.08)
+                    : color.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: isDark
+                      ? color.withValues(alpha: 0.15)
+                      : color.withValues(alpha: 0.12),
+                  width: 0.5,
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Icon(icon, size: 22, color: color),
+                  const SizedBox(height: 6),
+                  Text(
+                    label,
+                    style: _inter(
+                      size: 10,
+                      weight: FontWeight.w600,
+                      color: DashboardColors.textPrimary(isDark),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// DAILY PROGRESS HERO — today's summary with circular progress
+// ══════════════════════════════════════════════════════════════════
+
+class _DailyProgressHero extends StatelessWidget {
+  const _DailyProgressHero({
+    required this.pagesRead,
+    required this.dailyGoal,
+    required this.studyMinutes,
+    required this.dueRevisions,
+    required this.streak,
+    required this.isDark,
+  });
+
+  final int pagesRead;
+  final int dailyGoal;
+  final int studyMinutes;
+  final int dueRevisions;
+  final int streak;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = dailyGoal > 0
+        ? (pagesRead / dailyGoal).clamp(0.0, 1.0)
+        : 0.0;
+    final studyH = studyMinutes ~/ 60;
+    final studyM = studyMinutes % 60;
+
+    return Row(
+      children: <Widget>[
+        // Circular progress ring
+        SizedBox(
+          width: 90,
+          height: 90,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0, end: progress),
+            duration: const Duration(milliseconds: 1200),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) {
+              return CustomPaint(
+                painter: _CircularProgressPainter(
+                  progress: value,
+                  color: DashboardColors.primary,
+                  trackColor: isDark
+                      ? Colors.white.withValues(alpha: 0.06)
+                      : DashboardColors.primary.withValues(alpha: 0.08),
+                  strokeWidth: 7,
+                ),
+                child: child,
+              );
+            },
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  AnimatedCounter(
+                    value: pagesRead.toDouble(),
+                    style: _inter(
+                      size: 22,
+                      weight: FontWeight.w800,
+                      color: DashboardColors.textPrimary(isDark),
+                    ),
+                  ),
+                  Text(
+                    '/ $dailyGoal',
+                    style: _inter(
+                      size: 11,
+                      weight: FontWeight.w500,
+                      color: DashboardColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 18),
+        // Stats column
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                "Today's Progress",
+                style: _inter(
+                  size: 15,
+                  weight: FontWeight.w600,
+                  color: DashboardColors.textPrimary(isDark),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: <Widget>[
+                  _MiniStat(
+                    icon: Icons.schedule_rounded,
+                    value: studyH > 0 ? '${studyH}h ${studyM}m' : '${studyM}m',
+                    label: 'studied',
+                    color: DashboardColors.primary,
+                    isDark: isDark,
+                  ),
+                  const SizedBox(width: 14),
+                  _MiniStat(
+                    icon: Icons.replay_rounded,
+                    value: '$dueRevisions',
+                    label: 'due',
+                    color: dueRevisions > 0
+                        ? DashboardColors.warning
+                        : DashboardColors.success,
+                    isDark: isDark,
+                  ),
+                  const SizedBox(width: 14),
+                  _MiniStat(
+                    icon: Icons.local_fire_department_rounded,
+                    value: '$streak',
+                    label: 'streak',
+                    color: const Color(0xFFF97316),
+                    isDark: isDark,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  const _MiniStat({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.color,
+    required this.isDark,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color color;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: <Widget>[
+        Icon(icon, size: 16, color: color),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: _inter(
+            size: 14,
+            weight: FontWeight.w700,
+            color: DashboardColors.textPrimary(isDark),
+          ),
+        ),
+        Text(
+          label,
+          style: _inter(
+            size: 10,
+            weight: FontWeight.w400,
+            color: DashboardColors.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CircularProgressPainter extends CustomPainter {
+  const _CircularProgressPainter({
+    required this.progress,
+    required this.color,
+    required this.trackColor,
+    required this.strokeWidth,
+  });
+
+  final double progress;
+  final Color color;
+  final Color trackColor;
+  final double strokeWidth;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (math.min(size.width, size.height) - strokeWidth) / 2;
+
+    // Track
+    final trackPaint = Paint()
+      ..color = trackColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    canvas.drawCircle(center, radius, trackPaint);
+
+    // Progress arc
+    if (progress > 0) {
+      final progressPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round
+        ..shader = SweepGradient(
+          startAngle: -math.pi / 2,
+          endAngle: 3 * math.pi / 2,
+          colors: [
+            color,
+            color.withValues(alpha: 0.6),
+            color,
+          ],
+        ).createShader(Rect.fromCircle(center: center, radius: radius));
+
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        -math.pi / 2,
+        2 * math.pi * progress,
+        false,
+        progressPaint,
+      );
+
+      // Glow dot at end of arc
+      final angle = -math.pi / 2 + 2 * math.pi * progress;
+      final dotCenter = Offset(
+        center.dx + radius * math.cos(angle),
+        center.dy + radius * math.sin(angle),
+      );
+      final glowPaint = Paint()
+        ..color = color.withValues(alpha: 0.5)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      canvas.drawCircle(dotCenter, strokeWidth / 2, glowPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_CircularProgressPainter old) =>
+      progress != old.progress ||
+      color != old.color ||
+      trackColor != old.trackColor;
 }
 
 class _CountdownCard extends StatelessWidget {

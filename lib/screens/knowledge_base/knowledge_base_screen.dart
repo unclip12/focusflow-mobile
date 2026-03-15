@@ -178,8 +178,8 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
                     ),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 4),
+                    padding: EdgeInsets.fromLTRB(
+                        16, 4, 16, MediaQuery.of(context).padding.bottom + 16),
                     itemCount: filtered.length,
                     itemBuilder: (context, i) {
                       final entry = filtered[i];

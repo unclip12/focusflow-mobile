@@ -85,7 +85,7 @@ class TodoTab extends StatelessWidget {
                   ),
                 )
               : ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).padding.bottom + 16),
                   children: _categories.map((cat) {
                     final catItems = todos.where((t) => t.category == cat).toList();
                     if (catItems.isEmpty) return const SizedBox.shrink();

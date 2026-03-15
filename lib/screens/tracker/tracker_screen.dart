@@ -441,7 +441,7 @@ class _PageGridView extends StatelessWidget {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 80),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 16),
       itemCount: groupOrder.length,
       itemBuilder: (context, i) {
         final subject = groupOrder[i];
@@ -964,7 +964,7 @@ class _SubtopicListView extends StatelessWidget {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 80),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 16),
       itemCount: subtopics.length,
       itemBuilder: (context, i) {
         final st = subtopics[i];
@@ -1194,7 +1194,7 @@ class _SketchyVideoList extends StatelessWidget {
         // Grouped list
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.only(bottom: 80),
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 16),
             children: categories.map((cat) {
               final subcategories = grouped[cat]!;
               return Column(
@@ -1441,7 +1441,7 @@ class _PathomaTab extends StatelessWidget {
             ),
             Expanded(
               child: ListView.builder(
-                padding: const EdgeInsets.only(bottom: 80),
+                padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 16),
                 itemCount: chapters.length,
                 itemBuilder: (context, i) {
                   final ch = chapters[i];
@@ -1680,7 +1680,7 @@ class _UWorldTab extends StatelessWidget {
             // Body - ListView of Systems
             Expanded(
               child: ListView.builder(
-                padding: const EdgeInsets.only(bottom: 80),
+                padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 16),
                 itemCount: systems.length,
                 itemBuilder: (context, i) {
                   final sys = systems[i];
@@ -2796,7 +2796,7 @@ class _FACardView extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 80),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 16),
       itemCount: groupOrder.length,
       itemBuilder: (context, i) {
         final subject = groupOrder[i];

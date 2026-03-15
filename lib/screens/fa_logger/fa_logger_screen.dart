@@ -1,4 +1,4 @@
-﻿// =============================================================
+// =============================================================
 // FALoggerScreen â€” rebuilt for First Aid (USMLE) page logging only.
 // Shows KB entries as FA study log cards with coverage bars.
 // =============================================================
@@ -93,7 +93,7 @@ class _FALoggerScreenState extends State<FALoggerScreen> {
                 ? _EmptyState(hasQuery: _query.isNotEmpty)
                 : ListView.separated(
                     padding:
-                        const EdgeInsets.fromLTRB(16, 6, 16, 100),
+                        EdgeInsets.fromLTRB(16, 6, 16, MediaQuery.of(context).padding.bottom + 16),
                     itemCount: items.length,
                     separatorBuilder: (_, __) =>
                         const SizedBox(height: 10),

@@ -219,7 +219,7 @@ class MainShell extends StatelessWidget {
                 child: MediaQuery(
                   data: MediaQuery.of(context).copyWith(
                     padding: MediaQuery.of(context).padding.copyWith(
-                      bottom: MediaQuery.of(context).padding.bottom + 80,
+                      bottom: MediaQuery.of(context).padding.bottom + 100,
                     ),
                   ),
                   child: child,
@@ -294,28 +294,28 @@ class _GlassBottomNav extends StatelessWidget {
     ];
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(28),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+        filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
         child: Container(
           decoration: BoxDecoration(
             color: isDark
-                ? const Color(0xFF0E0E1A).withValues(alpha: 0.40)
-                : Colors.white.withValues(alpha: 0.35),
-            borderRadius: BorderRadius.circular(24),
+                ? const Color(0xFF0E0E1A).withValues(alpha: 0.18)
+                : Colors.white.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(28),
             border: Border.all(
               color: isDark
-                  ? DashboardColors.glassBorderDark
-                  : DashboardColors.glassBorderLight,
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.white.withValues(alpha: 0.25),
               width: 0.5,
             ),
             boxShadow: [
               BoxShadow(
                 color: isDark
-                    ? Colors.black.withValues(alpha: 0.3)
-                    : Colors.black.withValues(alpha: 0.08),
-                blurRadius: 20,
-                spreadRadius: -4,
+                    ? Colors.black.withValues(alpha: 0.15)
+                    : Colors.black.withValues(alpha: 0.04),
+                blurRadius: 30,
+                spreadRadius: -6,
                 offset: const Offset(0, 4),
               ),
             ],

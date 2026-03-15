@@ -91,7 +91,7 @@ class RoutinesTab extends StatelessWidget {
                   ),
                 )
               : ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  padding: EdgeInsets.fromLTRB(16, 4, 16, MediaQuery.of(context).padding.bottom + 16),
                   children: [
                     // ── Study Session Card ────────────
                     _StudySessionCard(dateKey: dateKey),

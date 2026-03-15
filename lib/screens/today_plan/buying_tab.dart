@@ -94,7 +94,7 @@ class BuyingTab extends StatelessWidget {
                   ),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  padding: EdgeInsets.fromLTRB(16, 4, 16, MediaQuery.of(context).padding.bottom + 16),
                   itemCount: items.length,
                   itemBuilder: (context, i) {
                     final item = items[i];

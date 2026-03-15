@@ -776,7 +776,7 @@ class _AllTabContentState extends State<_AllTabContent>
     final entries = _timeOfDayEntries(_groupByTimeOfDay(activities));
     final activityIndexes = _activityIndexes(allActivities);
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.of(context).padding.bottom + 16),
       itemCount: entries.length,
       itemBuilder: (context, index) {
         final entry = entries[index];
@@ -1620,7 +1620,7 @@ class _AllTabContentState extends State<_AllTabContent>
         ),
       );
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.of(context).padding.bottom + 16),
       itemCount: entries.length,
       itemBuilder: (context, index) {
         final entry = entries[index];
