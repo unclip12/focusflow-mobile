@@ -123,7 +123,7 @@ class ThemePickerCard extends StatelessWidget {
         width: 80,
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
-          color: cs.surface,
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: selected

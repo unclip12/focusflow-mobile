@@ -119,7 +119,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
                       )
                     : null,
                 filled: true,
-                fillColor: cs.onSurface.withValues(alpha: 0.05),
+                fillColor: Colors.transparent,
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 border: OutlineInputBorder(

@@ -1991,7 +1991,7 @@ class _RevisionQueueCard extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: isDark ? 0.03 : 0.14),
+                    color: Colors.transparent,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: Colors.white.withValues(alpha: isDark ? 0.07 : 0.18),

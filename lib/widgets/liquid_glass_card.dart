@@ -105,10 +105,10 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final background =
-        (isDark ? const Color(0xFF1E1E3A) : const Color(0xFFFFFFFF))
-            .withValues(alpha: isDark ? 0.30 : 0.40);
+        (isDark ? const Color(0xFF6366F1) : const Color(0xFFFFFFFF))
+            .withValues(alpha: isDark ? 0.08 : 0.12);
     final borderColor =
-        const Color(0xFF6366F1).withValues(alpha: isDark ? 0.20 : 0.15);
+        const Color(0xFF6366F1).withValues(alpha: isDark ? 0.30 : 0.22);
     final glowBaseColor = widget.glowColor ?? const Color(0xFF6366F1);
     final glowColor =
         glowBaseColor.withValues(alpha: isDark ? 0.12 : 0.08);
@@ -149,7 +149,7 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
           child: ClipRRect(
             borderRadius: widget.borderRadius,
             child: BackdropFilter(
-              filter: ui.ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+              filter: ui.ImageFilter.blur(sigmaX: 40, sigmaY: 40),
               child: Container(
                 padding: widget.padding,
                 decoration: BoxDecoration(
@@ -191,11 +191,11 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
                                   end: Alignment.bottomRight,
                                   colors: <Color>[
                                     Colors.white.withValues(
-                                      alpha: isDark ? 0.06 : 0.15,
+                                      alpha: isDark ? 0.10 : 0.20,
                                     ),
                                     Colors.transparent,
                                     const Color(0xFF6366F1).withValues(
-                                      alpha: isDark ? 0.04 : 0.02,
+                                      alpha: isDark ? 0.06 : 0.03,
                                     ),
                                   ],
                                 ),

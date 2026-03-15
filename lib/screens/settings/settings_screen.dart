@@ -982,7 +982,7 @@ class _SettingsTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: cs.surface,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: cs.onSurface.withValues(alpha: 0.06)),
       ),
@@ -1040,7 +1040,7 @@ class _TimeTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: cs.surface,
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: cs.onSurface.withValues(alpha: 0.06)),
         ),
@@ -1157,7 +1157,7 @@ class _MenuReorderSectionState extends State<_MenuReorderSection> {
 
     return Container(
       decoration: BoxDecoration(
-        color: cs.surface,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: cs.onSurface.withValues(alpha: 0.06)),
       ),

@@ -14,6 +14,8 @@ import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 
+const double kNavBarHeight = 72.0; // visible nav bar height
+
 class MainShell extends StatelessWidget {
   final Widget child;
   final String currentLocation;
@@ -219,7 +221,9 @@ class MainShell extends StatelessWidget {
                 child: MediaQuery(
                   data: MediaQuery.of(context).copyWith(
                     padding: MediaQuery.of(context).padding.copyWith(
-                      bottom: MediaQuery.of(context).padding.bottom + 100,
+                      bottom: MediaQuery.of(context).padding.bottom +
+                          kNavBarHeight +
+                          24,
                     ),
                   ),
                   child: child,
@@ -296,17 +300,17 @@ class _GlassBottomNav extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(28),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+        filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
         child: Container(
           decoration: BoxDecoration(
             color: isDark
-                ? const Color(0xFF0E0E1A).withValues(alpha: 0.18)
-                : Colors.white.withValues(alpha: 0.12),
+                ? const Color(0xFF0E0E1A).withValues(alpha: 0.10)
+                : Colors.white.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
               color: isDark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : Colors.white.withValues(alpha: 0.25),
+                  ? Colors.white.withValues(alpha: 0.12)
+                  : Colors.white.withValues(alpha: 0.35),
               width: 0.5,
             ),
             boxShadow: [
@@ -365,7 +369,7 @@ class _NavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = DashboardColors.primary;
+    const activeColor = DashboardColors.primary;
     final inactiveColor = isDark
         ? DashboardColors.textSecondary
         : DashboardColors.textSecondary;

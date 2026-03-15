@@ -447,7 +447,12 @@ class _BackupScreenState extends State<BackupScreen> {
           AbsorbPointer(
             absorbing: _isLoading,
             child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                12,
+                16,
+                MediaQuery.of(context).padding.bottom + 12,
+              ),
               children: [
                 _sectionLabel('Quick Backup', theme, cs),
                 const SizedBox(height: 8),
@@ -833,7 +838,7 @@ class _BackupEntry {
 
 BoxDecoration _cardDecor(ColorScheme cs) {
   return BoxDecoration(
-    color: cs.surface,
+    color: Colors.transparent,
     borderRadius: BorderRadius.circular(14),
     border: Border.all(color: cs.onSurface.withValues(alpha: 0.06)),
   );

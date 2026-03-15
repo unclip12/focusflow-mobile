@@ -1852,7 +1852,7 @@ class _AllTabContentState extends State<_AllTabContent>
               elevation: 0,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
-              color: cs.surfaceContainerHighest.withValues(alpha: 0.2),
+              color: Colors.transparent,
               child: ListTile(
                 dense: true,
                 leading: Icon(
@@ -1887,7 +1887,7 @@ class _AllTabContentState extends State<_AllTabContent>
               elevation: 0,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
-              color: cs.surfaceContainerHighest.withValues(alpha: 0.2),
+              color: Colors.transparent,
               child: ListTile(
                 dense: true,
                 leading: Icon(Icons.shopping_cart_outlined,
@@ -1993,11 +1993,7 @@ class _FullDayFlowCard extends StatelessWidget {
               )
             : BorderSide.none,
       ),
-      color: activity.isDone
-          ? const Color(0xFF10B981).withValues(alpha: 0.06)
-          : activity.isActive
-              ? const Color(0xFF3B82F6).withValues(alpha: 0.06)
-              : cs.surfaceContainerHighest.withValues(alpha: 0.4),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
