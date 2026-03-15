@@ -21,8 +21,8 @@ class DashboardColors {
   static const Color warning = Color(0xFFF59E0B);
   static const Color danger = Color(0xFFEF4444);
 
-  static const Color glassLight = Color.fromRGBO(255, 255, 255, 0.72);
-  static const Color glassDark = Color.fromRGBO(255, 255, 255, 0.08);
+  static const Color glassLight = Color.fromRGBO(255, 255, 255, 0.40);
+  static const Color glassDark = Color.fromRGBO(255, 255, 255, 0.12);
   static const Color glassBorderLight = Color.fromRGBO(255, 255, 255, 0.45);
   static const Color glassBorderDark = Color.fromRGBO(99, 102, 241, 0.30);
 

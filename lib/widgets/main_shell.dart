@@ -212,21 +212,32 @@ class MainShell extends StatelessWidget {
 
         return Scaffold(
           backgroundColor: DashboardColors.background(isDark),
-          body: child,
-          extendBody: true,
-          bottomNavigationBar: _GlassBottomNav(
-            pinnedTabs: pinnedTabs,
-            selectedIndex: selectedIndex,
-            moreIndex: moreIndex,
-            isDark: isDark,
-            icons: _icons,
-            onTabSelected: (index) {
-              if (index == moreIndex) {
-                _showMoreSheet(context, pinnedTabs);
-              } else if (index < pinnedTabs.length) {
-                _navigateTo(context, pinnedTabs[index]);
-              }
-            },
+          body: Stack(
+            children: [
+              // ── Main content ──────────────────────────────
+              Positioned.fill(child: child),
+
+              // ── Floating glass bottom nav ─────────────────
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: MediaQuery.of(context).padding.bottom + 8,
+                child: _GlassBottomNav(
+                  pinnedTabs: pinnedTabs,
+                  selectedIndex: selectedIndex,
+                  moreIndex: moreIndex,
+                  isDark: isDark,
+                  icons: _icons,
+                  onTabSelected: (index) {
+                    if (index == moreIndex) {
+                      _showMoreSheet(context, pinnedTabs);
+                    } else if (index < pinnedTabs.length) {
+                      _navigateTo(context, pinnedTabs[index]);
+                    }
+                  },
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -274,27 +285,34 @@ class _GlassBottomNav extends StatelessWidget {
     ];
 
     return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
         child: Container(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).padding.bottom,
-          ),
           decoration: BoxDecoration(
             color: isDark
-                ? const Color(0xFF0E0E1A).withValues(alpha: 0.78)
-                : Colors.white.withValues(alpha: 0.82),
-            border: Border(
-              top: BorderSide(
-                color: isDark
-                    ? DashboardColors.glassBorderDark
-                    : DashboardColors.glassBorderLight,
-                width: 0.5,
-              ),
+                ? const Color(0xFF0E0E1A).withValues(alpha: 0.65)
+                : Colors.white.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: isDark
+                  ? DashboardColors.glassBorderDark
+                  : DashboardColors.glassBorderLight,
+              width: 0.5,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.3)
+                    : Colors.black.withValues(alpha: 0.08),
+                blurRadius: 20,
+                spreadRadius: -4,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 8),
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: List.generate(allItems.length, (i) {

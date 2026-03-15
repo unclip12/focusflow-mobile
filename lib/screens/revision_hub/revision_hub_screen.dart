@@ -158,59 +158,66 @@ class _RevisionHubScreenState extends State<RevisionHubScreen>
       ],
       body: DefaultTabController(
         length: 3,
-        child: Column(
-          children: [
+        child: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) => [
             // ── Stats Header ────────────────────────────────────
-            _StatsHeader(
-              totalDue: totalDue,
-              totalItems: totalItems,
-              masteryPercent: masteryPercent,
-              isDark: isDark,
+            SliverToBoxAdapter(
+              child: _StatsHeader(
+                totalDue: totalDue,
+                totalItems: totalItems,
+                masteryPercent: masteryPercent,
+                isDark: isDark,
+              ),
             ),
 
             // ── Search Bar (animated) ───────────────────────────
-            SizeTransition(
-              sizeFactor: _searchAnim,
-              axisAlignment: -1,
-              child: _GlassSearchBar(
-                controller: _searchController,
-                isDark: isDark,
-                onChanged: (q) => setState(() => _searchQuery = q),
+            SliverToBoxAdapter(
+              child: SizeTransition(
+                sizeFactor: _searchAnim,
+                axisAlignment: -1,
+                child: _GlassSearchBar(
+                  controller: _searchController,
+                  isDark: isDark,
+                  onChanged: (q) => setState(() => _searchQuery = q),
+                ),
               ),
             ),
 
             // ── Source filter chips ─────────────────────────────
-            _SourceFilterBar(
-              selected: _sourceFilter,
-              counts: _countBySources(allItems),
-              isDark: isDark,
-              onSelect: (s) => setState(() => _sourceFilter = s),
+            SliverToBoxAdapter(
+              child: _SourceFilterBar(
+                selected: _sourceFilter,
+                counts: _countBySources(allItems),
+                isDark: isDark,
+                onSelect: (s) => setState(() => _sourceFilter = s),
+              ),
             ),
 
-            const SizedBox(height: 4),
+            const SliverToBoxAdapter(child: SizedBox(height: 4)),
 
-            // ── Tab bar ─────────────────────────────────────────
-            _GlassTabBar(
-              dueCount: dueItems.length,
-              upcomingCount: upcomingItems.length,
-              allCount: allSorted.length,
-              isDark: isDark,
-            ),
-
-            // ── Tab views ──────────────────────────────────────
-            Expanded(
-              child: TabBarView(
-                children: [
-                  _buildList(dueItems, 'All caught up!',
-                      'No revisions due right now', Icons.check_circle_outline_rounded, isDark),
-                  _buildList(upcomingItems, 'Nothing upcoming',
-                      'No revisions due in the next 7 days', Icons.event_available_rounded, isDark),
-                  _buildList(allSorted, 'No revisions yet',
-                      'Study some content to create revision items', Icons.library_books_rounded, isDark),
-                ],
+            // ── Tab bar (pinned so tabs stay visible) ───────────
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _SliverTabBarDelegate(
+                child: _GlassTabBar(
+                  dueCount: dueItems.length,
+                  upcomingCount: upcomingItems.length,
+                  allCount: allSorted.length,
+                  isDark: isDark,
+                ),
               ),
             ),
           ],
+          body: TabBarView(
+            children: [
+              _buildList(dueItems, 'All caught up!',
+                  'No revisions due right now', Icons.check_circle_outline_rounded, isDark),
+              _buildList(upcomingItems, 'Nothing upcoming',
+                  'No revisions due in the next 7 days', Icons.event_available_rounded, isDark),
+              _buildList(allSorted, 'No revisions yet',
+                  'Study some content to create revision items', Icons.library_books_rounded, isDark),
+            ],
+          ),
         ),
       ),
     );
@@ -251,7 +258,7 @@ class _RevisionHubScreenState extends State<RevisionHubScreen>
       return _EmptyTab(icon: emptyIcon, title: emptyTitle, subtitle: emptySubtitle, isDark: isDark);
     }
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
       itemCount: items.length,
       itemBuilder: (_, i) => UnifiedRevisionCard(
         item: items[i],
@@ -441,6 +448,31 @@ class RevisionDisplayItem {
       );
     }
   }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SLIVER TAB BAR DELEGATE — for pinned tab bar in NestedScrollView
+// ══════════════════════════════════════════════════════════════════
+
+class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+
+  const _SliverTabBarDelegate({required this.child});
+
+  @override
+  double get minExtent => 56;
+  @override
+  double get maxExtent => 56;
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return child;
+  }
+
+  @override
+  bool shouldRebuild(covariant _SliverTabBarDelegate oldDelegate) =>
+      child != oldDelegate.child;
 }
 
 // ══════════════════════════════════════════════════════════════════

@@ -5,7 +5,6 @@
 // revision log viewer, retention score, hard count display
 // =============================================================
 
-import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -35,17 +34,12 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard>
   bool _saving = false;
   bool _expanded = false;
   bool _showLogs = false;
-  late final AnimationController _shimmerController;
   late final AnimationController _expandController;
   late final Animation<double> _expandAnim;
 
   @override
   void initState() {
     super.initState();
-    _shimmerController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 5),
-    )..repeat();
     _expandController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -58,7 +52,6 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard>
 
   @override
   void dispose() {
-    _shimmerController.dispose();
     _expandController.dispose();
     super.dispose();
   }
@@ -103,8 +96,8 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard>
     final isOverdue = due.color == const Color(0xFFEF4444);
 
     final glassBg = isDark
-        ? const Color(0xFF1E1E3A).withValues(alpha: 0.85)
-        : Colors.white.withValues(alpha: 0.82);
+        ? const Color(0xFF1E1E3A).withValues(alpha: 0.30)
+        : Colors.white.withValues(alpha: 0.40);
     final borderCol = isDark
         ? const Color(0xFF6366F1).withValues(alpha: 0.25)
         : const Color(0xFF6366F1).withValues(alpha: 0.15);
@@ -154,49 +147,22 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard>
               borderRadius: BorderRadius.circular(18),
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                child: AnimatedBuilder(
-                  animation: _shimmerController,
-                  builder: (context, child) {
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: glassBg,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: borderCol, width: 1),
-                        boxShadow: [
-                          BoxShadow(
-                            color: item.sourceColor
-                                .withValues(alpha: isDark ? 0.12 : 0.08),
-                            blurRadius: 20,
-                            spreadRadius: -6,
-                          ),
-                          if (isOverdue)
-                            BoxShadow(
-                              color: const Color(0xFFEF4444).withValues(
-                                  alpha: 0.06 +
-                                      (math.sin(_shimmerController.value *
-                                              math.pi *
-                                              2) *
-                                          0.04)),
-                              blurRadius: 16,
-                              spreadRadius: -2,
-                            ),
-                        ],
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: glassBg,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: borderCol, width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: item.sourceColor
+                            .withValues(alpha: isDark ? 0.12 : 0.08),
+                        blurRadius: 20,
+                        spreadRadius: -6,
                       ),
-                      child: child,
-                    );
-                  },
+                    ],
+                  ),
                   child: Stack(
                     children: [
-                      // ── Shimmer overlay ────────────────────────
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: _ShimmerOverlay(
-                            controller: _shimmerController,
-                            isDark: isDark,
-                          ),
-                        ),
-                      ),
-
                       // ── Inner gradient overlay ─────────────────
                       Positioned.fill(
                         child: IgnorePointer(
@@ -1333,60 +1299,6 @@ class _LogDetailRow extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
-// SHIMMER OVERLAY
-// ══════════════════════════════════════════════════════════════════
-
-class _ShimmerOverlay extends StatelessWidget {
-  final AnimationController controller;
-  final bool isDark;
-
-  const _ShimmerOverlay({
-    required this.controller,
-    required this.isDark,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final shimmerWidth = width * 1.5;
-        final travel = width + shimmerWidth;
-
-        return AnimatedBuilder(
-          animation: controller,
-          builder: (context, child) {
-            final x = shimmerWidth / 2 - (travel * controller.value);
-            return Transform.translate(
-              offset: Offset(x, 0),
-              child: Transform.rotate(
-                angle: -0.25,
-                child: child,
-              ),
-            );
-          },
-          child: Container(
-            width: width * 0.4,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  DashboardColors.shimmerTransparent,
-                  DashboardColors.shimmerSoft,
-                  DashboardColors.shimmerBright,
-                  DashboardColors.shimmerSoft,
-                  DashboardColors.shimmerTransparent,
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
 
 // ══════════════════════════════════════════════════════════════════
 // SWIPE BACKGROUND

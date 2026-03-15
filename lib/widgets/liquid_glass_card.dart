@@ -31,7 +31,6 @@ class LiquidGlassCard extends StatefulWidget {
 
 class _LiquidGlassCardState extends State<LiquidGlassCard>
     with TickerProviderStateMixin {
-  late final AnimationController _shimmerController;
   late final AnimationController _rippleController;
   Timer? _entryTimer;
   bool _visible = false;
@@ -41,10 +40,6 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
   @override
   void initState() {
     super.initState();
-    _shimmerController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 4),
-    )..repeat();
     _rippleController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -84,7 +79,6 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
   @override
   void dispose() {
     _entryTimer?.cancel();
-    _shimmerController.dispose();
     _rippleController.dispose();
     super.dispose();
   }
@@ -112,15 +106,15 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final background =
         (isDark ? const Color(0xFF1E1E3A) : const Color(0xFFFFFFFF))
-            .withValues(alpha: isDark ? 0.92 : 0.88);
+            .withValues(alpha: isDark ? 0.30 : 0.40);
     final borderColor =
-        const Color(0xFF6366F1).withValues(alpha: isDark ? 0.35 : 0.25);
+        const Color(0xFF6366F1).withValues(alpha: isDark ? 0.20 : 0.15);
     final glowBaseColor = widget.glowColor ?? const Color(0xFF6366F1);
     final glowColor =
-        glowBaseColor.withValues(alpha: isDark ? 0.18 : 0.12);
+        glowBaseColor.withValues(alpha: isDark ? 0.12 : 0.08);
     final glowShadow = BoxShadow(
       color: glowColor,
-      blurRadius: isDark ? 24 : 20,
+      blurRadius: isDark ? 20 : 16,
       spreadRadius: isDark ? -4 : -2,
     );
 
@@ -154,154 +148,92 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
           onTap: widget.onTap,
           child: ClipRRect(
             borderRadius: widget.borderRadius,
-            child: Stack(
-              children: <Widget>[
-                // if (defaultTargetPlatform == TargetPlatform.iOS)
-                //   Positioned.fill(
-                //     child: BackdropFilter(
-                //       filter: ui.ImageFilter.blur(
-                //         sigmaX: 25,
-                //         sigmaY: 25,
-                //       ),
-                //       child: Container(color: Colors.transparent),
-                //     ),
-                //   ),
-                Container(
-                  padding: widget.padding,
-                  decoration: BoxDecoration(
-                    color: background,
-                    borderRadius: widget.borderRadius,
-                    border: Border.all(
-                      color: borderColor,
-                      width: 1.5,
-                    ),
-                    boxShadow: <BoxShadow>[glowShadow],
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+              child: Container(
+                padding: widget.padding,
+                decoration: BoxDecoration(
+                  color: background,
+                  borderRadius: widget.borderRadius,
+                  border: Border.all(
+                    color: borderColor,
+                    width: 1,
                   ),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final rippleAlignment = Alignment(
-                        ((constraints.maxWidth == 0
-                                    ? 0
-                                    : _rippleOrigin.dx / constraints.maxWidth) *
-                                2) -
-                            1,
-                        ((constraints.maxHeight == 0
-                                    ? 0
-                                    : _rippleOrigin.dy / constraints.maxHeight) *
-                                2) -
-                            1,
-                      );
+                  boxShadow: <BoxShadow>[glowShadow],
+                ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final rippleAlignment = Alignment(
+                      ((constraints.maxWidth == 0
+                                  ? 0
+                                  : _rippleOrigin.dx /
+                                      constraints.maxWidth) *
+                              2) -
+                          1,
+                      ((constraints.maxHeight == 0
+                                  ? 0
+                                  : _rippleOrigin.dy /
+                                      constraints.maxHeight) *
+                              2) -
+                          1,
+                    );
 
-                      return Stack(
-                        fit: StackFit.passthrough,
-                        children: <Widget>[
-                          Positioned.fill(
-                            child: IgnorePointer(
+                    return Stack(
+                      fit: StackFit.passthrough,
+                      children: <Widget>[
+                        // Subtle glass gradient overlay
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: <Color>[
+                                    Colors.white.withValues(
+                                      alpha: isDark ? 0.06 : 0.15,
+                                    ),
+                                    Colors.transparent,
+                                    const Color(0xFF6366F1).withValues(
+                                      alpha: isDark ? 0.04 : 0.02,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Tap ripple effect
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: FadeTransition(
+                              opacity: Tween<double>(
+                                begin: 0.3,
+                                end: 0,
+                              ).animate(_rippleController),
                               child: DecoratedBox(
                                 decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
+                                  gradient: RadialGradient(
+                                    center: rippleAlignment,
+                                    radius: 0.8,
                                     colors: <Color>[
-                                      Colors.white.withValues(
-                                        alpha: isDark ? 0.15 : 0.35,
+                                      DashboardColors.primary.withValues(
+                                        alpha: 0.30,
                                       ),
                                       Colors.transparent,
-                                      const Color(0xFF6366F1).withValues(
-                                        alpha: isDark ? 0.10 : 0.06,
-                                      ),
                                     ],
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                          Positioned.fill(
-                            child: IgnorePointer(
-                              child: AnimatedBuilder(
-                                animation: _shimmerController,
-                                builder: (context, child) {
-                                  final width = constraints.maxWidth;
-                                  final shimmerWidth = width * 1.6;
-                                  final travel = width + shimmerWidth;
-                                  final x = ui.lerpDouble(
-                                        shimmerWidth / 2,
-                                        -travel,
-                                        _shimmerController.value,
-                                      ) ??
-                                      0;
-                                  return Transform.translate(
-                                    offset: Offset(x, 0),
-                                    child: Transform.rotate(
-                                      angle: -0.30,
-                                      child: child,
-                                    ),
-                                  );
-                                },
-                                child: Container(
-                                  width: constraints.maxWidth * 0.45,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.centerLeft,
-                                      end: Alignment.centerRight,
-                                      colors: <Color>[
-                                        DashboardColors.shimmerTransparent,
-                                        DashboardColors.shimmerSoft,
-                                        DashboardColors.shimmerBright,
-                                        DashboardColors.shimmerSoft,
-                                        DashboardColors.shimmerTransparent,
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Positioned.fill(
-                            child: IgnorePointer(
-                              child: FadeTransition(
-                                opacity: Tween<double>(
-                                  begin: 0.3,
-                                  end: 0,
-                                ).animate(_rippleController),
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: RadialGradient(
-                                      center: rippleAlignment,
-                                      radius: 0.8,
-                                      colors: <Color>[
-                                        DashboardColors.primary.withValues(
-                                          alpha: 0.30,
-                                        ),
-                                        Colors.transparent,
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Positioned.fill(
-                            child: IgnorePointer(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: widget.borderRadius,
-                                  border: Border.all(
-                                    color: Colors.white.withValues(
-                                      alpha: isDark ? 0.06 : 0.18,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          widget.child,
-                        ],
-                      );
-                    },
-                  ),
+                        ),
+                        widget.child,
+                      ],
+                    );
+                  },
                 ),
-              ],
+              ),
             ),
           ),
         ),
