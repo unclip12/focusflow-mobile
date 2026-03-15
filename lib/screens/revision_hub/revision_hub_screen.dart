@@ -1,11 +1,9 @@
 // =============================================================
-// RevisionHubScreen — unified revision hub showing ALL resources
-// Data source: RevisionItem list + KnowledgeBase entries
-// Tabs: Due Now | Upcoming (7 days) | All
-// Filter chips: All / FA / Sketchy / Pathoma / UWorld / KB
-// Sorted by soonest due date first
+// RevisionHubScreen — Premium Revision Command Center
+// Liquid glass UI with stats header, search, sort, grouping
 // =============================================================
 
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -13,6 +11,7 @@ import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/revision_item.dart';
 import 'package:focusflow_mobile/models/knowledge_base.dart';
 import 'package:focusflow_mobile/services/srs_service.dart';
+import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'package:focusflow_mobile/widgets/app_scaffold.dart';
 import 'revision_card.dart';
 
@@ -23,25 +22,64 @@ class RevisionHubScreen extends StatefulWidget {
   State<RevisionHubScreen> createState() => _RevisionHubScreenState();
 }
 
-class _RevisionHubScreenState extends State<RevisionHubScreen> {
+class _RevisionHubScreenState extends State<RevisionHubScreen>
+    with TickerProviderStateMixin {
   String _sourceFilter = 'ALL';
+  String _sortBy = 'due_date'; // due_date, source, progress, last_studied
+  String _searchQuery = '';
+  bool _showSearch = false;
+  late final TextEditingController _searchController;
+  late final AnimationController _searchAnimController;
+  late final Animation<double> _searchAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+    _searchAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _searchAnim = CurvedAnimation(
+      parent: _searchAnimController,
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchAnimController.dispose();
+    super.dispose();
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _showSearch = !_showSearch;
+      if (_showSearch) {
+        _searchAnimController.forward();
+      } else {
+        _searchAnimController.reverse();
+        _searchQuery = '';
+        _searchController.clear();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // ── Build unified list from RevisionItems + KB entries ─────
     final List<RevisionDisplayItem> allItems = [];
 
-    // 1. RevisionItems (FA pages/subtopics, Sketchy, Pathoma, UWorld)
     for (final ri in app.revisionItems) {
       allItems.add(RevisionDisplayItem.fromRevisionItem(ri));
     }
 
-    // 2. KnowledgeBase entries with nextRevisionAt
     for (final kb in app.knowledgeBase) {
       if (kb.nextRevisionAt != null && kb.nextRevisionAt!.isNotEmpty) {
-        // Skip if a matching revision item already exists
         final alreadyTracked = app.revisionItems.any(
           (r) => r.id == 'kb-${kb.pageNumber}',
         );
@@ -52,9 +90,19 @@ class _RevisionHubScreenState extends State<RevisionHubScreen> {
     }
 
     // Apply source filter
-    final filtered = _sourceFilter == 'ALL'
+    final sourceFiltered = _sourceFilter == 'ALL'
         ? allItems
         : allItems.where((i) => i.source == _sourceFilter).toList();
+
+    // Apply search filter
+    final filtered = _searchQuery.isEmpty
+        ? sourceFiltered
+        : sourceFiltered.where((i) {
+            final q = _searchQuery.toLowerCase();
+            return i.title.toLowerCase().contains(q) ||
+                i.parentTitle.toLowerCase().contains(q) ||
+                i.displayTitle.toLowerCase().contains(q);
+          }).toList();
 
     // Partition into due and upcoming
     final dueItems = <RevisionDisplayItem>[];
@@ -71,59 +119,94 @@ class _RevisionHubScreenState extends State<RevisionHubScreen> {
       allSorted.add(item);
     }
 
-    // Sort: soonest first
-    int sortByDate(RevisionDisplayItem a, RevisionDisplayItem b) {
-      final aDate = a.nextRevisionAt;
-      final bDate = b.nextRevisionAt;
-      return aDate.compareTo(bDate);
-    }
+    // Sort
+    final sorter = _getSorter();
+    dueItems.sort(sorter);
+    upcomingItems.sort(sorter);
+    allSorted.sort(sorter);
 
-    dueItems.sort(sortByDate);
-    upcomingItems.sort(sortByDate);
-    allSorted.sort(sortByDate);
-
-    final totalDue = dueItems.length;
+    // Stats
+    final totalDue = allItems
+        .where(
+            (i) => SrsService.isDueNow(nextRevisionAt: i.nextRevisionAt))
+        .length;
+    final totalItems = allItems.length;
+    final masteryPercent = totalItems > 0
+        ? (allItems.fold<int>(0, (s, i) => s + i.currentRevisionIndex) /
+                (totalItems * 12) *
+                100)
+            .round()
+        : 0;
 
     return AppScaffold(
       screenName: 'Revision Hub',
       streakCount: 0,
+      actions: [
+        // Search toggle
+        _GlassIconButton(
+          icon: _showSearch ? Icons.close_rounded : Icons.search_rounded,
+          onTap: _toggleSearch,
+          isDark: isDark,
+        ),
+        const SizedBox(width: 6),
+        // Sort menu
+        _SortMenuButton(
+          currentSort: _sortBy,
+          isDark: isDark,
+          onChanged: (s) => setState(() => _sortBy = s),
+        ),
+      ],
       body: DefaultTabController(
         length: 3,
         child: Column(
           children: [
-            // ── Due count banner ───────────────────────────────
-            if (totalDue > 0)
-              _DueCountBanner(count: totalDue),
+            // ── Stats Header ────────────────────────────────────
+            _StatsHeader(
+              totalDue: totalDue,
+              totalItems: totalItems,
+              masteryPercent: masteryPercent,
+              isDark: isDark,
+            ),
 
-            // ── Source filter chips ────────────────────────────
+            // ── Search Bar (animated) ───────────────────────────
+            SizeTransition(
+              sizeFactor: _searchAnim,
+              axisAlignment: -1,
+              child: _GlassSearchBar(
+                controller: _searchController,
+                isDark: isDark,
+                onChanged: (q) => setState(() => _searchQuery = q),
+              ),
+            ),
+
+            // ── Source filter chips ─────────────────────────────
             _SourceFilterBar(
               selected: _sourceFilter,
               counts: _countBySources(allItems),
+              isDark: isDark,
               onSelect: (s) => setState(() => _sourceFilter = s),
             ),
 
-            // ── Tab bar ───────────────────────────────────────
-            _StyledTabBar(
+            const SizedBox(height: 4),
+
+            // ── Tab bar ─────────────────────────────────────────
+            _GlassTabBar(
               dueCount: dueItems.length,
               upcomingCount: upcomingItems.length,
               allCount: allSorted.length,
+              isDark: isDark,
             ),
 
-            // ── Tab views ─────────────────────────────────────
+            // ── Tab views ──────────────────────────────────────
             Expanded(
               child: TabBarView(
                 children: [
-                  // DUE tab
-                  _buildList(dueItems, 'All caught up!', 'No revisions due right now',
-                      Icons.check_circle_outline_rounded),
-
-                  // UPCOMING tab
+                  _buildList(dueItems, 'All caught up!',
+                      'No revisions due right now', Icons.check_circle_outline_rounded, isDark),
                   _buildList(upcomingItems, 'Nothing upcoming',
-                      'No revisions due in the next 7 days', Icons.calendar_today_rounded),
-
-                  // ALL tab
+                      'No revisions due in the next 7 days', Icons.event_available_rounded, isDark),
                   _buildList(allSorted, 'No revisions yet',
-                      'Study some content to create revision items', Icons.library_books_rounded),
+                      'Study some content to create revision items', Icons.library_books_rounded, isDark),
                 ],
               ),
             ),
@@ -133,15 +216,47 @@ class _RevisionHubScreenState extends State<RevisionHubScreen> {
     );
   }
 
+  Comparator<RevisionDisplayItem> _getSorter() {
+    switch (_sortBy) {
+      case 'source':
+        return (a, b) {
+          final cmp = a.source.compareTo(b.source);
+          if (cmp != 0) return cmp;
+          return a.nextRevisionAt.compareTo(b.nextRevisionAt);
+        };
+      case 'progress':
+        return (a, b) {
+          final aP = a.totalSteps > 0
+              ? a.currentRevisionIndex / a.totalSteps
+              : 0.0;
+          final bP = b.totalSteps > 0
+              ? b.currentRevisionIndex / b.totalSteps
+              : 0.0;
+          return bP.compareTo(aP); // highest progress first
+        };
+      case 'last_studied':
+        return (a, b) {
+          final aLs = a.lastStudiedAt ?? '';
+          final bLs = b.lastStudiedAt ?? '';
+          return bLs.compareTo(aLs); // most recently studied first
+        };
+      default: // due_date
+        return (a, b) => a.nextRevisionAt.compareTo(b.nextRevisionAt);
+    }
+  }
+
   Widget _buildList(List<RevisionDisplayItem> items, String emptyTitle,
-      String emptySubtitle, IconData emptyIcon) {
+      String emptySubtitle, IconData emptyIcon, bool isDark) {
     if (items.isEmpty) {
-      return _EmptyTab(icon: emptyIcon, title: emptyTitle, subtitle: emptySubtitle);
+      return _EmptyTab(icon: emptyIcon, title: emptyTitle, subtitle: emptySubtitle, isDark: isDark);
     }
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       itemCount: items.length,
-      itemBuilder: (_, i) => UnifiedRevisionCard(item: items[i]),
+      itemBuilder: (_, i) => UnifiedRevisionCard(
+        item: items[i],
+        delay: Duration(milliseconds: 40 * i.clamp(0, 10)),
+      ),
     );
   }
 
@@ -157,8 +272,8 @@ class _RevisionHubScreenState extends State<RevisionHubScreen> {
 // ── RevisionDisplayItem — unified display model ──────────────────
 class RevisionDisplayItem {
   final String id;
-  final String type; // PAGE, SUBTOPIC, VIDEO, CHAPTER, UWORLD_Q
-  final String source; // FA, SKETCHY_MICRO, SKETCHY_PHARM, PATHOMA, UWORLD, KB
+  final String type;
+  final String source;
   final String title;
   final String parentTitle;
   final String pageNumber;
@@ -166,7 +281,7 @@ class RevisionDisplayItem {
   final int currentRevisionIndex;
   final int totalSteps;
   final String? lastStudiedAt;
-  final bool isKBEntry; // true if from KB, false if from RevisionItem
+  final bool isKBEntry;
 
   const RevisionDisplayItem({
     required this.id,
@@ -211,7 +326,6 @@ class RevisionDisplayItem {
         isKBEntry: true,
       );
 
-  /// Human-readable source label
   String get sourceLabel {
     switch (source) {
       case 'FA': return 'First Aid';
@@ -224,7 +338,6 @@ class RevisionDisplayItem {
     }
   }
 
-  /// Source icon
   IconData get sourceIcon {
     switch (source) {
       case 'FA': return Icons.menu_book_rounded;
@@ -237,36 +350,34 @@ class RevisionDisplayItem {
     }
   }
 
-  /// Display title: FA shows page number, others show subtopic/title
   String get displayTitle {
     if (source == 'FA') {
-      // Always show page number for FA
       if (pageNumber.isNotEmpty) {
         return 'Pg $pageNumber — $title';
       }
       return title;
     }
-    // For Sketchy, Pathoma, UWorld — show the item title (subtopic)
     if (pageNumber.isNotEmpty && pageNumber != title) {
       return '$pageNumber — $title';
     }
     return title;
   }
 
-  /// Source color
   Color get sourceColor {
     switch (source) {
-      case 'FA': return const Color(0xFF3B82F6); // blue
-      case 'SKETCHY_MICRO': return const Color(0xFF10B981); // green
-      case 'SKETCHY_PHARM': return const Color(0xFF8B5CF6); // purple
-      case 'PATHOMA': return const Color(0xFFEC4899); // pink
-      case 'UWORLD': return const Color(0xFFF59E0B); // amber
-      case 'KB': return const Color(0xFF14B8A6); // teal
+      case 'FA': return const Color(0xFF3B82F6);
+      case 'SKETCHY_MICRO': return const Color(0xFF10B981);
+      case 'SKETCHY_PHARM': return const Color(0xFF8B5CF6);
+      case 'PATHOMA': return const Color(0xFFEC4899);
+      case 'UWORLD': return const Color(0xFFF59E0B);
+      case 'KB': return const Color(0xFF14B8A6);
       default: return const Color(0xFF6B7280);
     }
   }
 
-  /// Due status info
+  double get progressPercent =>
+      totalSteps > 0 ? currentRevisionIndex / totalSteps : 0.0;
+
   ({Color color, String label, String timeDetail}) get dueInfo {
     final nextRev = DateTime.tryParse(nextRevisionAt);
     if (nextRev == null) {
@@ -312,93 +423,540 @@ class RevisionDisplayItem {
   }
 }
 
-// ── Source filter bar ─────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+// STATS HEADER — three glass stat cards
+// ══════════════════════════════════════════════════════════════════
+
+class _StatsHeader extends StatelessWidget {
+  final int totalDue;
+  final int totalItems;
+  final int masteryPercent;
+  final bool isDark;
+
+  const _StatsHeader({
+    required this.totalDue,
+    required this.totalItems,
+    required this.masteryPercent,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: _StatCard(
+              icon: Icons.warning_amber_rounded,
+              iconColor: totalDue > 0
+                  ? const Color(0xFFEF4444)
+                  : const Color(0xFF10B981),
+              label: 'Due Now',
+              value: '$totalDue',
+              isDark: isDark,
+              pulse: totalDue > 0,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _StatCard(
+              icon: Icons.layers_rounded,
+              iconColor: DashboardColors.primary,
+              label: 'Total',
+              value: '$totalItems',
+              isDark: isDark,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _StatCard(
+              icon: Icons.trending_up_rounded,
+              iconColor: const Color(0xFF8B5CF6),
+              label: 'Mastery',
+              value: '$masteryPercent%',
+              isDark: isDark,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatCard extends StatefulWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String value;
+  final bool isDark;
+  final bool pulse;
+
+  const _StatCard({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.value,
+    required this.isDark,
+    this.pulse = false,
+  });
+
+  @override
+  State<_StatCard> createState() => _StatCardState();
+}
+
+class _StatCardState extends State<_StatCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    if (widget.pulse) _pulseController.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(_StatCard old) {
+    super.didUpdateWidget(old);
+    if (widget.pulse && !_pulseController.isAnimating) {
+      _pulseController.repeat(reverse: true);
+    } else if (!widget.pulse && _pulseController.isAnimating) {
+      _pulseController.stop();
+      _pulseController.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final glassBg = widget.isDark
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.white.withValues(alpha: 0.65);
+    final borderCol = widget.isDark
+        ? DashboardColors.glassBorderDark
+        : DashboardColors.glassBorderLight;
+
+    return AnimatedBuilder(
+      animation: _pulseController,
+      builder: (context, child) {
+        final glowAlpha = widget.pulse
+            ? 0.08 + (_pulseController.value * 0.15)
+            : 0.0;
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              decoration: BoxDecoration(
+                color: glassBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderCol, width: 0.5),
+                boxShadow: widget.pulse
+                    ? [
+                        BoxShadow(
+                          color: widget.iconColor
+                              .withValues(alpha: glowAlpha),
+                          blurRadius: 16,
+                          spreadRadius: -2,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: child,
+            ),
+          ),
+        );
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(widget.icon, size: 20, color: widget.iconColor),
+          const SizedBox(height: 6),
+          Text(
+            widget.value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: DashboardColors.textPrimary(widget.isDark),
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            widget.label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              color: DashboardColors.textPrimary(widget.isDark)
+                  .withValues(alpha: 0.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// GLASS SEARCH BAR
+// ══════════════════════════════════════════════════════════════════
+
+class _GlassSearchBar extends StatelessWidget {
+  final TextEditingController controller;
+  final bool isDark;
+  final ValueChanged<String> onChanged;
+
+  const _GlassSearchBar({
+    required this.controller,
+    required this.isDark,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final glassBg = isDark
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.white.withValues(alpha: 0.65);
+    final borderCol = isDark
+        ? DashboardColors.glassBorderDark
+        : DashboardColors.glassBorderLight;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            decoration: BoxDecoration(
+              color: glassBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: borderCol, width: 0.5),
+            ),
+            child: TextField(
+              controller: controller,
+              onChanged: onChanged,
+              style: TextStyle(
+                fontSize: 13,
+                color: DashboardColors.textPrimary(isDark),
+              ),
+              decoration: InputDecoration(
+                hintText: 'Search revisions...',
+                hintStyle: TextStyle(
+                  fontSize: 13,
+                  color: DashboardColors.textPrimary(isDark)
+                      .withValues(alpha: 0.35),
+                ),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  size: 18,
+                  color: DashboardColors.primary.withValues(alpha: 0.6),
+                ),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                isDense: true,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// GLASS ICON BUTTON
+// ══════════════════════════════════════════════════════════════════
+
+class _GlassIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isDark;
+
+  const _GlassIconButton({
+    required this.icon,
+    required this.onTap,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.white.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isDark
+                ? DashboardColors.glassBorderDark
+                : DashboardColors.glassBorderLight,
+            width: 0.5,
+          ),
+        ),
+        child: Icon(
+          icon,
+          size: 16,
+          color: DashboardColors.primary,
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SORT MENU BUTTON
+// ══════════════════════════════════════════════════════════════════
+
+class _SortMenuButton extends StatelessWidget {
+  final String currentSort;
+  final bool isDark;
+  final ValueChanged<String> onChanged;
+
+  const _SortMenuButton({
+    required this.currentSort,
+    required this.isDark,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      onSelected: onChanged,
+      offset: const Offset(0, 36),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      color: isDark ? const Color(0xFF1C1C2E) : const Color(0xFFF5F3FF),
+      itemBuilder: (_) => [
+        _buildItem('due_date', 'Due Date', Icons.schedule_rounded),
+        _buildItem('source', 'Source', Icons.category_rounded),
+        _buildItem('progress', 'Progress', Icons.trending_up_rounded),
+        _buildItem('last_studied', 'Last Studied', Icons.history_rounded),
+      ],
+      child: Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.white.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isDark
+                ? DashboardColors.glassBorderDark
+                : DashboardColors.glassBorderLight,
+            width: 0.5,
+          ),
+        ),
+        child: Icon(
+          Icons.sort_rounded,
+          size: 16,
+          color: DashboardColors.primary,
+        ),
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _buildItem(
+      String value, String label, IconData icon) {
+    final isSelected = currentSort == value;
+    return PopupMenuItem<String>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon,
+              size: 16,
+              color: isSelected
+                  ? DashboardColors.primary
+                  : DashboardColors.textSecondary),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              color: isSelected
+                  ? DashboardColors.primary
+                  : DashboardColors.textSecondary,
+            ),
+          ),
+          if (isSelected) ...[
+            const Spacer(),
+            const Icon(Icons.check_rounded,
+                size: 14, color: DashboardColors.primary),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SOURCE FILTER BAR — liquid glass chips
+// ══════════════════════════════════════════════════════════════════
+
 class _SourceFilterBar extends StatelessWidget {
   final String selected;
   final Map<String, int> counts;
+  final bool isDark;
   final ValueChanged<String> onSelect;
 
   const _SourceFilterBar({
     required this.selected,
     required this.counts,
+    required this.isDark,
     required this.onSelect,
   });
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final totalCount = counts.values.fold(0, (a, b) => a + b);
 
     final filters = <_FilterDef>[
-      _FilterDef('ALL', 'All', totalCount, cs.primary),
-      _FilterDef('FA', 'FA', counts['FA'] ?? 0, const Color(0xFF3B82F6)),
-      _FilterDef('SKETCHY_MICRO', 'Sketchy M', counts['SKETCHY_MICRO'] ?? 0, const Color(0xFF10B981)),
-      _FilterDef('SKETCHY_PHARM', 'Sketchy P', counts['SKETCHY_PHARM'] ?? 0, const Color(0xFF8B5CF6)),
-      _FilterDef('PATHOMA', 'Pathoma', counts['PATHOMA'] ?? 0, const Color(0xFFEC4899)),
-      _FilterDef('UWORLD', 'UWorld', counts['UWORLD'] ?? 0, const Color(0xFFF59E0B)),
-      _FilterDef('KB', 'KB', counts['KB'] ?? 0, const Color(0xFF14B8A6)),
+      _FilterDef('ALL', 'All', totalCount, DashboardColors.primary, Icons.dashboard_rounded),
+      _FilterDef('FA', 'FA', counts['FA'] ?? 0, const Color(0xFF3B82F6), Icons.menu_book_rounded),
+      _FilterDef('SKETCHY_MICRO', 'Sketchy M', counts['SKETCHY_MICRO'] ?? 0, const Color(0xFF10B981), Icons.biotech_rounded),
+      _FilterDef('SKETCHY_PHARM', 'Sketchy P', counts['SKETCHY_PHARM'] ?? 0, const Color(0xFF8B5CF6), Icons.medication_rounded),
+      _FilterDef('PATHOMA', 'Pathoma', counts['PATHOMA'] ?? 0, const Color(0xFFEC4899), Icons.science_rounded),
+      _FilterDef('UWORLD', 'UWorld', counts['UWORLD'] ?? 0, const Color(0xFFF59E0B), Icons.quiz_rounded),
+      _FilterDef('KB', 'KB', counts['KB'] ?? 0, const Color(0xFF14B8A6), Icons.library_books_rounded),
     ];
 
     return SizedBox(
-      height: 40,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: filters.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 6),
-        itemBuilder: (_, i) {
-          final f = filters[i];
-          final isSelected = selected == f.key;
-          return GestureDetector(
-            onTap: () => onSelect(f.key),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? f.color.withValues(alpha: 0.15)
-                    : cs.onSurface.withValues(alpha: 0.04),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
+      height: 38,
+      child: ShaderMask(
+        shaderCallback: (rect) => LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            Colors.transparent,
+            Colors.black,
+            Colors.black,
+            Colors.transparent,
+          ],
+          stops: const [0, 0.02, 0.95, 1],
+        ).createShader(rect),
+        blendMode: BlendMode.dstIn,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: filters.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 6),
+          itemBuilder: (_, i) {
+            final f = filters[i];
+            final isSelected = selected == f.key;
+            return GestureDetector(
+              onTap: () => onSelect(f.key),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutCubic,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
                   color: isSelected
-                      ? f.color.withValues(alpha: 0.4)
-                      : cs.onSurface.withValues(alpha: 0.08),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    f.label,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                      color: isSelected ? f.color : cs.onSurface.withValues(alpha: 0.5),
-                    ),
+                      ? f.color.withValues(alpha: isDark ? 0.18 : 0.12)
+                      : isDark
+                          ? Colors.white.withValues(alpha: 0.04)
+                          : Colors.white.withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSelected
+                        ? f.color.withValues(alpha: 0.45)
+                        : isDark
+                            ? DashboardColors.glassBorderDark.withValues(alpha: 0.3)
+                            : DashboardColors.glassBorderLight.withValues(alpha: 0.4),
+                    width: isSelected ? 1 : 0.5,
                   ),
-                  if (f.count > 0) ...[
-                    const SizedBox(width: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: f.color.withValues(alpha: 0.15),
+                            blurRadius: 10,
+                            spreadRadius: -2,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Colored dot
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: isSelected ? 6 : 4,
+                      height: isSelected ? 6 : 4,
                       decoration: BoxDecoration(
-                        color: isSelected ? f.color.withValues(alpha: 0.2) : cs.onSurface.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(6),
+                        color: f.color,
+                        shape: BoxShape.circle,
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: f.color.withValues(alpha: 0.5),
+                                  blurRadius: 4,
+                                ),
+                              ]
+                            : null,
                       ),
-                      child: Text(
-                        '${f.count}',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          color: isSelected ? f.color : cs.onSurface.withValues(alpha: 0.4),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      f.label,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected
+                            ? f.color
+                            : DashboardColors.textPrimary(isDark)
+                                .withValues(alpha: 0.5),
+                      ),
+                    ),
+                    if (f.count > 0) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? f.color.withValues(alpha: 0.2)
+                              : DashboardColors.textPrimary(isDark)
+                                  .withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${f.count}',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: isSelected
+                                ? f.color
+                                : DashboardColors.textPrimary(isDark)
+                                    .withValues(alpha: 0.4),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -409,96 +967,100 @@ class _FilterDef {
   final String label;
   final int count;
   final Color color;
-  const _FilterDef(this.key, this.label, this.count, this.color);
+  final IconData icon;
+  const _FilterDef(this.key, this.label, this.count, this.color, this.icon);
 }
 
-// ── Due count banner ────────────────────────────────────────────
-class _DueCountBanner extends StatelessWidget {
-  final int count;
-  const _DueCountBanner({required this.count});
+// ══════════════════════════════════════════════════════════════════
+// GLASS TAB BAR — frosted glass with gradient indicator
+// ══════════════════════════════════════════════════════════════════
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEF4444).withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-            color: const Color(0xFFEF4444).withValues(alpha: 0.15)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.warning_amber_rounded,
-              size: 18, color: Color(0xFFEF4444)),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '$count revision${count == 1 ? '' : 's'} due now',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFFEF4444),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Styled tab bar ──────────────────────────────────────────────
-class _StyledTabBar extends StatelessWidget {
+class _GlassTabBar extends StatelessWidget {
   final int dueCount;
   final int upcomingCount;
   final int allCount;
+  final bool isDark;
 
-  const _StyledTabBar({required this.dueCount, required this.upcomingCount, required this.allCount});
+  const _GlassTabBar({
+    required this.dueCount,
+    required this.upcomingCount,
+    required this.allCount,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: cs.onSurface.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: TabBar(
-        indicator: BoxDecoration(
-          color: cs.primary.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(10),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.white.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isDark
+                    ? DashboardColors.glassBorderDark.withValues(alpha: 0.3)
+                    : DashboardColors.glassBorderLight.withValues(alpha: 0.4),
+                width: 0.5,
+              ),
+            ),
+            child: TabBar(
+              indicator: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    DashboardColors.primary.withValues(alpha: isDark ? 0.2 : 0.15),
+                    DashboardColors.primaryViolet.withValues(alpha: isDark ? 0.15 : 0.10),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: DashboardColors.primary.withValues(alpha: 0.25),
+                  width: 0.5,
+                ),
+              ),
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: Colors.transparent,
+              labelColor: DashboardColors.primary,
+              unselectedLabelColor: DashboardColors.textPrimary(isDark)
+                  .withValues(alpha: 0.4),
+              labelStyle: const TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w600),
+              splashBorderRadius: BorderRadius.circular(12),
+              tabs: [
+                _tabWithBadge('Due', dueCount, const Color(0xFFEF4444)),
+                _tabWithBadge(
+                    'Upcoming', upcomingCount, DashboardColors.primary),
+                _tabWithBadge('All', allCount,
+                    DashboardColors.textPrimary(isDark).withValues(alpha: 0.5)),
+              ],
+            ),
+          ),
         ),
-        indicatorSize: TabBarIndicatorSize.tab,
-        dividerColor: Colors.transparent,
-        labelColor: cs.primary,
-        unselectedLabelColor: cs.onSurface.withValues(alpha: 0.45),
-        labelStyle:
-            const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-        tabs: [
-          _tabWithBadge('Due', dueCount, const Color(0xFFEF4444)),
-          _tabWithBadge('Upcoming', upcomingCount, cs.primary),
-          _tabWithBadge('All', allCount, cs.onSurface.withValues(alpha: 0.5)),
-        ],
       ),
     );
   }
 
   Widget _tabWithBadge(String label, int count, Color badgeColor) {
     return Tab(
+      height: 40,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(label),
           if (count > 0) ...[
-            const SizedBox(width: 4),
+            const SizedBox(width: 5),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
               decoration: BoxDecoration(
-                color: badgeColor.withValues(alpha: label == 'Due' ? 1.0 : 0.3),
+                color: badgeColor != const Color(0xFFEF4444)
+                    ? badgeColor.withValues(alpha: 0.25)
+                    : badgeColor,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -506,7 +1068,9 @@ class _StyledTabBar extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 9,
                   fontWeight: FontWeight.w700,
-                  color: label == 'Due' ? Colors.white : badgeColor,
+                  color: badgeColor == const Color(0xFFEF4444)
+                      ? Colors.white
+                      : badgeColor,
                 ),
               ),
             ),
@@ -517,39 +1081,69 @@ class _StyledTabBar extends StatelessWidget {
   }
 }
 
-// ── Empty tab state ─────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+// EMPTY TAB STATE — premium animated empty state
+// ══════════════════════════════════════════════════════════════════
+
 class _EmptyTab extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+  final bool isDark;
 
   const _EmptyTab({
     required this.icon,
     required this.title,
     required this.subtitle,
+    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 48, color: cs.primary.withValues(alpha: 0.3)),
-          const SizedBox(height: 16),
-          Text(title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: cs.onSurface.withValues(alpha: 0.5),
-              )),
+          // Glowing icon
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  DashboardColors.primary.withValues(alpha: isDark ? 0.15 : 0.10),
+                  Colors.transparent,
+                ],
+                radius: 0.8,
+              ),
+            ),
+            child: Icon(
+              icon,
+              size: 48,
+              color: DashboardColors.primary.withValues(alpha: 0.4),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+              color: DashboardColors.textPrimary(isDark).withValues(alpha: 0.6),
+            ),
+          ),
           const SizedBox(height: 8),
-          Text(subtitle,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 48),
+            child: Text(
+              subtitle,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: cs.onSurface.withValues(alpha: 0.35),
-              )),
+              style: TextStyle(
+                fontSize: 13,
+                color: DashboardColors.textPrimary(isDark).withValues(alpha: 0.35),
+              ),
+            ),
+          ),
         ],
       ),
     );
