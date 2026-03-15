@@ -2089,6 +2089,76 @@ class AppProvider extends ChangeNotifier {
     await upsertRevisionItem(updated);
   }
 
+  /// Smart confidence-based revision: 'hard', 'good', or 'easy'.
+  /// Updates scheduling, logs, and retention score via SrsService.
+  Future<void> markRevisionItemWithConfidence(String revId, String quality) async {
+    final idx = revisionItems.indexWhere((r) => r.id == revId);
+    if (idx < 0) return;
+    final item = revisionItems[idx];
+    final mode = revisionSettings?.mode ?? 'strict';
+
+    final updated = SrsService.processConfidenceResponse(
+      item: item,
+      quality: quality,
+      mode: mode,
+    );
+
+    // Check if mastered (empty nextRevisionAt)
+    if (updated.nextRevisionAt.isEmpty) {
+      await deleteRevisionItem(revId);
+      return;
+    }
+
+    await upsertRevisionItem(updated);
+  }
+
+  /// Smart confidence-based revision for KB entries.
+  Future<void> markKBEntryWithConfidence(String kbPageNumber, String quality) async {
+    final kbIdx = knowledgeBase.indexWhere((e) => e.pageNumber == kbPageNumber);
+    if (kbIdx < 0) return;
+    final kb = knowledgeBase[kbIdx];
+    final mode = revisionSettings?.mode ?? 'strict';
+
+    // Convert KB entry to a temporary RevisionItem for processing
+    final tempItem = RevisionItem(
+      id: 'kb-$kbPageNumber',
+      type: 'PAGE',
+      source: 'KB',
+      title: kb.title,
+      parentTitle: kb.subject,
+      pageNumber: kbPageNumber,
+      nextRevisionAt: kb.nextRevisionAt ?? '',
+      currentRevisionIndex: kb.currentRevisionIndex,
+      totalSteps: 12,
+      lastStudiedAt: kb.lastStudiedAt,
+      hardCount: kb.hardCount,
+      effectiveSrsStep: kb.effectiveSrsStep,
+      easyFlag: kb.easyFlag,
+      retentionScore: kb.retentionScore,
+      revisionLog: kb.revisionLog,
+    );
+
+    final updated = SrsService.processConfidenceResponse(
+      item: tempItem,
+      quality: quality,
+      mode: mode,
+    );
+
+    // Write back to KB entry
+    final updatedKb = kb.copyWith(
+      currentRevisionIndex: updated.currentRevisionIndex,
+      lastStudiedAt: updated.lastStudiedAt,
+      nextRevisionAt: updated.nextRevisionAt,
+      revisionCount: kb.revisionCount + (quality != 'hard' ? 1 : 0),
+      hardCount: updated.hardCount,
+      effectiveSrsStep: updated.effectiveSrsStep,
+      easyFlag: updated.easyFlag,
+      retentionScore: updated.retentionScore,
+      revisionLog: updated.revisionLog,
+    );
+    await upsertKBEntry(updatedKb);
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // STUDY TASK COMPLETION → TRACKER + REVISION HUB
   // ═══════════════════════════════════════════════════════════════

@@ -282,6 +282,11 @@ class RevisionDisplayItem {
   final int totalSteps;
   final String? lastStudiedAt;
   final bool isKBEntry;
+  final int hardCount;
+  final int effectiveSrsStep;
+  final bool easyFlag;
+  final int retentionScore;
+  final List<RevisionLogEntry> revisionLog;
 
   const RevisionDisplayItem({
     required this.id,
@@ -295,6 +300,11 @@ class RevisionDisplayItem {
     required this.totalSteps,
     this.lastStudiedAt,
     this.isKBEntry = false,
+    this.hardCount = 0,
+    this.effectiveSrsStep = 0,
+    this.easyFlag = true,
+    this.retentionScore = 0,
+    this.revisionLog = const [],
   });
 
   factory RevisionDisplayItem.fromRevisionItem(RevisionItem ri) =>
@@ -309,6 +319,11 @@ class RevisionDisplayItem {
         currentRevisionIndex: ri.currentRevisionIndex,
         totalSteps: ri.totalSteps,
         lastStudiedAt: ri.lastStudiedAt,
+        hardCount: ri.hardCount,
+        effectiveSrsStep: ri.effectiveSrsStep,
+        easyFlag: ri.easyFlag,
+        retentionScore: ri.retentionScore,
+        revisionLog: ri.revisionLog,
       );
 
   factory RevisionDisplayItem.fromKBEntry(KnowledgeBaseEntry kb) =>
@@ -324,6 +339,11 @@ class RevisionDisplayItem {
         totalSteps: 12,
         lastStudiedAt: kb.lastStudiedAt,
         isKBEntry: true,
+        hardCount: kb.hardCount,
+        effectiveSrsStep: kb.effectiveSrsStep,
+        easyFlag: kb.easyFlag,
+        retentionScore: kb.retentionScore,
+        revisionLog: kb.revisionLog,
       );
 
   String get sourceLabel {

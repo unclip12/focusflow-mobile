@@ -4,6 +4,7 @@
 // =============================================================
 
 import 'attachment.dart';
+import 'revision_item.dart';
 
 class RevisionLog {
   final String id;
@@ -213,6 +214,13 @@ class KnowledgeBaseEntry {
   // Nested topics & subtopics
   final List<TrackableItem> topics;
 
+  // Smart SRS fields
+  final int hardCount;
+  final int effectiveSrsStep;
+  final bool easyFlag;
+  final int retentionScore;
+  final List<RevisionLogEntry> revisionLog;
+
   const KnowledgeBaseEntry({
     required this.pageNumber,
     required this.title,
@@ -233,6 +241,11 @@ class KnowledgeBaseEntry {
     this.attachments,
     required this.logs,
     required this.topics,
+    this.hardCount = 0,
+    this.effectiveSrsStep = 0,
+    this.easyFlag = true,
+    this.retentionScore = 0,
+    this.revisionLog = const [],
   });
 
   factory KnowledgeBaseEntry.fromJson(Map<String, dynamic> j) =>
@@ -273,6 +286,13 @@ class KnowledgeBaseEntry {
                 ?.map((t) => TrackableItem.fromJson(t))
                 .toList() ??
             [],
+        hardCount: j['hardCount'] ?? 0,
+        effectiveSrsStep: j['effectiveSrsStep'] ?? j['currentRevisionIndex'] ?? 0,
+        easyFlag: j['easyFlag'] ?? true,
+        retentionScore: j['retentionScore'] ?? 0,
+        revisionLog: (j['revisionLog'] as List<dynamic>?)
+            ?.map((e) => RevisionLogEntry.fromJson(e as Map<String, dynamic>))
+            .toList() ?? const [],
       );
 
   Map<String, dynamic> toJson() => {
@@ -296,6 +316,11 @@ class KnowledgeBaseEntry {
           'attachments': attachments!.map((a) => a.toJson()).toList(),
         'logs': logs.map((l) => l.toJson()).toList(),
         'topics': topics.map((t) => t.toJson()).toList(),
+        'hardCount': hardCount,
+        'effectiveSrsStep': effectiveSrsStep,
+        'easyFlag': easyFlag,
+        'retentionScore': retentionScore,
+        'revisionLog': revisionLog.map((e) => e.toJson()).toList(),
       };
 
   KnowledgeBaseEntry copyWith({
@@ -318,6 +343,11 @@ class KnowledgeBaseEntry {
     List<Attachment>? attachments,
     List<RevisionLog>? logs,
     List<TrackableItem>? topics,
+    int? hardCount,
+    int? effectiveSrsStep,
+    bool? easyFlag,
+    int? retentionScore,
+    List<RevisionLogEntry>? revisionLog,
   }) =>
       KnowledgeBaseEntry(
         pageNumber: pageNumber ?? this.pageNumber,
@@ -340,5 +370,10 @@ class KnowledgeBaseEntry {
         attachments: attachments ?? this.attachments,
         logs: logs ?? this.logs,
         topics: topics ?? this.topics,
+        hardCount: hardCount ?? this.hardCount,
+        effectiveSrsStep: effectiveSrsStep ?? this.effectiveSrsStep,
+        easyFlag: easyFlag ?? this.easyFlag,
+        retentionScore: retentionScore ?? this.retentionScore,
+        revisionLog: revisionLog ?? this.revisionLog,
       );
 }

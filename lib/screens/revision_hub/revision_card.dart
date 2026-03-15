@@ -1,17 +1,19 @@
 // =============================================================
 // UnifiedRevisionCard — Premium liquid glass revision card
 // Features: progress ring, urgency stripe, confidence buttons,
-// swipe gestures, expandable details, shimmer effects
+// swipe gestures, expandable details, shimmer effects,
+// revision log viewer, retention score, hard count display
 // =============================================================
 
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
-import 'package:focusflow_mobile/services/srs_service.dart';
 import 'package:focusflow_mobile/utils/app_colors.dart';
+import 'package:focusflow_mobile/models/revision_item.dart';
 import 'revision_hub_screen.dart';
 
 class UnifiedRevisionCard extends StatefulWidget {
@@ -32,6 +34,7 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard>
     with TickerProviderStateMixin {
   bool _saving = false;
   bool _expanded = false;
+  bool _showLogs = false;
   late final AnimationController _shimmerController;
   late final AnimationController _expandController;
   late final Animation<double> _expandAnim;
@@ -68,38 +71,11 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard>
     try {
       final app = context.read<AppProvider>();
       if (widget.item.isKBEntry) {
-        final kbEntry = app.knowledgeBase.firstWhere(
-          (e) => 'kb-${e.pageNumber}' == widget.item.id,
-        );
-        final mode = app.revisionSettings?.mode ?? 'strict';
-
-        // Adjust revision index based on confidence
-        int newIndex;
-        switch (quality) {
-          case 'easy':
-            newIndex = (kbEntry.currentRevisionIndex + 2).clamp(0, 11);
-            break;
-          case 'hard':
-            newIndex = (kbEntry.currentRevisionIndex).clamp(0, 11);
-            break;
-          default: // good
-            newIndex = (kbEntry.currentRevisionIndex + 1).clamp(0, 11);
-        }
-
-        final nextDate = SrsService.calculateNextRevisionDateString(
-          lastStudiedAt: DateTime.now().toIso8601String(),
-          revisionIndex: newIndex,
-          mode: mode,
-        );
-        final updated = kbEntry.copyWith(
-          currentRevisionIndex: newIndex,
-          lastStudiedAt: DateTime.now().toIso8601String(),
-          nextRevisionAt: nextDate,
-          revisionCount: kbEntry.revisionCount + 1,
-        );
-        await app.upsertKBEntry(updated);
+        // Extract page number from id (format: "kb-{pageNumber}")
+        final pageNumber = widget.item.id.replaceFirst('kb-', '');
+        await app.markKBEntryWithConfidence(pageNumber, quality);
       } else {
-        await app.markRevisionItemDone(widget.item.id);
+        await app.markRevisionItemWithConfidence(widget.item.id, quality);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -113,6 +89,7 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard>
         _expandController.forward();
       } else {
         _expandController.reverse();
+        _showLogs = false;
       }
     });
     HapticFeedback.selectionClick();
@@ -165,9 +142,8 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard>
         confirmDismiss: (direction) async {
           if (direction == DismissDirection.startToEnd) {
             await _markRevised(quality: 'good');
-            return false; // Don't actually dismiss, the list updates via provider
+            return false;
           }
-          // Swipe left = skip for now — no action needed
           return false;
         },
         child: GestureDetector(
@@ -196,8 +172,11 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard>
                           if (isOverdue)
                             BoxShadow(
                               color: const Color(0xFFEF4444).withValues(
-                                  alpha:
-                                      0.06 + (math.sin(_shimmerController.value * math.pi * 2) * 0.04)),
+                                  alpha: 0.06 +
+                                      (math.sin(_shimmerController.value *
+                                              math.pi *
+                                              2) *
+                                          0.04)),
                               blurRadius: 16,
                               spreadRadius: -2,
                             ),
@@ -228,9 +207,11 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard>
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                                 colors: [
-                                  Colors.white.withValues(alpha: isDark ? 0.08 : 0.25),
+                                  Colors.white.withValues(
+                                      alpha: isDark ? 0.08 : 0.25),
                                   Colors.transparent,
-                                  item.sourceColor.withValues(alpha: isDark ? 0.04 : 0.02),
+                                  item.sourceColor.withValues(
+                                      alpha: isDark ? 0.04 : 0.02),
                                 ],
                               ),
                             ),
@@ -272,15 +253,12 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard>
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Source icon with glass container
                                 _SourceBadge(
                                   icon: item.sourceIcon,
                                   color: item.sourceColor,
                                   isDark: isDark,
                                 ),
                                 const SizedBox(width: 10),
-
-                                // Title + subject
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -326,14 +304,13 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard>
                                     ],
                                   ),
                                 ),
-
                                 const SizedBox(width: 8),
-
-                                // SRS Progress Ring
                                 _ProgressRing(
                                   progress: item.progressPercent,
                                   step: item.currentRevisionIndex,
                                   total: item.totalSteps,
+                                  hardCount: item.hardCount,
+                                  easyFlag: item.easyFlag,
                                   color: item.sourceColor,
                                   isDark: isDark,
                                 ),
@@ -342,7 +319,7 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard>
 
                             const SizedBox(height: 10),
 
-                            // Chips row: source label + due status
+                            // Chips row
                             Wrap(
                               spacing: 6,
                               runSpacing: 6,
@@ -362,16 +339,15 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard>
                                       ? Icons.warning_amber_rounded
                                       : Icons.schedule_rounded,
                                 ),
+                                // Retention score badge
+                                _RetentionBadge(
+                                  score: item.retentionScore,
+                                  isDark: isDark,
+                                ),
                                 if (due.timeDetail.isNotEmpty)
                                   _InfoPill(
                                     icon: Icons.access_time_rounded,
                                     text: due.timeDetail,
-                                    isDark: isDark,
-                                  ),
-                                if (item.lastStudiedAt != null)
-                                  _InfoPill(
-                                    icon: Icons.history_rounded,
-                                    text: _formatLastStudied(item.lastStudiedAt!),
                                     isDark: isDark,
                                   ),
                               ],
@@ -386,6 +362,9 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard>
                                 isDark: isDark,
                                 onRevise: _markRevised,
                                 saving: _saving,
+                                showLogs: _showLogs,
+                                onToggleLogs: () => setState(
+                                    () => _showLogs = !_showLogs),
                               ),
                             ),
 
@@ -427,21 +406,10 @@ class _UnifiedRevisionCardState extends State<UnifiedRevisionCard>
       ),
     );
   }
-
-  String _formatLastStudied(String iso) {
-    final dt = DateTime.tryParse(iso);
-    if (dt == null) return '';
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inDays == 0) return 'Studied today';
-    if (diff.inDays == 1) return 'Yesterday';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
-    return '${(diff.inDays / 7).floor()}w ago';
-  }
 }
 
 // ══════════════════════════════════════════════════════════════════
-// SOURCE BADGE — glass icon container
+// SOURCE BADGE
 // ══════════════════════════════════════════════════════════════════
 
 class _SourceBadge extends StatelessWidget {
@@ -480,13 +448,15 @@ class _SourceBadge extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// SRS PROGRESS RING
+// SRS PROGRESS RING — shows R{step}({hardCount})
 // ══════════════════════════════════════════════════════════════════
 
 class _ProgressRing extends StatelessWidget {
   final double progress;
   final int step;
   final int total;
+  final int hardCount;
+  final bool easyFlag;
   final Color color;
   final bool isDark;
 
@@ -494,22 +464,29 @@ class _ProgressRing extends StatelessWidget {
     required this.progress,
     required this.step,
     required this.total,
+    required this.hardCount,
+    required this.easyFlag,
     required this.color,
     required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Green ring color if easy flagged and no hard attempts
+    final ringColor = easyFlag && hardCount == 0
+        ? const Color(0xFF10B981)
+        : color;
+
     return SizedBox(
-      width: 40,
-      height: 40,
+      width: 44,
+      height: 44,
       child: Stack(
         alignment: Alignment.center,
         children: [
           // Track
           SizedBox(
-            width: 36,
-            height: 36,
+            width: 40,
+            height: 40,
             child: CircularProgressIndicator(
               value: 1.0,
               strokeWidth: 3,
@@ -521,8 +498,8 @@ class _ProgressRing extends StatelessWidget {
           ),
           // Progress
           SizedBox(
-            width: 36,
-            height: 36,
+            width: 40,
+            height: 40,
             child: TweenAnimationBuilder<double>(
               tween: Tween<double>(begin: 0, end: progress),
               duration: const Duration(milliseconds: 800),
@@ -533,18 +510,93 @@ class _ProgressRing extends StatelessWidget {
                   strokeWidth: 3,
                   strokeCap: StrokeCap.round,
                   backgroundColor: Colors.transparent,
-                  valueColor: AlwaysStoppedAnimation(color),
+                  valueColor: AlwaysStoppedAnimation(ringColor),
                 );
               },
             ),
           ),
-          // Step text
+          // Step text with hard count
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'R$step',
+                style: TextStyle(
+                  fontSize: hardCount > 0 ? 9 : 11,
+                  fontWeight: FontWeight.w700,
+                  color: ringColor,
+                ),
+              ),
+              if (hardCount > 0)
+                Text(
+                  '($hardCount)',
+                  style: TextStyle(
+                    fontSize: 8,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFFEF4444).withValues(alpha: 0.8),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// RETENTION SCORE BADGE
+// ══════════════════════════════════════════════════════════════════
+
+class _RetentionBadge extends StatelessWidget {
+  final int score;
+  final bool isDark;
+
+  const _RetentionBadge({required this.score, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    Color badgeColor;
+    IconData icon;
+
+    if (score >= 80) {
+      badgeColor = const Color(0xFF10B981);
+      icon = Icons.stars_rounded;
+    } else if (score >= 50) {
+      badgeColor = const Color(0xFF3B82F6);
+      icon = Icons.trending_up_rounded;
+    } else if (score >= 20) {
+      badgeColor = const Color(0xFFF59E0B);
+      icon = Icons.auto_graph_rounded;
+    } else if (score > 0) {
+      badgeColor = const Color(0xFFF97316);
+      icon = Icons.trending_flat_rounded;
+    } else {
+      badgeColor = DashboardColors.textPrimary(isDark).withValues(alpha: 0.3);
+      icon = Icons.remove_rounded;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: badgeColor.withValues(alpha: isDark ? 0.15 : 0.10),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: badgeColor.withValues(alpha: 0.2),
+          width: 0.5,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: badgeColor),
+          const SizedBox(width: 3),
           Text(
-            '$step',
+            score > 0 ? '$score' : '0',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 9,
               fontWeight: FontWeight.w700,
-              color: color,
+              color: badgeColor,
             ),
           ),
         ],
@@ -554,7 +606,7 @@ class _ProgressRing extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// GLASS CHIP — frosted source/status chip
+// GLASS CHIP
 // ══════════════════════════════════════════════════════════════════
 
 class _GlassChip extends StatelessWidget {
@@ -604,7 +656,7 @@ class _GlassChip extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// INFO PILL — subtle time/status info
+// INFO PILL
 // ══════════════════════════════════════════════════════════════════
 
 class _InfoPill extends StatelessWidget {
@@ -633,7 +685,8 @@ class _InfoPill extends StatelessWidget {
           text,
           style: TextStyle(
             fontSize: 9,
-            color: DashboardColors.textPrimary(isDark).withValues(alpha: 0.35),
+            color:
+                DashboardColors.textPrimary(isDark).withValues(alpha: 0.35),
           ),
         ),
       ],
@@ -642,7 +695,7 @@ class _InfoPill extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// MARK REVISED BUTTON — gradient glass button
+// MARK REVISED BUTTON
 // ══════════════════════════════════════════════════════════════════
 
 class _MarkRevisedButton extends StatelessWidget {
@@ -666,7 +719,8 @@ class _MarkRevisedButton extends StatelessWidget {
           gradient: LinearGradient(
             colors: [
               DashboardColors.primary.withValues(alpha: isDark ? 0.18 : 0.12),
-              DashboardColors.primaryViolet.withValues(alpha: isDark ? 0.12 : 0.08),
+              DashboardColors.primaryViolet
+                  .withValues(alpha: isDark ? 0.12 : 0.08),
             ],
           ),
           borderRadius: BorderRadius.circular(10),
@@ -682,7 +736,8 @@ class _MarkRevisedButton extends StatelessWidget {
                   height: 14,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation(DashboardColors.primary),
+                    valueColor:
+                        AlwaysStoppedAnimation(DashboardColors.primary),
                   ),
                 )
               : Row(
@@ -711,7 +766,7 @@ class _MarkRevisedButton extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// EXPANDED DETAILS — confidence buttons + revision timeline
+// EXPANDED DETAILS — confidence buttons + SRS timeline + logs
 // ══════════════════════════════════════════════════════════════════
 
 class _ExpandedDetails extends StatelessWidget {
@@ -719,12 +774,16 @@ class _ExpandedDetails extends StatelessWidget {
   final bool isDark;
   final Future<void> Function({String quality}) onRevise;
   final bool saving;
+  final bool showLogs;
+  final VoidCallback onToggleLogs;
 
   const _ExpandedDetails({
     required this.item,
     required this.isDark,
     required this.onRevise,
     required this.saving,
+    required this.showLogs,
+    required this.onToggleLogs,
   });
 
   @override
@@ -734,7 +793,7 @@ class _ExpandedDetails extends StatelessWidget {
       children: [
         const SizedBox(height: 14),
 
-        // ── Divider ──────────────────────────────────────────
+        // Divider
         Container(
           height: 0.5,
           decoration: BoxDecoration(
@@ -750,32 +809,35 @@ class _ExpandedDetails extends StatelessWidget {
 
         const SizedBox(height: 14),
 
-        // ── Revision Progress Timeline ──────────────────────
+        // SRS Progress Timeline
         Text(
           'SRS Progress',
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: DashboardColors.textPrimary(isDark).withValues(alpha: 0.6),
+            color: DashboardColors.textPrimary(isDark)
+                .withValues(alpha: 0.6),
           ),
         ),
         const SizedBox(height: 8),
         _SrsTimeline(
           currentStep: item.currentRevisionIndex,
           totalSteps: item.totalSteps,
+          effectiveSrsStep: item.effectiveSrsStep,
           color: item.sourceColor,
           isDark: isDark,
         ),
 
         const SizedBox(height: 16),
 
-        // ── Confidence Buttons ──────────────────────────────
+        // Confidence Buttons
         Text(
           'How well do you remember?',
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: DashboardColors.textPrimary(isDark).withValues(alpha: 0.6),
+            color: DashboardColors.textPrimary(isDark)
+                .withValues(alpha: 0.6),
           ),
         ),
         const SizedBox(height: 8),
@@ -818,13 +880,87 @@ class _ExpandedDetails extends StatelessWidget {
             ),
           ],
         ),
+
+        const SizedBox(height: 12),
+
+        // View Logs button
+        GestureDetector(
+          onTap: onToggleLogs,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            decoration: BoxDecoration(
+              color: DashboardColors.textPrimary(isDark)
+                  .withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: DashboardColors.textPrimary(isDark)
+                    .withValues(alpha: 0.08),
+                width: 0.5,
+              ),
+            ),
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    showLogs
+                        ? Icons.visibility_off_rounded
+                        : Icons.history_rounded,
+                    size: 13,
+                    color: DashboardColors.textPrimary(isDark)
+                        .withValues(alpha: 0.45),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    showLogs ? 'Hide Logs' : 'View Logs',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: DashboardColors.textPrimary(isDark)
+                          .withValues(alpha: 0.45),
+                    ),
+                  ),
+                  if (item.revisionLog.isNotEmpty) ...[
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: DashboardColors.primary
+                            .withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '${item.revisionLog.length}',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: DashboardColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        // Log entries
+        if (showLogs) ...[
+          const SizedBox(height: 10),
+          _RevisionLogList(
+            logs: item.revisionLog,
+            isDark: isDark,
+          ),
+        ],
       ],
     );
   }
 }
 
 // ══════════════════════════════════════════════════════════════════
-// CONFIDENCE BUTTON — glass-styled action button
+// CONFIDENCE BUTTON
 // ══════════════════════════════════════════════════════════════════
 
 class _ConfidenceButton extends StatelessWidget {
@@ -888,18 +1024,20 @@ class _ConfidenceButton extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// SRS TIMELINE — visual step indicator
+// SRS TIMELINE — with effective step indicator
 // ══════════════════════════════════════════════════════════════════
 
 class _SrsTimeline extends StatelessWidget {
   final int currentStep;
   final int totalSteps;
+  final int effectiveSrsStep;
   final Color color;
   final bool isDark;
 
   const _SrsTimeline({
     required this.currentStep,
     required this.totalSteps,
+    required this.effectiveSrsStep,
     required this.color,
     required this.isDark,
   });
@@ -907,37 +1045,290 @@ class _SrsTimeline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displaySteps = totalSteps.clamp(1, 12);
+    final isLagging = effectiveSrsStep < currentStep;
 
-    return Row(
-      children: List.generate(displaySteps, (i) {
-        final done = i < currentStep;
-        final current = i == currentStep;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: List.generate(displaySteps, (i) {
+            final done = i < currentStep;
+            final current = i == currentStep;
+            final isEffective = i == effectiveSrsStep && isLagging;
 
-        return Expanded(
-          child: Container(
-            margin: EdgeInsets.only(right: i < displaySteps - 1 ? 2 : 0),
-            height: 5,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(3),
-              color: done
-                  ? color.withValues(alpha: 0.8)
-                  : current
-                      ? color.withValues(alpha: 0.35)
-                      : DashboardColors.textPrimary(isDark)
-                          .withValues(alpha: 0.08),
-              boxShadow: done
-                  ? [
-                      BoxShadow(
-                        color: color.withValues(alpha: 0.3),
-                        blurRadius: 4,
-                        spreadRadius: -1,
-                      ),
-                    ]
-                  : null,
+            return Expanded(
+              child: Container(
+                margin:
+                    EdgeInsets.only(right: i < displaySteps - 1 ? 2 : 0),
+                height: 5,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(3),
+                  color: done
+                      ? color.withValues(alpha: 0.8)
+                      : current
+                          ? color.withValues(alpha: 0.35)
+                          : isEffective
+                              ? const Color(0xFFF59E0B)
+                                  .withValues(alpha: 0.5)
+                              : DashboardColors.textPrimary(isDark)
+                                  .withValues(alpha: 0.08),
+                  boxShadow: done
+                      ? [
+                          BoxShadow(
+                            color: color.withValues(alpha: 0.3),
+                            blurRadius: 4,
+                            spreadRadius: -1,
+                          ),
+                        ]
+                      : null,
+                ),
+              ),
+            );
+          }),
+        ),
+        if (isLagging) ...[
+          const SizedBox(height: 4),
+          Text(
+            'SRS lagging: interval at step ${effectiveSrsStep + 1} of ${currentStep + 1}',
+            style: TextStyle(
+              fontSize: 9,
+              color: const Color(0xFFF59E0B).withValues(alpha: 0.7),
             ),
           ),
-        );
-      }),
+        ],
+      ],
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// REVISION LOG LIST — timeline of all actions
+// ══════════════════════════════════════════════════════════════════
+
+class _RevisionLogList extends StatelessWidget {
+  final List<RevisionLogEntry> logs;
+  final bool isDark;
+
+  const _RevisionLogList({required this.logs, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    if (logs.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Center(
+          child: Text(
+            'No revision logs yet',
+            style: TextStyle(
+              fontSize: 11,
+              color: DashboardColors.textPrimary(isDark)
+                  .withValues(alpha: 0.35),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: DashboardColors.textPrimary(isDark).withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: DashboardColors.textPrimary(isDark).withValues(alpha: 0.06),
+          width: 0.5,
+        ),
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(10),
+        itemCount: logs.length,
+        separatorBuilder: (_, __) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Container(
+            height: 0.5,
+            color: DashboardColors.textPrimary(isDark)
+                .withValues(alpha: 0.06),
+          ),
+        ),
+        itemBuilder: (_, i) {
+          final log = logs[logs.length - 1 - i]; // newest first
+          return _LogEntry(log: log, isDark: isDark);
+        },
+      ),
+    );
+  }
+}
+
+class _LogEntry extends StatelessWidget {
+  final RevisionLogEntry log;
+  final bool isDark;
+
+  const _LogEntry({required this.log, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    Color responseColor;
+    IconData responseIcon;
+    switch (log.response) {
+      case 'hard':
+        responseColor = const Color(0xFFEF4444);
+        responseIcon = Icons.replay_rounded;
+        break;
+      case 'easy':
+        responseColor = const Color(0xFF10B981);
+        responseIcon = Icons.fast_forward_rounded;
+        break;
+      default:
+        responseColor = DashboardColors.primary;
+        responseIcon = Icons.check_rounded;
+    }
+
+    final scheduledDt = DateTime.tryParse(log.scheduledAt);
+    final actualDt = DateTime.tryParse(log.actualAt);
+    final fmt = DateFormat('MMM d, h:mm a');
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Response icon
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: responseColor.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(responseIcon, size: 10, color: responseColor),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Revision label
+              Row(
+                children: [
+                  Text(
+                    'R${log.revisionNumber}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: DashboardColors.textPrimary(isDark),
+                    ),
+                  ),
+                  if (log.hardAttempt > 0)
+                    Text(
+                      ' (Hard #${log.hardAttempt})',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: responseColor,
+                      ),
+                    ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: responseColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      log.response.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 8,
+                        fontWeight: FontWeight.w800,
+                        color: responseColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 3),
+              // Scheduled vs Actual
+              if (scheduledDt != null)
+                _LogDetailRow(
+                  label: 'Scheduled',
+                  value: fmt.format(scheduledDt),
+                  isDark: isDark,
+                ),
+              if (actualDt != null)
+                _LogDetailRow(
+                  label: 'Actual',
+                  value: fmt.format(actualDt),
+                  isDark: isDark,
+                ),
+              if (log.nextScheduledHours > 0)
+                _LogDetailRow(
+                  label: 'Next in',
+                  value: _formatHours(log.nextScheduledHours),
+                  isDark: isDark,
+                ),
+              if (log.note.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    log.note,
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontStyle: FontStyle.italic,
+                      color: DashboardColors.textPrimary(isDark)
+                          .withValues(alpha: 0.35),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatHours(int hours) {
+    if (hours < 24) return '${hours}h';
+    final days = hours ~/ 24;
+    final rem = hours % 24;
+    if (rem == 0) return '${days}d';
+    return '${days}d ${rem}h';
+  }
+}
+
+class _LogDetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool isDark;
+
+  const _LogDetailRow({
+    required this.label,
+    required this.value,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 1),
+      child: Row(
+        children: [
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w500,
+              color: DashboardColors.textPrimary(isDark)
+                  .withValues(alpha: 0.35),
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 9,
+              color: DashboardColors.textPrimary(isDark)
+                  .withValues(alpha: 0.5),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1027,7 +1418,7 @@ class _SwipeBackground extends StatelessWidget {
         ),
       ),
       alignment: alignment,
-      padding: EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
