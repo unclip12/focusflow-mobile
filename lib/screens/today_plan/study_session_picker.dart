@@ -1270,7 +1270,7 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                       16,
                       0,
                       16,
-                      MediaQuery.of(ctx).padding.bottom + 20,
+                      MediaQuery.of(ctx).padding.bottom + 72 + 20,
                     ),
                     itemCount: pages.length,
                     itemBuilder: (ctx, i) {
@@ -1318,7 +1318,12 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.only(
+                    left: 16,
+                    top: 16,
+                    right: 16,
+                    bottom: MediaQuery.of(ctx).padding.bottom + 16,
+                  ),
                   child: SizedBox(
                     width: double.infinity,
                     child: FilledButton(

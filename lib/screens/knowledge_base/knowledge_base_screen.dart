@@ -88,10 +88,17 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
 
     return AppScaffold(
       screenName: 'Knowledge Base',
-      body: Stack(
+      floatingActionButton: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).padding.bottom + 72,
+        ),
+        child: FloatingActionButton(
+          onPressed: () => _showAddEntrySheet(context),
+          child: const Icon(Icons.add_rounded),
+        ),
+      ),
+      body: Column(
         children: [
-          Column(
-            children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                 child: TextField(
@@ -196,16 +203,6 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
                         },
                       ),
               ),
-            ],
-          ),
-          Positioned(
-            bottom: 20,
-            right: 20,
-            child: FloatingActionButton(
-              onPressed: () => _showAddEntrySheet(context),
-              child: const Icon(Icons.add_rounded),
-            ),
-          ),
         ],
       ),
     );
