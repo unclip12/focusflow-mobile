@@ -11,13 +11,14 @@ import 'package:focusflow_mobile/models/sketchy_video.dart';
 import 'package:focusflow_mobile/models/uworld_topic.dart';
 import 'package:focusflow_mobile/models/pathoma_chapter.dart';
 import 'package:focusflow_mobile/models/fa_subtopic.dart';
+import 'package:focusflow_mobile/models/activity_log.dart';
 
 class DatabaseService {
   DatabaseService._();
   static final DatabaseService instance = DatabaseService._();
 
   static const _dbName = 'focusflow.db';
-  static const _dbVersion = 8;
+  static const _dbVersion = 9;
 
   Database? _database;
 
@@ -72,6 +73,7 @@ class DatabaseService {
   static const tDefaultRoutineOrder = 'default_routine_order';
   static const tDailyFlows = 'daily_flows';
   static const tLibraryNotes = 'library_notes';
+  static const tActivityLogs = 'activity_logs';
 
   Future<void> _onCreate(Database db, int version) async {
     // Knowledge Base — pageNumber is the primary key
@@ -253,6 +255,9 @@ class DatabaseService {
 
     // ── V8 tables (Library Notes) ─────────────────────────────
     await _createV8Tables(db);
+
+    // ── V9 tables (Activity Logs) ─────────────────────────────
+    await _createV9Tables(db);
   }
 
   /// Create G5 tracker tables — called from both _onCreate and _onUpgrade.
@@ -373,6 +378,9 @@ class DatabaseService {
     if (oldVersion < 8) {
       await _createV8Tables(db);
     }
+    if (oldVersion < 9) {
+      await _createV9Tables(db);
+    }
     // Streak data table — always ensure it exists
     await db.execute('''
       CREATE TABLE IF NOT EXISTS $tStreakData (
@@ -395,6 +403,27 @@ class DatabaseService {
     ''');
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_lib_notes_item ON $tLibraryNotes(itemId)');
+  }
+
+  /// Create V9 tables (Activity Logs).
+  Future<void> _createV9Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tActivityLogs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        item_id TEXT NOT NULL,
+        item_type TEXT NOT NULL,
+        action TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        title TEXT,
+        details TEXT
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_activity_logs_item ON $tActivityLogs(item_id)');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_activity_logs_ts ON $tActivityLogs(timestamp)');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_activity_logs_type ON $tActivityLogs(item_type)');
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -508,6 +537,65 @@ class DatabaseService {
 
   Future<int> deleteLibraryNote(String id) =>
       deleteById(tLibraryNotes, 'id', id);
+
+  // ═══════════════════════════════════════════════════════════════
+  // ACTIVITY LOGS (V9)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<int> insertActivityLog(ActivityLogEntry entry) async {
+    final db = await database;
+    return db.insert(tActivityLogs, entry.toMap()..remove('id'));
+  }
+
+  Future<List<ActivityLogEntry>> getActivityLogsByItem(String itemId) async {
+    final db = await database;
+    final rows = await db.query(
+      tActivityLogs,
+      where: 'item_id = ?',
+      whereArgs: [itemId],
+      orderBy: 'timestamp DESC',
+    );
+    return rows.map(ActivityLogEntry.fromMap).toList();
+  }
+
+  Future<List<ActivityLogEntry>> getActivityLogsByType(String itemType) async {
+    final db = await database;
+    final rows = await db.query(
+      tActivityLogs,
+      where: 'item_type = ?',
+      whereArgs: [itemType],
+      orderBy: 'timestamp DESC',
+    );
+    return rows.map(ActivityLogEntry.fromMap).toList();
+  }
+
+  Future<List<ActivityLogEntry>> getAllActivityLogs({int? limit}) async {
+    final db = await database;
+    final rows = await db.query(
+      tActivityLogs,
+      orderBy: 'timestamp DESC',
+      limit: limit,
+    );
+    return rows.map(ActivityLogEntry.fromMap).toList();
+  }
+
+  Future<List<ActivityLogEntry>> getActivityLogsSince(String sinceIso) async {
+    final db = await database;
+    final rows = await db.query(
+      tActivityLogs,
+      where: 'timestamp >= ?',
+      whereArgs: [sinceIso],
+      orderBy: 'timestamp DESC',
+    );
+    return rows.map(ActivityLogEntry.fromMap).toList();
+  }
+
+  Future<int> deleteActivityLog(int id) async {
+    final db = await database;
+    return db.delete(tActivityLogs, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<int> deleteAllActivityLogs() => deleteAll(tActivityLogs);
 
   // ═══════════════════════════════════════════════════════════════
   // KNOWLEDGE BASE — pageNumber is primary key
@@ -1264,7 +1352,7 @@ class DatabaseService {
         tFaPages, tSketchyItems, tPathomaItems, tUworldSessions, tUworldTopics,
         tSketchyMicroVideos, tSketchyPharmVideos, tPathomaChapters, tFaSubtopics,
         tStreakData, tRoutines, tRoutineLogs, tBuyingItems, tTodoItems,
-        tDefaultRoutineOrder, tDailyFlows,
+        tDefaultRoutineOrder, tDailyFlows, tActivityLogs,
       ]) {
         await txn.delete(table);
       }

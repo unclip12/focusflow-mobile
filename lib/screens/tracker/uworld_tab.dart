@@ -235,6 +235,7 @@ class UWorldTab extends StatelessWidget {
     final accuracy = topic.doneQuestions > 0
         ? ((topic.correctQuestions / topic.doneQuestions) * 100).round()
         : 0;
+    final remaining = topic.totalQuestions - topic.doneQuestions;
 
     return Slidable(
       key: ValueKey(key),
@@ -303,10 +304,25 @@ class UWorldTab extends StatelessWidget {
                         minHeight: 4,
                       ),
                     ),
+                    const SizedBox(height: 3),
+                    // Remaining count
+                    Text(
+                      remaining > 0
+                          ? '$remaining remaining'
+                          : 'All done! 🎉',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: remaining > 0
+                            ? DashboardColors.textPrimary(isDark)
+                                .withValues(alpha: 0.4)
+                            : DashboardColors.success,
+                        fontWeight: remaining == 0 ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               // Stats
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -339,10 +355,55 @@ class UWorldTab extends StatelessWidget {
                   ),
                 ],
               ),
+              // Quick-mark + button
+              if (!selectionMode && remaining > 0) ...[
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () => _showQuickMark(context, topic),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          DashboardColors.primary,
+                          DashboardColors.primaryViolet,
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: DashboardColors.primary.withValues(alpha: 0.3),
+                          blurRadius: 6,
+                          spreadRadius: -1,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.add_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
       ),
+    );
+  }
+
+  void _showQuickMark(BuildContext context, UWorldTopic topic) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _QuickMarkSheet(app: app, topic: topic),
     );
   }
 
@@ -653,6 +714,244 @@ class _UWorldEditSheetState extends State<_UWorldEditSheet> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Quick Mark Sheet — compact stepper for marking questions
+// ═══════════════════════════════════════════════════════════════
+
+class _QuickMarkSheet extends StatefulWidget {
+  final AppProvider app;
+  final UWorldTopic topic;
+
+  const _QuickMarkSheet({required this.app, required this.topic});
+
+  @override
+  State<_QuickMarkSheet> createState() => _QuickMarkSheetState();
+}
+
+class _QuickMarkSheetState extends State<_QuickMarkSheet> {
+  late int _done;
+  late int _correct;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _done = 0;
+    _correct = 0;
+  }
+
+  int get _maxRemaining =>
+      widget.topic.totalQuestions - widget.topic.doneQuestions;
+
+  Future<void> _save() async {
+    if (_done == 0) return;
+    setState(() => _saving = true);
+    await widget.app.updateUWorldProgress(
+      widget.topic.id!,
+      widget.topic.doneQuestions + _done,
+      widget.topic.correctQuestions + _correct,
+    );
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        24,
+        16,
+        24,
+        MediaQuery.of(context).padding.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: cs.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Text(
+            'Quick Mark — ${widget.topic.subtopic}',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: DashboardColors.textPrimary(isDark),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${widget.topic.doneQuestions}/${widget.topic.totalQuestions} done • $_maxRemaining remaining',
+            style: TextStyle(
+              fontSize: 12,
+              color: DashboardColors.textPrimary(isDark).withValues(alpha: 0.5),
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Done stepper
+          _buildStepper(
+            label: 'Questions Done',
+            value: _done,
+            max: _maxRemaining,
+            color: DashboardColors.primary,
+            isDark: isDark,
+            onChanged: (v) => setState(() {
+              _done = v;
+              if (_correct > _done) _correct = _done;
+            }),
+          ),
+          const SizedBox(height: 12),
+          // Correct stepper
+          _buildStepper(
+            label: 'Correct',
+            value: _correct,
+            max: _done,
+            color: DashboardColors.success,
+            isDark: isDark,
+            onChanged: (v) => setState(() => _correct = v),
+          ),
+          const SizedBox(height: 8),
+          // Wrong summary
+          if (_done > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: DashboardColors.danger.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.close_rounded,
+                      size: 14, color: DashboardColors.danger),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${_done - _correct} wrong',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: DashboardColors.danger,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _done > 0 && !_saving ? _save : null,
+              child: _saving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text('Add $_done question${_done != 1 ? 's' : ''}'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepper({
+    required String label,
+    required int value,
+    required int max,
+    required Color color,
+    required bool isDark,
+    required ValueChanged<int> onChanged,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: DashboardColors.textPrimary(isDark),
+            ),
+          ),
+        ),
+        // - button
+        InkWell(
+          onTap: value > 0 ? () => onChanged(value - 1) : null,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: value > 0
+                  ? color.withValues(alpha: 0.12)
+                  : isDark
+                      ? Colors.white.withValues(alpha: 0.04)
+                      : Colors.grey.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.remove_rounded,
+              size: 20,
+              color: value > 0
+                  ? color
+                  : DashboardColors.textPrimary(isDark).withValues(alpha: 0.2),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        SizedBox(
+          width: 40,
+          child: Text(
+            '$value',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        // + button
+        InkWell(
+          onTap: value < max ? () => onChanged(value + 1) : null,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: value < max
+                  ? color.withValues(alpha: 0.12)
+                  : isDark
+                      ? Colors.white.withValues(alpha: 0.04)
+                      : Colors.grey.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.add_rounded,
+              size: 20,
+              color: value < max
+                  ? color
+                  : DashboardColors.textPrimary(isDark).withValues(alpha: 0.2),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

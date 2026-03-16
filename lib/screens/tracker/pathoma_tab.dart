@@ -265,6 +265,52 @@ class PathomaTab extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
+                      // Revision badge
+                      Builder(builder: (context) {
+                        final revId = 'pathoma-ch-${chapter.id}';
+                        final revItem = app.revisionItems.cast<dynamic>().firstWhere(
+                              (r) => r.id == revId,
+                              orElse: () => null,
+                            );
+                        if (revItem != null && chapter.watched) {
+                          final revIndex = revItem.currentRevisionIndex as int;
+                          return Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  DashboardColors.primary,
+                                  DashboardColors.primaryViolet,
+                                ],
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: DashboardColors.primary.withValues(alpha: 0.3),
+                                  blurRadius: 4,
+                                  spreadRadius: -1,
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Text(
+                                'R$revIndex',
+                                style: const TextStyle(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                  height: 1,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      }),
+                      const SizedBox(width: 6),
                       // Status badge
                       InkWell(
                         onTap: selectionMode

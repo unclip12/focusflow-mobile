@@ -43,6 +43,7 @@ import 'package:focusflow_mobile/models/buying_item.dart';
 import 'package:focusflow_mobile/models/todo_item.dart';
 import 'package:focusflow_mobile/models/default_routine_order.dart';
 import 'package:focusflow_mobile/models/daily_flow.dart';
+import 'package:focusflow_mobile/models/activity_log.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart' as du;
 
@@ -2326,6 +2327,14 @@ class AppProvider extends ChangeNotifier {
         await deleteRevisionItem(revId);
       }
     }
+
+    // Log activity
+    await _logActivity(
+      itemId: 'fa:$pageNum',
+      itemType: 'fa',
+      action: status == 'unread' ? 'reset' : status == 'read' ? 'read' : 'anki_done',
+      title: updated.title.isNotEmpty ? 'FA p.$pageNum — ${updated.title}' : 'FA Page $pageNum',
+    );
   }
 
   /// Bulk-update FA pages in range [from..to] to the given status.
@@ -2928,6 +2937,15 @@ class AppProvider extends ChangeNotifier {
     }
     notifyListeners();
     unawaited(_triggerBackup());
+
+    // Log activity
+    final logVideo = idx >= 0 ? sketchyMicroVideos[idx] : null;
+    await _logActivity(
+      itemId: 'sketchy-micro:$id',
+      itemType: 'sketchy',
+      action: watched ? 'watched' : 'unwatched',
+      title: logVideo != null ? 'Sketchy Micro — ${logVideo.title}' : 'Sketchy Micro #$id',
+    );
   }
 
   Future<void> undoSketchyMicro(int id) async {
@@ -2997,6 +3015,15 @@ class AppProvider extends ChangeNotifier {
     }
     notifyListeners();
     unawaited(_triggerBackup());
+
+    // Log activity
+    final logVideo = idx >= 0 ? sketchyPharmVideos[idx] : null;
+    await _logActivity(
+      itemId: 'sketchy-pharm:$id',
+      itemType: 'sketchy',
+      action: watched ? 'watched' : 'unwatched',
+      title: logVideo != null ? 'Sketchy Pharm — ${logVideo.title}' : 'Sketchy Pharm #$id',
+    );
   }
 
   Future<void> undoSketchyPharm(int id) async {
@@ -3112,6 +3139,15 @@ class AppProvider extends ChangeNotifier {
     }
     notifyListeners();
     unawaited(_triggerBackup());
+
+    // Log activity
+    final logChapter = idx >= 0 ? pathomaChapters[idx] : null;
+    await _logActivity(
+      itemId: 'pathoma:$id',
+      itemType: 'pathoma',
+      action: watched ? 'watched' : 'unwatched',
+      title: logChapter != null ? 'Pathoma Ch${logChapter.chapter} — ${logChapter.title}' : 'Pathoma #$id',
+    );
   }
 
   Future<void> undoPathomaChapter(int id) async {
@@ -3301,9 +3337,28 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> updateUWorldProgress(int id, int done, int correct) async {
+    // Get topic info before update for logging
+    final topicIdx = uworldTopics.indexWhere((t) => t.id == id);
+    final prevDone = topicIdx >= 0 ? uworldTopics[topicIdx].doneQuestions : 0;
+    final prevCorrect = topicIdx >= 0 ? uworldTopics[topicIdx].correctQuestions : 0;
+
     await _db.updateUWorldProgress(id, done, correct);
     await loadUWorldTopics();
     unawaited(_triggerBackup());
+
+    // Log activity if questions were added
+    final deltaDone = done - prevDone;
+    final deltaCorrect = correct - prevCorrect;
+    if (deltaDone > 0) {
+      final topic = topicIdx >= 0 ? uworldTopics.firstWhere((t) => t.id == id, orElse: () => uworldTopics[0]) : null;
+      await _logActivity(
+        itemId: 'uworld:$id',
+        itemType: 'uworld',
+        action: 'question_done',
+        title: topic != null ? 'UWorld — ${topic.subtopic}' : 'UWorld Topic #$id',
+        details: '{"done":$deltaDone,"correct":$deltaCorrect,"totalDone":$done,"totalCorrect":$correct}',
+      );
+    }
   }
 
   Future<void> markUWorldTopicDone(int topicId) async {
@@ -3798,5 +3853,48 @@ class AppProvider extends ChangeNotifier {
       await _db.updateUWorldTopic(updatedTopic.toMap());
     }
     notifyListeners();
+  }
+
+  // ═════════════════════════════════════════════════════════════════
+  // ACTIVITY LOGS
+  // ═════════════════════════════════════════════════════════════════
+
+  /// Internal helper to log an activity.
+  Future<void> _logActivity({
+    required String itemId,
+    required String itemType,
+    required String action,
+    String title = '',
+    String details = '{}',
+  }) async {
+    final entry = ActivityLogEntry(
+      itemId: itemId,
+      itemType: itemType,
+      action: action,
+      timestamp: DateTime.now().toIso8601String(),
+      title: title,
+      details: details,
+    );
+    await _db.insertActivityLog(entry);
+  }
+
+  /// Get activity logs for a specific item.
+  Future<List<ActivityLogEntry>> getActivityLogs(String itemId) async {
+    return _db.getActivityLogsByItem(itemId);
+  }
+
+  /// Get all activity logs, optionally limited.
+  Future<List<ActivityLogEntry>> getAllActivityLogs({int? limit}) async {
+    return _db.getAllActivityLogs(limit: limit);
+  }
+
+  /// Get activity logs by item type.
+  Future<List<ActivityLogEntry>> getActivityLogsByType(String itemType) async {
+    return _db.getActivityLogsByType(itemType);
+  }
+
+  /// Get activity logs since a specific date.
+  Future<List<ActivityLogEntry>> getActivityLogsSince(DateTime since) async {
+    return _db.getActivityLogsSince(since.toIso8601String());
   }
 }

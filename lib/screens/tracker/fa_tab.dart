@@ -620,24 +620,41 @@ class _LiquidFillPageBox extends StatelessWidget {
               ),
             ),
 
-            // Revision badge
+            // Revision badge — premium circular
             if (page.revisionCount > 0)
               Positioned(
-                top: 2,
-                right: 2,
+                top: 1,
+                right: 1,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  width: 20,
+                  height: 20,
                   decoration: BoxDecoration(
-                    color: DashboardColors.primary,
-                    borderRadius: BorderRadius.circular(6),
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        DashboardColors.primary,
+                        DashboardColors.primaryViolet,
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: DashboardColors.primary.withValues(alpha: 0.4),
+                        blurRadius: 4,
+                        spreadRadius: -1,
+                      ),
+                    ],
                   ),
-                  child: Text(
-                    'R${page.revisionCount}',
-                    style: const TextStyle(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                  child: Center(
+                    child: Text(
+                      'R${page.revisionCount}',
+                      style: const TextStyle(
+                        fontSize: 7,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        height: 1,
+                      ),
                     ),
                   ),
                 ),
@@ -1192,13 +1209,35 @@ class _FACardView extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 3),
-                            Text(
-                              '${page.system} • $readSubs/${subtopics.length} subtopics',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: DashboardColors.textPrimary(isDark)
-                                    .withValues(alpha: 0.5),
-                              ),
+                            Row(
+                              children: [
+                                Text(
+                                  '${page.system} • $readSubs/${subtopics.length} subtopics',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: DashboardColors.textPrimary(isDark)
+                                        .withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                if (page.lastRevisedAt != null) ...[
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    Icons.history_rounded,
+                                    size: 10,
+                                    color: DashboardColors.textPrimary(isDark)
+                                        .withValues(alpha: 0.35),
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    _formatTimeAgo(page.lastRevisedAt!),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: DashboardColors.textPrimary(isDark)
+                                          .withValues(alpha: 0.35),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ],
                         ),
@@ -1251,19 +1290,35 @@ class _FACardView extends StatelessWidget {
                       if (page.revisionCount > 0) ...[
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 4),
+                          width: 26,
+                          height: 26,
                           decoration: BoxDecoration(
-                            color: DashboardColors.primary
-                                .withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                DashboardColors.primary,
+                                DashboardColors.primaryViolet,
+                              ],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: DashboardColors.primary.withValues(alpha: 0.3),
+                                blurRadius: 6,
+                                spreadRadius: -1,
+                              ),
+                            ],
                           ),
-                          child: Text(
-                            'R${page.revisionCount}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: DashboardColors.primary,
+                          child: Center(
+                            child: Text(
+                              'R${page.revisionCount}',
+                              style: const TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                height: 1,
+                              ),
                             ),
                           ),
                         ),
@@ -1277,6 +1332,19 @@ class _FACardView extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatTimeAgo(String isoDate) {
+    try {
+      final date = DateTime.parse(isoDate);
+      final diff = DateTime.now().difference(date);
+      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+      if (diff.inHours < 24) return '${diff.inHours}h ago';
+      if (diff.inDays < 7) return '${diff.inDays}d ago';
+      return '${(diff.inDays / 7).floor()}w ago';
+    } catch (_) {
+      return '';
+    }
   }
 }
 

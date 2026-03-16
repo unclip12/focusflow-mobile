@@ -445,6 +445,16 @@ class _SketchyVideoList extends StatelessWidget {
     final key = 'sketchy:${video.id}';
     final isSelected = selectedItems.contains(key);
 
+    // Check for revision item
+    final revIdMicro = 'sketchy-micro-${video.id}';
+    final revIdPharm = 'sketchy-pharm-${video.id}';
+    final revItem = app.revisionItems.cast<dynamic>().firstWhere(
+          (r) => r.id == revIdMicro || r.id == revIdPharm,
+          orElse: () => null,
+        );
+    final hasRevision = revItem != null;
+    final revIndex = hasRevision ? revItem.currentRevisionIndex as int : 0;
+
     return Slidable(
       key: ValueKey(key),
       endActionPane: ActionPane(
@@ -466,16 +476,59 @@ class _SketchyVideoList extends StatelessWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 20),
         dense: true,
-        title: Text(
-          video.title,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: DashboardColors.textPrimary(isDark),
-            decoration: video.watched ? TextDecoration.lineThrough : null,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                video.title,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: DashboardColors.textPrimary(isDark),
+                  decoration: video.watched ? TextDecoration.lineThrough : null,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            // Revision badge
+            if (hasRevision && video.watched) ...[
+              const SizedBox(width: 6),
+              Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      DashboardColors.primary,
+                      DashboardColors.primaryViolet,
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: DashboardColors.primary.withValues(alpha: 0.3),
+                      blurRadius: 4,
+                      spreadRadius: -1,
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Text(
+                    'R$revIndex',
+                    style: const TextStyle(
+                      fontSize: 7,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
         leading: selectionMode
             ? Icon(
