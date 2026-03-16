@@ -18,6 +18,7 @@ import 'package:focusflow_mobile/models/uworld_topic.dart';
 import 'package:focusflow_mobile/screens/library/fa_item_detail_sheet.dart';
 import 'package:focusflow_mobile/screens/library/library_item_detail_sheet.dart';
 import 'package:focusflow_mobile/screens/library/uworld_detail_sheet.dart';
+import 'package:focusflow_mobile/screens/revision_hub/revision_confidence_sheet.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 
 class TrackerScreen extends StatefulWidget {
@@ -1031,7 +1032,30 @@ class _SubtopicListView extends StatelessWidget {
               style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
             ),
             trailing: InkWell(
-              onTap: () => app.advanceFASubtopicRevision(st.id!),
+              onTap: () {
+                if (st.status == 'unread') {
+                  app.advanceFASubtopicRevision(st.id!);
+                } else {
+                  // Find the revision item for parent page or subtopic
+                  final subRevId = 'fa-sub-${st.pageNum}-${st.id}';
+                  final pageRevId = 'fa-page-${st.pageNum}';
+                  // Prefer subtopic revision if it exists, else fall back to page
+                  final hasSubRev = app.revisionItems.any((r) => r.id == subRevId);
+                  final revId = hasSubRev ? subRevId : pageRevId;
+                  final hasRev = app.revisionItems.any((r) => r.id == revId);
+                  if (hasRev) {
+                    showRevisionConfidenceSheet(
+                      context: context,
+                      revisionItemId: revId,
+                      title: '${st.name} (p.${st.pageNum})',
+                      source: 'FA',
+                    );
+                  } else {
+                    // No revision item yet — advance normally
+                    app.advanceFASubtopicRevision(st.id!);
+                  }
+                }
+              },
               borderRadius: BorderRadius.circular(8),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1345,8 +1369,25 @@ class _SketchyVideoList extends StatelessWidget {
                                           },
                                         );
                                         if (!shouldAdvance) return;
+                                        app.advanceSketchyRevision(v.id!);
+                                      } else {
+                                        // Already watched → show confidence sheet
+                                        final isMicro = v.category.toLowerCase().contains('micro');
+                                        final revId = isMicro
+                                            ? 'sketchy-micro-${v.id}'
+                                            : 'sketchy-pharm-${v.id}';
+                                        final hasRev = app.revisionItems.any((r) => r.id == revId);
+                                        if (hasRev) {
+                                          showRevisionConfidenceSheet(
+                                            context: context,
+                                            revisionItemId: revId,
+                                            title: v.title,
+                                            source: isMicro ? 'SKETCHY_MICRO' : 'SKETCHY_PHARM',
+                                          );
+                                        } else {
+                                          app.advanceSketchyRevision(v.id!);
+                                        }
                                       }
-                                      app.advanceSketchyRevision(v.id!);
                                     }
                                   : null,
                               borderRadius: BorderRadius.circular(8),
@@ -1551,8 +1592,22 @@ class _PathomaTab extends StatelessWidget {
                                     },
                                   );
                                   if (!shouldAdvance) return;
+                                  app.advancePathomaRevision(ch.id!);
+                                } else {
+                                  // Already watched → show confidence sheet
+                                  final revId = 'pathoma-ch-${ch.id}';
+                                  final hasRev = app.revisionItems.any((r) => r.id == revId);
+                                  if (hasRev) {
+                                    showRevisionConfidenceSheet(
+                                      context: context,
+                                      revisionItemId: revId,
+                                      title: 'Ch ${ch.chapter} — ${ch.title}',
+                                      source: 'PATHOMA',
+                                    );
+                                  } else {
+                                    app.advancePathomaRevision(ch.id!);
+                                  }
                                 }
-                                app.advancePathomaRevision(ch.id!);
                               }
                             : null,
                         borderRadius: BorderRadius.circular(8),
@@ -3046,8 +3101,26 @@ class _FACardView extends StatelessWidget {
                             InkWell(
                               onTap: selectionMode
                                   ? null
-                                  : () =>
-                                      app.advanceFAPageRevision(page.pageNum),
+                                  : () {
+                                      if (page.status == 'unread') {
+                                        // First time — cycle to 'read'
+                                        app.advanceFAPageRevision(page.pageNum);
+                                      } else {
+                                        // Already read/anki_done → show confidence sheet
+                                        final revId = 'fa-page-${page.pageNum}';
+                                        final hasRev = app.revisionItems.any((r) => r.id == revId);
+                                        if (hasRev) {
+                                          showRevisionConfidenceSheet(
+                                            context: context,
+                                            revisionItemId: revId,
+                                            title: '${page.title} (p.${page.pageNum})',
+                                            source: 'FA',
+                                          );
+                                        } else {
+                                          app.advanceFAPageRevision(page.pageNum);
+                                        }
+                                      }
+                                    },
                               borderRadius: BorderRadius.circular(8),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
