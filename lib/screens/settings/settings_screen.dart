@@ -9,8 +9,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 
-import 'package:focusflow_mobile/providers/app_provider.dart';
+
 import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/models/app_settings.dart';
 import 'package:focusflow_mobile/services/backup_service.dart';
@@ -502,17 +503,17 @@ class SettingsScreen extends StatelessWidget {
           ],
           const SizedBox(height: 20),
 
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // MENU CONFIGURATION
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           _GlassSectionHeader(title: 'Menu'),
           const SizedBox(height: 8),
           _MenuReorderSection(sp: sp),
           const SizedBox(height: 20),
 
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          // ═════════════════════════════════════════════════════════════════════
           // BACKUP & RESTORE
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          // ═════════════════════════════════════════════════════════════════════
           _GlassSectionHeader(title: 'Backup & Restore'),
           const SizedBox(height: 8),
           LiquidGlassCard(
@@ -556,131 +557,15 @@ class SettingsScreen extends StatelessWidget {
                     height: 1,
                     color: DashboardColors.glassBorder(
                         Theme.of(context).brightness == Brightness.dark)),
-                // Row 2 — Backup Now
+                // Row 2 — Open Backup & Restore Screen
                 _GlassListTile(
                   icon: Icons.backup_rounded,
                   iconColor: DashboardColors.success,
-                  title: 'Backup Now',
+                  title: 'Backup & Restore',
+                  subtitle: 'Create backups, restore, or export data',
                   trailing: Icon(Icons.chevron_right_rounded,
                       color: DashboardColors.textSecondary, size: 20),
-                  onTap: () async {
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (_) =>
-                          const Center(child: CircularProgressIndicator()),
-                    );
-                    try {
-                      final app = context.read<AppProvider>();
-                      final savedPath = await BackupService.saveBackup(
-                          BackupService.buildBackupData(app));
-                      if (context.mounted)
-                        Navigator.pop(context); // close dialog
-
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                                '✅ Backup saved to ${savedPath.split('/').last}'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                        // Refresh to update Last Backup row
-                        (context as Element).markNeedsBuild();
-                      }
-                    } catch (e) {
-                      if (context.mounted)
-                        Navigator.pop(context); // close dialog
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('❌ Backup failed: $e'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      }
-                    }
-                  },
-                ),
-                Divider(
-                    height: 1,
-                    color: DashboardColors.glassBorder(
-                        Theme.of(context).brightness == Brightness.dark)),
-                _GlassListTile(
-                  icon: Icons.restore_rounded,
-                  iconColor: DashboardColors.warning,
-                  title: 'Restore from Backup',
-                  trailing: Icon(Icons.chevron_right_rounded,
-                      color: DashboardColors.textSecondary, size: 20),
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('⚠️ Restore Backup?'),
-                        content: const Text(
-                          'This will overwrite all current data with the '
-                          'last saved backup.\n\nThis cannot be undone.',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: const Text('Cancel'),
-                          ),
-                          FilledButton(
-                            onPressed: () async {
-                              Navigator.pop(ctx); // close alert
-
-                              showDialog(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (_) => const Center(
-                                    child: CircularProgressIndicator()),
-                              );
-
-                              try {
-                                final data = await BackupService.loadBackup();
-                                if (!context.mounted) return;
-                                if (data == null) {
-                                  Navigator.pop(context); // close loader
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('No backup file found'),
-                                      behavior: SnackBarBehavior.floating,
-                                    ),
-                                  );
-                                  return;
-                                }
-                                final app = context.read<AppProvider>();
-                                await app.restoreFromBackup(data);
-                                if (context.mounted) {
-                                  Navigator.pop(context); // close loader
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content:
-                                          Text('✅ Data restored from backup'),
-                                      behavior: SnackBarBehavior.floating,
-                                    ),
-                                  );
-                                }
-                              } catch (e) {
-                                if (context.mounted)
-                                  Navigator.pop(context); // close loader
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('❌ Restore failed: $e'),
-                                      behavior: SnackBarBehavior.floating,
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                            child: const Text('Restore'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                  onTap: () => GoRouter.of(context).push('/backup'),
                 ),
               ],
             ),

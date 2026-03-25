@@ -356,6 +356,15 @@ class DatabaseService {
       'CREATE INDEX IF NOT EXISTS idx_fa_subtopics_page ON $tFaSubtopics(pageNum)');
   }
 
+  // ── APK Update Safety ──────────────────────────────────────────
+  // Android preserves the app's internal SQLite database and
+  // SharedPreferences when installing a new APK over an existing
+  // one, as long as the package name and signing key remain the
+  // same. Therefore, no special backup-before-update logic is
+  // needed — the _onUpgrade callback below handles all schema
+  // migrations incrementally so that users upgrading from any
+  // previous version get the correct table structure.
+  // ────────────────────────────────────────────────────────────────
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await _createG5Tables(db);
@@ -515,6 +524,25 @@ class DatabaseService {
     final result = await db.rawQuery('SELECT COUNT(*) AS cnt FROM $table');
     return Sqflite.firstIntValue(result) ?? 0;
   }
+
+  /// Return every raw row from [table] without decoding the data column.
+  /// Used by BackupService to export tables with all index columns intact.
+  Future<List<Map<String, dynamic>>> getRawTableRows(String table) async {
+    final db = await database;
+    final rows = await db.query(table);
+    // sqflite returns read-only maps — copy them so callers can modify.
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  /// Insert a raw row (as previously exported) back into a table.
+  /// Used by BackupService during restore.
+  Future<void> insertRawRow(String table, Map<String, dynamic> row) async {
+    final db = await database;
+    await db.insert(table, row, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  /// The current database schema version.
+  static int get dbVersion => _dbVersion;
 
   // ═══════════════════════════════════════════════════════════════
   // LIBRARY NOTES

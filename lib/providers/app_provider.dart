@@ -3532,102 +3532,26 @@ class AppProvider extends ChangeNotifier {
 
   /// Fire-and-forget backup after every write.
   Future<void> _triggerBackup() async {
-    final data = BackupService.buildBackupData(this);
-    await BackupService.saveBackup(data);
+    try {
+      final data = await BackupService.buildBackupData();
+      await BackupService.saveBackup(data);
+    } catch (_) {
+      // Backup failure should never crash the app
+    }
   }
 
-  /// Restore all backed-up domains from a JSON map.
+  /// Restore all backed-up domains from a decoded backup map.
+  /// Clears DB, writes all data, then reloads in-memory state.
   Future<void> restoreFromBackup(Map<String, dynamic> data) async {
-    // Clear everything first
+    // 1. Clear everything
     await _db.clearAllData();
-    knowledgeBase.clear();
-    dayPlans.clear();
-    studyPlan.clear();
-    fmgeEntries.clear();
-    timeLogs.clear();
-    dailyTrackers.clear();
-    studyEntries.clear();
-    studyMaterials.clear();
-    mentorMessages.clear();
-    history.clear();
-    revisionItems.clear();
-    faPages.clear();
-    sketchyItems.clear();
-    pathomaItems.clear();
-    uWorldSessions.clear();
 
-    // Re-insert each domain from the backup map
-    if (data['faPages'] != null) {
-      final pages = (data['faPages'] as List)
-          .map((e) => FAPage.fromJson(e as Map<String, dynamic>))
-          .toList();
-      for (final p in pages) {
-        await _db.upsertFAPage(p.toJson());
-      }
-      faPages = pages;
-    }
+    // 2. Let BackupService handle the actual restore of all 34 tables + prefs
+    await BackupService.restoreFromBackupData(data);
 
-    if (data['sketchyItems'] != null) {
-      final items = (data['sketchyItems'] as List)
-          .map((e) => SketchyItem.fromJson(e as Map<String, dynamic>))
-          .toList();
-      for (final i in items) {
-        await _db.upsertSketchyItem(i.toJson());
-      }
-      sketchyItems = items;
-    }
-
-    if (data['pathomaItems'] != null) {
-      final items = (data['pathomaItems'] as List)
-          .map((e) => PathomaItem.fromJson(e as Map<String, dynamic>))
-          .toList();
-      for (final i in items) {
-        await _db.upsertPathomaItem(i.toJson());
-      }
-      pathomaItems = items;
-    }
-
-    if (data['uWorldSessions'] != null) {
-      final items = (data['uWorldSessions'] as List)
-          .map((e) => UWorldSession.fromJson(e as Map<String, dynamic>))
-          .toList();
-      for (final s in items) {
-        await _db.insertUWorldSession(s.toJson());
-      }
-      uWorldSessions = items;
-    }
-
-    if (data['timeLogs'] != null) {
-      final items = (data['timeLogs'] as List)
-          .map((e) => TimeLogEntry.fromJson(e as Map<String, dynamic>))
-          .toList();
-      for (final t in items) {
-        await _db.upsertTimeLog(t.toJson());
-      }
-      timeLogs = items;
-    }
-
-    if (data['revisionItems'] != null) {
-      final items = (data['revisionItems'] as List)
-          .map((e) => RevisionItem.fromJson(e as Map<String, dynamic>))
-          .toList();
-      for (final r in items) {
-        await _db.upsertRevisionItem(r.toJson());
-      }
-      revisionItems = items;
-    }
-
-    if (data['dayPlans'] != null) {
-      final items = (data['dayPlans'] as List)
-          .map((e) => DayPlan.fromJson(e as Map<String, dynamic>))
-          .toList();
-      for (final d in items) {
-        await _db.upsertDayPlan(d.toJson());
-      }
-      dayPlans = items;
-    }
-
-    notifyListeners();
+    // 3. Reload all in-memory state from the freshly-restored DB
+    _loaded = false;
+    await loadAll();
   }
 
   // ═══════════════════════════════════════════════════════════════

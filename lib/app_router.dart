@@ -22,6 +22,7 @@ import 'package:focusflow_mobile/screens/analytics/analytics_screen.dart';
 import 'package:focusflow_mobile/screens/session/session_screen.dart';
 import 'package:focusflow_mobile/screens/tracker/tracker_screen.dart';
 import 'package:focusflow_mobile/screens/import/import_screen.dart';
+import 'package:focusflow_mobile/screens/backup/backup_screen.dart';
 
 // ── Route names ─────────────────────────────────────────────────
 class Routes {
@@ -38,6 +39,7 @@ class Routes {
   static const settings      = 'settings';
   static const session       = 'session';
   static const tracker       = 'tracker';
+  static const backup        = 'backup';
 }
 
 // ── Router ──────────────────────────────────────────────────────
@@ -118,6 +120,11 @@ final GoRouter appRouter = GoRouter(
         GoRoute(
           path: '/import',
           builder: (_, __) => const ImportScreen(),
+        ),
+        GoRoute(
+          path: '/backup',
+          name: Routes.backup,
+          builder: (_, __) => const BackupScreen(),
         ),
       ],
     ),
