@@ -2,8 +2,8 @@
 // BackupService — Complete backup & restore for all 34 tables
 //                 + SharedPreferences
 // File format: .ffbackup (JSON internally)
-// Android: file_picker folder selection → dart:io write
-// iOS:     temp file → share_plus ShareXFiles
+// Manual backup: temp file → share_plus ShareXFiles (all platforms)
+// Auto backup:   Documents/FocusFlow (always writable)
 // =============================================================
 
 import 'dart:convert';
@@ -27,7 +27,6 @@ String _encodeBackupPayload(Map<String, dynamic> data) => jsonEncode(data);
 Object? _decodeBackupPayload(String contents) => jsonDecode(contents);
 
 class BackupService {
-  static const _kBackupFolderUri = 'backup_folder_uri';
   static const _kLastBackupPath = 'last_backup_path';
   static const _kLastBackupTime = 'last_backup_time';
 
@@ -80,17 +79,6 @@ class BackupService {
   // SHARED PREFERENCES HELPERS
   // ═════════════════════════════════════════════════════════════════
 
-  /// Save the user-selected folder label to SharedPreferences (display only).
-  static Future<void> setBackupFolderUri(String uri) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kBackupFolderUri, uri);
-  }
-
-  /// Read the saved backup folder label from SharedPreferences.
-  static Future<String?> getBackupFolderUri() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_kBackupFolderUri);
-  }
 
   /// Record last backup path + time in SharedPreferences.
   static Future<void> _recordBackupInfo(String path) async {
@@ -184,17 +172,14 @@ class BackupService {
     return 'focusflow_backup_$timestamp.ffbackup';
   }
 
-  /// Write backup data to a specific folder path.
-  /// Returns the full path of the written file.
-  static Future<String> saveBackupToFolder(
-    Map<String, dynamic> data,
-    String folderPath,
-  ) async {
+  /// Write backup data to a temp directory for sharing.
+  /// Returns the full path of the temp file.
+  static Future<String> saveBackupToTemp(Map<String, dynamic> data) async {
+    final dir = await getTemporaryDirectory();
     final fileName = generateFileName();
-    final filePath = '$folderPath/$fileName';
+    final filePath = '${dir.path}/$fileName';
     final file = File(filePath);
 
-    // Encode off the main isolate for large backups
     final payload = await compute(_encodeBackupPayload, data);
     await file.writeAsString(payload);
 
@@ -202,14 +187,7 @@ class BackupService {
     return filePath;
   }
 
-  /// Write backup data to a temp directory (for iOS share).
-  /// Returns the full path of the temp file.
-  static Future<String> saveBackupToTemp(Map<String, dynamic> data) async {
-    final dir = await getTemporaryDirectory();
-    return saveBackupToFolder(data, dir.path);
-  }
-
-  /// Fallback: write to Documents/FocusFlow.
+  /// Fallback: write to Documents/FocusFlow (used by auto-backup).
   static Future<String> saveBackupToDocuments(
       Map<String, dynamic> data) async {
     final docsDir = await getApplicationDocumentsDirectory();
@@ -217,7 +195,15 @@ class BackupService {
     if (!await backupDir.exists()) {
       await backupDir.create(recursive: true);
     }
-    return saveBackupToFolder(data, backupDir.path);
+    final fileName = generateFileName();
+    final filePath = '${backupDir.path}/$fileName';
+    final file = File(filePath);
+
+    final payload = await compute(_encodeBackupPayload, data);
+    await file.writeAsString(payload);
+
+    await _recordBackupInfo(filePath);
+    return filePath;
   }
 
   // ═════════════════════════════════════════════════════════════════
@@ -381,15 +367,13 @@ class BackupService {
     final spMap = data['shared_preferences'] as Map<String, dynamic>?;
     if (spMap != null) {
       final prefs = await SharedPreferences.getInstance();
-      // Preserve current backup folder URI
-      final currentBackupUri = prefs.getString(_kBackupFolderUri);
+
 
       for (final entry in spMap.entries) {
         final key = entry.key;
         final value = entry.value;
 
-        // Skip backup_folder_uri — keep the current device's folder
-        if (key == _kBackupFolderUri) continue;
+
 
         try {
           if (value is bool) {
@@ -416,10 +400,7 @@ class BackupService {
         }
       }
 
-      // Re-set backup folder URI if it existed
-      if (currentBackupUri != null) {
-        await prefs.setString(_kBackupFolderUri, currentBackupUri);
-      }
+
     }
   }
 

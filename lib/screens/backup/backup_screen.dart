@@ -40,7 +40,7 @@ class _BackupScreenState extends State<BackupScreen> {
   bool _prefsLoaded = false;
   bool _isLoading = false;
   String? _loadingMessage;
-  String? _backupFolder;
+
 
   final List<_BackupEntry> _history = [];
 
@@ -76,7 +76,6 @@ class _BackupScreenState extends State<BackupScreen> {
       setState(() {
         _autoBackup = prefs.getBool(_kAutoBackup) ?? false;
         _backupFrequency = prefs.getString(_kFrequency) ?? 'Daily';
-        _backupFolder = prefs.getString('backup_folder_uri');
         _history
           ..clear()
           ..addAll(entries);
@@ -111,9 +110,6 @@ class _BackupScreenState extends State<BackupScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_kAutoBackup, _autoBackup);
       await prefs.setString(_kFrequency, _backupFrequency);
-      if (_backupFolder != null) {
-        await prefs.setString('backup_folder_uri', _backupFolder!);
-      }
       final rawHistory = _history
           .map(
             (e) => '{"date":"${e.date}","size":"${e.size}","path":"${e.path ?? ''}"}',
@@ -123,7 +119,7 @@ class _BackupScreenState extends State<BackupScreen> {
     } catch (_) {}
   }
 
-  // ── Backup Now (Android: folder picker → file write) ──────────
+  // ── Backup Now (share sheet on all platforms) ─────────────────
   Future<void> _backupNow() async {
     _beginLoading(message: 'Building backup…', backingUp: true);
     HapticFeedback.lightImpact();
@@ -131,45 +127,14 @@ class _BackupScreenState extends State<BackupScreen> {
     try {
       await _nextFrame();
 
-      // 1. Build backup data from DB
       final data = await BackupService.buildBackupData();
+      final filePath = await BackupService.saveBackupToTemp(data);
 
-      // 2. Platform-aware save
-      String filePath;
-      if (Platform.isAndroid) {
-        // Try to let user pick a folder
-        String? folderPath = _backupFolder;
-        if (folderPath == null || folderPath.isEmpty) {
-          folderPath = await FilePicker.platform.getDirectoryPath(
-            dialogTitle: 'Select Backup Folder',
-          );
-          if (folderPath == null || folderPath.isEmpty) {
-            // User cancelled — fall back to Documents
-            filePath = await BackupService.saveBackupToDocuments(data);
-          } else {
-            setState(() => _backupFolder = folderPath);
-            await BackupService.setBackupFolderUri(folderPath);
-            filePath = await BackupService.saveBackupToFolder(data, folderPath);
-          }
-        } else {
-          // Use previously selected folder
-          try {
-            filePath =
-                await BackupService.saveBackupToFolder(data, folderPath);
-          } catch (_) {
-            // Folder might not be accessible anymore — fall back
-            filePath = await BackupService.saveBackupToDocuments(data);
-          }
-        }
-      } else {
-        // iOS: write to temp, then share
-        filePath = await BackupService.saveBackupToTemp(data);
-        if (mounted) {
-          await Share.shareXFiles(
-            [XFile(filePath)],
-            subject: 'FocusFlow Backup',
-          );
-        }
+      if (mounted) {
+        await Share.shareXFiles(
+          [XFile(filePath)],
+          subject: 'FocusFlow Backup',
+        );
       }
 
       final entry = await _buildHistoryEntry(filePath);
@@ -181,10 +146,7 @@ class _BackupScreenState extends State<BackupScreen> {
       });
       await _savePrefs();
       if (mounted) {
-        final msg = Platform.isIOS
-            ? 'Backup created — share sheet opened'
-            : 'Backup saved: ${_fileNameFromPath(filePath)}';
-        _showSnack(msg, isSuccess: true);
+        _showSnack('Backup created — share sheet opened', isSuccess: true);
       }
     } catch (e) {
       if (mounted) {
@@ -195,29 +157,7 @@ class _BackupScreenState extends State<BackupScreen> {
     }
   }
 
-  // ── Change Backup Folder ──────────────────────────────────────
-  Future<void> _pickBackupFolder() async {
-    try {
-      final result = await FilePicker.platform.getDirectoryPath(
-        dialogTitle: 'Select Backup Folder',
-      );
-      if (result == null || result.isEmpty) return;
 
-      setState(() => _backupFolder = result);
-      await BackupService.setBackupFolderUri(result);
-      await _savePrefs();
-      if (mounted) {
-        _showSnack('Backup folder set: $result');
-      }
-    } catch (e) {
-      if (mounted) {
-        _showSnack(
-          'Could not select folder: ${_errorMessage(e)}',
-          isError: true,
-        );
-      }
-    }
-  }
 
   // ── Export & Share ─────────────────────────────────────────────
   Future<void> _exportBackup() async {
@@ -457,11 +397,6 @@ class _BackupScreenState extends State<BackupScreen> {
     });
   }
 
-  String _fileNameFromPath(String path) {
-    final segments = path.split(RegExp(r'[\\/]'));
-    return segments.isEmpty ? path : segments.last;
-  }
-
   String _errorMessage(Object error) {
     final message = error.toString();
     if (message.startsWith('Exception: ')) {
@@ -578,11 +513,7 @@ class _BackupScreenState extends State<BackupScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                _backupFolder != null
-                                    ? 'Saves to: ${_fileNameFromPath(_backupFolder!)}'
-                                    : Platform.isIOS
-                                        ? 'Share via iOS share sheet'
-                                        : 'Saves to Documents/FocusFlow',
+                                'Share via share sheet',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color:
                                       cs.onSurface.withValues(alpha: 0.5),
@@ -602,20 +533,7 @@ class _BackupScreenState extends State<BackupScreen> {
                     ),
                   ),
                 ),
-                if (Platform.isAndroid) ...[
-                  const SizedBox(height: 12),
-                  TextButton.icon(
-                    onPressed: _isLoading ? null : _pickBackupFolder,
-                    icon: const Icon(Icons.folder_open_rounded, size: 18),
-                    label: const Text('Change Backup Folder'),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                    ),
-                  ),
-                ],
+
                 const SizedBox(height: 20),
                 _sectionLabel('Auto Backup', theme, cs),
                 const SizedBox(height: 8),
