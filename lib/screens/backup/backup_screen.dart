@@ -13,6 +13,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_file_saver/flutter_file_saver.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -119,7 +120,7 @@ class _BackupScreenState extends State<BackupScreen> {
     } catch (_) {}
   }
 
-  // ── Backup Now (share sheet on all platforms) ─────────────────
+  // ── Backup Now (native Save dialog via flutter_file_saver) ────
   Future<void> _backupNow() async {
     _beginLoading(message: 'Building backup…', backingUp: true);
     HapticFeedback.lightImpact();
@@ -128,16 +129,19 @@ class _BackupScreenState extends State<BackupScreen> {
       await _nextFrame();
 
       final data = await BackupService.buildBackupData();
-      final filePath = await BackupService.saveBackupToTemp(data);
+      final jsonString = jsonEncode(data);
+      final fileName = BackupService.generateFileName();
 
-      if (mounted) {
-        await Share.shareXFiles(
-          [XFile(filePath)],
-          subject: 'FocusFlow Backup',
-        );
-      }
+      await FlutterFileSaver().writeFileAsString(
+        fileName: fileName,
+        data: jsonString,
+      );
 
-      final entry = await _buildHistoryEntry(filePath);
+      final sizeBytes = utf8.encode(jsonString).length;
+      final entry = _buildHistoryEntryFromSize(
+        sizeBytes: sizeBytes,
+        fileName: fileName,
+      );
 
       if (!mounted) return;
       setState(() {
@@ -146,11 +150,18 @@ class _BackupScreenState extends State<BackupScreen> {
       });
       await _savePrefs();
       if (mounted) {
-        _showSnack('Backup created — share sheet opened', isSuccess: true);
+        _showSnack('Backup saved successfully', isSuccess: true);
       }
     } catch (e) {
       if (mounted) {
-        _showSnack(_errorMessage(e), isError: true);
+        final msg = _errorMessage(e);
+        // User cancelled the save dialog — not an error
+        if (msg.toLowerCase().contains('cancel') ||
+            msg.toLowerCase().contains('abort')) {
+          _showSnack('Backup cancelled');
+        } else {
+          _showSnack('Backup failed: $msg', isError: true);
+        }
       }
     } finally {
       _endLoading();
@@ -369,6 +380,23 @@ class _BackupScreenState extends State<BackupScreen> {
     );
   }
 
+  /// Build history entry from known size (used when FlutterFileSaver
+  /// doesn't return a file path).
+  _BackupEntry _buildHistoryEntryFromSize({
+    required int sizeBytes,
+    required String fileName,
+    String? labelSuffix,
+  }) {
+    final sizeKb = (sizeBytes / 1024).toStringAsFixed(1);
+    final sizeLabel =
+        labelSuffix == null ? '$sizeKb KB' : '$sizeKb KB ($labelSuffix)';
+    return _BackupEntry(
+      date: DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now()),
+      size: sizeLabel,
+      path: null,
+    );
+  }
+
   Future<void> _nextFrame() async {
     await Future<void>.delayed(Duration.zero);
   }
@@ -513,7 +541,7 @@ class _BackupScreenState extends State<BackupScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Share via share sheet',
+                                'Tap to save backup file to your chosen folder',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color:
                                       cs.onSurface.withValues(alpha: 0.5),
