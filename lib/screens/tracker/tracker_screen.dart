@@ -184,32 +184,36 @@ class _TrackerScreenState extends State<TrackerScreen>
               ],
             ),
           ),
+
+          // ── Selection mode bottom bar (above nav bar) ──
+          if (_selectionMode && _selectedItems.isNotEmpty)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: MediaQuery.of(context).padding.bottom,
+              child: _GlassSelectionBar(
+                count: _selectedItems.length,
+                isDark: isDark,
+                onAddToTask: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
+                    builder: (_) => AddToTaskSheet(
+                      selectedItems: _selectedItems,
+                      onDone: _exitSelection,
+                    ),
+                  );
+                },
+                onClear: _exitSelection,
+              ),
+            ),
         ],
       ),
-
-      // ── Selection mode bottom bar ─────────────────────
-      bottomSheet: _selectionMode && _selectedItems.isNotEmpty
-          ? _GlassSelectionBar(
-              count: _selectedItems.length,
-              isDark: isDark,
-              onAddToTask: () {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  useSafeArea: true,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(20)),
-                  ),
-                  builder: (_) => AddToTaskSheet(
-                    selectedItems: _selectedItems,
-                    onDone: _exitSelection,
-                  ),
-                );
-              },
-              onClear: _exitSelection,
-            )
-          : null,
     );
   }
 
@@ -870,12 +874,7 @@ class _GlassSelectionBar extends StatelessWidget {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            12,
-            20,
-            MediaQuery.of(context).padding.bottom + 12,
-          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
           decoration: BoxDecoration(
             color: isDark
                 ? DashboardColors.primary.withValues(alpha: 0.12)
