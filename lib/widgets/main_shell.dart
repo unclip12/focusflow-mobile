@@ -1,22 +1,19 @@
-// =============================================================
-// MainShell — ShellRoute builder widget
-// G4: 4 pinned tabs + permanent More tab + fullScreenMode
-// Ultra-premium frosted glass bottom nav with glow indicators
-// =============================================================
-
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 
-const double kNavBarHeight = 72.0; // visible nav bar height
+const double kNavBarHeight = 72.0;
 
-class MainShell extends StatelessWidget {
+class MainShell extends StatefulWidget {
   final Widget child;
   final String currentLocation;
 
@@ -26,7 +23,6 @@ class MainShell extends StatelessWidget {
     required this.currentLocation,
   });
 
-  // ── Icon map for all pinnable screens ─────────────────────────
   static const Map<String, IconData> _icons = {
     'dashboard': Icons.home_rounded,
     'todays-plan': Icons.today_rounded,
@@ -39,13 +35,28 @@ class MainShell extends StatelessWidget {
     'tracker': Icons.local_library_rounded,
   };
 
-  // Normalise /knowledge-base/:id → knowledge-base for tab highlight
+  @override
+  State<MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends State<MainShell> {
+  bool _isExitDialogOpen = false;
+
   String _routeToTabId(String location) {
     final path = location.startsWith('/') ? location.substring(1) : location;
     return path.split('/').first;
   }
 
-  void _navigateTo(BuildContext context, String routeId) async {
+  bool _hasNestedPath(String location) {
+    final segments = location.split('/').where((segment) => segment.isNotEmpty);
+    return segments.length > 1;
+  }
+
+  bool _isDashboardRoute(String location) {
+    return _routeToTabId(location) == 'dashboard';
+  }
+
+  Future<void> _navigateTo(BuildContext context, String routeId) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('lastActiveTab', routeId);
     if (context.mounted) {
@@ -67,8 +78,7 @@ class MainShell extends StatelessWidget {
       ),
       builder: (ctx) {
         return ClipRRect(
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
             child: Container(
@@ -77,7 +87,8 @@ class MainShell extends StatelessWidget {
                     ? const Color(0xFF0E0E1A).withValues(alpha: 0.85)
                     : Colors.white.withValues(alpha: 0.88),
                 borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(24)),
+                  top: Radius.circular(24),
+                ),
                 border: Border.all(
                   color: isDark
                       ? DashboardColors.glassBorderDark
@@ -127,10 +138,9 @@ class MainShell extends StatelessWidget {
                         itemCount: unpinned.length,
                         itemBuilder: (_, i) {
                           final id = unpinned[i];
-                          final label =
-                              kPinnableScreenLabels[id] ?? id;
+                          final label = kPinnableScreenLabels[id] ?? id;
                           final icon =
-                              _icons[id] ?? Icons.circle_outlined;
+                              MainShell._icons[id] ?? Icons.circle_outlined;
                           return GestureDetector(
                             onTap: () {
                               Navigator.of(ctx).pop();
@@ -140,29 +150,27 @@ class MainShell extends StatelessWidget {
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(16),
                                 color: isDark
-                                    ? Colors.white
-                                        .withValues(alpha: 0.06)
+                                    ? Colors.white.withValues(alpha: 0.06)
                                     : DashboardColors.primary
                                         .withValues(alpha: 0.06),
                                 border: Border.all(
                                   color: isDark
-                                      ? Colors.white
-                                          .withValues(alpha: 0.08)
+                                      ? Colors.white.withValues(alpha: 0.08)
                                       : DashboardColors.primary
                                           .withValues(alpha: 0.10),
                                   width: 0.5,
                                 ),
                               ),
                               child: Column(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.center,
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(icon,
-                                      size: 24,
-                                      color: isDark
-                                          ? DashboardColors
-                                              .primaryLight
-                                          : DashboardColors.primary),
+                                  Icon(
+                                    icon,
+                                    size: 24,
+                                    color: isDark
+                                        ? DashboardColors.primaryLight
+                                        : DashboardColors.primary,
+                                  ),
                                   const SizedBox(height: 6),
                                   Text(
                                     label,
@@ -170,8 +178,9 @@ class MainShell extends StatelessWidget {
                                     style: GoogleFonts.inter(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w500,
-                                      color: DashboardColors
-                                          .textPrimary(isDark),
+                                      color: DashboardColors.textPrimary(
+                                        isDark,
+                                      ),
                                     ),
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
@@ -193,79 +202,135 @@ class MainShell extends StatelessWidget {
     );
   }
 
+  Future<bool> _showExitDialog(BuildContext context) async {
+    if (_isExitDialogOpen) {
+      return false;
+    }
+
+    _isExitDialogOpen = true;
+    try {
+      return await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) {
+              return AlertDialog(
+                title: const Text('Leave the app?'),
+                content: const Text('Press OK to close FocusFlow.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(true),
+                    child: const Text('OK'),
+                  ),
+                ],
+              );
+            },
+          ) ??
+          false;
+    } finally {
+      _isExitDialogOpen = false;
+    }
+  }
+
+  Future<void> _handleBackPress(BuildContext context) async {
+    final currentLocation = widget.currentLocation;
+
+    if (_hasNestedPath(currentLocation)) {
+      await _navigateTo(context, _routeToTabId(currentLocation));
+      return;
+    }
+
+    if (!_isDashboardRoute(currentLocation)) {
+      await _navigateTo(context, 'dashboard');
+      return;
+    }
+
+    final shouldExit = await _showExitDialog(context);
+    if (shouldExit && context.mounted) {
+      await SystemNavigator.pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<SettingsProvider>(
       builder: (context, settings, _) {
-        // Full screen mode — just return child, AppScaffold handles nav
+        late final Widget shellChild;
+
         if (settings.fullScreenMode) {
-          return child;
-        }
+          shellChild = widget.child;
+        } else {
+          final pinnedTabs = settings.pinnedTabs;
+          final currentTabId = _routeToTabId(widget.currentLocation);
+          final isDark = Theme.of(context).brightness == Brightness.dark;
 
-        final pinnedTabs = settings.pinnedTabs;
-        final currentTabId = _routeToTabId(currentLocation);
-        final isDark = Theme.of(context).brightness == Brightness.dark;
+          int selectedIndex = pinnedTabs.indexOf(currentTabId);
+          final moreIndex = pinnedTabs.length;
+          if (currentTabId == MenuItemId.settings) {
+            selectedIndex = moreIndex;
+          }
 
-        int selectedIndex = pinnedTabs.indexOf(currentTabId);
-        final moreIndex = pinnedTabs.length;
-        if (currentTabId == MenuItemId.settings) {
-          selectedIndex = moreIndex;
-        }
-
-        return Scaffold(
-          backgroundColor: DashboardColors.background(isDark),
-          body: Stack(
-            children: [
-              // ── Main content with extra bottom padding for floating nav ──
-              Positioned.fill(
-                child: MediaQuery(
-                  data: MediaQuery.of(context).copyWith(
-                    padding: MediaQuery.of(context).padding.copyWith(
-                      bottom: MediaQuery.of(context).padding.bottom +
-                          kNavBarHeight +
-                          24,
+          shellChild = Scaffold(
+            backgroundColor: DashboardColors.background(isDark),
+            body: Stack(
+              children: [
+                Positioned.fill(
+                  child: MediaQuery(
+                    data: MediaQuery.of(context).copyWith(
+                      padding: MediaQuery.of(context).padding.copyWith(
+                            bottom: MediaQuery.of(context).padding.bottom +
+                                kNavBarHeight +
+                                24,
+                          ),
                     ),
+                    child: widget.child,
                   ),
-                  child: child,
                 ),
-              ),
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: MediaQuery.of(context).padding.bottom + 8,
+                  child: _GlassBottomNav(
+                    pinnedTabs: pinnedTabs,
+                    selectedIndex: selectedIndex,
+                    moreIndex: moreIndex,
+                    isDark: isDark,
+                    icons: MainShell._icons,
+                    onTabSelected: (index) {
+                      if (index == moreIndex) {
+                        _navigateTo(context, MenuItemId.settings);
+                      } else if (index < pinnedTabs.length) {
+                        _navigateTo(context, pinnedTabs[index]);
+                      }
+                    },
+                    onTabLongPress: (index) {
+                      if (index == moreIndex) {
+                        _showMoreSheet(context, pinnedTabs);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
 
-              // ── Floating glass bottom nav ─────────────────
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: MediaQuery.of(context).padding.bottom + 8,
-                child: _GlassBottomNav(
-                  pinnedTabs: pinnedTabs,
-                  selectedIndex: selectedIndex,
-                  moreIndex: moreIndex,
-                  isDark: isDark,
-                  icons: _icons,
-                  onTabSelected: (index) {
-                    if (index == moreIndex) {
-                      _navigateTo(context, MenuItemId.settings);
-                    } else if (index < pinnedTabs.length) {
-                      _navigateTo(context, pinnedTabs[index]);
-                    }
-                  },
-                  onTabLongPress: (index) {
-                    if (index == moreIndex) {
-                      _showMoreSheet(context, pinnedTabs);
-                    }
-                  },
-                ),
-              ),
-            ],
-          ),
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) {
+            if (didPop) {
+              return;
+            }
+            _handleBackPress(context);
+          },
+          child: shellChild,
         );
       },
     );
   }
 }
-
-// ══════════════════════════════════════════════════════════════════
-// FROSTED GLASS BOTTOM NAV
-// ══════════════════════════════════════════════════════════════════
 
 class _GlassBottomNav extends StatelessWidget {
   final List<String> pinnedTabs;
@@ -378,14 +443,12 @@ class _NavButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const activeColor = DashboardColors.primary;
-    final inactiveColor = isDark
-        ? DashboardColors.textSecondary
-        : DashboardColors.textSecondary;
+    final inactiveColor =
+        isDark ? DashboardColors.textSecondary : DashboardColors.textSecondary;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // ── Glow dot indicator ──────────────────────────
         AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
@@ -406,7 +469,6 @@ class _NavButton extends StatelessWidget {
                 : null,
           ),
         ),
-        // ── Icon ─────────────────────────────────────────
         AnimatedScale(
           scale: item.isSelected ? 1.15 : 1.0,
           duration: const Duration(milliseconds: 200),
@@ -418,7 +480,6 @@ class _NavButton extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 3),
-        // ── Label ────────────────────────────────────────
         Text(
           item.label,
           style: GoogleFonts.inter(
