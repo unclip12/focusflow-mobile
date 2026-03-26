@@ -16,6 +16,7 @@ import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:provider/provider.dart';
 
 import 'study_flow_screen.dart';
+import 'package:focusflow_mobile/utils/show_app_bottom_sheet.dart';
 
 class StudySessionPicker extends StatefulWidget {
   final String dateKey;
@@ -431,48 +432,30 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
     var plannedQueue = _queueWithPlanningDefaults(_queue);
     TimeOfDay selectedTime = TimeOfDay.now();
 
-    await showModalBottomSheet(
+    await showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        final cs = Theme.of(sheetContext).colorScheme;
+      initialChildSize: 0.7,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      builder: (sheetContext, scrollController) {
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
+            final cs = Theme.of(sheetContext).colorScheme;
             final estimatedMinutes =
                 StudyTask.estimateQueueDurationMinutes(plannedQueue);
             final sessionStart = _sessionStartDateTime(selectedTime);
-            return Container(
+            return SingleChildScrollView(
+              controller: scrollController,
               padding: EdgeInsets.fromLTRB(
                 20,
                 12,
                 20,
                 MediaQuery.of(sheetContext).padding.bottom + 20,
               ),
-              decoration: BoxDecoration(
-                color: cs.surface,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: SafeArea(
-                top: false,
-                child: SingleChildScrollView(
-                  child: Column(
+              child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: cs.onSurface.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+                children: [
                       Text(
                         'Plan for Later',
                         style: TextStyle(
@@ -679,8 +662,6 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                         ),
                       ),
                     ],
-                  ),
-                ),
               ),
             );
           },
@@ -1204,7 +1185,6 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
   }
 
   void _showFAPagePicker(BuildContext context, AppProvider app) {
-    final cs = Theme.of(context).colorScheme;
     final pages = List<FAPage>.from(app.faPages)
       ..sort((a, b) {
         final orderCompare = a.orderIndex.compareTo(b.orderIndex);
@@ -1215,63 +1195,49 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
       });
     final selectedPageNumbers = <int>{};
 
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
+      initialChildSize: 0.7,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      builder: (ctx, scrollController) {
         return StatefulBuilder(builder: (ctx, setSheetState) {
-          return Container(
-            height: MediaQuery.of(ctx).size.height * 0.7,
-            decoration: BoxDecoration(
-              color: cs.surface,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: Column(
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(top: 12, bottom: 8),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: cs.onSurface.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Select FA Pages',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: cs.onSurface,
-                        ),
+          final cs = Theme.of(ctx).colorScheme;
+          return Column(
+            children: [
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
+                  children: [
+                    Text(
+                      'Select FA Pages',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
                       ),
-                      const Spacer(),
-                      Text(
-                        'Selected: ${selectedPageNumbers.length}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: cs.onSurface.withValues(alpha: 0.5),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: ListView.builder(
-                    padding: EdgeInsets.fromLTRB(
-                      16,
-                      0,
-                      16,
-                      MediaQuery.of(ctx).padding.bottom + 72 + 20,
                     ),
+                    const Spacer(),
+                    Text(
+                      'Selected: ${selectedPageNumbers.length}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    0,
+                    16,
+                    MediaQuery.of(ctx).padding.bottom + 72 + 20,
+                  ),
                     itemCount: pages.length,
                     itemBuilder: (ctx, i) {
                       final page = pages[i];
@@ -1363,15 +1329,13 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                   ),
                 ),
               ],
-            ),
-          );
-        });
-      },
-    );
-  }
+            );
+          });
+        },
+      );
+    }
 
   void _showUWorldPicker(BuildContext context, AppProvider app) {
-    final cs = Theme.of(context).colorScheme;
     final systems = <String, List<UWorldTopic>>{};
     for (final topic in app.uworldTopics) {
       systems.putIfAbsent(topic.system, () => []).add(topic);
@@ -1380,13 +1344,14 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
     String? selectedSystem;
     final selectedTopicIds = <int>{};
 
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
+      initialChildSize: 0.75,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      builder: (ctx, scrollController) {
         return StatefulBuilder(builder: (ctx, setSheetState) {
+          final cs = Theme.of(ctx).colorScheme;
           final topics = List<UWorldTopic>.from(
             selectedSystem == null
                 ? app.uworldTopics
@@ -1402,105 +1367,90 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
             (sum, topic) => sum + (topic.totalQuestions - topic.doneQuestions),
           );
 
-          return Container(
-            height: MediaQuery.of(ctx).size.height * 0.75,
-            decoration: BoxDecoration(
-              color: cs.surface,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: Column(
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(top: 12, bottom: 8),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: cs.onSurface.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(2),
+          return Column(
+            children: [
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Text(
+                  'UWorld Questions',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
                   ),
                 ),
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  child: Text(
-                    'UWorld Questions',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: cs.onSurface,
+              ),
+              SizedBox(
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: const Text('All'),
+                        selected: selectedSystem == null,
+                        selectedColor: const Color(0xFFF59E0B),
+                        labelStyle: TextStyle(
+                          color: selectedSystem == null
+                              ? Colors.white
+                              : cs.onSurface,
+                        ),
+                        onSelected: (_) => setSheetState(() {
+                          selectedSystem = null;
+                        }),
+                      ),
                     ),
-                  ),
-                ),
-                SizedBox(
-                  height: 40,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    children: [
-                      Padding(
+                    ...systems.keys.map((system) {
+                      final isSelected = selectedSystem == system;
+                      final remaining = systems[system]!.fold<int>(
+                        0,
+                        (sum, topic) =>
+                            sum + topic.totalQuestions - topic.doneQuestions,
+                      );
+                      return Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ChoiceChip(
-                          label: const Text('All'),
-                          selected: selectedSystem == null,
+                          label: Text('$system ($remaining)'),
+                          selected: isSelected,
                           selectedColor: const Color(0xFFF59E0B),
                           labelStyle: TextStyle(
-                            color: selectedSystem == null
-                                ? Colors.white
-                                : cs.onSurface,
+                            color: isSelected ? Colors.white : cs.onSurface,
                           ),
                           onSelected: (_) => setSheetState(() {
-                            selectedSystem = null;
+                            selectedSystem = system;
                           }),
                         ),
-                      ),
-                      ...systems.keys.map((system) {
-                        final isSelected = selectedSystem == system;
-                        final remaining = systems[system]!.fold<int>(
-                          0,
-                          (sum, topic) =>
-                              sum + topic.totalQuestions - topic.doneQuestions,
-                        );
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                            label: Text('$system ($remaining)'),
-                            selected: isSelected,
-                            selectedColor: const Color(0xFFF59E0B),
-                            labelStyle: TextStyle(
-                              color: isSelected ? Colors.white : cs.onSurface,
-                            ),
-                            onSelected: (_) => setSheetState(() {
-                              selectedSystem = system;
-                            }),
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
+                      );
+                    }),
+                  ],
                 ),
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Selected: ${selectedTopics.length} topics - $selectedQuestionTotal questions',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: cs.onSurface.withValues(alpha: 0.5),
-                      ),
+              ),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Selected: ${selectedTopics.length} topics - $selectedQuestionTotal questions',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: cs.onSurface.withValues(alpha: 0.5),
                     ),
                   ),
                 ),
-                Expanded(
-                  child: ListView.builder(
-                    padding: EdgeInsets.fromLTRB(
-                      16,
-                      0,
-                      16,
-                      MediaQuery.of(ctx).padding.bottom + 20,
-                    ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    0,
+                    16,
+                    MediaQuery.of(ctx).padding.bottom + 20,
+                  ),
                     itemCount: topics.length,
                     itemBuilder: (ctx, i) {
                       final topic = topics[i];
@@ -1591,15 +1541,13 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                   ),
                 ),
               ],
-            ),
-          );
-        });
-      },
+            );
+          });
+        },
     );
   }
 
   void _showSketchyPicker(BuildContext context, AppProvider app, String type) {
-    final cs = Theme.of(context).colorScheme;
     final videos =
         type == 'micro' ? app.sketchyMicroVideos : app.sketchyPharmVideos;
     final label = type == 'micro' ? 'Sketchy Micro' : 'Sketchy Pharm';
@@ -1614,83 +1562,69 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
     String? selectedCategory;
     final selectedVideos = <int>{};
 
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
+      initialChildSize: 0.7,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      builder: (ctx, scrollController) {
         return StatefulBuilder(builder: (ctx, setSheetState) {
+          final cs = Theme.of(ctx).colorScheme;
           final categoryVideos = selectedCategory != null
               ? (categories[selectedCategory] ?? const <SketchyVideo>[])
               : const <SketchyVideo>[];
 
-          return Container(
-            height: MediaQuery.of(ctx).size.height * 0.7,
-            decoration: BoxDecoration(
-              color: cs.surface,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: Column(
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(top: 12, bottom: 8),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: cs.onSurface.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(2),
+          return Column(
+            children: [
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
                   ),
                 ),
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: cs.onSurface,
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  height: 40,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    children: categories.keys.map((category) {
-                      final isSelected = category == selectedCategory;
-                      final unwatchedCount = categories[category]!
-                          .where((video) => !video.watched)
-                          .length;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text('$category ($unwatchedCount)'),
-                          selected: isSelected,
-                          selectedColor: color,
-                          labelStyle: TextStyle(
-                            color: isSelected ? Colors.white : cs.onSurface,
-                          ),
-                          onSelected: (_) => setSheetState(() {
-                            selectedCategory = category;
-                          }),
+              ),
+              SizedBox(
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  children: categories.keys.map((category) {
+                    final isSelected = category == selectedCategory;
+                    final unwatchedCount = categories[category]!
+                        .where((video) => !video.watched)
+                        .length;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text('$category ($unwatchedCount)'),
+                        selected: isSelected,
+                        selectedColor: color,
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : cs.onSurface,
                         ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-                if (selectedCategory != null)
-                  Expanded(
-                    child: ListView.builder(
-                      padding: EdgeInsets.fromLTRB(
-                        16,
-                        0,
-                        16,
-                        MediaQuery.of(ctx).padding.bottom + 20,
+                        onSelected: (_) => setSheetState(() {
+                          selectedCategory = category;
+                        }),
                       ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              if (selectedCategory != null)
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      0,
+                      16,
+                      MediaQuery.of(ctx).padding.bottom + 20,
+                    ),
                       itemCount: categoryVideos.length,
                       itemBuilder: (ctx, i) {
                         final video = categoryVideos[i];
@@ -1788,27 +1722,26 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                   ),
                 ),
               ],
-            ),
-          );
-        });
-      },
+            );
+          });
+        },
     );
   }
 
   void _showPathomaPicker(BuildContext context, AppProvider app) {
-    final cs = Theme.of(context).colorScheme;
     final chapters = List<PathomaChapter>.from(app.pathomaChapters)
       ..sort((a, b) => a.chapter.compareTo(b.chapter));
     final selectedChapterIds = <int>{};
 
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
+      initialChildSize: 0.7,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      builder: (ctx, scrollController) {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
+            final cs = Theme.of(ctx).colorScheme;
             final selectedChapters = chapters
                 .where(
                   (chapter) =>
@@ -1818,56 +1751,41 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                 .toList()
               ..sort((a, b) => a.chapter.compareTo(b.chapter));
 
-            return Container(
-              height: MediaQuery.of(ctx).size.height * 0.7,
-              decoration: BoxDecoration(
-                color: cs.surface,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 12, bottom: 8),
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: cs.onSurface.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: Row(
-                      children: [
-                        Text(
-                          'Pathoma',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: cs.onSurface,
-                          ),
+            return Column(
+              children: [
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Pathoma',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurface,
                         ),
-                        const Spacer(),
-                        Text(
-                          'Selected: ${selectedChapters.length}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: cs.onSurface.withValues(alpha: 0.5),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      padding: EdgeInsets.fromLTRB(
-                        16,
-                        0,
-                        16,
-                        MediaQuery.of(ctx).padding.bottom + 20,
                       ),
+                      const Spacer(),
+                      Text(
+                        'Selected: ${selectedChapters.length}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: cs.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      0,
+                      16,
+                      MediaQuery.of(ctx).padding.bottom + 20,
+                    ),
                       itemCount: chapters.length,
                       itemBuilder: (ctx, i) {
                         final chapter = chapters[i];
@@ -1958,11 +1876,10 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                     ),
                   ),
                 ],
-              ),
-            );
-          },
-        );
-      },
+              );
+            },
+          );
+        },
     );
   }
 }
