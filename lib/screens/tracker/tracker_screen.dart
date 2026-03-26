@@ -16,6 +16,7 @@ import 'package:focusflow_mobile/screens/tracker/sketchy_tab.dart';
 import 'package:focusflow_mobile/screens/tracker/pathoma_tab.dart';
 import 'package:focusflow_mobile/screens/tracker/uworld_tab.dart';
 import 'package:focusflow_mobile/screens/tracker/tracker_sheets.dart';
+import 'package:focusflow_mobile/utils/show_app_bottom_sheet.dart';
 
 class TrackerScreen extends StatefulWidget {
   const TrackerScreen({super.key});
@@ -195,17 +196,16 @@ class _TrackerScreenState extends State<TrackerScreen>
                 count: _selectedItems.length,
                 isDark: isDark,
                 onAddToTask: () {
-                  showModalBottomSheet(
+                  showAppBottomSheet(
                     context: context,
-                    isScrollControlled: true,
-                    useSafeArea: true,
-                    shape: const RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.vertical(top: Radius.circular(20)),
-                    ),
-                    builder: (_) => AddToTaskSheet(
-                      selectedItems: _selectedItems,
-                      onDone: _exitSelection,
+                    initialChildSize: 0.55,
+                    minChildSize: 0.3,
+                    builder: (ctx, sc) => SingleChildScrollView(
+                      controller: sc,
+                      child: AddToTaskSheet(
+                        selectedItems: _selectedItems,
+                        onDone: _exitSelection,
+                      ),
                     ),
                   );
                 },
@@ -221,38 +221,24 @@ class _TrackerScreenState extends State<TrackerScreen>
 
   void _showSortSheet(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(ctx).colorScheme.outlineVariant,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
+      initialChildSize: 0.45,
+      minChildSize: 0.25,
+      builder: (ctx, sc) => ListView(
+        controller: sc,
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        children: [
+          Text(
+            'Sort By',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: DashboardColors.textPrimary(isDark),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Sort By',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: DashboardColors.textPrimary(isDark),
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...[
+          ),
+          const SizedBox(height: 12),
+          ...[
               ('page_order', 'Page Order', Icons.sort_rounded),
               ('status', 'Status', Icons.traffic_rounded),
               ('subject', 'Subject', Icons.school_rounded),
@@ -287,8 +273,7 @@ class _TrackerScreenState extends State<TrackerScreen>
                 },
               );
             }),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -297,38 +282,24 @@ class _TrackerScreenState extends State<TrackerScreen>
 
   void _showFilterSheet(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(ctx).colorScheme.outlineVariant,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
+      initialChildSize: 0.5,
+      minChildSize: 0.25,
+      builder: (ctx, sc) => ListView(
+        controller: sc,
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        children: [
+          Text(
+            'Filter By Status',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: DashboardColors.textPrimary(isDark),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Filter By Status',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: DashboardColors.textPrimary(isDark),
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...[
+          ),
+          const SizedBox(height: 12),
+          ...[
               ('all', 'All Items', Icons.select_all_rounded,
                   DashboardColors.primary),
               ('unread', 'Unread', Icons.circle_outlined,
@@ -367,8 +338,7 @@ class _TrackerScreenState extends State<TrackerScreen>
                 },
               );
             }),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -378,24 +348,24 @@ class _TrackerScreenState extends State<TrackerScreen>
   void _showAddSheet(BuildContext context, AppProvider app) {
     final tabIndex = _tabController.index;
     if (tabIndex == 0) {
-      showModalBottomSheet(
+      showAppBottomSheet(
         context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        initialChildSize: 0.7,
+        minChildSize: 0.3,
+        builder: (ctx, sc) => SingleChildScrollView(
+          controller: sc,
+          child: const AddFAPageSheet(),
         ),
-        builder: (_) => const AddFAPageSheet(),
       );
     } else if (tabIndex == 3) {
-      showModalBottomSheet(
+      showAppBottomSheet(
         context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        initialChildSize: 0.55,
+        minChildSize: 0.3,
+        builder: (ctx, sc) => SingleChildScrollView(
+          controller: sc,
+          child: const AddUWorldTopicSheet(),
         ),
-        builder: (_) => const AddUWorldTopicSheet(),
       );
     }
   }
@@ -403,14 +373,14 @@ class _TrackerScreenState extends State<TrackerScreen>
   // ── Bulk mark ───────────────────────────────────────────────
 
   void _showBulkSheet(BuildContext context) {
-    showModalBottomSheet(
+    showAppBottomSheet(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      initialChildSize: 0.55,
+      minChildSize: 0.3,
+      builder: (ctx, sc) => SingleChildScrollView(
+        controller: sc,
+        child: const BulkMarkSheet(),
       ),
-      builder: (_) => const BulkMarkSheet(),
     );
   }
 }
