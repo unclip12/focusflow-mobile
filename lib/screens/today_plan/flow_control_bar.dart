@@ -64,86 +64,79 @@ class FlowControlBar extends StatelessWidget {
     if (flow == null || flow!.activities.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          DashboardColors.primary,
-                          DashboardColors.primaryDeep,
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: DashboardColors.primary
-                              .withValues(alpha: 0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      DashboardColors.primary,
+                      DashboardColors.primaryDeep,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: DashboardColors.primary
+                          .withValues(alpha: 0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: startAndOpenFlow,
-                        borderRadius: BorderRadius.circular(14),
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 14),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.play_arrow_rounded,
-                                  size: 20, color: Colors.white),
-                              SizedBox(width: 8),
-                              Text(
-                                'Start Flow',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: startAndOpenFlow,
+                    borderRadius: BorderRadius.circular(14),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.play_arrow_rounded,
+                              size: 18, color: Colors.white),
+                          SizedBox(width: 6),
+                          Text('Start Flow',
+                            style: TextStyle(fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white)),
+                        ],
                       ),
                     ),
                   ),
                 ),
-                if (onAddTask != null) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    height: 48,
-                    width: 48,
-                    decoration: BoxDecoration(
-                      color: cs.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: cs.primary.withValues(alpha: 0.15),
-                      ),
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: onAddTask,
-                        borderRadius: BorderRadius.circular(14),
-                        child: Icon(Icons.add_rounded,
-                            color: cs.primary, size: 22),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+              ),
             ),
-            const SizedBox(height: 8),
-            // Study Session Button
-            _StudySessionButton(onTap: openStudySessionPicker, isDark: isDark),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _CompactStudyBtn(
+                  onTap: openStudySessionPicker, isDark: isDark),
+            ),
+            if (onAddTask != null) ...[
+              const SizedBox(width: 8),
+              Container(
+                height: 48,
+                width: 48,
+                decoration: BoxDecoration(
+                  color: cs.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: cs.primary.withValues(alpha: 0.15),
+                  ),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: onAddTask,
+                    borderRadius: BorderRadius.circular(14),
+                    child: Icon(Icons.add_rounded,
+                        color: cs.primary, size: 22),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       );
@@ -271,8 +264,31 @@ class FlowControlBar extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
-            _StudySessionButton(onTap: openStudySessionPicker, isDark: isDark),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                if (onAddTask != null)
+                  Expanded(
+                    child: _GlassActionBtn(
+                      onTap: onAddTask!,
+                      icon: Icons.add_rounded,
+                      label: 'Add More',
+                      color: const Color(0xFF10B981),
+                      isDark: isDark,
+                    ),
+                  ),
+                if (onAddTask != null) const SizedBox(width: 8),
+                Expanded(
+                  child: _GlassActionBtn(
+                    onTap: openStudySessionPicker,
+                    icon: Icons.school_rounded,
+                    label: 'Study',
+                    color: const Color(0xFF8B5CF6),
+                    isDark: isDark,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       );
@@ -506,60 +522,72 @@ class FlowControlBar extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          _StudySessionButton(onTap: openStudySessionPicker, isDark: isDark),
+          Row(
+            children: [
+              if (onAddTask != null) ...[
+                Expanded(
+                  child: _GlassActionBtn(
+                    onTap: onAddTask!,
+                    icon: Icons.add_rounded,
+                    label: '',
+                    color: cs.primary,
+                    isDark: isDark,
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: _CompactStudyBtn(
+                    onTap: openStudySessionPicker, isDark: isDark),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-// ── Study Session Button ────────────────────────────────────────
-class _StudySessionButton extends StatelessWidget {
+// ── Compact Study Session Button ────────────────────────────────
+class _CompactStudyBtn extends StatelessWidget {
   final VoidCallback onTap;
   final bool isDark;
 
-  const _StudySessionButton({required this.onTap, required this.isDark});
+  const _CompactStudyBtn({required this.onTap, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
-          ),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF8B5CF6).withValues(alpha: 0.25),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
         ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(14),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 14),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.school_rounded, size: 18, color: Colors.white),
-                  SizedBox(width: 8),
-                  Text(
-                    'Start Study Session',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8B5CF6).withValues(alpha: 0.25),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.school_rounded, size: 16, color: Colors.white),
+                SizedBox(width: 6),
+                Text('Study',
+                  style: TextStyle(fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white)),
+              ],
             ),
           ),
         ),

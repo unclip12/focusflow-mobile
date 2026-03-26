@@ -436,12 +436,17 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                           SliverToBoxAdapter(
                             child: Column(
                               children: [
-                                // ── Date navigation & Track Now button ───
+                                // ── Unified Header (date + stats + quick actions) ───
                                 _DateHeader(
                                   date: _selectedDate,
                                   isToday: _isToday,
                                   streakCount: streak,
                                   weekActivity: weekActivity,
+                                  studyMinutes: totalStudyMinutesToday,
+                                  completedTasks: completedCount,
+                                  totalTasks: totalCount,
+                                  dateKey: _dateKey,
+                                  sleepTime: sp.sleepTime,
                                   onPrev: _prevDay,
                                   onNext: _nextDay,
                                   onDateTap: () async {
@@ -459,17 +464,6 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                                   },
                                   onTrackNow: _openTrackNow,
                                 ),
-
-                                // ── Daily Progress Summary Card ──────────
-                                _DailyProgressCard(
-                                  studyMinutes: totalStudyMinutesToday,
-                                  completedTasks: completedCount,
-                                  totalTasks: totalCount,
-                                  streak: streak,
-                                ),
-
-                                // ── Activity Selector (all dates) ─────────
-                                ActivitySelector(dateKey: _dateKey),
                               ],
                             ),
                           ),
@@ -2683,7 +2677,7 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   bool shouldRebuild(_SliverAppBarDelegate oldDelegate) => false;
 }
 
-// ── Date header (Premium Redesign) ──────────────────────────────
+// ── Date header (Unified — includes stats + quick actions) ──────
 class _DateHeader extends StatelessWidget {
   final DateTime date;
   final bool isToday;
@@ -2693,6 +2687,11 @@ class _DateHeader extends StatelessWidget {
   final VoidCallback onDateTap;
   final VoidCallback onTrackNow;
   final List<bool> weekActivity;
+  final int studyMinutes;
+  final int completedTasks;
+  final int totalTasks;
+  final String dateKey;
+  final String sleepTime;
 
   const _DateHeader({
     required this.date,
@@ -2703,14 +2702,40 @@ class _DateHeader extends StatelessWidget {
     required this.onDateTap,
     required this.onTrackNow,
     this.weekActivity = const [false, false, false, false, false, false, false],
+    this.studyMinutes = 0,
+    this.completedTasks = 0,
+    this.totalTasks = 0,
+    required this.dateKey,
+    this.sleepTime = '23:00',
   });
 
-  String _greeting() {
+  String _smartGreeting() {
     final hour = DateTime.now().hour;
+    if (totalTasks > 0) {
+      final pct = ((completedTasks / totalTasks) * 100).round();
+      if (pct >= 100) return 'All done! Relax 🎉';
+      if (pct >= 75) return 'Almost there! $pct% done 💪';
+      if (pct >= 50) return 'Halfway! Keep going 🚀';
+    }
     if (hour >= 5 && hour < 12) return 'Good Morning 🌅';
     if (hour >= 12 && hour < 17) return 'Good Afternoon ☀️';
     if (hour >= 17 && hour < 21) return 'Good Evening 🌙';
     return 'Night Mode 🌌';
+  }
+
+  String _timeRemaining() {
+    final parts = sleepTime.split(':');
+    if (parts.length != 2) return '';
+    final sleepH = int.tryParse(parts[0]) ?? 23;
+    final sleepM = int.tryParse(parts[1]) ?? 0;
+    final now = DateTime.now();
+    final sleepDt = DateTime(now.year, now.month, now.day, sleepH, sleepM);
+    if (sleepDt.isBefore(now)) return '';
+    final diff = sleepDt.difference(now);
+    final h = diff.inHours;
+    final m = diff.inMinutes.remainder(60);
+    if (h <= 0 && m <= 0) return '';
+    return h > 0 ? '${h}h ${m}m left' : '${m}m left';
   }
 
   @override
@@ -2718,6 +2743,12 @@ class _DateHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+    final progress =
+        totalTasks > 0 ? (completedTasks / totalTasks).clamp(0.0, 1.0) : 0.0;
+    final hours = studyMinutes ~/ 60;
+    final mins = studyMinutes % 60;
+    final studyLabel = hours > 0 ? '${hours}h ${mins}m' : '${mins}m';
+    final timeLeft = _timeRemaining();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -2756,7 +2787,9 @@ class _DateHeader extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        isToday ? _greeting() : DateFormat('EEEE').format(date),
+                        isToday
+                            ? _smartGreeting()
+                            : DateFormat('EEEE').format(date),
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -2805,11 +2838,8 @@ class _DateHeader extends StatelessWidget {
                 // ── Date navigation row ──
                 Row(
                   children: [
-                    _NavArrow(
-                      icon: Icons.chevron_left_rounded,
-                      onTap: onPrev,
-                      isDark: isDark,
-                    ),
+                    _NavArrow(icon: Icons.chevron_left_rounded,
+                        onTap: onPrev, isDark: isDark),
                     const SizedBox(width: 8),
                     Expanded(
                       child: GestureDetector(
@@ -2817,8 +2847,7 @@ class _DateHeader extends StatelessWidget {
                         child: Column(
                           children: [
                             Text(
-                              isToday
-                                  ? 'Today'
+                              isToday ? 'Today'
                                   : DateFormat('EEEE').format(date),
                               style: TextStyle(
                                 fontSize: 20,
@@ -2841,13 +2870,9 @@ class _DateHeader extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    _NavArrow(
-                      icon: Icons.chevron_right_rounded,
-                      onTap: onNext,
-                      isDark: isDark,
-                    ),
+                    _NavArrow(icon: Icons.chevron_right_rounded,
+                        onTap: onNext, isDark: isDark),
                     const SizedBox(width: 10),
-                    // ── Track Now ──
                     Container(
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
@@ -2877,14 +2902,10 @@ class _DateHeader extends StatelessWidget {
                                 Icon(Icons.play_arrow_rounded,
                                     size: 16, color: Colors.white),
                                 SizedBox(width: 4),
-                                Text(
-                                  'Track',
-                                  style: TextStyle(
-                                    fontSize: 12,
+                                Text('Track',
+                                  style: TextStyle(fontSize: 12,
                                     fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                  ),
-                                ),
+                                    color: Colors.white)),
                               ],
                             ),
                           ),
@@ -2893,11 +2914,100 @@ class _DateHeader extends StatelessWidget {
                     ),
                   ],
                 ),
-                // ── Weekly Mini Calendar Strip ──
                 const SizedBox(height: 12),
                 _WeeklyCalendarStrip(
-                  selectedDate: date,
-                  weekActivity: weekActivity,
+                    selectedDate: date, weekActivity: weekActivity),
+                // ── Inline Stats Bar ──
+                if (totalTasks > 0 || studyMinutes > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.04)
+                            : cs.primary.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 32, height: 32,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 32, height: 32,
+                                  child: CircularProgressIndicator(
+                                    value: progress, strokeWidth: 3,
+                                    backgroundColor:
+                                        cs.primary.withValues(alpha: 0.1),
+                                    valueColor: const AlwaysStoppedAnimation(
+                                        DashboardColors.primary),
+                                    strokeCap: StrokeCap.round,
+                                  ),
+                                ),
+                                Text('${(progress * 100).round()}%',
+                                  style: TextStyle(fontSize: 8,
+                                    fontWeight: FontWeight.w800,
+                                    color: cs.primary)),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          _MiniStat(icon: Icons.schedule_rounded,
+                              value: studyLabel,
+                              color: const Color(0xFF3B82F6)),
+                          const SizedBox(width: 10),
+                          _MiniStat(icon: Icons.task_alt_rounded,
+                              value: '$completedTasks/$totalTasks',
+                              color: const Color(0xFF10B981)),
+                          if (isToday && timeLeft.isNotEmpty) ...[
+                            const SizedBox(width: 10),
+                            _MiniStat(icon: Icons.hourglass_bottom_rounded,
+                                value: timeLeft,
+                                color: const Color(0xFFF59E0B)),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                // ── Inline Quick Actions ──
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: SizedBox(
+                    height: 34,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        _MiniActionChip(emoji: '📋', label: 'Template',
+                          color: const Color(0xFF6366F1), isDark: isDark,
+                          onTap: () => ActivityActions.openDefaultOrder(
+                              context, dateKey)),
+                        const SizedBox(width: 6),
+                        _MiniActionChip(emoji: '🌅', label: 'Routine',
+                          color: const Color(0xFF10B981), isDark: isDark,
+                          onTap: () => ActivityActions.pickRoutine(
+                              context, dateKey)),
+                        const SizedBox(width: 6),
+                        _MiniActionChip(emoji: '📚', label: 'Study',
+                          color: const Color(0xFF8B5CF6), isDark: isDark,
+                          onTap: () => ActivityActions.startStudy(
+                              context, dateKey)),
+                        const SizedBox(width: 6),
+                        _MiniActionChip(emoji: '🛒', label: 'Shop',
+                          color: const Color(0xFFF59E0B), isDark: isDark,
+                          onTap: () => ActivityActions.startShopping(
+                              context, dateKey)),
+                        const SizedBox(width: 6),
+                        _MiniActionChip(emoji: '⏱️', label: 'Focus',
+                          color: const Color(0xFFEF4444), isDark: isDark,
+                          onTap: () => ActivityActions.startFocusTimer(
+                              context, dateKey)),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -3159,179 +3269,101 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-// ── Daily Progress Summary Card ─────────────────────────────────
-class _DailyProgressCard extends StatelessWidget {
-  final int studyMinutes;
-  final int completedTasks;
-  final int totalTasks;
-  final int streak;
-
-  const _DailyProgressCard({
-    required this.studyMinutes,
-    required this.completedTasks,
-    required this.totalTasks,
-    required this.streak,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final progress =
-        totalTasks > 0 ? (completedTasks / totalTasks).clamp(0.0, 1.0) : 0.0;
-    final hours = studyMinutes ~/ 60;
-    final mins = studyMinutes % 60;
-    final studyLabel =
-        hours > 0 ? '${hours}h ${mins}m' : '${mins}m';
-
-    // Don't render if nothing to show
-    if (totalTasks == 0 && studyMinutes == 0 && streak == 0) {
-      return const SizedBox.shrink();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isDark
-                    ? [
-                        Colors.white.withValues(alpha: 0.06),
-                        Colors.white.withValues(alpha: 0.02),
-                      ]
-                    : [
-                        Colors.white.withValues(alpha: 0.70),
-                        Colors.white.withValues(alpha: 0.45),
-                      ],
-              ),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: isDark
-                    ? DashboardColors.glassBorderDark
-                    : DashboardColors.glassBorderLight,
-                width: 0.5,
-              ),
-            ),
-            child: Row(
-              children: [
-                // Circular progress ring
-                SizedBox(
-                  width: 52,
-                  height: 52,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      SizedBox(
-                        width: 52,
-                        height: 52,
-                        child: CircularProgressIndicator(
-                          value: progress,
-                          strokeWidth: 4,
-                          backgroundColor:
-                              cs.primary.withValues(alpha: 0.1),
-                          valueColor: const AlwaysStoppedAnimation(
-                              DashboardColors.primary),
-                          strokeCap: StrokeCap.round,
-                        ),
-                      ),
-                      Text(
-                        '${(progress * 100).round()}%',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: cs.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // Stats
-                Expanded(
-                  child: Row(
-                    children: [
-                      _StatChip(
-                        icon: Icons.schedule_rounded,
-                        label: studyLabel,
-                        subtitle: 'Study',
-                        color: const Color(0xFF3B82F6),
-                      ),
-                      const SizedBox(width: 12),
-                      _StatChip(
-                        icon: Icons.task_alt_rounded,
-                        label: '$completedTasks/$totalTasks',
-                        subtitle: 'Tasks',
-                        color: const Color(0xFF10B981),
-                      ),
-                      if (streak > 0) ...[
-                        const SizedBox(width: 12),
-                        _StatChip(
-                          icon: Icons.local_fire_department_rounded,
-                          label: '$streak',
-                          subtitle: 'Streak',
-                          color: const Color(0xFFFF6B35),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatChip extends StatelessWidget {
+// ── Mini Stat Chip (for inline stats bar) ───────────────────────
+class _MiniStat extends StatelessWidget {
   final IconData icon;
-  final String label;
-  final String subtitle;
+  final String value;
   final Color color;
 
-  const _StatChip({
+  const _MiniStat({
     required this.icon,
-    required this.label,
-    required this.subtitle,
+    required this.value,
     required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Column(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: color.withValues(alpha: 0.8)),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.4),
+          Icon(icon, size: 13, color: color.withValues(alpha: 0.7)),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Mini Action Chip (for inline quick actions) ─────────────────
+class _MiniActionChip extends StatelessWidget {
+  final String emoji;
+  final String label;
+  final Color color;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _MiniActionChip({
+    required this.emoji,
+    required this.label,
+    required this.color,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withValues(alpha: isDark ? 0.15 : 0.10),
+            color.withValues(alpha: isDark ? 0.07 : 0.04),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: color.withValues(alpha: isDark ? 0.20 : 0.12),
+          width: 0.5,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(emoji, style: const TextStyle(fontSize: 13)),
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/default_routine_order.dart';
+import 'package:focusflow_mobile/models/daily_flow.dart';
 import 'package:focusflow_mobile/models/routine.dart';
 import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'routine_runner_screen.dart';
@@ -145,7 +146,27 @@ class ActivitySelector extends StatelessWidget {
     );
   }
 
-  void _pickRoutine(BuildContext context) {
+  void _pickRoutine(BuildContext context) =>
+      ActivityActions.pickRoutine(context, dateKey);
+
+  void _startStudy(BuildContext context) =>
+      ActivityActions.startStudy(context, dateKey);
+
+  void _startShopping(BuildContext context) =>
+      ActivityActions.startShopping(context, dateKey);
+
+  void _openDefaultOrder(BuildContext context) =>
+      ActivityActions.openDefaultOrder(context, dateKey);
+}
+
+// =============================================================
+// ActivityActions — Static helper for reusable quick action logic
+// Used by both ActivitySelector widget and inline header chips
+// =============================================================
+class ActivityActions {
+  ActivityActions._();
+
+  static void pickRoutine(BuildContext context, String dateKey) {
     final app = context.read<AppProvider>();
     if (app.routines.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -165,7 +186,7 @@ class ActivitySelector extends StatelessWidget {
     );
   }
 
-  void _startStudy(BuildContext context) {
+  static void startStudy(BuildContext context, String dateKey) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => StudyFlowScreen(dateKey: dateKey),
@@ -173,7 +194,7 @@ class ActivitySelector extends StatelessWidget {
     );
   }
 
-  void _startShopping(BuildContext context) {
+  static void startShopping(BuildContext context, String dateKey) {
     showDialog(
       context: context,
       useSafeArea: false,
@@ -181,7 +202,7 @@ class ActivitySelector extends StatelessWidget {
     );
   }
 
-  void _openDefaultOrder(BuildContext context) {
+  static void openDefaultOrder(BuildContext context, String dateKey) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -189,6 +210,27 @@ class ActivitySelector extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => DefaultOrderSheet(dateKey: dateKey),
+    );
+  }
+
+  /// Add a 25-minute Pomodoro focus timer as a flow activity
+  static void startFocusTimer(BuildContext context, String dateKey) {
+    final app = context.read<AppProvider>();
+    final activity = FlowActivity(
+      id: 'focus-${DateTime.now().millisecondsSinceEpoch}',
+      label: 'Focus Session',
+      icon: '⏱️',
+      activityType: 'custom',
+      sortOrder: 999,
+      category: 'Focus',
+      durationSeconds: 25 * 60,
+    );
+    app.addFlowActivity(dateKey, activity);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('⏱️ 25-min Focus Session added!'),
+        duration: Duration(seconds: 2),
+      ),
     );
   }
 }
