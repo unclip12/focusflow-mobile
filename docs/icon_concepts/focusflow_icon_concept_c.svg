@@ -1,0 +1,46 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgC" x1="136" y1="104" x2="894" y2="926" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#071A18"/>
+      <stop offset="0.56" stop-color="#0B2A26"/>
+      <stop offset="1" stop-color="#05100F"/>
+    </linearGradient>
+    <radialGradient id="washC" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(530 258) rotate(90) scale(520 468)">
+      <stop stop-color="#5BF0D3" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#5BF0D3" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="shieldC" x1="323" y1="232" x2="712" y2="778" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F3A35"/>
+      <stop offset="1" stop-color="#081B18"/>
+    </linearGradient>
+    <linearGradient id="coreC" x1="391" y1="311" x2="644" y2="662" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E7FFFB"/>
+      <stop offset="0.48" stop-color="#9FF7E7"/>
+      <stop offset="1" stop-color="#37D8C0"/>
+    </linearGradient>
+    <linearGradient id="pulseC" x1="300" y1="566" x2="730" y2="566" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8CF8E9"/>
+      <stop offset="1" stop-color="#C9FFF5"/>
+    </linearGradient>
+    <filter id="shadowC" x="214" y="170" width="596" height="702" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="24"/>
+      <feGaussianBlur stdDeviation="28"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.009 0 0 0 0 0.058 0 0 0 0 0.051 0 0 0 0.42 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_1" result="shape"/>
+    </filter>
+  </defs>
+
+  <rect x="72" y="72" width="880" height="880" rx="220" fill="url(#bgC)"/>
+  <rect x="72" y="72" width="880" height="880" rx="220" fill="url(#washC)"/>
+  <rect x="98" y="98" width="828" height="828" rx="194" stroke="white" stroke-opacity="0.08" stroke-width="2"/>
+
+  <g filter="url(#shadowC)">
+    <path d="M512 230C617.486 230 703 315.514 703 421V534C703 627.248 635.707 706.878 544 723.622V794H480V723.622C388.293 706.878 321 627.248 321 534V421C321 315.514 406.514 230 512 230Z" fill="url(#shieldC)"/>
+    <path d="M512 282C592.634 282 658 347.366 658 428V528C658 608.634 592.634 674 512 674C431.366 674 366 608.634 366 528V428C366 347.366 431.366 282 512 282Z" fill="#0C231F" fill-opacity="0.72"/>
+    <path d="M413 406C413 389.431 426.431 376 443 376H581C597.569 376 611 389.431 611 406C611 422.569 597.569 436 581 436H536V560C536 576.569 522.569 590 506 590C489.431 590 476 576.569 476 560V436H443C426.431 436 413 422.569 413 406Z" fill="url(#coreC)"/>
+    <path d="M301 566H392L438 512L496 610L548 474L604 566H723" stroke="url(#pulseC)" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

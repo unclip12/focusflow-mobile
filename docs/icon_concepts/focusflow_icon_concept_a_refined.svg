@@ -1,0 +1,48 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="128" y1="110" x2="901" y2="926" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1A2A"/>
+      <stop offset="0.52" stop-color="#0B2640"/>
+      <stop offset="1" stop-color="#06111C"/>
+    </linearGradient>
+    <radialGradient id="wash" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(360 250) rotate(41) scale(612 540)">
+      <stop stop-color="#43F1D4" stop-opacity="0.24"/>
+      <stop offset="1" stop-color="#43F1D4" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="262" y1="266" x2="790" y2="760" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#83FFF1"/>
+      <stop offset="0.48" stop-color="#36E0F8"/>
+      <stop offset="1" stop-color="#A5F3FF"/>
+    </linearGradient>
+    <linearGradient id="glyph" x1="407" y1="316" x2="648" y2="705" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E7FFFD"/>
+      <stop offset="0.42" stop-color="#9EF9EE"/>
+      <stop offset="1" stop-color="#30D5D7"/>
+    </linearGradient>
+    <filter id="shadow" x="162" y="154" width="704" height="716" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="24"/>
+      <feGaussianBlur stdDeviation="30"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.01 0 0 0 0 0.05 0 0 0 0 0.09 0 0 0 0.42 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_1" result="shape"/>
+    </filter>
+  </defs>
+
+  <rect x="72" y="72" width="880" height="880" rx="220" fill="url(#bg)"/>
+  <rect x="72" y="72" width="880" height="880" rx="220" fill="url(#wash)"/>
+  <rect x="98" y="98" width="828" height="828" rx="194" stroke="white" stroke-opacity="0.08" stroke-width="2"/>
+
+  <g filter="url(#shadow)">
+    <path d="M771 426C771 575.669 649.669 697 500 697C350.331 697 229 575.669 229 426C229 276.331 350.331 155 500 155C565.064 155 624.776 177.93 671.488 216.155" stroke="url(#ring)" stroke-width="82" stroke-linecap="round"/>
+    <path d="M672 216L724 232L709 284" stroke="#90FBFF" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <rect x="396" y="302" width="86" height="420" rx="43" fill="url(#glyph)"/>
+    <rect x="450" y="302" width="224" height="86" rx="43" fill="url(#glyph)"/>
+    <rect x="450" y="469" width="172" height="86" rx="43" fill="url(#glyph)"/>
+
+    <path d="M538 646C576.06 646 611.341 633.989 639.991 613.554" stroke="#8FFBF4" stroke-opacity="0.62" stroke-width="24" stroke-linecap="round"/>
+    <circle cx="658" cy="598" r="18" fill="#B8FFF8"/>
+  </g>
+</svg>
