@@ -206,11 +206,11 @@ class MainShell extends StatelessWidget {
         final currentTabId = _routeToTabId(currentLocation);
         final isDark = Theme.of(context).brightness == Brightness.dark;
 
-        // Find selected index — fallback to 0 if not in pinned list
         int selectedIndex = pinnedTabs.indexOf(currentTabId);
-        if (selectedIndex < 0) selectedIndex = 0;
-
         final moreIndex = pinnedTabs.length;
+        if (currentTabId == MenuItemId.settings) {
+          selectedIndex = moreIndex;
+        }
 
         return Scaffold(
           backgroundColor: DashboardColors.background(isDark),
@@ -243,9 +243,14 @@ class MainShell extends StatelessWidget {
                   icons: _icons,
                   onTabSelected: (index) {
                     if (index == moreIndex) {
-                      _showMoreSheet(context, pinnedTabs);
+                      _navigateTo(context, MenuItemId.settings);
                     } else if (index < pinnedTabs.length) {
                       _navigateTo(context, pinnedTabs[index]);
+                    }
+                  },
+                  onTabLongPress: (index) {
+                    if (index == moreIndex) {
+                      _showMoreSheet(context, pinnedTabs);
                     }
                   },
                 ),
@@ -269,6 +274,7 @@ class _GlassBottomNav extends StatelessWidget {
   final bool isDark;
   final Map<String, IconData> icons;
   final ValueChanged<int> onTabSelected;
+  final ValueChanged<int> onTabLongPress;
 
   const _GlassBottomNav({
     required this.pinnedTabs,
@@ -277,6 +283,7 @@ class _GlassBottomNav extends StatelessWidget {
     required this.isDark,
     required this.icons,
     required this.onTabSelected,
+    required this.onTabLongPress,
   });
 
   @override
@@ -291,9 +298,9 @@ class _GlassBottomNav extends StatelessWidget {
         );
       }),
       _NavItem(
-        icon: Icons.grid_view_rounded,
-        label: 'More',
-        isSelected: false,
+        icon: Icons.settings_rounded,
+        label: 'Settings',
+        isSelected: selectedIndex == moreIndex,
       ),
     ];
 
@@ -334,6 +341,7 @@ class _GlassBottomNav extends StatelessWidget {
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => onTabSelected(i),
+                    onLongPress: () => onTabLongPress(i),
                     child: _NavButton(
                       item: item,
                       isDark: isDark,

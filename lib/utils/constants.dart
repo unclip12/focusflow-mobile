@@ -40,7 +40,6 @@ const Map<String, String> kPinnableScreenLabels = {
   'tracker':                'Library',
   MenuItemId.revision:      'Revision',
   MenuItemId.analytics:     'Analytics',
-  MenuItemId.settings:      'Settings',
   'import':                 'Import',
 };
 
