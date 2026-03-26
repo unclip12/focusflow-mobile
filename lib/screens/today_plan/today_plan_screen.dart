@@ -314,6 +314,22 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // ── Compute weekly activity for calendar strip ──────────
+    final weekday = _selectedDate.weekday;
+    final monday = _selectedDate.subtract(Duration(days: weekday - 1));
+    final weekActivity = List.generate(7, (i) {
+      final d = monday.add(Duration(days: i));
+      final ds = DateFormat('yyyy-MM-dd').format(d);
+      return app.timeLogs.any((l) => l.date == ds && l.durationMinutes > 0);
+    });
+
+    // ── Compute daily stats for progress card ──────────────
+    final todayLogs = app.timeLogs.where((l) => l.date == _dateKey).toList();
+    final totalStudyMinutesToday = todayLogs.fold<int>(0, (s, l) => s + l.durationMinutes);
+    final allActivities = app.getFlowActivitiesForDate(_dateKey);
+    final completedCount = allActivities.where((a) => a.isDone).length;
+    final totalCount = allActivities.length;
+
     return Scaffold(
       backgroundColor: DashboardColors.background(isDark),
       body: Stack(
@@ -333,26 +349,81 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                       GestureDetector(
                         onTap: _openTrackNow,
                         child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 10),
-                          color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                              horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                const Color(0xFFEF4444).withValues(alpha: 0.12),
+                                const Color(0xFFEF4444).withValues(alpha: 0.06),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: const Color(0xFFEF4444).withValues(alpha: 0.2),
+                            ),
+                          ),
                           child: Row(
                             children: [
-                              const Icon(Icons.timer_outlined,
-                                  color: Color(0xFFEF4444), size: 18),
-                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.timer_outlined,
+                                    color: Color(0xFFEF4444), size: 16),
+                              ),
+                              const SizedBox(width: 10),
                               Expanded(
-                                child: Text(
-                                  'Tracking: ${activeTrackNow.label}',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFFEF4444),
-                                  ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Live Tracking',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: const Color(0xFFEF4444).withValues(alpha: 0.7),
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    Text(
+                                      activeTrackNow.label,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFFEF4444),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const Icon(Icons.open_in_full_rounded,
-                                  color: Color(0xFFEF4444), size: 16),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Open',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFFEF4444),
+                                      ),
+                                    ),
+                                    SizedBox(width: 2),
+                                    Icon(Icons.open_in_new_rounded,
+                                        color: Color(0xFFEF4444), size: 13),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -370,6 +441,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                                   date: _selectedDate,
                                   isToday: _isToday,
                                   streakCount: streak,
+                                  weekActivity: weekActivity,
                                   onPrev: _prevDay,
                                   onNext: _nextDay,
                                   onDateTap: () async {
@@ -386,6 +458,14 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                                     }
                                   },
                                   onTrackNow: _openTrackNow,
+                                ),
+
+                                // ── Daily Progress Summary Card ──────────
+                                _DailyProgressCard(
+                                  studyMinutes: totalStudyMinutesToday,
+                                  completedTasks: completedCount,
+                                  totalTasks: totalCount,
+                                  streak: streak,
                                 ),
 
                                 // ── Activity Selector (all dates) ─────────
@@ -442,10 +522,50 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                                               BorderRadius.circular(10),
                                         ),
                                         tabs: const [
-                                          Tab(text: 'All', height: 36),
-                                          Tab(text: 'To-Do', height: 36),
-                                          Tab(text: 'Buying', height: 36),
-                                          Tab(text: 'Routines', height: 36),
+                                          Tab(
+                                            height: 38,
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.dashboard_rounded, size: 14),
+                                                SizedBox(width: 5),
+                                                Text('All'),
+                                              ],
+                                            ),
+                                          ),
+                                          Tab(
+                                            height: 38,
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.check_circle_outline_rounded, size: 14),
+                                                SizedBox(width: 5),
+                                                Text('To-Do'),
+                                              ],
+                                            ),
+                                          ),
+                                          Tab(
+                                            height: 38,
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.shopping_bag_outlined, size: 14),
+                                                SizedBox(width: 5),
+                                                Text('Buying'),
+                                              ],
+                                            ),
+                                          ),
+                                          Tab(
+                                            height: 38,
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.repeat_rounded, size: 14),
+                                                SizedBox(width: 5),
+                                                Text('Routines'),
+                                              ],
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
@@ -1982,6 +2102,7 @@ class _FullDayFlowCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     Color statusColor;
     IconData statusIcon;
@@ -2010,175 +2131,305 @@ class _FullDayFlowCard extends StatelessWidget {
         statusLabel = '';
     }
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
-        side: activity.isActive
-            ? BorderSide(
-                color: const Color(0xFF3B82F6).withValues(alpha: 0.4),
-                width: 1.5,
-              )
-            : BorderSide.none,
-      ),
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Center(
-                  child: activity.isNotStarted
-                      ? Text(
-                          '${index + 1}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: cs.onSurface.withValues(alpha: 0.4),
-                          ),
-                        )
-                      : Icon(statusIcon, size: 20, color: statusColor),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(activity.icon,
-                            style: const TextStyle(fontSize: 16)),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            activity.label,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: activity.isDone
-                                  ? cs.onSurface.withValues(alpha: 0.5)
-                                  : cs.onSurface,
-                              decoration: activity.isDone
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: activity.isActive
+                  ? [
+                      const Color(0xFF3B82F6)
+                          .withValues(alpha: isDark ? 0.12 : 0.08),
+                      const Color(0xFF3B82F6)
+                          .withValues(alpha: isDark ? 0.06 : 0.03),
+                    ]
+                  : activity.isDone
+                      ? [
+                          const Color(0xFF10B981)
+                              .withValues(alpha: isDark ? 0.08 : 0.05),
+                          const Color(0xFF10B981)
+                              .withValues(alpha: isDark ? 0.03 : 0.01),
+                        ]
+                      : isDark
+                          ? [
+                              Colors.white.withValues(alpha: 0.04),
+                              Colors.white.withValues(alpha: 0.02),
+                            ]
+                          : [
+                              Colors.white.withValues(alpha: 0.50),
+                              Colors.white.withValues(alpha: 0.30),
+                            ],
+            ),
+            borderRadius: BorderRadius.circular(14),
+            border: activity.isActive
+                ? Border.all(
+                    color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
+                    width: 1.5,
+                  )
+                : Border.all(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.05)
+                        : Colors.white.withValues(alpha: 0.4),
+                    width: 0.5,
+                  ),
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              children: [
+                // Left accent border
+                Container(
+                  width: 4,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(14),
+                      bottomLeft: Radius.circular(14),
                     ),
-                    if (subtitle != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 3),
-                        child: Text(
-                          subtitle!,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: cs.onSurface.withValues(alpha: 0.55),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    if (activity.linkedTaskIds.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 3),
-                        child: Text(
-                          '${activity.linkedTaskIds.length} task${activity.linkedTaskIds.length == 1 ? '' : 's'} linked',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: cs.primary.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ),
-                    if (activity.notes != null && activity.notes!.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 3),
+                  ),
+                ),
+                Expanded(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: onTap,
+                      child: Padding(
+                        padding:
+                            const EdgeInsets.fromLTRB(12, 12, 14, 12),
                         child: Row(
                           children: [
-                            Icon(Icons.sticky_note_2_outlined,
-                                size: 12,
-                                color: cs.onSurface.withValues(alpha: 0.3)),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                activity.notes!,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: cs.onSurface.withValues(alpha: 0.5),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color:
+                                    statusColor.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Center(
+                                child: activity.isNotStarted
+                                    ? Text(
+                                        '${index + 1}',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: cs.onSurface
+                                              .withValues(alpha: 0.4),
+                                        ),
+                                      )
+                                    : Icon(statusIcon,
+                                        size: 20,
+                                        color: statusColor),
                               ),
                             ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(activity.icon,
+                                          style: const TextStyle(
+                                              fontSize: 16)),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          activity.label,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            color: activity.isDone
+                                                ? cs.onSurface
+                                                    .withValues(
+                                                        alpha: 0.5)
+                                                : cs.onSurface,
+                                            decoration: activity.isDone
+                                                ? TextDecoration
+                                                    .lineThrough
+                                                : null,
+                                          ),
+                                          overflow:
+                                              TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (subtitle != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                          top: 3),
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.schedule_rounded,
+                                              size: 11,
+                                              color: cs.onSurface
+                                                  .withValues(
+                                                      alpha: 0.35)),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            subtitle!,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                              color: cs.onSurface
+                                                  .withValues(
+                                                      alpha: 0.55),
+                                            ),
+                                            overflow:
+                                                TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  if (activity.linkedTaskIds.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                          top: 3),
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.link_rounded,
+                                              size: 11,
+                                              color: cs.primary
+                                                  .withValues(
+                                                      alpha: 0.5)),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${activity.linkedTaskIds.length} task${activity.linkedTaskIds.length == 1 ? '' : 's'} linked',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: cs.primary
+                                                  .withValues(
+                                                      alpha: 0.6),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  if (activity.notes != null &&
+                                      activity.notes!.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                          top: 3),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                              Icons
+                                                  .sticky_note_2_outlined,
+                                              size: 12,
+                                              color: cs.onSurface
+                                                  .withValues(
+                                                      alpha: 0.3)),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              activity.notes!,
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: cs.onSurface
+                                                    .withValues(
+                                                        alpha: 0.5),
+                                              ),
+                                              maxLines: 1,
+                                              overflow:
+                                                  TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  if (statusLabel.isNotEmpty &&
+                                      !activity.isNotStarted)
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                          top: 4),
+                                      child: Container(
+                                        padding:
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 2),
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              statusColor.withValues(
+                                                  alpha: 0.15),
+                                              statusColor.withValues(
+                                                  alpha: 0.08),
+                                            ],
+                                          ),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          statusLabel,
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w700,
+                                            color: statusColor,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            if (activity.isDone && onUndo != null)
+                              IconButton(
+                                onPressed: onUndo,
+                                icon: const Icon(Icons.undo_rounded,
+                                    size: 18),
+                                color: cs.onSurface
+                                    .withValues(alpha: 0.4),
+                                tooltip: 'Undo',
+                                constraints: const BoxConstraints(
+                                  minWidth: 36,
+                                  minHeight: 36,
+                                ),
+                              ),
+                            if ((activity.isActive ||
+                                    activity.isPaused) &&
+                                onComplete != null)
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981)
+                                      .withValues(alpha: 0.1),
+                                  borderRadius:
+                                      BorderRadius.circular(8),
+                                ),
+                                child: IconButton(
+                                  onPressed: onComplete,
+                                  icon: const Icon(
+                                      Icons
+                                          .check_circle_outline_rounded,
+                                      size: 22),
+                                  color: const Color(0xFF10B981),
+                                  tooltip: 'Complete',
+                                  constraints: const BoxConstraints(
+                                    minWidth: 36,
+                                    minHeight: 36,
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),
-                    if (statusLabel.isNotEmpty && !activity.isNotStarted)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: statusColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            statusLabel,
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: statusColor,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              if (activity.isDone && onUndo != null)
-                IconButton(
-                  onPressed: onUndo,
-                  icon: const Icon(Icons.undo_rounded, size: 18),
-                  color: cs.onSurface.withValues(alpha: 0.4),
-                  tooltip: 'Undo',
-                  constraints: const BoxConstraints(
-                    minWidth: 36,
-                    minHeight: 36,
+                    ),
                   ),
                 ),
-              if ((activity.isActive || activity.isPaused) &&
-                  onComplete != null)
-                IconButton(
-                  onPressed: onComplete,
-                  icon:
-                      const Icon(Icons.check_circle_outline_rounded, size: 22),
-                  color: const Color(0xFF10B981),
-                  tooltip: 'Complete',
-                  constraints: const BoxConstraints(
-                    minWidth: 36,
-                    minHeight: 36,
-                  ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
+
+
 
 class _FullDayItem {
   final String type; // 'flow' | 'todo' | 'buying'
@@ -2432,7 +2683,7 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   bool shouldRebuild(_SliverAppBarDelegate oldDelegate) => false;
 }
 
-// ── Date header ─────────────────────────────────────────────────
+// ── Date header (Premium Redesign) ──────────────────────────────
 class _DateHeader extends StatelessWidget {
   final DateTime date;
   final bool isToday;
@@ -2441,6 +2692,7 @@ class _DateHeader extends StatelessWidget {
   final VoidCallback onNext;
   final VoidCallback onDateTap;
   final VoidCallback onTrackNow;
+  final List<bool> weekActivity;
 
   const _DateHeader({
     required this.date,
@@ -2450,95 +2702,338 @@ class _DateHeader extends StatelessWidget {
     required this.onNext,
     required this.onDateTap,
     required this.onTrackNow,
+    this.weekActivity = const [false, false, false, false, false, false, false],
   });
+
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 12) return 'Good Morning 🌅';
+    if (hour >= 12 && hour < 17) return 'Good Afternoon ☀️';
+    if (hour >= 17 && hour < 21) return 'Good Evening 🌙';
+    return 'Night Mode 🌌';
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.chevron_left_rounded),
-            onPressed: onPrev,
-            color: cs.onSurface.withValues(alpha: 0.6),
-          ),
-          Expanded(
-            child: GestureDetector(
-              onTap: onDateTap,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        isToday ? 'Today' : DateFormat('EEEE').format(date),
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: isToday ? cs.primary : cs.onSurface,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? [
+                        Colors.white.withValues(alpha: 0.06),
+                        Colors.white.withValues(alpha: 0.03),
+                      ]
+                    : [
+                        Colors.white.withValues(alpha: 0.65),
+                        Colors.white.withValues(alpha: 0.40),
+                      ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isDark
+                    ? DashboardColors.glassBorderDark
+                    : DashboardColors.glassBorderLight,
+                width: 0.5,
+              ),
+            ),
+            child: Column(
+              children: [
+                // ── Greeting + Streak ──
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        isToday ? _greeting() : DateFormat('EEEE').format(date),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface.withValues(alpha: 0.55),
                         ),
                       ),
-                      if (streakCount > 0) ...[
-                        const SizedBox(width: 6),
-                        Icon(Icons.local_fire_department_rounded,
-                            size: 14, color: Colors.deepOrange),
-                        const SizedBox(width: 2),
-                        Text(
-                          '$streakCount',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.deepOrange,
+                    ),
+                    if (streakCount > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFF6B35), Color(0xFFFF4444)],
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFF6B35)
+                                  .withValues(alpha: 0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.local_fire_department_rounded,
+                                size: 14, color: Colors.white),
+                            const SizedBox(width: 3),
+                            Text(
+                              '$streakCount',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // ── Date navigation row ──
+                Row(
+                  children: [
+                    _NavArrow(
+                      icon: Icons.chevron_left_rounded,
+                      onTap: onPrev,
+                      isDark: isDark,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: onDateTap,
+                        child: Column(
+                          children: [
+                            Text(
+                              isToday
+                                  ? 'Today'
+                                  : DateFormat('EEEE').format(date),
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: isToday ? cs.primary : cs.onSurface,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              DateFormat('d MMMM yyyy').format(date),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: cs.onSurface.withValues(alpha: 0.45),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _NavArrow(
+                      icon: Icons.chevron_right_rounded,
+                      onTap: onNext,
+                      isDark: isDark,
+                    ),
+                    const SizedBox(width: 10),
+                    // ── Track Now ──
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF10B981), Color(0xFF059669)],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF10B981)
+                                .withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: onTrackNow,
+                          borderRadius: BorderRadius.circular(12),
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 10),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.play_arrow_rounded,
+                                    size: 16, color: Colors.white),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Track',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ],
-                    ],
-                  ),
-                  Text(
-                    DateFormat('d MMMM yyyy').format(date),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontSize: 12,
-                      color: cs.onSurface.withValues(alpha: 0.45),
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+                // ── Weekly Mini Calendar Strip ──
+                const SizedBox(height: 12),
+                _WeeklyCalendarStrip(
+                  selectedDate: date,
+                  weekActivity: weekActivity,
+                ),
+              ],
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right_rounded),
-            onPressed: onNext,
-            color: cs.onSurface.withValues(alpha: 0.6),
-          ),
-          // ── Track Now Button ────────────────────────────
-          FilledButton.icon(
-            onPressed: onTrackNow,
-            icon: const Icon(Icons.play_arrow_rounded, size: 16),
-            label: const Text('Track Now'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              backgroundColor: const Color(0xFF10B981),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              textStyle: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-// ── Empty state ─────────────────────────────────────────────────
+class _NavArrow extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isDark;
+
+  const _NavArrow({
+    required this.icon,
+    required this.onTap,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: isDark
+          ? Colors.white.withValues(alpha: 0.06)
+          : Colors.white.withValues(alpha: 0.5),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(icon, size: 20,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+        ),
+      ),
+    );
+  }
+}
+
+class _WeeklyCalendarStrip extends StatelessWidget {
+  final DateTime selectedDate;
+  final List<bool> weekActivity;
+
+  const _WeeklyCalendarStrip({
+    required this.selectedDate,
+    required this.weekActivity,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Find the Monday of the selected week
+    final weekday = selectedDate.weekday; // 1=Mon, 7=Sun
+    final monday = selectedDate.subtract(Duration(days: weekday - 1));
+    final today = AppDateUtils.getAdjustedDate();
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: List.generate(7, (i) {
+        final day = monday.add(Duration(days: i));
+        final isSelected = AppDateUtils.isSameDay(day, selectedDate);
+        final isToday = AppDateUtils.isSameDay(day, today);
+        final hasActivity =
+            i < weekActivity.length ? weekActivity[i] : false;
+        final dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              dayLabels[i],
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                color: isSelected
+                    ? cs.primary
+                    : cs.onSurface.withValues(alpha: 0.35),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? cs.primary.withValues(alpha: 0.15)
+                    : hasActivity
+                        ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                        : Colors.transparent,
+                shape: BoxShape.circle,
+                border: isToday && !isSelected
+                    ? Border.all(
+                        color: cs.primary.withValues(alpha: 0.3),
+                        width: 1.5,
+                      )
+                    : null,
+              ),
+              child: Center(
+                child: Text(
+                  '${day.day}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight:
+                        isSelected ? FontWeight.w800 : FontWeight.w600,
+                    color: isSelected
+                        ? cs.primary
+                        : cs.onSurface.withValues(alpha: 0.55),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 3),
+            Container(
+              width: 4,
+              height: 4,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: hasActivity
+                    ? const Color(0xFF10B981)
+                    : isDark
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : Colors.black.withValues(alpha: 0.06),
+              ),
+            ),
+          ],
+        );
+      }),
+    );
+  }
+}
+
+// ── Empty state (Premium Redesign) ──────────────────────────────
 class _EmptyState extends StatelessWidget {
   final bool hasNoPlan;
   final String dateKey;
@@ -2557,40 +3052,102 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              hasNoPlan
-                  ? Icons.calendar_today_rounded
-                  : Icons.check_circle_outline_rounded,
-              size: 48,
-              color: cs.primary.withValues(alpha: 0.3),
+            // Gradient glow icon
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    cs.primary.withValues(alpha: 0.15),
+                    cs.primary.withValues(alpha: 0.05),
+                  ],
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: cs.primary.withValues(alpha: 0.15),
+                    blurRadius: 24,
+                    spreadRadius: 4,
+                  ),
+                ],
+              ),
+              child: Icon(
+                hasNoPlan
+                    ? Icons.auto_awesome_rounded
+                    : Icons.event_note_rounded,
+                size: 36,
+                color: cs.primary.withValues(alpha: 0.6),
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             Text(
-              hasNoPlan ? 'No plan for this day' : 'No blocks yet',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: cs.onSurface.withValues(alpha: 0.5),
+              hasNoPlan ? 'Ready to plan your day?' : 'No activities yet',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface.withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(height: 8),
             Text(
               hasNoPlan
-                  ? 'Plan from your template or add activities'
-                  : 'Add blocks to your plan',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: cs.onSurface.withValues(alpha: 0.35),
+                  ? 'Use your template to kickstart today, or add activities manually'
+                  : 'Add your first activity to get started',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: cs.onSurface.withValues(alpha: 0.4),
+                height: 1.4,
               ),
             ),
             if (hasNoPlan && app.defaultActivities.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: () => app.planFlowFromTemplate(dateKey),
-                icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-                label: const Text('Plan from Template'),
-                style: FilledButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                  shape: RoundedRectangleBorder(
+              const SizedBox(height: 24),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      DashboardColors.primary,
+                      DashboardColors.primaryViolet,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: DashboardColors.primary.withValues(alpha: 0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => app.planFlowFromTemplate(dateKey),
                     borderRadius: BorderRadius.circular(14),
+                    child: const Padding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.auto_awesome_rounded,
+                              size: 18, color: Colors.white),
+                          SizedBox(width: 8),
+                          Text(
+                            'Plan from Template',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -2601,3 +3158,182 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
+
+// ── Daily Progress Summary Card ─────────────────────────────────
+class _DailyProgressCard extends StatelessWidget {
+  final int studyMinutes;
+  final int completedTasks;
+  final int totalTasks;
+  final int streak;
+
+  const _DailyProgressCard({
+    required this.studyMinutes,
+    required this.completedTasks,
+    required this.totalTasks,
+    required this.streak,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final progress =
+        totalTasks > 0 ? (completedTasks / totalTasks).clamp(0.0, 1.0) : 0.0;
+    final hours = studyMinutes ~/ 60;
+    final mins = studyMinutes % 60;
+    final studyLabel =
+        hours > 0 ? '${hours}h ${mins}m' : '${mins}m';
+
+    // Don't render if nothing to show
+    if (totalTasks == 0 && studyMinutes == 0 && streak == 0) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? [
+                        Colors.white.withValues(alpha: 0.06),
+                        Colors.white.withValues(alpha: 0.02),
+                      ]
+                    : [
+                        Colors.white.withValues(alpha: 0.70),
+                        Colors.white.withValues(alpha: 0.45),
+                      ],
+              ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: isDark
+                    ? DashboardColors.glassBorderDark
+                    : DashboardColors.glassBorderLight,
+                width: 0.5,
+              ),
+            ),
+            child: Row(
+              children: [
+                // Circular progress ring
+                SizedBox(
+                  width: 52,
+                  height: 52,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox(
+                        width: 52,
+                        height: 52,
+                        child: CircularProgressIndicator(
+                          value: progress,
+                          strokeWidth: 4,
+                          backgroundColor:
+                              cs.primary.withValues(alpha: 0.1),
+                          valueColor: const AlwaysStoppedAnimation(
+                              DashboardColors.primary),
+                          strokeCap: StrokeCap.round,
+                        ),
+                      ),
+                      Text(
+                        '${(progress * 100).round()}%',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: cs.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Stats
+                Expanded(
+                  child: Row(
+                    children: [
+                      _StatChip(
+                        icon: Icons.schedule_rounded,
+                        label: studyLabel,
+                        subtitle: 'Study',
+                        color: const Color(0xFF3B82F6),
+                      ),
+                      const SizedBox(width: 12),
+                      _StatChip(
+                        icon: Icons.task_alt_rounded,
+                        label: '$completedTasks/$totalTasks',
+                        subtitle: 'Tasks',
+                        color: const Color(0xFF10B981),
+                      ),
+                      if (streak > 0) ...[
+                        const SizedBox(width: 12),
+                        _StatChip(
+                          icon: Icons.local_fire_department_rounded,
+                          label: '$streak',
+                          subtitle: 'Streak',
+                          color: const Color(0xFFFF6B35),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final Color color;
+
+  const _StatChip({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color.withValues(alpha: 0.8)),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

@@ -1,14 +1,15 @@
 // =============================================================
 // ActivitySelector — "What do you want to do?" bar
-// Horizontal chip selector for quick-access to routines,
-// study, shopping, and default chain.
+// Premium Redesign with glassmorphic chips
 // =============================================================
 
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/default_routine_order.dart';
 import 'package:focusflow_mobile/models/routine.dart';
+import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'routine_runner_screen.dart';
 import 'study_flow_screen.dart';
 import 'shopping_flow_overlay.dart';
@@ -22,94 +23,135 @@ class ActivitySelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            cs.primary.withValues(alpha: 0.08),
-            cs.tertiary.withValues(alpha: 0.06),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.primary.withValues(alpha: 0.12)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.rocket_launch_rounded, size: 16, color: cs.primary),
-              const SizedBox(width: 6),
-              Text(
-                'What do you want to do?',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: cs.onSurface,
-                ),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? [
+                        Colors.white.withValues(alpha: 0.05),
+                        Colors.white.withValues(alpha: 0.02),
+                      ]
+                    : [
+                        Colors.white.withValues(alpha: 0.60),
+                        Colors.white.withValues(alpha: 0.35),
+                      ],
               ),
-              const Spacer(),
-              InkWell(
-                onTap: () => _openDefaultOrder(context),
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: Icon(Icons.tune_rounded, size: 18,
-                      color: cs.onSurface.withValues(alpha: 0.4)),
-                ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark
+                    ? DashboardColors.glassBorderDark
+                    : DashboardColors.glassBorderLight,
+                width: 0.5,
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _ActivityChip(
-                  emoji: '📋',
-                  label: 'Template',
-                  color: const Color(0xFF6366F1),
-                  onTap: () => _openDefaultOrder(context),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: cs.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.rocket_launch_rounded,
+                          size: 14, color: cs.primary),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Quick Actions',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: cs.onSurface.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: InkWell(
+                        onTap: () => _openDefaultOrder(context),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Icon(Icons.tune_rounded,
+                              size: 16,
+                              color: cs.onSurface.withValues(alpha: 0.4)),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                _ActivityChip(
-                  emoji: '🌅',
-                  label: 'Routine',
-                  color: const Color(0xFF10B981),
-                  onTap: () => _pickRoutine(context),
-                ),
-                const SizedBox(width: 8),
-                _ActivityChip(
-                  emoji: '📚',
-                  label: 'Study',
-                  color: const Color(0xFF8B5CF6),
-                  onTap: () => _startStudy(context),
-                ),
-                const SizedBox(width: 8),
-                _ActivityChip(
-                  emoji: '🛒',
-                  label: 'Shopping',
-                  color: const Color(0xFFF59E0B),
-                  onTap: () => _startShopping(context),
+                const SizedBox(height: 10),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _PremiumChip(
+                        emoji: '📋',
+                        label: 'Template',
+                        color: const Color(0xFF6366F1),
+                        isDark: isDark,
+                        onTap: () => _openDefaultOrder(context),
+                      ),
+                      const SizedBox(width: 8),
+                      _PremiumChip(
+                        emoji: '🌅',
+                        label: 'Routine',
+                        color: const Color(0xFF10B981),
+                        isDark: isDark,
+                        onTap: () => _pickRoutine(context),
+                      ),
+                      const SizedBox(width: 8),
+                      _PremiumChip(
+                        emoji: '📚',
+                        label: 'Study',
+                        color: const Color(0xFF8B5CF6),
+                        isDark: isDark,
+                        onTap: () => _startStudy(context),
+                      ),
+                      const SizedBox(width: 8),
+                      _PremiumChip(
+                        emoji: '🛒',
+                        label: 'Shopping',
+                        color: const Color(0xFFF59E0B),
+                        isDark: isDark,
+                        onTap: () => _startShopping(context),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
-
-
 
   void _pickRoutine(BuildContext context) {
     final app = context.read<AppProvider>();
     if (app.routines.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No routines yet. Create one from the Routines tab!')),
+        const SnackBar(
+            content:
+                Text('No routines yet. Create one from the Routines tab!')),
       );
       return;
     }
@@ -173,11 +215,12 @@ class DefaultChainRunner {
       case ActivityType.asrPrayer:
       case ActivityType.maghribPrayer:
       case ActivityType.ishaPrayer:
-        // Try to find linked routine
         if (activity.routineId != null) {
           final routine = app.routines.firstWhere(
             (r) => r.id == activity.routineId,
-            orElse: () => app.routines.isNotEmpty ? app.routines.first : _placeholderRoutine(activity),
+            orElse: () => app.routines.isNotEmpty
+                ? app.routines.first
+                : _placeholderRoutine(activity),
           );
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -218,7 +261,6 @@ class DefaultChainRunner {
         });
         break;
       case ActivityType.sleep:
-        // End of chain
         break;
     }
   }
@@ -288,13 +330,20 @@ class _RoutinePickerSheet extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: ListTile(
-                    leading: Text(r.icon, style: const TextStyle(fontSize: 24)),
-                    title: Text(r.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    leading:
+                        Text(r.icon, style: const TextStyle(fontSize: 24)),
+                    title: Text(r.name,
+                        style:
+                            const TextStyle(fontWeight: FontWeight.w600)),
                     subtitle: Text(
                       '${r.steps.length} steps • ~${r.totalEstimatedMinutes} min',
-                      style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.5)),
+                      style: TextStyle(
+                          fontSize: 12,
+                          color:
+                              cs.onSurface.withValues(alpha: 0.5)),
                     ),
-                    trailing: Icon(Icons.play_arrow_rounded, color: cs.primary),
+                    trailing:
+                        Icon(Icons.play_arrow_rounded, color: cs.primary),
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.of(context).push(
@@ -317,44 +366,69 @@ class _RoutinePickerSheet extends StatelessWidget {
   }
 }
 
-// ── Activity Chip ───────────────────────────────────────────────
-class _ActivityChip extends StatelessWidget {
+// ── Premium Activity Chip ───────────────────────────────────────
+class _PremiumChip extends StatelessWidget {
   final String emoji;
   final String label;
   final Color color;
+  final bool isDark;
   final VoidCallback onTap;
 
-  const _ActivityChip({
+  const _PremiumChip({
     required this.emoji,
     required this.label,
     required this.color,
+    required this.isDark,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: color.withValues(alpha: 0.1),
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withValues(alpha: isDark ? 0.18 : 0.12),
+            color.withValues(alpha: isDark ? 0.08 : 0.05),
+          ],
+        ),
         borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(emoji, style: const TextStyle(fontSize: 16)),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: color,
+        border: Border.all(
+          color: color.withValues(alpha: isDark ? 0.25 : 0.15),
+          width: 0.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(emoji, style: const TextStyle(fontSize: 16)),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
