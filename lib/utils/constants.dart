@@ -18,11 +18,8 @@ class MenuItemId {
 const List<String> kDefaultMenuOrder = [
   MenuItemId.dashboard,
   MenuItemId.todaysPlan,
-  MenuItemId.faLogger,
   MenuItemId.tracker,
   MenuItemId.revision,
-  MenuItemId.knowledgeBase,
-  MenuItemId.timeLogger,
   MenuItemId.analytics,
   MenuItemId.settings,
 ];
@@ -30,11 +27,8 @@ const List<String> kDefaultMenuOrder = [
 const Map<String, String> kMenuItemLabels = {
   MenuItemId.dashboard:     'Dashboard',
   MenuItemId.todaysPlan:    "Today's Plan",
-  MenuItemId.faLogger:      'FA Tracker',
   MenuItemId.tracker:       'Library',
   MenuItemId.revision:      'Revision Hub',
-  MenuItemId.knowledgeBase: 'Knowledge Base',
-  MenuItemId.timeLogger:    'Time Logger',
   MenuItemId.analytics:     'Analytics',
   MenuItemId.settings:      'Settings',
 };
@@ -43,11 +37,8 @@ const Map<String, String> kMenuItemLabels = {
 const Map<String, String> kPinnableScreenLabels = {
   MenuItemId.dashboard:     'Dashboard',
   MenuItemId.todaysPlan:    "Today's Plan",
-  MenuItemId.faLogger:      'FA Tracker',
   'tracker':                'Library',
   MenuItemId.revision:      'Revision',
-  MenuItemId.knowledgeBase: 'Knowledge',
-  MenuItemId.timeLogger:    'Time Log',
   MenuItemId.analytics:     'Analytics',
   MenuItemId.settings:      'Settings',
   'import':                 'Import',

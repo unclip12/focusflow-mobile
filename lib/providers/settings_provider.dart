@@ -11,6 +11,33 @@ class SettingsProvider extends ChangeNotifier {
   AppSettings _settings = AppSettings.defaults().copyWith(darkMode: false);
   bool _loaded = false;
 
+  static final Set<String> _allowedPinnedTabs =
+      kPinnableScreenLabels.keys.toSet();
+
+  List<String> _sanitizePinnedTabs(List<String>? tabs) {
+    final source = tabs ?? kDefaultPinnedTabs;
+    final cleaned = <String>[];
+    for (final tab in source) {
+      if (_allowedPinnedTabs.contains(tab) && !cleaned.contains(tab)) {
+        cleaned.add(tab);
+      }
+    }
+    return cleaned.isEmpty ? List<String>.from(kDefaultPinnedTabs) : cleaned;
+  }
+
+  List<MenuItemConfig> _sanitizeMenuConfiguration(List<MenuItemConfig>? config) {
+    final existing = {
+      for (final item in (config ?? <MenuItemConfig>[])) item.id: item,
+    };
+    return kDefaultMenuOrder.map((id) {
+      final item = existing[id];
+      return MenuItemConfig(
+        id: id,
+        visible: item?.visible ?? true,
+      );
+    }).toList();
+  }
+
   AppSettings get settings => _settings;
   bool get loaded => _loaded;
 
@@ -21,11 +48,11 @@ class SettingsProvider extends ChangeNotifier {
   String get fontSize => _settings.fontSize;
 
   // ── G4: Bottom nav ────────────────────────────────────────────
-  List<String> get pinnedTabs => _settings.pinnedTabs ?? kDefaultPinnedTabs;
+  List<String> get pinnedTabs => _sanitizePinnedTabs(_settings.pinnedTabs);
   bool get fullScreenMode => _settings.fullScreenMode ?? false;
 
   Future<void> setPinnedTabs(List<String> tabs) async {
-    _settings = _settings.copyWith(pinnedTabs: tabs);
+    _settings = _settings.copyWith(pinnedTabs: _sanitizePinnedTabs(tabs));
     await _persist();
   }
 
@@ -109,6 +136,11 @@ class SettingsProvider extends ChangeNotifier {
         data['darkMode'] = false;
       }
       _settings = AppSettings.fromJson(data);
+      _settings = _settings.copyWith(
+        pinnedTabs: _sanitizePinnedTabs(_settings.pinnedTabs),
+        menuConfiguration:
+            _sanitizeMenuConfiguration(_settings.menuConfiguration),
+      );
     } else {
       _settings = AppSettings.defaults().copyWith(darkMode: false);
     }
@@ -151,12 +183,14 @@ class SettingsProvider extends ChangeNotifier {
 
   // ── Menu Configuration ─────────────────────────────────────────
   Future<void> updateMenuConfig(List<MenuItemConfig> config) async {
-    _settings = _settings.copyWith(menuConfiguration: config);
+    _settings = _settings.copyWith(
+      menuConfiguration: _sanitizeMenuConfiguration(config),
+    );
     await _persist();
   }
 
   List<MenuItemConfig> get menuConfiguration =>
-      _settings.menuConfiguration ?? [];
+      _sanitizeMenuConfiguration(_settings.menuConfiguration);
 
   // ── Notifications ──────────────────────────────────────────────
   Future<void> updateNotifications(NotificationConfig config) async {
