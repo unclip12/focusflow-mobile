@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -6,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:focusflow_mobile/models/uworld_topic.dart';
 import 'package:focusflow_mobile/models/library_note.dart';
+import 'package:focusflow_mobile/models/activity_log.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/screens/library/add_note_sheet.dart';
 import 'package:focusflow_mobile/screens/library/edit_metadata_sheet.dart';
@@ -319,12 +321,23 @@ class _ProgressTab extends StatefulWidget {
 class _ProgressTabState extends State<_ProgressTab> {
   late int _done;
   late int _correct;
+  List<ActivityLogEntry>? _activityLogs;
 
   @override
   void initState() {
     super.initState();
     _done = widget.topic.doneQuestions;
     _correct = widget.topic.correctQuestions;
+    _loadActivityLogs();
+  }
+
+  Future<void> _loadActivityLogs() async {
+    final logs = await widget.app.getActivityLogs('uworld:${widget.topic.id}');
+    // Sort newest first
+    logs.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    if (mounted) {
+      setState(() => _activityLogs = logs);
+    }
   }
 
   @override
@@ -334,6 +347,7 @@ class _ProgressTabState extends State<_ProgressTab> {
         oldWidget.topic.correctQuestions != widget.topic.correctQuestions) {
       _done = widget.topic.doneQuestions;
       _correct = widget.topic.correctQuestions;
+      _loadActivityLogs(); // Refresh logs when progress changes
     }
   }
 
@@ -348,6 +362,33 @@ class _ProgressTabState extends State<_ProgressTab> {
     setState(() {
       _correct = (_correct + delta).clamp(0, _done);
     });
+  }
+
+  String _formatDate(String iso) {
+    try {
+      final dt = DateTime.parse(iso);
+      final h = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final m = dt.minute.toString().padLeft(2, '0');
+      final amPm = dt.hour >= 12 ? 'PM' : 'AM';
+      return '${dt.day}/${dt.month}/${dt.year}  $h:$m $amPm';
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  String _timeAgo(String iso) {
+    try {
+      final dt = DateTime.parse(iso);
+      final diff = DateTime.now().difference(dt);
+      if (diff.inDays > 365) return '${diff.inDays ~/ 365}y ago';
+      if (diff.inDays > 30) return '${diff.inDays ~/ 30}mo ago';
+      if (diff.inDays > 0) return '${diff.inDays}d ago';
+      if (diff.inHours > 0) return '${diff.inHours}h ago';
+      if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
+      return 'just now';
+    } catch (_) {
+      return '';
+    }
   }
 
   @override
@@ -379,6 +420,60 @@ class _ProgressTabState extends State<_ProgressTab> {
         MediaQuery.of(context).padding.bottom + 20,
       ),
       children: [
+        // ── Session Info Cards ─────────────────────────────
+        if (_activityLogs != null && _activityLogs!.isNotEmpty) ...[
+          Row(
+            children: [
+              Expanded(
+                child: _GlassInfoCard(
+                  icon: Icons.play_circle_outline_rounded,
+                  label: 'First Session',
+                  value: _formatDate(_activityLogs!.last.timestamp),
+                  subtitle: _timeAgo(_activityLogs!.last.timestamp),
+                  isDark: isDark,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _GlassInfoCard(
+                  icon: Icons.update_rounded,
+                  label: 'Last Session',
+                  value: _formatDate(_activityLogs!.first.timestamp),
+                  subtitle: _timeAgo(_activityLogs!.first.timestamp),
+                  color: DashboardColors.primaryViolet,
+                  isDark: isDark,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _GlassInfoCard(
+                  icon: Icons.format_list_numbered_rounded,
+                  label: 'Total Sessions',
+                  value: '${_activityLogs!.length}',
+                  subtitle: '${_activityLogs!.length} update${_activityLogs!.length == 1 ? '' : 's'} logged',
+                  color: DashboardColors.success,
+                  isDark: isDark,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _GlassInfoCard(
+                  icon: Icons.quiz_rounded,
+                  label: 'Questions Done',
+                  value: '$_done / ${topic.totalQuestions}',
+                  subtitle: '${topic.totalQuestions - _done} remaining',
+                  color: DashboardColors.warning,
+                  isDark: isDark,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+        ],
         // ── Accuracy Ring ──────────────────────────────────
         _GlassContainer(
           isDark: isDark,
@@ -597,6 +692,8 @@ class _ProgressTabState extends State<_ProgressTab> {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Progress saved')),
             );
+            // Refresh activity logs after saving
+            Future.delayed(const Duration(milliseconds: 300), _loadActivityLogs);
           },
           child: ClipRRect(
             borderRadius: BorderRadius.circular(14),
@@ -636,6 +733,62 @@ class _ProgressTabState extends State<_ProgressTab> {
             ),
           ),
         ),
+        // ── Activity Log Timeline ───────────────────────
+        if (_activityLogs != null && _activityLogs!.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _SectionLabel(label: 'Activity Timeline', isDark: isDark),
+          const SizedBox(height: 10),
+          _GlassContainer(
+            isDark: isDark,
+            child: Column(
+              children: [
+                for (int i = 0; i < _activityLogs!.length; i++)
+                  _UWorldTimelineEntry(
+                    log: _activityLogs![i],
+                    isLast: i == _activityLogs!.length - 1,
+                    isDark: isDark,
+                  ),
+              ],
+            ),
+          ),
+        ] else if (_activityLogs != null && _activityLogs!.isEmpty) ...[
+          const SizedBox(height: 24),
+          _SectionLabel(label: 'Activity Timeline', isDark: isDark),
+          const SizedBox(height: 10),
+          _GlassContainer(
+            isDark: isDark,
+            child: Center(
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.history_rounded,
+                    size: 32,
+                    color: DashboardColors.textSecondary.withValues(alpha: 0.4),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No sessions logged yet',
+                    style: _inter(
+                      size: 13,
+                      weight: FontWeight.w500,
+                      color: DashboardColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Save progress to start tracking',
+                    style: _inter(
+                      size: 11,
+                      weight: FontWeight.w400,
+                      color: DashboardColors.textSecondary.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 16),
       ],
     );
   }
@@ -798,6 +951,348 @@ class _NotesTabState extends State<_NotesTab> {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// INFO CARD & TIMELINE ENTRY
+// ══════════════════════════════════════════════════════════════════
+
+class _GlassInfoCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final String? subtitle;
+  final Color? color;
+  final bool isDark;
+
+  const _GlassInfoCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.subtitle,
+    this.color,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? DashboardColors.primary;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.04)
+                : Colors.white.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: DashboardColors.glassBorder(isDark),
+              width: 0.5,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: c.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(icon, size: 14, color: c),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: _inter(
+                        size: 11,
+                        weight: FontWeight.w500,
+                        color: DashboardColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                value,
+                style: _inter(
+                  size: 14,
+                  weight: FontWeight.w700,
+                  color: DashboardColors.textPrimary(isDark),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (subtitle != null && subtitle!.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtitle!,
+                  style: _inter(
+                    size: 10,
+                    weight: FontWeight.w500,
+                    color: c.withValues(alpha: 0.8),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UWorldTimelineEntry extends StatelessWidget {
+  final ActivityLogEntry log;
+  final bool isLast;
+  final bool isDark;
+
+  const _UWorldTimelineEntry({
+    required this.log,
+    required this.isLast,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Parse details JSON for question counts
+    int? sessionDone;
+    int? sessionCorrect;
+    int? totalDone;
+    int? totalCorrect;
+    try {
+      final d = jsonDecode(log.details) as Map<String, dynamic>;
+      sessionDone = d['done'] as int?;
+      sessionCorrect = d['correct'] as int?;
+      totalDone = d['totalDone'] as int?;
+      totalCorrect = d['totalCorrect'] as int?;
+    } catch (_) {}
+
+    // Color based on accuracy
+    Color dotColor = DashboardColors.primary;
+    if (sessionDone != null && sessionDone > 0 && sessionCorrect != null) {
+      final acc = sessionCorrect / sessionDone;
+      if (acc >= 0.8) {
+        dotColor = DashboardColors.success;
+      } else if (acc >= 0.5) {
+        dotColor = DashboardColors.warning;
+      } else {
+        dotColor = DashboardColors.danger;
+      }
+    }
+
+    return IntrinsicHeight(
+      child: Row(
+        children: [
+          // Timeline line + dot
+          SizedBox(
+            width: 24,
+            child: Column(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        dotColor,
+                        dotColor.withValues(alpha: 0.7),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: dotColor.withValues(alpha: 0.4),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                ),
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            dotColor.withValues(alpha: 0.4),
+                            dotColor.withValues(alpha: 0.1),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Content
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          log.actionLabel,
+                          style: _inter(
+                            size: 13,
+                            weight: FontWeight.w600,
+                            color: DashboardColors.textPrimary(isDark),
+                          ),
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            _formatDate(log.timestamp),
+                            style: _inter(
+                              size: 11,
+                              weight: FontWeight.w400,
+                              color: DashboardColors.textSecondary,
+                            ),
+                          ),
+                          Text(
+                            _timeAgo(log.timestamp),
+                            style: _inter(
+                              size: 10,
+                              weight: FontWeight.w400,
+                              color: DashboardColors.textSecondary
+                                  .withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  if (sessionDone != null && sessionDone > 0) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        _DetailChip(
+                          icon: Icons.check_rounded,
+                          label: '+$sessionDone done',
+                          color: DashboardColors.primary,
+                          isDark: isDark,
+                        ),
+                        if (sessionCorrect != null) ...[
+                          const SizedBox(width: 6),
+                          _DetailChip(
+                            icon: Icons.star_rounded,
+                            label: '+$sessionCorrect correct',
+                            color: DashboardColors.success,
+                            isDark: isDark,
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (totalDone != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Running total: $totalDone done${totalCorrect != null ? ', $totalCorrect correct' : ''}',
+                        style: _inter(
+                          size: 10,
+                          weight: FontWeight.w400,
+                          color: DashboardColors.textSecondary
+                              .withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(String iso) {
+    try {
+      final dt = DateTime.parse(iso);
+      final h = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final m = dt.minute.toString().padLeft(2, '0');
+      final amPm = dt.hour >= 12 ? 'PM' : 'AM';
+      return '${dt.day}/${dt.month}/${dt.year}  $h:$m $amPm';
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  String _timeAgo(String iso) {
+    try {
+      final dt = DateTime.parse(iso);
+      final diff = DateTime.now().difference(dt);
+      if (diff.inDays > 365) return '${diff.inDays ~/ 365}y ago';
+      if (diff.inDays > 30) return '${diff.inDays ~/ 30}mo ago';
+      if (diff.inDays > 0) return '${diff.inDays}d ago';
+      if (diff.inHours > 0) return '${diff.inHours}h ago';
+      if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
+      return 'just now';
+    } catch (_) {
+      return '';
+    }
+  }
+}
+
+class _DetailChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool isDark;
+
+  const _DetailChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: isDark ? 0.12 : 0.08),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: color.withValues(alpha: 0.2),
+          width: 0.5,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: _inter(
+              size: 9,
+              weight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

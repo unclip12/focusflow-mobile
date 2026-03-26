@@ -3766,29 +3766,29 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateSketchyMetadata(SketchyItem updatedItem) async {
+  Future<void> updateSketchyMetadata(SketchyVideo updatedItem) async {
     final microIndex = sketchyMicroVideos
-        .indexWhere((v) => v.id?.toString() == updatedItem.id);
+        .indexWhere((v) => v.id == updatedItem.id);
     if (microIndex != -1) {
-      sketchyMicroVideos[microIndex] = updatedItem as SketchyVideo;
-      await _db.updateSketchyMicroVideo(updatedItem.toJson());
+      sketchyMicroVideos[microIndex] = updatedItem;
+      await _db.updateSketchyMicroVideo(updatedItem.toMap());
     } else {
       final pharmIndex = sketchyPharmVideos
-          .indexWhere((v) => v.id?.toString() == updatedItem.id);
+          .indexWhere((v) => v.id == updatedItem.id);
       if (pharmIndex != -1) {
-        sketchyPharmVideos[pharmIndex] = updatedItem as SketchyVideo;
-        await _db.updateSketchyPharmVideo(updatedItem.toJson());
+        sketchyPharmVideos[pharmIndex] = updatedItem;
+        await _db.updateSketchyPharmVideo(updatedItem.toMap());
       }
     }
     notifyListeners();
   }
 
-  Future<void> updatePathomaMetadata(PathomaItem updatedItem) async {
+  Future<void> updatePathomaMetadata(PathomaChapter updatedItem) async {
     final i =
-        pathomaChapters.indexWhere((c) => c.id?.toString() == updatedItem.id);
+        pathomaChapters.indexWhere((c) => c.id == updatedItem.id);
     if (i == -1) return;
-    pathomaChapters[i] = updatedItem as PathomaChapter;
-    await _db.updatePathomaChapter(updatedItem.toJson());
+    pathomaChapters[i] = updatedItem;
+    await _db.updatePathomaChapter(updatedItem.toMap());
     notifyListeners();
   }
 

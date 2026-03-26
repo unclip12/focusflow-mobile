@@ -4,6 +4,8 @@ class SketchyVideo {
   final String subcategory;
   final String title;
   final bool watched;
+  final String? customTitle;
+  final String? userDescription;
 
   const SketchyVideo({
     this.id,
@@ -11,14 +13,23 @@ class SketchyVideo {
     required this.subcategory,
     required this.title,
     required this.watched,
+    this.customTitle,
+    this.userDescription,
   });
 
-  SketchyVideo copyWith({bool? watched}) => SketchyVideo(
+  SketchyVideo copyWith({
+    bool? watched,
+    String? customTitle,
+    String? userDescription,
+  }) =>
+      SketchyVideo(
         id: id,
         category: category,
         subcategory: subcategory,
         title: title,
         watched: watched ?? this.watched,
+        customTitle: customTitle ?? this.customTitle,
+        userDescription: userDescription ?? this.userDescription,
       );
 
   Map<String, dynamic> toMap() => {
@@ -27,6 +38,8 @@ class SketchyVideo {
         'subcategory': subcategory,
         'title': title,
         'watched': watched ? 1 : 0,
+        if (customTitle != null) 'customTitle': customTitle,
+        if (userDescription != null) 'userDescription': userDescription,
       };
 
   factory SketchyVideo.fromMap(Map<String, dynamic> m) => SketchyVideo(
@@ -35,5 +48,7 @@ class SketchyVideo {
         subcategory: m['subcategory'] as String? ?? '',
         title: m['title'] as String? ?? '',
         watched: (m['watched'] as int) == 1,
+        customTitle: m['customTitle'] as String?,
+        userDescription: m['userDescription'] as String?,
       );
 }

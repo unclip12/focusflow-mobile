@@ -10,6 +10,7 @@ import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/sketchy_video.dart';
 import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'package:focusflow_mobile/screens/library/library_item_detail_sheet.dart';
+import 'package:focusflow_mobile/utils/show_app_bottom_sheet.dart';
 import 'package:focusflow_mobile/screens/revision_hub/revision_confidence_sheet.dart';
 import 'package:focusflow_mobile/screens/tracker/tracker_sheets.dart';
 
@@ -601,15 +602,12 @@ class _SketchyVideoList extends StatelessWidget {
         onTap: selectionMode
             ? () => onToggleSelect(key)
             : () {
-                showModalBottomSheet(
+                showAppBottomSheet(
                   context: context,
-                  isScrollControlled: true,
-                  useSafeArea: true,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(20)),
-                  ),
-                  builder: (_) => LibraryItemDetailSheet(
+                  initialChildSize: 0.9,
+                  minChildSize: 0.5,
+                  maxChildSize: 0.95,
+                  builder: (_, __) => LibraryItemDetailSheet(
                     app: app,
                     item: video,
                     itemType: 'sketchy',

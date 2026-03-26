@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:focusflow_mobile/models/library_note.dart';
 import 'package:focusflow_mobile/models/sketchy_video.dart';
 import 'package:focusflow_mobile/models/pathoma_chapter.dart';
+import 'package:focusflow_mobile/models/revision_item.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/screens/library/add_note_sheet.dart';
 import 'package:focusflow_mobile/screens/library/edit_metadata_sheet.dart';
@@ -75,103 +76,106 @@ class _LibraryItemDetailSheetState extends State<LibraryItemDetailSheet>
     }
   }
 
+  /// Find the matching RevisionItem for this library item.
+  RevisionItem? get _revisionItem {
+    final item = _item;
+    if (widget.itemType == 'sketchy') {
+      final video = item as SketchyVideo;
+      final revIdMicro = 'sketchy-micro-${video.id}';
+      final revIdPharm = 'sketchy-pharm-${video.id}';
+      final revIdGeneric = 'sketchy-${video.id}';
+      return widget.app.revisionItems.cast<RevisionItem?>().firstWhere(
+            (r) =>
+                r!.id == revIdMicro ||
+                r.id == revIdPharm ||
+                r.id == revIdGeneric,
+            orElse: () => null,
+          );
+    } else {
+      final chapter = item as PathomaChapter;
+      final revIdCh = 'pathoma-ch-${chapter.id}';
+      final revIdGeneric = 'pathoma-${chapter.id}';
+      return widget.app.revisionItems.cast<RevisionItem?>().firstWhere(
+            (r) => r!.id == revIdCh || r.id == revIdGeneric,
+            orElse: () => null,
+          );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final dynamic item = _item;
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.9,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (context, scrollController) {
-        return Column(
-          children: [
-            // ── Drag handle ─────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 4),
-              child: Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.25)
-                        : Colors.black.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
+    return Column(
+      children: [
+        // ── Header ──────────────────────────────────────
+        _LibraryDetailHeader(
+          item: item,
+          itemType: widget.itemType,
+          isDark: isDark,
+          onEdit: () {
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              useSafeArea: true,
+              builder: (_) => EditMetadataSheet(
+                initialTitle: item.customTitle,
+                initialDescription: item.userDescription,
+                onSave: (title, desc) {
+                  final updated = item.copyWith(
+                    customTitle: title,
+                    userDescription: desc,
+                  );
+                  if (widget.itemType == 'sketchy') {
+                    widget.app.updateSketchyMetadata(updated);
+                  } else {
+                    widget.app.updatePathomaMetadata(updated);
+                  }
+                },
               ),
-            ),
-            // ── Header ──────────────────────────────────────
-            _LibraryDetailHeader(
-              item: item,
-              itemType: widget.itemType,
-              isDark: isDark,
-              onEdit: () {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  useSafeArea: true,
-                  builder: (_) => EditMetadataSheet(
-                    initialTitle: item.customTitle,
-                    initialDescription: item.userDescription,
-                    onSave: (title, desc) {
-                      final updated = item.copyWith(
-                        customTitle: title,
-                        userDescription: desc,
-                      );
-                      if (widget.itemType == 'sketchy') {
-                        widget.app.updateSketchyMetadata(updated);
-                      } else {
-                        widget.app.updatePathomaMetadata(updated);
-                      }
-                    },
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-            // ── Quick Actions ───────────────────────────────
-            _LibraryQuickActions(
-              item: item,
-              itemType: widget.itemType,
-              app: widget.app,
-              isDark: isDark,
-            ),
-            const SizedBox(height: 16),
-            // ── Tab Bar ─────────────────────────────────────
-            _GlassTabBar(
-              controller: _tabController,
-              tabs: const ['Progress', 'Notes & Attachments'],
-              isDark: isDark,
-            ),
-            const SizedBox(height: 4),
-            // ── Tab Content ─────────────────────────────────
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _ProgressTab(
-                    item: item,
-                    itemType: widget.itemType,
-                    app: widget.app,
-                    scrollController: scrollController,
-                    isDark: isDark,
-                  ),
-                  _NotesTab(
-                    itemId: _itemId,
-                    itemType: widget.itemType,
-                    app: widget.app,
-                    isDark: isDark,
-                  ),
-                ],
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        // ── Quick Actions ───────────────────────────────
+        _LibraryQuickActions(
+          item: item,
+          itemType: widget.itemType,
+          app: widget.app,
+          isDark: isDark,
+        ),
+        const SizedBox(height: 16),
+        // ── Tab Bar ─────────────────────────────────────
+        _GlassTabBar(
+          controller: _tabController,
+          tabs: const ['History & Progress', 'Notes & Attachments'],
+          isDark: isDark,
+        ),
+        const SizedBox(height: 4),
+        // ── Tab Content ─────────────────────────────────
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _HistoryTab(
+                item: item,
+                itemType: widget.itemType,
+                app: widget.app,
+                revisionItem: _revisionItem,
+                scrollController: null, // will use its own
+                isDark: isDark,
               ),
-            ),
-          ],
-        );
-      },
+              _NotesTab(
+                itemId: _itemId,
+                itemType: widget.itemType,
+                app: widget.app,
+                isDark: isDark,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -394,20 +398,22 @@ class _LibraryQuickActions extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// PROGRESS TAB
+// HISTORY TAB — glass info cards + revision log timeline
 // ══════════════════════════════════════════════════════════════════
 
-class _ProgressTab extends StatelessWidget {
+class _HistoryTab extends StatelessWidget {
   final dynamic item;
   final String itemType;
   final AppProvider app;
-  final ScrollController scrollController;
+  final RevisionItem? revisionItem;
+  final ScrollController? scrollController;
   final bool isDark;
 
-  const _ProgressTab({
+  const _HistoryTab({
     required this.item,
     required this.itemType,
     required this.app,
+    required this.revisionItem,
     required this.scrollController,
     required this.isDark,
   });
@@ -415,6 +421,9 @@ class _ProgressTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isWatched = item.watched;
+    final revItem = revisionItem;
+    final hasRevision = revItem != null;
+    final revisionLog = revItem?.revisionLog ?? [];
 
     return ListView(
       controller: scrollController,
@@ -425,7 +434,7 @@ class _ProgressTab extends StatelessWidget {
         MediaQuery.of(context).padding.bottom + 20,
       ),
       children: [
-        // Watch status card
+        // ── Watch status card ──────────────────────────────
         _GlassContainer(
           isDark: isDark,
           child: Row(
@@ -482,20 +491,76 @@ class _ProgressTab extends StatelessWidget {
             ],
           ),
         ),
-        // Resource info
+
+        // ── Info cards grid ─────────────────────────────────
         const SizedBox(height: 12),
-        _GlassContainer(
-          isDark: isDark,
-          child: Column(
-            children: [
-              _InfoRow(
+        Row(
+          children: [
+            Expanded(
+              child: _GlassInfoCard(
                 icon: Icons.category_rounded,
                 label: 'Type',
-                value: itemType == 'sketchy' ? 'Sketchy Video' : 'Pathoma Chapter',
+                value: itemType == 'sketchy' ? 'Sketchy' : 'Pathoma',
                 isDark: isDark,
               ),
-              if (itemType == 'sketchy') ...[
-                const SizedBox(height: 10),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _GlassInfoCard(
+                icon: Icons.replay_rounded,
+                label: 'Revisions',
+                value: hasRevision
+                    ? 'R${revItem.currentRevisionIndex}'
+                    : 'R0',
+                subtitle: hasRevision && revItem.lastStudiedAt != null
+                    ? _timeAgo(revItem.lastStudiedAt!)
+                    : null,
+                color: DashboardColors.primaryViolet,
+                isDark: isDark,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _GlassInfoCard(
+                icon: itemType == 'sketchy'
+                    ? Icons.folder_rounded
+                    : Icons.bookmark_rounded,
+                label: itemType == 'sketchy' ? 'Category' : 'Chapter',
+                value: itemType == 'sketchy'
+                    ? item.category
+                    : '${item.chapter}',
+                isDark: isDark,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _GlassInfoCard(
+                icon: Icons.event_rounded,
+                label: 'Next Due',
+                value: hasRevision && revItem.nextRevisionAt.isNotEmpty
+                    ? _formatDate(revItem.nextRevisionAt)
+                    : '—',
+                subtitle: hasRevision && revItem.nextRevisionAt.isNotEmpty
+                    ? _daysUntil(revItem.nextRevisionAt)
+                    : null,
+                color: DashboardColors.warning,
+                isDark: isDark,
+              ),
+            ),
+          ],
+        ),
+
+        // ── Resource info ────────────────────────────────────
+        if (itemType == 'sketchy') ...[
+          const SizedBox(height: 12),
+          _GlassContainer(
+            isDark: isDark,
+            child: Column(
+              children: [
                 _InfoRow(
                   icon: Icons.folder_rounded,
                   label: 'Category',
@@ -509,20 +574,159 @@ class _ProgressTab extends StatelessWidget {
                   value: item.subcategory,
                   isDark: isDark,
                 ),
-              ] else ...[
-                const SizedBox(height: 10),
-                _InfoRow(
-                  icon: Icons.bookmark_rounded,
-                  label: 'Chapter',
-                  value: '${item.chapter}',
-                  isDark: isDark,
-                ),
               ],
-            ],
+            ),
           ),
-        ),
+        ],
+
+        // ── Revision Log Timeline ────────────────────────────
+        if (revisionLog.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          _SectionLabel(label: 'Revision Log', isDark: isDark),
+          const SizedBox(height: 10),
+          _GlassContainer(
+            isDark: isDark,
+            child: Column(
+              children: [
+                for (int i = 0; i < revisionLog.length; i++)
+                  _RevisionLogTimelineEntry(
+                    entry: revisionLog[i],
+                    isLast: i == revisionLog.length - 1,
+                    isDark: isDark,
+                  ),
+              ],
+            ),
+          ),
+        ],
+
+        // ── Retention Score ──────────────────────────────────
+        if (hasRevision) ...[
+          const SizedBox(height: 12),
+          _GlassContainer(
+            isDark: isDark,
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        DashboardColors.primary.withValues(alpha: 0.15),
+                        DashboardColors.primaryViolet.withValues(alpha: 0.1),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${revItem.retentionScore}',
+                      style: _inter(
+                        size: 16,
+                        weight: FontWeight.w800,
+                        color: revItem.retentionScore >= 50
+                            ? DashboardColors.success
+                            : revItem.retentionScore >= 20
+                                ? DashboardColors.warning
+                                : DashboardColors.danger,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Retention Score',
+                        style: _inter(
+                          size: 14,
+                          weight: FontWeight.w600,
+                          color: DashboardColors.textPrimary(isDark),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        revItem.easyFlag
+                            ? 'Never marked hard — great recall!'
+                            : 'Hard count: ${revItem.hardCount}',
+                        style: _inter(
+                          size: 11,
+                          weight: FontWeight.w400,
+                          color: DashboardColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (revItem.easyFlag)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: DashboardColors.success.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: DashboardColors.success.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Text(
+                      '🟢 Easy',
+                      style: _inter(
+                        size: 10,
+                        weight: FontWeight.w700,
+                        color: DashboardColors.success,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+
+        const SizedBox(height: 16),
       ],
     );
+  }
+
+  String _formatDate(String iso) {
+    try {
+      final dt = DateTime.parse(iso);
+      final h = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final m = dt.minute.toString().padLeft(2, '0');
+      final amPm = dt.hour >= 12 ? 'PM' : 'AM';
+      return '${dt.day}/${dt.month}/${dt.year}  $h:$m $amPm';
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  String _timeAgo(String iso) {
+    try {
+      final dt = DateTime.parse(iso);
+      final diff = DateTime.now().difference(dt);
+      if (diff.inDays > 365) return '${diff.inDays ~/ 365}y ago';
+      if (diff.inDays > 30) return '${diff.inDays ~/ 30}mo ago';
+      if (diff.inDays > 0) return '${diff.inDays}d ago';
+      if (diff.inHours > 0) return '${diff.inHours}h ago';
+      return 'just now';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  String _daysUntil(String iso) {
+    try {
+      final dt = DateTime.parse(iso);
+      final diff = dt.difference(DateTime.now());
+      if (diff.isNegative) return 'overdue';
+      if (diff.inDays == 0) return 'today';
+      if (diff.inDays == 1) return 'tomorrow';
+      return 'in ${diff.inDays}d';
+    } catch (_) {
+      return '';
+    }
   }
 }
 
@@ -864,6 +1068,128 @@ class _GlassContainer extends StatelessWidget {
   }
 }
 
+class _GlassInfoCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final String? subtitle;
+  final Color? color;
+  final bool isDark;
+
+  const _GlassInfoCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.subtitle,
+    this.color,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? DashboardColors.primary;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.04)
+                : Colors.white.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: DashboardColors.glassBorder(isDark),
+              width: 0.5,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: c.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(icon, size: 14, color: c),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    label,
+                    style: _inter(
+                      size: 11,
+                      weight: FontWeight.w500,
+                      color: DashboardColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                value,
+                style: _inter(
+                  size: 15,
+                  weight: FontWeight.w700,
+                  color: DashboardColors.textPrimary(isDark),
+                ),
+              ),
+              if (subtitle != null && subtitle!.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtitle!,
+                  style: _inter(
+                    size: 10,
+                    weight: FontWeight.w500,
+                    color: c.withValues(alpha: 0.8),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  final bool isDark;
+
+  const _SectionLabel({required this.label, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 3,
+          height: 14,
+          decoration: BoxDecoration(
+            gradient: DashboardColors.verticalAccentGradient(),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label.toUpperCase(),
+          style: _inter(
+            size: 11,
+            weight: FontWeight.w700,
+            color: DashboardColors.primary.withValues(alpha: 0.7),
+            letterSpacing: 1.2,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -910,6 +1236,225 @@ class _InfoRow extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+// ── Revision Log Timeline Entry ─────────────────────────────────
+
+class _RevisionLogTimelineEntry extends StatelessWidget {
+  final RevisionLogEntry entry;
+  final bool isLast;
+  final bool isDark;
+
+  const _RevisionLogTimelineEntry({
+    required this.entry,
+    required this.isLast,
+    required this.isDark,
+  });
+
+  Color get _responseColor {
+    switch (entry.response) {
+      case 'easy':
+        return DashboardColors.success;
+      case 'hard':
+        return DashboardColors.danger;
+      default:
+        return DashboardColors.primary;
+    }
+  }
+
+  String get _responseLabel {
+    switch (entry.response) {
+      case 'easy':
+        return '🟢 Easy';
+      case 'hard':
+        return '🔴 Hard${entry.hardAttempt > 0 ? ' #${entry.hardAttempt}' : ''}';
+      default:
+        return '🔵 Good';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicHeight(
+      child: Row(
+        children: [
+          // Timeline line + dot
+          SizedBox(
+            width: 24,
+            child: Column(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        DashboardColors.primary,
+                        DashboardColors.primaryViolet,
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: DashboardColors.primary.withValues(alpha: 0.4),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                ),
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            DashboardColors.primary.withValues(alpha: 0.4),
+                            DashboardColors.primaryViolet
+                                .withValues(alpha: 0.1),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Content
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Revision ${entry.revisionNumber}',
+                        style: _inter(
+                          size: 13,
+                          weight: FontWeight.w600,
+                          color: DashboardColors.textPrimary(isDark),
+                        ),
+                      ),
+                      // Response badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: _responseColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: _responseColor.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Text(
+                          _responseLabel,
+                          style: _inter(
+                            size: 9,
+                            weight: FontWeight.w700,
+                            color: _responseColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _formatDate(entry.actualAt),
+                        style: _inter(
+                          size: 11,
+                          weight: FontWeight.w400,
+                          color: DashboardColors.textSecondary,
+                        ),
+                      ),
+                      Text(
+                        _timeAgo(entry.actualAt),
+                        style: _inter(
+                          size: 10,
+                          weight: FontWeight.w400,
+                          color: DashboardColors.textSecondary
+                              .withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (entry.note.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      entry.note,
+                      style: _inter(
+                        size: 11,
+                        weight: FontWeight.w400,
+                        color: DashboardColors.textSecondary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  if (entry.nextScheduledHours > 0) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Next in ${_formatHours(entry.nextScheduledHours)}',
+                      style: _inter(
+                        size: 10,
+                        weight: FontWeight.w500,
+                        color: DashboardColors.primary.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(String iso) {
+    try {
+      final dt = DateTime.parse(iso);
+      final h = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final m = dt.minute.toString().padLeft(2, '0');
+      final amPm = dt.hour >= 12 ? 'PM' : 'AM';
+      return '${dt.day}/${dt.month}/${dt.year}  $h:$m $amPm';
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  String _timeAgo(String iso) {
+    try {
+      final dt = DateTime.parse(iso);
+      final diff = DateTime.now().difference(dt);
+      if (diff.inDays > 365) return '${diff.inDays ~/ 365}y ago';
+      if (diff.inDays > 30) return '${diff.inDays ~/ 30}mo ago';
+      if (diff.inDays > 0) return '${diff.inDays}d ago';
+      if (diff.inHours > 0) return '${diff.inHours}h ago';
+      if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
+      return 'just now';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  String _formatHours(int hours) {
+    if (hours >= 24) {
+      final days = hours ~/ 24;
+      final rem = hours % 24;
+      if (rem == 0) return '${days}d';
+      return '${days}d ${rem}h';
+    }
+    return '${hours}h';
   }
 }
 

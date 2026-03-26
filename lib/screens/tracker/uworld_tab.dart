@@ -9,6 +9,7 @@ import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/uworld_topic.dart';
 import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'package:focusflow_mobile/screens/tracker/tracker_sheets.dart';
+import 'package:focusflow_mobile/screens/library/uworld_detail_sheet.dart';
 
 class UWorldTab extends StatelessWidget {
   final AppProvider app;
@@ -258,7 +259,7 @@ class UWorldTab extends StatelessWidget {
       child: InkWell(
         onTap: selectionMode
             ? () => onToggleSelect(key)
-            : () => _showEditDialog(context, topic),
+            : () => _showDetailSheet(context, topic),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
           child: Row(
@@ -411,6 +412,21 @@ class UWorldTab extends StatelessWidget {
     if (accuracy >= 80) return DashboardColors.success;
     if (accuracy >= 60) return DashboardColors.warning;
     return DashboardColors.danger;
+  }
+
+  void _showDetailSheet(BuildContext context, UWorldTopic topic) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF1A1A2E)
+          : const Color(0xFFF5F3FF),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => UWorldDetailSheet(app: app, topic: topic),
+    );
   }
 
   void _showEditDialog(BuildContext context, UWorldTopic topic) {

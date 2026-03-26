@@ -18,7 +18,7 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._();
 
   static const _dbName = 'focusflow.db';
-  static const _dbVersion = 9;
+  static const _dbVersion = 10;
 
   Database? _database;
 
@@ -299,7 +299,9 @@ class DatabaseService {
         category TEXT NOT NULL,
         subcategory TEXT NOT NULL,
         title TEXT NOT NULL,
-        watched INTEGER NOT NULL DEFAULT 0
+        watched INTEGER NOT NULL DEFAULT 0,
+        customTitle TEXT,
+        userDescription TEXT
       )
     ''');
 
@@ -309,7 +311,9 @@ class DatabaseService {
         category TEXT NOT NULL,
         subcategory TEXT NOT NULL,
         title TEXT NOT NULL,
-        watched INTEGER NOT NULL DEFAULT 0
+        watched INTEGER NOT NULL DEFAULT 0,
+        customTitle TEXT,
+        userDescription TEXT
       )
     ''');
 
@@ -318,7 +322,9 @@ class DatabaseService {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         chapter INTEGER NOT NULL,
         title TEXT NOT NULL,
-        watched INTEGER NOT NULL DEFAULT 0
+        watched INTEGER NOT NULL DEFAULT 0,
+        customTitle TEXT,
+        userDescription TEXT
       )
     ''');
   }
@@ -390,6 +396,9 @@ class DatabaseService {
     if (oldVersion < 9) {
       await _createV9Tables(db);
     }
+    if (oldVersion < 10) {
+      await _migrateV10(db);
+    }
     // Streak data table — always ensure it exists
     await db.execute('''
       CREATE TABLE IF NOT EXISTS $tStreakData (
@@ -433,6 +442,18 @@ class DatabaseService {
       'CREATE INDEX IF NOT EXISTS idx_activity_logs_ts ON $tActivityLogs(timestamp)');
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_activity_logs_type ON $tActivityLogs(item_type)');
+  }
+
+  /// Migrate V10 — add customTitle + userDescription to Sketchy/Pathoma tables.
+  Future<void> _migrateV10(Database db) async {
+    for (final table in [tSketchyMicroVideos, tSketchyPharmVideos, tPathomaChapters]) {
+      try {
+        await db.execute('ALTER TABLE $table ADD COLUMN customTitle TEXT');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE $table ADD COLUMN userDescription TEXT');
+      } catch (_) {}
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════
