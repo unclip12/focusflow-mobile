@@ -35,6 +35,7 @@ import 'package:focusflow_mobile/models/pathoma_item.dart';
 import 'package:focusflow_mobile/models/sketchy_video.dart';
 import 'package:focusflow_mobile/models/pathoma_chapter.dart';
 import 'package:focusflow_mobile/models/uworld_topic.dart';
+import 'package:focusflow_mobile/models/video_lecture.dart';
 import 'package:focusflow_mobile/models/uworld_session.dart';
 import 'package:focusflow_mobile/models/fa_subtopic.dart';
 import 'package:focusflow_mobile/models/streak_data.dart';
@@ -156,6 +157,7 @@ class AppProvider extends ChangeNotifier {
   List<TodoItem> todoItems = [];
   List<DefaultActivity> defaultActivities = [];
   List<DailyFlow> dailyFlows = [];
+  List<VideoLecture> videoLectures = [];
 
   String faViewMode = 'cards';
 
@@ -251,6 +253,9 @@ class AppProvider extends ChangeNotifier {
     dailyFlows = (await _db.getAllDailyFlows())
         .map((j) => DailyFlow.fromJson(j))
         .toList();
+
+    // V11: Video Lectures
+    videoLectures = await _db.getVideoLectures();
 
     // Singletons
     final memJson = await _db.getMentorMemory();
@@ -3293,6 +3298,137 @@ class AppProvider extends ChangeNotifier {
       await _db.upsertRevisionItem(updated.toJson());
       revisionItems[revIdx] = updated;
       notifyListeners();
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // VIDEO LECTURES (V11)
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> toggleVideoLectureWatched(int id, bool watched) async {
+    await _db.toggleVideoLecture(id, watched);
+    final idx = videoLectures.indexWhere((v) => v.id == id);
+    if (idx >= 0) {
+      final lecture = videoLectures[idx];
+      videoLectures[idx] = lecture.copyWith(
+        watched: watched,
+        watchedMinutes: watched ? lecture.durationMinutes : lecture.watchedMinutes,
+      );
+      if (watched) {
+        // Also update watched_minutes in DB to match full duration
+        await _db.updateVideoLectureProgress(id, lecture.durationMinutes);
+        // Create revision item
+        final revId = 'video-lecture-$id';
+        final exists = revisionItems.any((r) => r.id == revId);
+        if (!exists) {
+          final mode = revisionSettings?.mode ?? 'strict';
+          final now = DateTime.now().toIso8601String();
+          final nextDate = SrsService.calculateNextRevisionDateString(
+            lastStudiedAt: now,
+            revisionIndex: 0,
+            mode: mode,
+          );
+          final revItem = RevisionItem(
+            id: revId,
+            type: 'VIDEO',
+            source: 'VIDEO_LECTURE',
+            pageNumber: '',
+            title: lecture.title,
+            parentTitle: lecture.subject,
+            nextRevisionAt: nextDate ??
+                DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
+            currentRevisionIndex: 0,
+            lastStudiedAt: now,
+            totalSteps: SrsService.totalSteps(mode),
+          );
+          await upsertRevisionItem(revItem);
+        }
+      }
+    }
+    notifyListeners();
+    unawaited(_triggerBackup());
+
+    // Log activity
+    final logLecture = idx >= 0 ? videoLectures[idx] : null;
+    await _logActivity(
+      itemId: 'video-lecture:$id',
+      itemType: 'video_lecture',
+      action: watched ? 'watched' : 'unwatched',
+      title: logLecture != null ? '${logLecture.subject} — ${logLecture.title}' : 'Video Lecture #$id',
+    );
+  }
+
+  Future<void> updateVideoLectureProgress(int id, int watchedMinutes) async {
+    final idx = videoLectures.indexWhere((v) => v.id == id);
+    if (idx < 0) return;
+    final lecture = videoLectures[idx];
+    final clamped = watchedMinutes.clamp(0, lecture.durationMinutes);
+    final autoComplete = clamped >= lecture.durationMinutes;
+
+    await _db.updateVideoLectureProgress(id, clamped);
+    if (autoComplete && !lecture.watched) {
+      await _db.toggleVideoLecture(id, true);
+    }
+
+    videoLectures[idx] = lecture.copyWith(
+      watchedMinutes: clamped,
+      watched: autoComplete ? true : lecture.watched,
+    );
+
+    // Create revision if auto-completed
+    if (autoComplete && !lecture.watched) {
+      final revId = 'video-lecture-$id';
+      final exists = revisionItems.any((r) => r.id == revId);
+      if (!exists) {
+        final mode = revisionSettings?.mode ?? 'strict';
+        final now = DateTime.now().toIso8601String();
+        final nextDate = SrsService.calculateNextRevisionDateString(
+          lastStudiedAt: now,
+          revisionIndex: 0,
+          mode: mode,
+        );
+        final revItem = RevisionItem(
+          id: revId,
+          type: 'VIDEO',
+          source: 'VIDEO_LECTURE',
+          pageNumber: '',
+          title: lecture.title,
+          parentTitle: lecture.subject,
+          nextRevisionAt: nextDate ??
+              DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
+          currentRevisionIndex: 0,
+          lastStudiedAt: now,
+          totalSteps: SrsService.totalSteps(mode),
+        );
+        await upsertRevisionItem(revItem);
+      }
+    }
+
+    notifyListeners();
+    unawaited(_triggerBackup());
+  }
+
+  Future<void> updateVideoLectureMetadata(VideoLecture updated) async {
+    await _db.updateVideoLectureMetadata({
+      'id': updated.id,
+      'customTitle': updated.customTitle,
+      'userDescription': updated.userDescription,
+    });
+    final idx = videoLectures.indexWhere((v) => v.id == updated.id);
+    if (idx >= 0) {
+      videoLectures[idx] = videoLectures[idx].copyWith(
+        customTitle: updated.customTitle,
+        userDescription: updated.userDescription,
+      );
+    }
+    notifyListeners();
+  }
+
+  Future<void> undoVideoLecture(int id) async {
+    await toggleVideoLectureWatched(id, false);
+    final revId = 'video-lecture-$id';
+    if (revisionItems.any((r) => r.id == revId)) {
+      await deleteRevisionItem(revId);
     }
   }
 

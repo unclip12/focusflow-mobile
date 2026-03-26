@@ -12,6 +12,7 @@ import 'package:focusflow_mobile/models/fa_subtopic.dart';
 import 'package:focusflow_mobile/services/sketchy_micro_seed.dart';
 import 'package:focusflow_mobile/services/sketchy_pharm_seed.dart';
 import 'package:focusflow_mobile/services/pathoma_seed.dart';
+import 'package:focusflow_mobile/services/video_lecture_seed.dart';
 
 class SeedService {
   static const String _seededKey = 'fa_2025_seeded_v3'; // v3: accurate topics from PDF
@@ -120,6 +121,7 @@ class SeedService {
     await db.seedSketchyMicro(sketchyMicroSeed);
     await db.seedSketchyPharm(sketchyPharmSeed);
     await db.seedPathoma(pathomaSeed);
+    await db.seedVideoLectures(videoLectureSeed);
   }
 
   /// Force re-seed (use when you push an updated JSON).

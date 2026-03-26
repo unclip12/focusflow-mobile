@@ -12,13 +12,14 @@ import 'package:focusflow_mobile/models/uworld_topic.dart';
 import 'package:focusflow_mobile/models/pathoma_chapter.dart';
 import 'package:focusflow_mobile/models/fa_subtopic.dart';
 import 'package:focusflow_mobile/models/activity_log.dart';
+import 'package:focusflow_mobile/models/video_lecture.dart';
 
 class DatabaseService {
   DatabaseService._();
   static final DatabaseService instance = DatabaseService._();
 
   static const _dbName = 'focusflow.db';
-  static const _dbVersion = 10;
+  static const _dbVersion = 11;
 
   Database? _database;
 
@@ -74,6 +75,7 @@ class DatabaseService {
   static const tDailyFlows = 'daily_flows';
   static const tLibraryNotes = 'library_notes';
   static const tActivityLogs = 'activity_logs';
+  static const tVideoLectures = 'video_lectures';
 
   Future<void> _onCreate(Database db, int version) async {
     // Knowledge Base — pageNumber is the primary key
@@ -258,6 +260,9 @@ class DatabaseService {
 
     // ── V9 tables (Activity Logs) ─────────────────────────────
     await _createV9Tables(db);
+
+    // ── V11 tables (Video Lectures) ───────────────────────────
+    await _createV11Tables(db);
   }
 
   /// Create G5 tracker tables — called from both _onCreate and _onUpgrade.
@@ -398,6 +403,9 @@ class DatabaseService {
     }
     if (oldVersion < 10) {
       await _migrateV10(db);
+    }
+    if (oldVersion < 11) {
+      await _createV11Tables(db);
     }
     // Streak data table — always ensure it exists
     await db.execute('''
@@ -1386,6 +1394,65 @@ class DatabaseService {
       deleteById(tDailyFlows, 'date', date);
 
   // ═══════════════════════════════════════════════════════════════
+  // VIDEO LECTURES (V11)
+  // ═══════════════════════════════════════════════════════════════
+
+  /// Create V11 tables — Video Lectures.
+  Future<void> _createV11Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tVideoLectures (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        subject TEXT NOT NULL,
+        title TEXT NOT NULL,
+        duration_minutes INTEGER NOT NULL,
+        watched_minutes INTEGER NOT NULL DEFAULT 0,
+        watched INTEGER NOT NULL DEFAULT 0,
+        order_index INTEGER NOT NULL DEFAULT 0,
+        customTitle TEXT,
+        userDescription TEXT
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_video_lectures_subject ON $tVideoLectures(subject)');
+  }
+
+  Future<void> seedVideoLectures(List<VideoLecture> lectures) async {
+    final db = await database;
+    final count = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM $tVideoLectures'),
+    );
+    if (count != null && count > 0) return;
+    final batch = db.batch();
+    for (final l in lectures) {
+      batch.insert(tVideoLectures, l.toMap()..remove('id'));
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<VideoLecture>> getVideoLectures() async {
+    final db = await database;
+    final rows = await db.query(tVideoLectures, orderBy: 'order_index ASC');
+    return rows.map(VideoLecture.fromMap).toList();
+  }
+
+  Future<void> toggleVideoLecture(int id, bool watched) async {
+    final db = await database;
+    await db.update(tVideoLectures, {'watched': watched ? 1 : 0},
+        where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> updateVideoLectureProgress(int id, int watchedMinutes) async {
+    final db = await database;
+    await db.update(tVideoLectures, {'watched_minutes': watchedMinutes},
+        where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> updateVideoLectureMetadata(Map<String, dynamic> json) async {
+    final db = await database;
+    await db.update(tVideoLectures, json, where: 'id = ?', whereArgs: [json['id']]);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // BULK OPERATIONS (for backup restore)
   // ═══════════════════════════════════════════════════════════════
 
@@ -1401,7 +1468,7 @@ class DatabaseService {
         tFaPages, tSketchyItems, tPathomaItems, tUworldSessions, tUworldTopics,
         tSketchyMicroVideos, tSketchyPharmVideos, tPathomaChapters, tFaSubtopics,
         tStreakData, tRoutines, tRoutineLogs, tBuyingItems, tTodoItems,
-        tDefaultRoutineOrder, tDailyFlows, tActivityLogs,
+        tDefaultRoutineOrder, tDailyFlows, tActivityLogs, tVideoLectures,
       ]) {
         await txn.delete(table);
       }

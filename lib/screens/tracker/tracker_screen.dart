@@ -15,6 +15,7 @@ import 'package:focusflow_mobile/screens/tracker/fa_tab.dart';
 import 'package:focusflow_mobile/screens/tracker/sketchy_tab.dart';
 import 'package:focusflow_mobile/screens/tracker/pathoma_tab.dart';
 import 'package:focusflow_mobile/screens/tracker/uworld_tab.dart';
+import 'package:focusflow_mobile/screens/tracker/video_lectures_tab.dart';
 import 'package:focusflow_mobile/screens/tracker/tracker_sheets.dart';
 import 'package:focusflow_mobile/utils/show_app_bottom_sheet.dart';
 
@@ -41,7 +42,7 @@ class _TrackerScreenState extends State<TrackerScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _searchCtrl.addListener(() {
       setState(() => _searchQuery = _searchCtrl.text.trim());
     });
@@ -173,6 +174,14 @@ class _TrackerScreenState extends State<TrackerScreen>
                       ),
                       // UWorld
                       UWorldTab(
+                        app: app,
+                        selectionMode: _selectionMode,
+                        selectedItems: _selectedItems,
+                        onToggleSelect: _toggleSelect,
+                        searchQuery: _searchQuery,
+                      ),
+                      // Video Lectures
+                      VideoLecturesTab(
                         app: app,
                         selectionMode: _selectionMode,
                         selectedItems: _selectedItems,
@@ -764,6 +773,7 @@ class _GlassLibraryTabBar extends StatelessWidget {
                     app.sketchyMicroVideos.length + app.sketchyPharmVideos.length),
                 _buildTab('Pathoma', app.pathomaChapters.length),
                 _buildTab('UWorld', app.uworldTopics.length),
+                _buildTab('Videos', app.videoLectures.length),
               ],
               labelColor: DashboardColors.primary,
               unselectedLabelColor:

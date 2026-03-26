@@ -109,6 +109,8 @@ class _RevisionConfidenceSheetState extends State<_RevisionConfidenceSheet> {
         return const Color(0xFFF59E0B);
       case 'KB':
         return const Color(0xFF14B8A6);
+      case 'VIDEO_LECTURE':
+        return const Color(0xFFF59E0B);
       default:
         return const Color(0xFF6B7280);
     }
@@ -128,6 +130,8 @@ class _RevisionConfidenceSheetState extends State<_RevisionConfidenceSheet> {
         return Icons.quiz_rounded;
       case 'KB':
         return Icons.library_books_rounded;
+      case 'VIDEO_LECTURE':
+        return Icons.ondemand_video_rounded;
       default:
         return Icons.book_rounded;
     }
@@ -147,6 +151,8 @@ class _RevisionConfidenceSheetState extends State<_RevisionConfidenceSheet> {
         return 'UWorld';
       case 'KB':
         return 'Knowledge Base';
+      case 'VIDEO_LECTURE':
+        return 'Video Lectures';
       default:
         return widget.source;
     }
