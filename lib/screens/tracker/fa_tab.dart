@@ -1294,34 +1294,27 @@ class _FACardView extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (page.revisionCount > 0) ...[
+                      if (page.status == 'anki_done') ...[
                         const SizedBox(width: 6),
                         Container(
-                          width: 26,
-                          height: 26,
+                          width: 24,
+                          height: 24,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                DashboardColors.primary,
-                                DashboardColors.primaryViolet,
-                              ],
-                            ),
+                            color: DashboardColors.primaryViolet,
                             boxShadow: [
                               BoxShadow(
-                                color: DashboardColors.primary.withValues(alpha: 0.3),
-                                blurRadius: 6,
+                                color: DashboardColors.primaryViolet.withValues(alpha: 0.35),
+                                blurRadius: 5,
                                 spreadRadius: -1,
                               ),
                             ],
                           ),
-                          child: Center(
+                          child: const Center(
                             child: Text(
-                              'R${page.revisionCount}',
-                              style: const TextStyle(
-                                fontSize: 9,
+                              'A',
+                              style: TextStyle(
+                                fontSize: 11,
                                 fontWeight: FontWeight.w900,
                                 color: Colors.white,
                                 height: 1,

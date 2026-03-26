@@ -7,6 +7,7 @@ import 'package:focusflow_mobile/models/fa_page.dart';
 import 'package:focusflow_mobile/models/fa_subtopic.dart';
 import 'package:focusflow_mobile/models/library_note.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/screens/library/add_note_sheet.dart';
 import 'package:focusflow_mobile/screens/library/edit_metadata_sheet.dart';
 import 'package:focusflow_mobile/utils/app_colors.dart';
@@ -417,40 +418,57 @@ class _QuickActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Determine next action label
-    String nextActionLabel;
-    IconData nextActionIcon;
-    Color nextActionColor;
-    switch (page.status) {
-      case 'anki_done':
-        nextActionLabel = 'Mark Unread';
-        nextActionIcon = Icons.undo_rounded;
-        nextActionColor = DashboardColors.warning;
-        break;
-      case 'read':
-        nextActionLabel = 'Mark Anki Done';
-        nextActionIcon = Icons.check_circle_outline_rounded;
-        nextActionColor = DashboardColors.primaryViolet;
-        break;
-      default:
-        nextActionLabel = 'Mark Read';
-        nextActionIcon = Icons.menu_book_rounded;
-        nextActionColor = DashboardColors.success;
-    }
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
-          Expanded(
-            child: _GlassActionButton(
-              icon: nextActionIcon,
-              label: nextActionLabel,
-              color: nextActionColor,
-              isDark: isDark,
-              onTap: onCycleStatus,
+          if (page.status == 'anki_done') ...[
+            // When anki_done: show Mark Unread + Anki Done indicator
+            Expanded(
+              child: _GlassActionButton(
+                icon: Icons.undo_rounded,
+                label: 'Mark Unread',
+                color: DashboardColors.warning,
+                isDark: isDark,
+                onTap: onCycleStatus,
+              ),
             ),
-          ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _GlassActionButton(
+                icon: Icons.check_circle_rounded,
+                label: 'Anki Done ✓',
+                color: DashboardColors.primaryViolet,
+                isDark: isDark,
+                onTap: () {},
+              ),
+            ),
+          ] else if (page.status == 'read') ...[
+            // When read: show Mark Anki Done button
+            Expanded(
+              child: _GlassActionButton(
+                icon: Icons.check_circle_outline_rounded,
+                label: 'Mark Anki Done',
+                color: DashboardColors.primaryViolet,
+                isDark: isDark,
+                onTap: () {
+                  final app = context.read<AppProvider>();
+                  app.updateFAPageStatus(page.pageNum, 'anki_done');
+                },
+              ),
+            ),
+          ] else ...[
+            // When unread: show Mark Read
+            Expanded(
+              child: _GlassActionButton(
+                icon: Icons.menu_book_rounded,
+                label: 'Mark Read',
+                color: DashboardColors.success,
+                isDark: isDark,
+                onTap: onCycleStatus,
+              ),
+            ),
+          ],
         ],
       ),
     );
