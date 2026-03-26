@@ -307,149 +307,153 @@ class _AddTodoSheetState extends State<_AddTodoSheet> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final mediaQuery = MediaQuery.of(context);
 
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom +
-            MediaQuery.of(context).padding.bottom +
-            20,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 32,
-              height: 4,
-              decoration: BoxDecoration(
-                color: cs.onSurface.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(4),
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: mediaQuery.viewInsets.bottom),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: mediaQuery.padding.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 32,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Text('Add To-Do',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface,
-              )),
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
+            Text('Add To-Do',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: cs.onSurface,
+                )),
+            const SizedBox(height: 16),
 
-          // Title
-          TextField(
-            controller: _titleCtrl,
-            autofocus: true,
-            decoration: InputDecoration(
-              labelText: 'Task',
-              hintText: 'e.g., Review Anatomy notes',
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Category
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Category:',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: cs.onSurface,
-                  )),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: ['Studies', 'Daily Life', 'Other'].map((cat) {
-                  final selected = _category == cat;
-                  return ChoiceChip(
-                    label: Text(cat, style: const TextStyle(fontSize: 12)),
-                    selected: selected,
-                    onSelected: (_) => setState(() => _category = cat),
-                    visualDensity: VisualDensity.compact,
-                  );
-                }).toList(),
+            // Title
+            TextField(
+              controller: _titleCtrl,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: 'Task',
+                hintText: 'e.g., Review Anatomy notes',
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
+            ),
+            const SizedBox(height: 12),
 
-          // Time + Duration
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () async {
-                    final t = await showTimePicker(
-                      context: context,
-                      initialTime: TimeOfDay.now(),
+            // Category
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Category:',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    )),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: ['Studies', 'Daily Life', 'Other'].map((cat) {
+                    final selected = _category == cat;
+                    return ChoiceChip(
+                      label: Text(cat, style: const TextStyle(fontSize: 12)),
+                      selected: selected,
+                      onSelected: (_) => setState(() => _category = cat),
+                      visualDensity: VisualDensity.compact,
                     );
-                    if (t != null) setState(() => _scheduledTime = t);
-                  },
-                  icon: const Icon(Icons.schedule_rounded, size: 16),
-                  label: Text(
-                    _scheduledTime != null
-                        ? '${_scheduledTime!.hour.toString().padLeft(2, '0')}:${_scheduledTime!.minute.toString().padLeft(2, '0')}'
-                        : 'Time',
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                  }).toList(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Time + Duration
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final t = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.now(),
+                      );
+                      if (t != null) setState(() => _scheduledTime = t);
+                    },
+                    icon: const Icon(Icons.schedule_rounded, size: 16),
+                    label: Text(
+                      _scheduledTime != null
+                          ? '${_scheduledTime!.hour.toString().padLeft(2, '0')}:${_scheduledTime!.minute.toString().padLeft(2, '0')}'
+                          : 'Time',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 100,
-                child: TextField(
-                  keyboardType: TextInputType.number,
-                  onChanged: (v) => _estimatedMinutes = int.tryParse(v),
-                  decoration: InputDecoration(
-                    labelText: 'Minutes',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    isDense: true,
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 100,
+                  child: TextField(
+                    keyboardType: TextInputType.number,
+                    onChanged: (v) => _estimatedMinutes = int.tryParse(v),
+                    decoration: InputDecoration(
+                      labelText: 'Minutes',
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      isDense: true,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Notes
-          TextField(
-            controller: _notesCtrl,
-            decoration: InputDecoration(
-              labelText: 'Notes (optional)',
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              isDense: true,
+              ],
             ),
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _save,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
+            // Notes
+            TextField(
+              controller: _notesCtrl,
+              decoration: InputDecoration(
+                labelText: 'Notes (optional)',
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                isDense: true,
               ),
-              child: const Text('Add Task',
-                  style: TextStyle(fontWeight: FontWeight.w700)),
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _save,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+                child: const Text('Add Task',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

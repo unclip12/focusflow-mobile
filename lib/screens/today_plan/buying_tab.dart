@@ -262,121 +262,125 @@ class _AddBuyingSheetState extends State<_AddBuyingSheet> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final mediaQuery = MediaQuery.of(context);
 
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom +
-            MediaQuery.of(context).padding.bottom +
-            20,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 32,
-              height: 4,
-              decoration: BoxDecoration(
-                color: cs.onSurface.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text('Add Item',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface,
-              )),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _nameCtrl,
-            autofocus: true,
-            decoration: InputDecoration(
-              labelText: 'Item name',
-              hintText: 'e.g., Milk',
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _shopCtrl,
-            decoration: InputDecoration(
-              labelText: 'Shop (optional)',
-              hintText: 'e.g., DMart',
-              prefixIcon: const Icon(Icons.store_rounded, size: 18),
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _qtyCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Qty',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    isDense: true,
-                  ),
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: mediaQuery.viewInsets.bottom),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: mediaQuery.padding.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 32,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
                 ),
               ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 100,
-                child: DropdownButtonFormField<String>(
-                  // ignore: deprecated_member_use
-                  value: _unit,
-                  decoration: InputDecoration(
-                    labelText: 'Unit',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    isDense: true,
+            ),
+            const SizedBox(height: 16),
+            Text('Add Item',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: cs.onSurface,
+                )),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _nameCtrl,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: 'Item name',
+                hintText: 'e.g., Milk',
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _shopCtrl,
+              decoration: InputDecoration(
+                labelText: 'Shop (optional)',
+                hintText: 'e.g., DMart',
+                prefixIcon: const Icon(Icons.store_rounded, size: 18),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _qtyCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Qty',
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      isDense: true,
+                    ),
                   ),
-                  items: ['kg', 'g', 'L', 'ml', 'pcs', 'pkt']
-                      .map((u) => DropdownMenuItem(value: u, child: Text(u)))
-                      .toList(),
-                  onChanged: (v) => setState(() => _unit = v),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _notesCtrl,
-            decoration: InputDecoration(
-              labelText: 'Notes (optional)',
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              isDense: true,
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 100,
+                  child: DropdownButtonFormField<String>(
+                    // ignore: deprecated_member_use
+                    value: _unit,
+                    decoration: InputDecoration(
+                      labelText: 'Unit',
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      isDense: true,
+                    ),
+                    items: ['kg', 'g', 'L', 'ml', 'pcs', 'pkt']
+                        .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                        .toList(),
+                    onChanged: (v) => setState(() => _unit = v),
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _save,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
-                backgroundColor: const Color(0xFFF59E0B),
-                foregroundColor: Colors.white,
+            const SizedBox(height: 12),
+            TextField(
+              controller: _notesCtrl,
+              decoration: InputDecoration(
+                labelText: 'Notes (optional)',
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                isDense: true,
               ),
-              child: const Text('Add Item',
-                  style: TextStyle(fontWeight: FontWeight.w700)),
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _save,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                  backgroundColor: const Color(0xFFF59E0B),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Add Item',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

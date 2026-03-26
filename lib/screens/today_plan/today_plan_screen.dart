@@ -325,14 +325,15 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
 
     // ── Compute daily stats for progress card ──────────────
     final todayLogs = app.timeLogs.where((l) => l.date == _dateKey).toList();
-    final totalStudyMinutesToday = todayLogs.fold<int>(0, (s, l) => s + l.durationMinutes);
+    final totalStudyMinutesToday =
+        todayLogs.fold<int>(0, (s, l) => s + l.durationMinutes);
     final allActivities = app.getFlowActivitiesForDate(_dateKey);
     final completedCount = allActivities.where((a) => a.isDone).length;
     final totalCount = allActivities.length;
 
     return Scaffold(
       backgroundColor: DashboardColors.background(isDark),
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
           Positioned.fill(
@@ -350,7 +351,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                       GestureDetector(
                         onTap: _openTrackNow,
                         child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 4),
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
@@ -362,7 +364,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                             ),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: const Color(0xFFEF4444).withValues(alpha: 0.2),
+                              color: const Color(0xFFEF4444)
+                                  .withValues(alpha: 0.2),
                             ),
                           ),
                           child: Row(
@@ -370,7 +373,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                               Container(
                                 padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                                  color: const Color(0xFFEF4444)
+                                      .withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: const Icon(Icons.timer_outlined,
@@ -386,7 +390,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                                       style: TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.w700,
-                                        color: const Color(0xFFEF4444).withValues(alpha: 0.7),
+                                        color: const Color(0xFFEF4444)
+                                            .withValues(alpha: 0.7),
                                         letterSpacing: 0.5,
                                       ),
                                     ),
@@ -405,7 +410,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 10, vertical: 5),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                                  color: const Color(0xFFEF4444)
+                                      .withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: const Row(
@@ -522,7 +528,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                                             child: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                Icon(Icons.dashboard_rounded, size: 14),
+                                                Icon(Icons.dashboard_rounded,
+                                                    size: 14),
                                                 SizedBox(width: 5),
                                                 Text('All'),
                                               ],
@@ -533,7 +540,10 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                                             child: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                Icon(Icons.check_circle_outline_rounded, size: 14),
+                                                Icon(
+                                                    Icons
+                                                        .check_circle_outline_rounded,
+                                                    size: 14),
                                                 SizedBox(width: 5),
                                                 Text('To-Do'),
                                               ],
@@ -544,7 +554,9 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                                             child: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                Icon(Icons.shopping_bag_outlined, size: 14),
+                                                Icon(
+                                                    Icons.shopping_bag_outlined,
+                                                    size: 14),
                                                 SizedBox(width: 5),
                                                 Text('Buying'),
                                               ],
@@ -555,7 +567,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                                             child: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                Icon(Icons.repeat_rounded, size: 14),
+                                                Icon(Icons.repeat_rounded,
+                                                    size: 14),
                                                 SizedBox(width: 5),
                                                 Text('Routines'),
                                               ],
@@ -2192,16 +2205,14 @@ class _FullDayFlowCard extends StatelessWidget {
                     child: InkWell(
                       onTap: onTap,
                       child: Padding(
-                        padding:
-                            const EdgeInsets.fromLTRB(12, 12, 14, 12),
+                        padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
                         child: Row(
                           children: [
                             Container(
                               width: 36,
                               height: 36,
                               decoration: BoxDecoration(
-                                color:
-                                    statusColor.withValues(alpha: 0.12),
+                                color: statusColor.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Center(
@@ -2216,21 +2227,18 @@ class _FullDayFlowCard extends StatelessWidget {
                                         ),
                                       )
                                     : Icon(statusIcon,
-                                        size: 20,
-                                        color: statusColor),
+                                        size: 20, color: statusColor),
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
                                     children: [
                                       Text(activity.icon,
-                                          style: const TextStyle(
-                                              fontSize: 16)),
+                                          style: const TextStyle(fontSize: 16)),
                                       const SizedBox(width: 6),
                                       Expanded(
                                         child: Text(
@@ -2240,31 +2248,26 @@ class _FullDayFlowCard extends StatelessWidget {
                                             fontWeight: FontWeight.w600,
                                             color: activity.isDone
                                                 ? cs.onSurface
-                                                    .withValues(
-                                                        alpha: 0.5)
+                                                    .withValues(alpha: 0.5)
                                                 : cs.onSurface,
                                             decoration: activity.isDone
-                                                ? TextDecoration
-                                                    .lineThrough
+                                                ? TextDecoration.lineThrough
                                                 : null,
                                           ),
-                                          overflow:
-                                              TextOverflow.ellipsis,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                     ],
                                   ),
                                   if (subtitle != null)
                                     Padding(
-                                      padding: const EdgeInsets.only(
-                                          top: 3),
+                                      padding: const EdgeInsets.only(top: 3),
                                       child: Row(
                                         children: [
                                           Icon(Icons.schedule_rounded,
                                               size: 11,
                                               color: cs.onSurface
-                                                  .withValues(
-                                                      alpha: 0.35)),
+                                                  .withValues(alpha: 0.35)),
                                           const SizedBox(width: 4),
                                           Text(
                                             subtitle!,
@@ -2272,34 +2275,29 @@ class _FullDayFlowCard extends StatelessWidget {
                                               fontSize: 11,
                                               fontWeight: FontWeight.w500,
                                               color: cs.onSurface
-                                                  .withValues(
-                                                      alpha: 0.55),
+                                                  .withValues(alpha: 0.55),
                                             ),
-                                            overflow:
-                                                TextOverflow.ellipsis,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         ],
                                       ),
                                     ),
                                   if (activity.linkedTaskIds.isNotEmpty)
                                     Padding(
-                                      padding: const EdgeInsets.only(
-                                          top: 3),
+                                      padding: const EdgeInsets.only(top: 3),
                                       child: Row(
                                         children: [
                                           Icon(Icons.link_rounded,
                                               size: 11,
                                               color: cs.primary
-                                                  .withValues(
-                                                      alpha: 0.5)),
+                                                  .withValues(alpha: 0.5)),
                                           const SizedBox(width: 4),
                                           Text(
                                             '${activity.linkedTaskIds.length} task${activity.linkedTaskIds.length == 1 ? '' : 's'} linked',
                                             style: TextStyle(
                                               fontSize: 11,
                                               color: cs.primary
-                                                  .withValues(
-                                                      alpha: 0.6),
+                                                  .withValues(alpha: 0.6),
                                             ),
                                           ),
                                         ],
@@ -2308,17 +2306,13 @@ class _FullDayFlowCard extends StatelessWidget {
                                   if (activity.notes != null &&
                                       activity.notes!.isNotEmpty)
                                     Padding(
-                                      padding: const EdgeInsets.only(
-                                          top: 3),
+                                      padding: const EdgeInsets.only(top: 3),
                                       child: Row(
                                         children: [
-                                          Icon(
-                                              Icons
-                                                  .sticky_note_2_outlined,
+                                          Icon(Icons.sticky_note_2_outlined,
                                               size: 12,
                                               color: cs.onSurface
-                                                  .withValues(
-                                                      alpha: 0.3)),
+                                                  .withValues(alpha: 0.3)),
                                           const SizedBox(width: 4),
                                           Expanded(
                                             child: Text(
@@ -2326,12 +2320,10 @@ class _FullDayFlowCard extends StatelessWidget {
                                               style: TextStyle(
                                                 fontSize: 10,
                                                 color: cs.onSurface
-                                                    .withValues(
-                                                        alpha: 0.5),
+                                                    .withValues(alpha: 0.5),
                                               ),
                                               maxLines: 1,
-                                              overflow:
-                                                  TextOverflow.ellipsis,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
                                         ],
@@ -2340,13 +2332,10 @@ class _FullDayFlowCard extends StatelessWidget {
                                   if (statusLabel.isNotEmpty &&
                                       !activity.isNotStarted)
                                     Padding(
-                                      padding: const EdgeInsets.only(
-                                          top: 4),
+                                      padding: const EdgeInsets.only(top: 4),
                                       child: Container(
-                                        padding:
-                                            const EdgeInsets.symmetric(
-                                                horizontal: 8,
-                                                vertical: 2),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 2),
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
                                             colors: [
@@ -2375,31 +2364,26 @@ class _FullDayFlowCard extends StatelessWidget {
                             if (activity.isDone && onUndo != null)
                               IconButton(
                                 onPressed: onUndo,
-                                icon: const Icon(Icons.undo_rounded,
-                                    size: 18),
-                                color: cs.onSurface
-                                    .withValues(alpha: 0.4),
+                                icon: const Icon(Icons.undo_rounded, size: 18),
+                                color: cs.onSurface.withValues(alpha: 0.4),
                                 tooltip: 'Undo',
                                 constraints: const BoxConstraints(
                                   minWidth: 36,
                                   minHeight: 36,
                                 ),
                               ),
-                            if ((activity.isActive ||
-                                    activity.isPaused) &&
+                            if ((activity.isActive || activity.isPaused) &&
                                 onComplete != null)
                               Container(
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF10B981)
                                       .withValues(alpha: 0.1),
-                                  borderRadius:
-                                      BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: IconButton(
                                   onPressed: onComplete,
                                   icon: const Icon(
-                                      Icons
-                                          .check_circle_outline_rounded,
+                                      Icons.check_circle_outline_rounded,
                                       size: 22),
                                   color: const Color(0xFF10B981),
                                   tooltip: 'Complete',
@@ -2423,8 +2407,6 @@ class _FullDayFlowCard extends StatelessWidget {
     );
   }
 }
-
-
 
 class _FullDayItem {
   final String type; // 'flow' | 'todo' | 'buying'
@@ -2839,8 +2821,10 @@ class _DateHeader extends StatelessWidget {
                 // ── Date navigation row ──
                 Row(
                   children: [
-                    _NavArrow(icon: Icons.chevron_left_rounded,
-                        onTap: onPrev, isDark: isDark),
+                    _NavArrow(
+                        icon: Icons.chevron_left_rounded,
+                        onTap: onPrev,
+                        isDark: isDark),
                     const SizedBox(width: 8),
                     Expanded(
                       child: GestureDetector(
@@ -2848,7 +2832,8 @@ class _DateHeader extends StatelessWidget {
                         child: Column(
                           children: [
                             Text(
-                              isToday ? 'Today'
+                              isToday
+                                  ? 'Today'
                                   : DateFormat('EEEE').format(date),
                               style: TextStyle(
                                 fontSize: 20,
@@ -2871,8 +2856,10 @@ class _DateHeader extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    _NavArrow(icon: Icons.chevron_right_rounded,
-                        onTap: onNext, isDark: isDark),
+                    _NavArrow(
+                        icon: Icons.chevron_right_rounded,
+                        onTap: onNext,
+                        isDark: isDark),
                     const SizedBox(width: 10),
                     Container(
                       decoration: BoxDecoration(
@@ -2882,8 +2869,8 @@ class _DateHeader extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF10B981)
-                                .withValues(alpha: 0.3),
+                            color:
+                                const Color(0xFF10B981).withValues(alpha: 0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -2904,9 +2891,10 @@ class _DateHeader extends StatelessWidget {
                                     size: 16, color: Colors.white),
                                 SizedBox(width: 4),
                                 Text('Track',
-                                  style: TextStyle(fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white)),
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white)),
                               ],
                             ),
                           ),
@@ -2934,14 +2922,17 @@ class _DateHeader extends StatelessWidget {
                       child: Row(
                         children: [
                           SizedBox(
-                            width: 32, height: 32,
+                            width: 32,
+                            height: 32,
                             child: Stack(
                               alignment: Alignment.center,
                               children: [
                                 SizedBox(
-                                  width: 32, height: 32,
+                                  width: 32,
+                                  height: 32,
                                   child: CircularProgressIndicator(
-                                    value: progress, strokeWidth: 3,
+                                    value: progress,
+                                    strokeWidth: 3,
                                     backgroundColor:
                                         cs.primary.withValues(alpha: 0.1),
                                     valueColor: const AlwaysStoppedAnimation(
@@ -2950,23 +2941,27 @@ class _DateHeader extends StatelessWidget {
                                   ),
                                 ),
                                 Text('${(progress * 100).round()}%',
-                                  style: TextStyle(fontSize: 8,
-                                    fontWeight: FontWeight.w800,
-                                    color: cs.primary)),
+                                    style: TextStyle(
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w800,
+                                        color: cs.primary)),
                               ],
                             ),
                           ),
                           const SizedBox(width: 10),
-                          _MiniStat(icon: Icons.schedule_rounded,
+                          _MiniStat(
+                              icon: Icons.schedule_rounded,
                               value: studyLabel,
                               color: const Color(0xFF3B82F6)),
                           const SizedBox(width: 10),
-                          _MiniStat(icon: Icons.task_alt_rounded,
+                          _MiniStat(
+                              icon: Icons.task_alt_rounded,
                               value: '$completedTasks/$totalTasks',
                               color: const Color(0xFF10B981)),
                           if (isToday && timeLeft.isNotEmpty) ...[
                             const SizedBox(width: 10),
-                            _MiniStat(icon: Icons.hourglass_bottom_rounded,
+                            _MiniStat(
+                                icon: Icons.hourglass_bottom_rounded,
                                 value: timeLeft,
                                 color: const Color(0xFFF59E0B)),
                           ],
@@ -2982,30 +2977,45 @@ class _DateHeader extends StatelessWidget {
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       children: [
-                        _MiniActionChip(emoji: '📋', label: 'Template',
-                          color: const Color(0xFF6366F1), isDark: isDark,
-                          onTap: () => ActivityActions.openDefaultOrder(
-                              context, dateKey)),
+                        _MiniActionChip(
+                            emoji: '📋',
+                            label: 'Template',
+                            color: const Color(0xFF6366F1),
+                            isDark: isDark,
+                            onTap: () => ActivityActions.openDefaultOrder(
+                                context, dateKey)),
                         const SizedBox(width: 6),
-                        _MiniActionChip(emoji: '🌅', label: 'Routine',
-                          color: const Color(0xFF10B981), isDark: isDark,
-                          onTap: () => ActivityActions.pickRoutine(
-                              context, dateKey)),
+                        _MiniActionChip(
+                            emoji: '🌅',
+                            label: 'Routine',
+                            color: const Color(0xFF10B981),
+                            isDark: isDark,
+                            onTap: () =>
+                                ActivityActions.pickRoutine(context, dateKey)),
                         const SizedBox(width: 6),
-                        _MiniActionChip(emoji: '📚', label: 'Study',
-                          color: const Color(0xFF8B5CF6), isDark: isDark,
-                          onTap: () => ActivityActions.startStudy(
-                              context, dateKey)),
+                        _MiniActionChip(
+                            emoji: '📚',
+                            label: 'Study',
+                            color: const Color(0xFF8B5CF6),
+                            isDark: isDark,
+                            onTap: () =>
+                                ActivityActions.startStudy(context, dateKey)),
                         const SizedBox(width: 6),
-                        _MiniActionChip(emoji: '🛒', label: 'Shop',
-                          color: const Color(0xFFF59E0B), isDark: isDark,
-                          onTap: () => ActivityActions.startShopping(
-                              context, dateKey)),
+                        _MiniActionChip(
+                            emoji: '🛒',
+                            label: 'Shop',
+                            color: const Color(0xFFF59E0B),
+                            isDark: isDark,
+                            onTap: () => ActivityActions.startShopping(
+                                context, dateKey)),
                         const SizedBox(width: 6),
-                        _MiniActionChip(emoji: '⏱️', label: 'Focus',
-                          color: const Color(0xFFEF4444), isDark: isDark,
-                          onTap: () => ActivityActions.startFocusTimer(
-                              context, dateKey)),
+                        _MiniActionChip(
+                            emoji: '⏱️',
+                            label: 'Focus',
+                            color: const Color(0xFFEF4444),
+                            isDark: isDark,
+                            onTap: () => ActivityActions.startFocusTimer(
+                                context, dateKey)),
                       ],
                     ),
                   ),
@@ -3042,8 +3052,12 @@ class _NavArrow extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         child: Padding(
           padding: const EdgeInsets.all(8),
-          child: Icon(icon, size: 20,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+          child: Icon(icon,
+              size: 20,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.5)),
         ),
       ),
     );
@@ -3075,8 +3089,7 @@ class _WeeklyCalendarStrip extends StatelessWidget {
         final day = monday.add(Duration(days: i));
         final isSelected = AppDateUtils.isSameDay(day, selectedDate);
         final isToday = AppDateUtils.isSameDay(day, today);
-        final hasActivity =
-            i < weekActivity.length ? weekActivity[i] : false;
+        final hasActivity = i < weekActivity.length ? weekActivity[i] : false;
         final dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
         return Column(
@@ -3115,8 +3128,7 @@ class _WeeklyCalendarStrip extends StatelessWidget {
                   '${day.day}',
                   style: TextStyle(
                     fontSize: 11,
-                    fontWeight:
-                        isSelected ? FontWeight.w800 : FontWeight.w600,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                     color: isSelected
                         ? cs.primary
                         : cs.onSurface.withValues(alpha: 0.55),
@@ -3369,4 +3381,3 @@ class _MiniActionChip extends StatelessWidget {
     );
   }
 }
-
