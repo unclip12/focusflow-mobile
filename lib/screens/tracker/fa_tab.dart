@@ -1069,10 +1069,17 @@ class _FACardView extends StatelessWidget {
     String statusLabel;
     if (isAnkiDone) {
       statusColor = DashboardColors.primaryViolet;
-      statusLabel = 'Anki Done';
+      statusLabel = page.revisionCount > 0
+          ? 'R${page.revisionCount}'
+          : 'Anki Done';
     } else if (isFullyRead || percent >= 1.0) {
-      statusColor = DashboardColors.success;
-      statusLabel = 'Read';
+      if (page.revisionCount > 0) {
+        statusColor = DashboardColors.primary;
+        statusLabel = 'R${page.revisionCount}';
+      } else {
+        statusColor = DashboardColors.success;
+        statusLabel = 'Read';
+      }
     } else if (percent > 0) {
       statusColor = DashboardColors.warning;
       statusLabel = '${(percent * 100).round()}%';

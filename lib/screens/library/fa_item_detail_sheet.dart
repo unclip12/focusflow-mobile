@@ -703,7 +703,10 @@ class _HistoryTab extends StatelessWidget {
   String _formatDate(String iso) {
     try {
       final dt = DateTime.parse(iso);
-      return '${dt.day}/${dt.month}/${dt.year}';
+      final h = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final m = dt.minute.toString().padLeft(2, '0');
+      final amPm = dt.hour >= 12 ? 'PM' : 'AM';
+      return '${dt.day}/${dt.month}/${dt.year}  $h:$m $amPm';
     } catch (_) {
       return iso;
     }
@@ -1306,13 +1309,26 @@ class _TimelineEntry extends StatelessWidget {
                       color: DashboardColors.textPrimary(isDark),
                     ),
                   ),
-                  Text(
-                    _formatDate(revision.date),
-                    style: _inter(
-                      size: 12,
-                      weight: FontWeight.w400,
-                      color: DashboardColors.textSecondary,
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        _formatDate(revision.date),
+                        style: _inter(
+                          size: 12,
+                          weight: FontWeight.w400,
+                          color: DashboardColors.textSecondary,
+                        ),
+                      ),
+                      Text(
+                        _timeAgo(revision.date),
+                        style: _inter(
+                          size: 10,
+                          weight: FontWeight.w400,
+                          color: DashboardColors.textSecondary.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1326,9 +1342,27 @@ class _TimelineEntry extends StatelessWidget {
   String _formatDate(String iso) {
     try {
       final dt = DateTime.parse(iso);
-      return '${dt.day}/${dt.month}/${dt.year}';
+      final h = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final m = dt.minute.toString().padLeft(2, '0');
+      final amPm = dt.hour >= 12 ? 'PM' : 'AM';
+      return '${dt.day}/${dt.month}/${dt.year}  $h:$m $amPm';
     } catch (_) {
       return iso;
+    }
+  }
+
+  String _timeAgo(String iso) {
+    try {
+      final dt = DateTime.parse(iso);
+      final diff = DateTime.now().difference(dt);
+      if (diff.inDays > 365) return '${diff.inDays ~/ 365}y ago';
+      if (diff.inDays > 30) return '${diff.inDays ~/ 30}mo ago';
+      if (diff.inDays > 0) return '${diff.inDays}d ago';
+      if (diff.inHours > 0) return '${diff.inHours}h ago';
+      if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
+      return 'just now';
+    } catch (_) {
+      return '';
     }
   }
 }

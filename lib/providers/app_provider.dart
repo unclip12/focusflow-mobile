@@ -2111,6 +2111,29 @@ class AppProvider extends ChangeNotifier {
     }
 
     await upsertRevisionItem(updated);
+
+    // ── Sync back to FAPage if this is an FA page revision ──
+    if (revId.startsWith('fa-page-')) {
+      final pageNum = int.tryParse(revId.replaceFirst('fa-page-', ''));
+      if (pageNum != null) {
+        final pageIdx = faPages.indexWhere((p) => p.pageNum == pageNum);
+        if (pageIdx >= 0) {
+          final page = faPages[pageIdx];
+          final now = DateTime.now().toIso8601String();
+          final newRevCount = page.revisionCount + 1;
+          final updatedPage = page.copyWith(
+            revisionCount: newRevCount,
+            lastRevisedAt: now,
+            lastReviewed: now,
+            revisionHistory: [
+              ...page.revisionHistory,
+              FAPageRevision(date: now, revisionNum: newRevCount),
+            ],
+          );
+          await upsertFAPage(updatedPage);
+        }
+      }
+    }
   }
 
   /// Smart confidence-based revision for KB entries.
