@@ -74,15 +74,6 @@ class _TimelineViewState extends State<TimelineView> {
     return (int.tryParse(parts[0]) ?? 0) * 60 + (int.tryParse(parts[1]) ?? 0);
   }
 
-  String _formatDuration(int minutes) {
-    if (minutes >= 60) {
-      final h = minutes ~/ 60;
-      final m = minutes % 60;
-      return m > 0 ? '${h}h ${m}min' : '${h}h';
-    }
-    return '$minutes min';
-  }
-
   /// Build timeline items including gaps between blocks.
   List<_TimelineItem> _buildTimelineItems() {
     final items = <_TimelineItem>[];
@@ -477,7 +468,7 @@ class _BlockCard extends StatelessWidget {
       final m = minutes % 60;
       return m > 0 ? '${h}h ${m}min' : '${h}h';
     }
-    return '${minutes} min';
+    return '$minutes min';
   }
 
   @override
@@ -711,12 +702,6 @@ class _GapSlot extends StatelessWidget {
     required this.onTap,
     required this.isDark,
   });
-
-  String _formatTime(int mins) {
-    final h = (mins ~/ 60).clamp(0, 23);
-    final m = mins % 60;
-    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
-  }
 
   @override
   Widget build(BuildContext context) {

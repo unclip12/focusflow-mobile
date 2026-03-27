@@ -395,6 +395,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         type: _blockType,
         title: title,
         plannedDurationMinutes: 0,
+        isEvent: _isEvent,
         status: BlockStatus.notStarted,
       ));
     } else if (batches.isEmpty) {
@@ -409,6 +410,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         plannedDurationMinutes: _endTime!.hour * 60 +
             _endTime!.minute -
             (_startTime!.hour * 60 + _startTime!.minute),
+        isEvent: _isEvent,
         status: BlockStatus.notStarted,
       ));
     } else {
@@ -424,6 +426,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
             type: BlockType.breakBlock,
             title: '${b.label} (${b.durationMinutes}m)',
             plannedDurationMinutes: b.durationMinutes,
+            isEvent: _isEvent,
             status: BlockStatus.notStarted,
           ));
         } else {
@@ -436,6 +439,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
             type: _blockType,
             title: title,
             plannedDurationMinutes: b.durationMinutes,
+            isEvent: _isEvent,
             status: BlockStatus.notStarted,
           ));
         }

@@ -27,11 +27,9 @@ import 'buying_tab.dart';
 import 'routines_tab.dart';
 import 'routine_editor_sheet.dart';
 import 'flow_control_bar.dart';
-import 'flow_activity_card.dart';
 import 'timeline_view.dart';
 import 'day_session_screen.dart';
 import 'wakeup_snooze_overlay.dart';
-import 'package:focusflow_mobile/models/day_session.dart';
 import 'package:focusflow_mobile/models/daily_flow.dart';
 import 'package:focusflow_mobile/screens/session/session_screen.dart';
 import 'study_flow_screen.dart';
@@ -767,6 +765,117 @@ class _AllTabContentState extends State<_AllTabContent>
           },
         ),
 
+        // ── Day Session banner ──────────────────────────────────
+        Builder(
+          builder: (ctx) {
+            final session = app.getActiveDaySession(widget.dateKey);
+            if (session != null && session.isRunning) {
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    ctx,
+                    MaterialPageRoute(
+                      builder: (_) => DaySessionScreen(
+                        dateKey: widget.dateKey,
+                        session: session,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF10B981),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Day Running',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF10B981),
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Open Full ↗',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF10B981).withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+            // No active session — show Start Day button
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      ctx,
+                      MaterialPageRoute(
+                        builder: (_) => WakeupSnoozeOverlay(
+                          scheduledWakeTime: const TimeOfDay(hour: 6, minute: 0),
+                          onStartNow: () {
+                            app.startDaySession(widget.dateKey);
+                            app.rescheduleFromNow(widget.dateKey);
+                            final newSession = app.getActiveDaySession(widget.dateKey);
+                            if (newSession != null && ctx.mounted) {
+                              Navigator.pushReplacement(
+                                ctx,
+                                MaterialPageRoute(
+                                  builder: (_) => DaySessionScreen(
+                                    dateKey: widget.dateKey,
+                                    session: newSession,
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          onSnooze: (minutes) {
+                            // Snooze — reschedule from now + snooze minutes
+                            final snoozeTime = DateTime.now().add(Duration(minutes: minutes));
+                            app.rescheduleFrom(widget.dateKey, snoozeTime);
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                  label: const Text('Start Day'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+
         // ── Segment selector ────────────────────────────────────
         Container(
           height: 34,
@@ -873,7 +982,7 @@ class _AllTabContentState extends State<_AllTabContent>
     List<dynamic> todos,
     List<dynamic> buyingItems,
   ) {
-    final cs = Theme.of(context).colorScheme;
+
 
     switch (_segmentIndex) {
       case 0: // Timeline — new scrollable timeline view
@@ -901,145 +1010,7 @@ class _AllTabContentState extends State<_AllTabContent>
     }
   }
 
-  // ── Grouped list by time-of-day (for Resume / Upcoming) ──────
-  Widget _buildGroupedList(
-    BuildContext context,
-    AppProvider app,
-    List<FlowActivity> activities,
-    List<FlowActivity> allActivities, {
-    required bool showComplete,
-    required bool showUndo,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final entries = _timeOfDayEntries(_groupByTimeOfDay(activities));
-    final activityIndexes = _activityIndexes(allActivities);
-    return ListView.builder(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        0,
-        16,
-        MediaQuery.of(context).padding.bottom + 72 + 24,
-      ),
-      itemCount: entries.length,
-      itemBuilder: (context, index) {
-        final entry = entries[index];
-        if (entry.isHeader) {
-          return _buildFlowGroupHeader(entry.title!, entry.icon!, cs);
-        }
-        final activity = entry.activity!;
-        return Dismissible(
-          key: ValueKey('dismiss-${activity.id}'),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            alignment: Alignment.centerRight,
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.only(right: 20),
-            decoration: BoxDecoration(
-              color: Colors.red.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.delete_outline_rounded, color: Colors.red),
-          ),
-          onDismissed: (_) => _deleteFlowActivity(app, activity),
-          child: FlowActivityCard(
-            activity: activity,
-            index: activityIndexes[activity.id] ?? 0,
-            onTap: () => _showFlowTaskActionsSheet(context, app, activity),
-            onComplete: showComplete && (activity.isActive || activity.isPaused)
-                ? () => app.completeFlowActivity(widget.dateKey, activity.id)
-                : null,
-            onUndo: showUndo && activity.isDone
-                ? () => app.undoFlowActivity(widget.dateKey, activity.id)
-                : null,
-          ),
-        );
-      },
-    );
-  }
 
-  Widget _buildFlowGroupHeader(
-    String title,
-    IconData icon,
-    ColorScheme cs,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8, top: 16),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: cs.onSurface.withValues(alpha: 0.5)),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: cs.onSurface.withValues(alpha: 0.5),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Map<String, int> _activityIndexes(List<FlowActivity> activities) {
-    return {
-      for (int i = 0; i < activities.length; i++) activities[i].id: i,
-    };
-  }
-
-  List<_FlowActivityListEntry> _timeOfDayEntries(
-    Map<String, List<FlowActivity>> groups,
-  ) {
-    final entries = <_FlowActivityListEntry>[];
-    for (final section in _timeOfDaySections) {
-      final activities = groups[section.key] ?? const <FlowActivity>[];
-      if (activities.isEmpty) {
-        continue;
-      }
-      entries.add(_FlowActivityListEntry.header(section.title, section.icon));
-      for (final activity in activities) {
-        entries.add(_FlowActivityListEntry.activity(activity));
-      }
-    }
-    return entries;
-  }
-
-  Map<String, List<FlowActivity>> _groupByTimeOfDay(
-      List<FlowActivity> activities) {
-    final morning = <FlowActivity>[];
-    final afternoon = <FlowActivity>[];
-    final evening = <FlowActivity>[];
-    final night = <FlowActivity>[];
-
-    for (final a in activities) {
-      final timeStr = a.startedAt ?? a.completedAt;
-      if (timeStr == null) {
-        morning.add(a); // default if no time data
-        continue;
-      }
-      final dt = DateTime.tryParse(timeStr);
-      if (dt == null) {
-        morning.add(a);
-        continue;
-      }
-      final hour = dt.hour;
-      if (hour >= 5 && hour < 12) {
-        morning.add(a);
-      } else if (hour >= 12 && hour < 17) {
-        afternoon.add(a);
-      } else if (hour >= 17 && hour < 21) {
-        evening.add(a);
-      } else {
-        night.add(a);
-      }
-    }
-    return {
-      'morning': morning,
-      'afternoon': afternoon,
-      'evening': evening,
-      'night': night
-    };
-  }
 
   // ── Edit Task Bottom Sheet ──────────────────────────────────────
   String? _dayPlanBackedBlockId(AppProvider app, FlowActivity activity) {
@@ -1703,191 +1674,6 @@ class _AllTabContentState extends State<_AllTabContent>
     );
   }
 
-  Widget _buildCompletedTab(
-    BuildContext context,
-    AppProvider app,
-    List<FlowActivity> completed,
-    List<FlowActivity> allActivities,
-  ) {
-    final cs = Theme.of(context).colorScheme;
-    final activityIndexes = _activityIndexes(allActivities);
-    final morning = <FlowActivity>[];
-    final afternoon = <FlowActivity>[];
-    final evening = <FlowActivity>[];
-    final night = <FlowActivity>[];
-    int totalSeconds = 0;
-    final categorySeconds = <String, int>{};
-    for (final a in completed) {
-      if (a.durationSeconds != null) {
-        totalSeconds += a.durationSeconds!;
-        final cat = a.category ?? 'Other';
-        categorySeconds[cat] = (categorySeconds[cat] ?? 0) + a.durationSeconds!;
-      }
-      if (a.completedAt == null) {
-        morning.add(a);
-        continue;
-      }
-      final date = DateTime.tryParse(a.completedAt!);
-      if (date == null) {
-        morning.add(a);
-        continue;
-      }
-      final hour = date.hour;
-      if (hour >= 5 && hour < 12) {
-        morning.add(a);
-      } else if (hour >= 12 && hour < 17) {
-        afternoon.add(a);
-      } else if (hour >= 17 && hour < 21) {
-        evening.add(a);
-      } else {
-        night.add(a);
-      }
-    }
-    String fmtHrMin(int totalSec) {
-      final h = totalSec ~/ 3600;
-      final m = (totalSec % 3600) ~/ 60;
-      if (h > 0) return '${h}h ${m}m';
-      return '${m}m';
-    }
-
-    final entries = _timeOfDayEntries({
-      'morning': morning,
-      'afternoon': afternoon,
-      'evening': evening,
-      'night': night,
-    })
-      ..add(
-        _FlowActivityListEntry.summary(
-          totalSeconds: totalSeconds,
-          categorySeconds: categorySeconds,
-        ),
-      );
-    return ListView.builder(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        0,
-        16,
-        MediaQuery.of(context).padding.bottom + 72 + 24,
-      ),
-      itemCount: entries.length,
-      itemBuilder: (context, index) {
-        final entry = entries[index];
-        if (entry.isHeader) {
-          return _buildFlowGroupHeader(entry.title!, entry.icon!, cs);
-        }
-        if (entry.isSummary) {
-          return Padding(
-            padding: const EdgeInsets.only(top: 24),
-            child: _buildCompletedSummaryCard(
-              cs,
-              fmtHrMin(entry.totalSeconds!),
-              entry.categorySeconds!,
-              fmtHrMin,
-            ),
-          );
-        }
-        final activity = entry.activity!;
-        return FlowActivityCard(
-          activity: activity,
-          index: activityIndexes[activity.id] ?? 0,
-          onUndo: () => app.undoFlowActivity(widget.dateKey, activity.id),
-        );
-      },
-    );
-  }
-
-  Widget _buildCompletedSummaryCard(
-    ColorScheme cs,
-    String totalLabel,
-    Map<String, int> categorySeconds,
-    String Function(int totalSeconds) formatDuration,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cs.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.primary.withValues(alpha: 0.15)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: cs.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child:
-                    Icon(Icons.insights_rounded, size: 16, color: cs.primary),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Total Hours Today',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: cs.onSurface,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                totalLabel,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: cs.primary,
-                ),
-              ),
-            ],
-          ),
-          if (categorySeconds.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            const Divider(height: 1),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: categorySeconds.entries.map((entry) {
-                return Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        entry.key,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: cs.onSurface.withValues(alpha: 0.7),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        formatDuration(entry.value),
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: cs.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 
   Widget _buildFullDayPlan(
     BuildContext context,
@@ -2068,22 +1854,6 @@ class _AllTabContentState extends State<_AllTabContent>
     );
   }
 
-  Widget _emptySegment(ColorScheme cs, String msg, IconData icon) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 40, color: cs.primary.withValues(alpha: 0.2)),
-          const SizedBox(height: 8),
-          Text(msg,
-              style: TextStyle(
-                fontSize: 14,
-                color: cs.onSurface.withValues(alpha: 0.4),
-              )),
-        ],
-      ),
-    );
-  }
 }
 
 class _FullDayFlowCard extends StatelessWidget {
@@ -2423,66 +2193,6 @@ class _FullDayItem {
     this.index,
   });
 }
-
-class _TimeOfDaySection {
-  final String key;
-  final String title;
-  final IconData icon;
-
-  const _TimeOfDaySection(this.key, this.title, this.icon);
-}
-
-class _FlowActivityListEntry {
-  final String? title;
-  final IconData? icon;
-  final FlowActivity? activity;
-  final int? totalSeconds;
-  final Map<String, int>? categorySeconds;
-
-  const _FlowActivityListEntry.header(this.title, this.icon)
-      : activity = null,
-        totalSeconds = null,
-        categorySeconds = null;
-
-  const _FlowActivityListEntry.activity(this.activity)
-      : title = null,
-        icon = null,
-        totalSeconds = null,
-        categorySeconds = null;
-
-  const _FlowActivityListEntry.summary({
-    required this.totalSeconds,
-    required this.categorySeconds,
-  })  : title = null,
-        icon = null,
-        activity = null;
-
-  bool get isHeader => title != null;
-  bool get isSummary => totalSeconds != null;
-}
-
-const _timeOfDaySections = <_TimeOfDaySection>[
-  _TimeOfDaySection(
-    'morning',
-    'Morning (5 AM - 12 PM)',
-    Icons.wb_twilight_rounded,
-  ),
-  _TimeOfDaySection(
-    'afternoon',
-    'Afternoon (12 PM - 5 PM)',
-    Icons.wb_sunny_rounded,
-  ),
-  _TimeOfDaySection(
-    'evening',
-    'Evening (5 PM - 9 PM)',
-    Icons.nights_stay_rounded,
-  ),
-  _TimeOfDaySection(
-    'night',
-    'Night (9 PM - 5 AM)',
-    Icons.bedtime_rounded,
-  ),
-];
 
 // ══════════════════════════════════════════════════════════════════
 // CELEBRATION OVERLAY — burst of confetti-like particles
