@@ -28,6 +28,10 @@ import 'routines_tab.dart';
 import 'routine_editor_sheet.dart';
 import 'flow_control_bar.dart';
 import 'flow_activity_card.dart';
+import 'timeline_view.dart';
+import 'day_session_screen.dart';
+import 'wakeup_snooze_overlay.dart';
+import 'package:focusflow_mobile/models/day_session.dart';
 import 'package:focusflow_mobile/models/daily_flow.dart';
 import 'package:focusflow_mobile/screens/session/session_screen.dart';
 import 'study_flow_screen.dart';
@@ -90,6 +94,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
         type: BlockType.other,
         title: '${p.$1} 🕌',
         plannedDurationMinutes: dur,
+        isEvent: true,
         status: BlockStatus.done,
         isVirtual: true,
       );
@@ -716,7 +721,7 @@ class _AllTabContent extends StatefulWidget {
 class _AllTabContentState extends State<_AllTabContent>
     with AutomaticKeepAliveClientMixin {
   int _segmentIndex = 0;
-  static const _segments = ['Full Day Plan', 'Resume', 'Upcoming', 'Completed'];
+  static const _segments = ['Timeline', 'Routines', 'More'];
 
   void _setStateIfMounted(VoidCallback fn) {
     if (!mounted) return;
@@ -871,7 +876,19 @@ class _AllTabContentState extends State<_AllTabContent>
     final cs = Theme.of(context).colorScheme;
 
     switch (_segmentIndex) {
-      case 0: // Full Day Plan — everything
+      case 0: // Timeline — new scrollable timeline view
+        final dateKey = widget.dateKey;
+        final app2 = context.read<AppProvider>();
+        final plan2 = app2.getDayPlan(dateKey);
+        final blocks2 = plan2?.blocks ?? const <Block>[];
+        return TimelineView(
+          blocks: blocks2,
+          dateKey: dateKey,
+        );
+      case 1: // Routines
+        return RoutinesTab(dateKey: widget.dateKey);
+      case 2: // More — opens bottom sheet with To-Do / Buying links
+        // Show the existing content as a simple list
         return _buildFullDayPlan(
           context,
           app,
@@ -879,27 +896,6 @@ class _AllTabContentState extends State<_AllTabContent>
           todos,
           buyingItems,
         );
-      case 1: // Resume — grouped by time of day
-        if (resumeActivities.isEmpty) {
-          return _emptySegment(
-              cs, 'No active items', Icons.play_circle_outline_rounded);
-        }
-        return _buildGroupedList(context, app, resumeActivities, allActivities,
-            showComplete: true, showUndo: false);
-      case 2: // Upcoming — grouped by time of day
-        if (upcomingActivities.isEmpty) {
-          return _emptySegment(cs, 'Nothing upcoming', Icons.upcoming_rounded);
-        }
-        return _buildGroupedList(
-            context, app, upcomingActivities, allActivities,
-            showComplete: false, showUndo: false);
-      case 3: // Completed
-        if (completedActivities.isEmpty) {
-          return _emptySegment(
-              cs, 'Nothing completed yet', Icons.check_circle_outline_rounded);
-        }
-        return _buildCompletedTab(
-            context, app, completedActivities, allActivities);
       default:
         return const SizedBox.shrink();
     }

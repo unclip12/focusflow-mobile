@@ -71,7 +71,17 @@ const _fmgeChips = <FmgeTaskType, _TaskTypeChip>{
 
 class AddTaskSheet extends StatefulWidget {
   final String dateKey; // YYYY-MM-DD
-  const AddTaskSheet({super.key, required this.dateKey});
+  final TimeOfDay? prefillStartTime;
+  final TimeOfDay? prefillEndTime;
+  final bool showEventToggle;
+
+  const AddTaskSheet({
+    super.key,
+    required this.dateKey,
+    this.prefillStartTime,
+    this.prefillEndTime,
+    this.showEventToggle = true,
+  });
 
   @override
   State<AddTaskSheet> createState() => _AddTaskSheetState();
@@ -105,6 +115,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
 
+  // ── Event toggle ──────────────────────────────────────────
+  bool _isEvent = false;
+
   // ── Tracker integration state ─────────────────────────────
   bool _isRevision = false;
   Map<String, dynamic>? _trackerInfo; // looked-up tracker data
@@ -113,6 +126,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   void initState() {
     super.initState();
     _pageCtrl.addListener(_onPageNumberChanged);
+    // Pre-fill times from constructor (e.g. from FreeGapPanel)
+    _startTime = widget.prefillStartTime;
+    _endTime = widget.prefillEndTime;
   }
 
   void _onPageNumberChanged() {

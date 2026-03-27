@@ -291,10 +291,8 @@ class _LibraryDetailHeader extends StatelessWidget {
                       color: DashboardColors.primary,
                     ),
                     if (itemType == 'sketchy') ...[
-                      _BreadcrumbChip(
-                          label: item.category, isDark: isDark),
-                      _BreadcrumbChip(
-                          label: item.subcategory, isDark: isDark),
+                      _BreadcrumbChip(label: item.category, isDark: isDark),
+                      _BreadcrumbChip(label: item.subcategory, isDark: isDark),
                     ] else
                       _BreadcrumbChip(
                         label: 'Chapter ${item.chapter}',
@@ -379,9 +377,8 @@ class _LibraryQuickActions extends StatelessWidget {
                   ? Icons.visibility_off_rounded
                   : Icons.visibility_rounded,
               label: isWatched ? 'Mark Unwatched' : 'Mark Watched',
-              color: isWatched
-                  ? DashboardColors.warning
-                  : DashboardColors.success,
+              color:
+                  isWatched ? DashboardColors.warning : DashboardColors.success,
               isDark: isDark,
               onTap: () {
                 if (itemType == 'sketchy') {
@@ -466,9 +463,7 @@ class _HistoryTab extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isWatched
-                          ? 'You have watched this'
-                          : 'Not watched yet',
+                      isWatched ? 'You have watched this' : 'Not watched yet',
                       style: _inter(
                         size: 14,
                         weight: FontWeight.w600,
@@ -510,9 +505,7 @@ class _HistoryTab extends StatelessWidget {
               child: _GlassInfoCard(
                 icon: Icons.replay_rounded,
                 label: 'Revisions',
-                value: hasRevision
-                    ? 'R${revItem.currentRevisionIndex}'
-                    : 'R0',
+                value: hasRevision ? 'R${revItem.currentRevisionIndex}' : 'R0',
                 subtitle: hasRevision && revItem.lastStudiedAt != null
                     ? _timeAgo(revItem.lastStudiedAt!)
                     : null,
@@ -531,9 +524,8 @@ class _HistoryTab extends StatelessWidget {
                     ? Icons.folder_rounded
                     : Icons.bookmark_rounded,
                 label: itemType == 'sketchy' ? 'Category' : 'Chapter',
-                value: itemType == 'sketchy'
-                    ? item.category
-                    : '${item.chapter}',
+                value:
+                    itemType == 'sketchy' ? item.category : '${item.chapter}',
                 isDark: isDark,
               ),
             ),
@@ -795,8 +787,7 @@ class _NotesTabState extends State<_NotesTab> {
                         decoration: BoxDecoration(
                           color: isDark
                               ? Colors.white.withValues(alpha: 0.04)
-                              : DashboardColors.primary
-                                  .withValues(alpha: 0.06),
+                              : DashboardColors.primary.withValues(alpha: 0.06),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: DashboardColors.glassBorder(isDark),
@@ -806,8 +797,7 @@ class _NotesTabState extends State<_NotesTab> {
                         child: Icon(
                           Icons.note_alt_rounded,
                           size: 28,
-                          color:
-                              DashboardColors.primary.withValues(alpha: 0.5),
+                          color: DashboardColors.primary.withValues(alpha: 0.5),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -1469,6 +1459,12 @@ class _GlassNoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final links =
+        note.attachmentPaths.where(AttachmentHelper.isWebLink).toList();
+    final files = note.attachmentPaths
+        .where((path) => !AttachmentHelper.isWebLink(path))
+        .toList();
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: BackdropFilter(
@@ -1511,12 +1507,62 @@ class _GlassNoteCard extends StatelessWidget {
                       .toList(),
                 ),
               ],
-              if (note.attachmentPaths.isNotEmpty) ...[
+              if (links.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
-                  children: note.attachmentPaths.map((path) {
+                  children: links.map((link) {
+                    return GestureDetector(
+                      onTap: () =>
+                          AttachmentHelper.openAttachment(context, link),
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 240),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: DashboardColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color:
+                                DashboardColors.primary.withValues(alpha: 0.2),
+                            width: 0.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.link_rounded,
+                              size: 12,
+                              color: DashboardColors.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                link,
+                                maxLines: 1,
+                                style: _inter(
+                                  size: 10,
+                                  weight: FontWeight.w500,
+                                  color: DashboardColors.primary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+              if (files.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: files.map((path) {
                     return GestureDetector(
                       onTap: () =>
                           AttachmentHelper.openAttachment(context, path),
@@ -1524,12 +1570,11 @@ class _GlassNoteCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: DashboardColors.warning
-                              .withValues(alpha: 0.1),
+                          color: DashboardColors.warning.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: DashboardColors.warning
-                                .withValues(alpha: 0.2),
+                            color:
+                                DashboardColors.warning.withValues(alpha: 0.2),
                             width: 0.5,
                           ),
                         ),
@@ -1537,8 +1582,7 @@ class _GlassNoteCard extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(AttachmentHelper.getIcon(path),
-                                size: 12,
-                                color: DashboardColors.warning),
+                                size: 12, color: DashboardColors.warning),
                             const SizedBox(width: 4),
                             Text(
                               path.split('/').last,

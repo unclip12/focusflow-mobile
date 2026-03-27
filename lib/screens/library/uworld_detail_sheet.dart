@@ -10,6 +10,7 @@ import 'package:focusflow_mobile/models/library_note.dart';
 import 'package:focusflow_mobile/models/activity_log.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/screens/library/add_note_sheet.dart';
+import 'package:focusflow_mobile/screens/library/attachment_helper.dart';
 import 'package:focusflow_mobile/screens/library/edit_metadata_sheet.dart';
 import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'package:focusflow_mobile/utils/show_app_bottom_sheet.dart';
@@ -162,8 +163,8 @@ class _UWorldHeader extends StatelessWidget {
     final doneProgress = topic.totalQuestions > 0
         ? topic.doneQuestions / topic.totalQuestions
         : 0.0;
-    final isDone = topic.doneQuestions >= topic.totalQuestions &&
-        topic.totalQuestions > 0;
+    final isDone =
+        topic.doneQuestions >= topic.totalQuestions && topic.totalQuestions > 0;
 
     final statusColor =
         isDone ? DashboardColors.success : DashboardColors.warning;
@@ -455,7 +456,8 @@ class _ProgressTabState extends State<_ProgressTab> {
                   icon: Icons.format_list_numbered_rounded,
                   label: 'Total Sessions',
                   value: '${_activityLogs!.length}',
-                  subtitle: '${_activityLogs!.length} update${_activityLogs!.length == 1 ? '' : 's'} logged',
+                  subtitle:
+                      '${_activityLogs!.length} update${_activityLogs!.length == 1 ? '' : 's'} logged',
                   color: DashboardColors.success,
                   isDark: isDark,
                 ),
@@ -505,9 +507,7 @@ class _ProgressTabState extends State<_ProgressTab> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          _done > 0
-                              ? '${(accuracy * 100).round()}%'
-                              : '—',
+                          _done > 0 ? '${(accuracy * 100).round()}%' : '—',
                           style: _inter(
                             size: 20,
                             weight: FontWeight.w800,
@@ -598,8 +598,7 @@ class _ProgressTabState extends State<_ProgressTab> {
                       minHeight: 6,
                       backgroundColor: isDark
                           ? Colors.white.withValues(alpha: 0.06)
-                          : DashboardColors.primary
-                              .withValues(alpha: 0.08),
+                          : DashboardColors.primary.withValues(alpha: 0.08),
                       valueColor: AlwaysStoppedAnimation<Color>(
                         doneProgress >= 1.0
                             ? DashboardColors.success
@@ -627,9 +626,8 @@ class _ProgressTabState extends State<_ProgressTab> {
                 max: topic.totalQuestions,
                 isDark: isDark,
                 onDecrement: _done > 0 ? () => _updateDone(-1) : null,
-                onIncrement: _done < topic.totalQuestions
-                    ? () => _updateDone(1)
-                    : null,
+                onIncrement:
+                    _done < topic.totalQuestions ? () => _updateDone(1) : null,
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 10),
@@ -644,10 +642,8 @@ class _ProgressTabState extends State<_ProgressTab> {
                 value: _correct,
                 max: _done,
                 isDark: isDark,
-                onDecrement:
-                    _correct > 0 ? () => _updateCorrect(-1) : null,
-                onIncrement:
-                    _correct < _done ? () => _updateCorrect(1) : null,
+                onDecrement: _correct > 0 ? () => _updateCorrect(-1) : null,
+                onIncrement: _correct < _done ? () => _updateCorrect(1) : null,
               ),
             ],
           ),
@@ -663,8 +659,7 @@ class _ProgressTabState extends State<_ProgressTab> {
                 color: DashboardColors.primary,
                 isDark: isDark,
                 onTap: () {
-                  final delta = math.min(
-                      5, topic.totalQuestions - _done);
+                  final delta = math.min(5, topic.totalQuestions - _done);
                   if (delta > 0) _updateDone(delta);
                 },
               ),
@@ -688,13 +683,13 @@ class _ProgressTabState extends State<_ProgressTab> {
         const SizedBox(height: 20),
         GestureDetector(
           onTap: () {
-            widget.app
-                .updateUWorldProgress(topic.id!, _done, _correct);
+            widget.app.updateUWorldProgress(topic.id!, _done, _correct);
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Progress saved')),
             );
             // Refresh activity logs after saving
-            Future.delayed(const Duration(milliseconds: 300), _loadActivityLogs);
+            Future.delayed(
+                const Duration(milliseconds: 300), _loadActivityLogs);
           },
           child: ClipRRect(
             borderRadius: BorderRadius.circular(14),
@@ -713,8 +708,7 @@ class _ProgressTabState extends State<_ProgressTab> {
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color: DashboardColors.primary
-                          .withValues(alpha: 0.3),
+                      color: DashboardColors.primary.withValues(alpha: 0.3),
                       blurRadius: 12,
                       spreadRadius: -2,
                     ),
@@ -781,7 +775,8 @@ class _ProgressTabState extends State<_ProgressTab> {
                     style: _inter(
                       size: 11,
                       weight: FontWeight.w400,
-                      color: DashboardColors.textSecondary.withValues(alpha: 0.7),
+                      color:
+                          DashboardColors.textSecondary.withValues(alpha: 0.7),
                     ),
                   ),
                 ],
@@ -859,8 +854,7 @@ class _NotesTabState extends State<_NotesTab> {
                         decoration: BoxDecoration(
                           color: isDark
                               ? Colors.white.withValues(alpha: 0.04)
-                              : DashboardColors.primary
-                                  .withValues(alpha: 0.06),
+                              : DashboardColors.primary.withValues(alpha: 0.06),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: DashboardColors.glassBorder(isDark),
@@ -870,8 +864,7 @@ class _NotesTabState extends State<_NotesTab> {
                         child: Icon(
                           Icons.note_alt_rounded,
                           size: 28,
-                          color:
-                              DashboardColors.primary.withValues(alpha: 0.5),
+                          color: DashboardColors.primary.withValues(alpha: 0.5),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -1669,6 +1662,12 @@ class _GlassNoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final links =
+        note.attachmentPaths.where(AttachmentHelper.isWebLink).toList();
+    final files = note.attachmentPaths
+        .where((path) => !AttachmentHelper.isWebLink(path))
+        .toList();
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: BackdropFilter(
@@ -1711,40 +1710,90 @@ class _GlassNoteCard extends StatelessWidget {
                       .toList(),
                 ),
               ],
-              if (note.attachmentPaths.isNotEmpty) ...[
+              if (links.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
-                  children: note.attachmentPaths.map((path) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color:
-                            DashboardColors.warning.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: DashboardColors.warning
-                              .withValues(alpha: 0.2),
-                          width: 0.5,
+                  children: links.map((link) {
+                    return GestureDetector(
+                      onTap: () =>
+                          AttachmentHelper.openAttachment(context, link),
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 240),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: DashboardColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color:
+                                DashboardColors.primary.withValues(alpha: 0.2),
+                            width: 0.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.link_rounded,
+                                size: 12, color: DashboardColors.primary),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                link,
+                                maxLines: 1,
+                                style: _inter(
+                                  size: 10,
+                                  weight: FontWeight.w500,
+                                  color: DashboardColors.primary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.attachment_rounded,
-                              size: 12, color: DashboardColors.warning),
-                          const SizedBox(width: 4),
-                          Text(
-                            path.split('/').last,
-                            style: _inter(
-                              size: 10,
-                              weight: FontWeight.w500,
-                              color: DashboardColors.warning,
-                            ),
+                    );
+                  }).toList(),
+                ),
+              ],
+              if (files.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: files.map((path) {
+                    return GestureDetector(
+                      onTap: () =>
+                          AttachmentHelper.openAttachment(context, path),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: DashboardColors.warning.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color:
+                                DashboardColors.warning.withValues(alpha: 0.2),
+                            width: 0.5,
                           ),
-                        ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(AttachmentHelper.getIcon(path),
+                                size: 12, color: DashboardColors.warning),
+                            const SizedBox(width: 4),
+                            Text(
+                              path.split('/').last.split('\\').last,
+                              style: _inter(
+                                size: 10,
+                                weight: FontWeight.w500,
+                                color: DashboardColors.warning,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   }).toList(),

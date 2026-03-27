@@ -9,6 +9,7 @@ import 'package:focusflow_mobile/models/library_note.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/screens/library/add_note_sheet.dart';
+import 'package:focusflow_mobile/screens/library/attachment_helper.dart';
 import 'package:focusflow_mobile/screens/library/edit_metadata_sheet.dart';
 import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'package:focusflow_mobile/utils/show_app_bottom_sheet.dart';
@@ -197,8 +198,7 @@ class _FADetailHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final readSubs = subtopics.where((s) => s.status != 'unread').length;
-    final subProgress =
-        subtopics.isEmpty ? 0.0 : readSubs / subtopics.length;
+    final subProgress = subtopics.isEmpty ? 0.0 : readSubs / subtopics.length;
 
     // Status properties
     Color statusColor;
@@ -351,8 +351,7 @@ class _FADetailHeader extends StatelessWidget {
                               : DashboardColors.primary,
                           trackColor: isDark
                               ? Colors.white.withValues(alpha: 0.06)
-                              : DashboardColors.primary
-                                  .withValues(alpha: 0.08),
+                              : DashboardColors.primary.withValues(alpha: 0.08),
                           strokeWidth: 4,
                         ),
                         child: child,
@@ -605,9 +604,8 @@ class _HistoryTab extends StatelessWidget {
                 value: page.ankiDoneAt != null
                     ? _formatDate(page.ankiDoneAt!)
                     : '—',
-                subtitle: page.ankiDoneAt != null
-                    ? _timeAgo(page.ankiDoneAt!)
-                    : null,
+                subtitle:
+                    page.ankiDoneAt != null ? _timeAgo(page.ankiDoneAt!) : null,
                 color: DashboardColors.success,
                 isDark: isDark,
               ),
@@ -674,8 +672,7 @@ class _HistoryTab extends StatelessWidget {
                         minHeight: 6,
                         backgroundColor: isDark
                             ? Colors.white.withValues(alpha: 0.06)
-                            : DashboardColors.primary
-                                .withValues(alpha: 0.08),
+                            : DashboardColors.primary.withValues(alpha: 0.08),
                         valueColor: AlwaysStoppedAnimation<Color>(
                           readSubs == subtopics.length
                               ? DashboardColors.success
@@ -823,8 +820,7 @@ class _NotesTabState extends State<_NotesTab> {
                         decoration: BoxDecoration(
                           color: isDark
                               ? Colors.white.withValues(alpha: 0.04)
-                              : DashboardColors.primary
-                                  .withValues(alpha: 0.06),
+                              : DashboardColors.primary.withValues(alpha: 0.06),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: DashboardColors.glassBorder(isDark),
@@ -834,8 +830,7 @@ class _NotesTabState extends State<_NotesTab> {
                         child: Icon(
                           Icons.note_alt_rounded,
                           size: 28,
-                          color:
-                              DashboardColors.primary.withValues(alpha: 0.5),
+                          color: DashboardColors.primary.withValues(alpha: 0.5),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -1227,8 +1222,7 @@ class _SubtopicRow extends StatelessWidget {
           ),
           if (subtopic.revisionCount > 0)
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
@@ -1287,8 +1281,7 @@ class _TimelineEntry extends StatelessWidget {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color:
-                            DashboardColors.primary.withValues(alpha: 0.4),
+                        color: DashboardColors.primary.withValues(alpha: 0.4),
                         blurRadius: 4,
                       ),
                     ],
@@ -1346,7 +1339,8 @@ class _TimelineEntry extends StatelessWidget {
                         style: _inter(
                           size: 10,
                           weight: FontWeight.w400,
-                          color: DashboardColors.textSecondary.withValues(alpha: 0.7),
+                          color: DashboardColors.textSecondary
+                              .withValues(alpha: 0.7),
                         ),
                       ),
                     ],
@@ -1396,6 +1390,12 @@ class _GlassNoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final links =
+        note.attachmentPaths.where(AttachmentHelper.isWebLink).toList();
+    final files = note.attachmentPaths
+        .where((path) => !AttachmentHelper.isWebLink(path))
+        .toList();
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: BackdropFilter(
@@ -1438,41 +1438,90 @@ class _GlassNoteCard extends StatelessWidget {
                       .toList(),
                 ),
               ],
-              if (note.attachmentPaths.isNotEmpty) ...[
+              if (links.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
-                  children: note.attachmentPaths.map((path) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: DashboardColors.warning
-                            .withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: DashboardColors.warning
-                              .withValues(alpha: 0.2),
-                          width: 0.5,
+                  children: links.map((link) {
+                    return GestureDetector(
+                      onTap: () =>
+                          AttachmentHelper.openAttachment(context, link),
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 240),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: DashboardColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color:
+                                DashboardColors.primary.withValues(alpha: 0.2),
+                            width: 0.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.link_rounded,
+                                size: 12, color: DashboardColors.primary),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                link,
+                                maxLines: 1,
+                                style: _inter(
+                                  size: 10,
+                                  weight: FontWeight.w500,
+                                  color: DashboardColors.primary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.attachment_rounded,
-                              size: 12,
-                              color: DashboardColors.warning),
-                          const SizedBox(width: 4),
-                          Text(
-                            path.split('/').last,
-                            style: _inter(
-                              size: 10,
-                              weight: FontWeight.w500,
-                              color: DashboardColors.warning,
-                            ),
+                    );
+                  }).toList(),
+                ),
+              ],
+              if (files.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: files.map((path) {
+                    return GestureDetector(
+                      onTap: () =>
+                          AttachmentHelper.openAttachment(context, path),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: DashboardColors.warning.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color:
+                                DashboardColors.warning.withValues(alpha: 0.2),
+                            width: 0.5,
                           ),
-                        ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(AttachmentHelper.getIcon(path),
+                                size: 12, color: DashboardColors.warning),
+                            const SizedBox(width: 4),
+                            Text(
+                              path.split('/').last.split('\\').last,
+                              style: _inter(
+                                size: 10,
+                                weight: FontWeight.w500,
+                                color: DashboardColors.warning,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   }).toList(),

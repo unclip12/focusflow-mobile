@@ -26,6 +26,7 @@ class AddNoteSheet extends StatefulWidget {
 
 class _AddNoteSheetState extends State<AddNoteSheet> {
   final _textCtrl = TextEditingController();
+  final _linkCtrl = TextEditingController();
   final _tagCtrl = TextEditingController();
   final List<String> _tags = [];
   final List<String> _attachments = [];
@@ -35,8 +36,19 @@ class _AddNoteSheetState extends State<AddNoteSheet> {
   @override
   void dispose() {
     _textCtrl.dispose();
+    _linkCtrl.dispose();
     _tagCtrl.dispose();
     super.dispose();
+  }
+
+  void _addLink() {
+    final normalizedLink = AttachmentHelper.normalizeLink(_linkCtrl.text);
+    if (normalizedLink != null && !_attachments.contains(normalizedLink)) {
+      setState(() {
+        _attachments.add(normalizedLink);
+        _linkCtrl.clear();
+      });
+    }
   }
 
   void _addTag() {
@@ -95,7 +107,9 @@ class _AddNoteSheetState extends State<AddNoteSheet> {
         24,
         24,
         24,
-        24 + MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom,
+        24 +
+            MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).padding.bottom,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -121,9 +135,55 @@ class _AddNoteSheetState extends State<AddNoteSheet> {
             maxLines: 4,
             decoration: InputDecoration(
               hintText: 'Type your note here...',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _linkCtrl,
+                  keyboardType: TextInputType.url,
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(
+                    hintText: 'Paste website link...',
+                    isDense: true,
+                    prefixIcon: const Icon(Icons.link_rounded),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onSubmitted: (_) => _addLink(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton.filledTonal(
+                onPressed: _addLink,
+                icon: const Icon(Icons.add_link_rounded),
+              ),
+            ],
+          ),
+          if (_attachments.any(AttachmentHelper.isWebLink)) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children:
+                  _attachments.where(AttachmentHelper.isWebLink).map((link) {
+                return InputChip(
+                  avatar: const Icon(Icons.link_rounded, size: 16),
+                  label: Text(link),
+                  onPressed: () =>
+                      AttachmentHelper.openAttachment(context, link),
+                  onDeleted: () {
+                    setState(() => _attachments.remove(link));
+                  },
+                );
+              }).toList(),
+            ),
+          ],
           const SizedBox(height: 16),
           // Tags
           Row(
@@ -134,7 +194,8 @@ class _AddNoteSheetState extends State<AddNoteSheet> {
                   decoration: InputDecoration(
                     hintText: 'Add a tag...',
                     isDense: true,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                   onSubmitted: (_) => _addTag(),
                 ),
@@ -178,12 +239,15 @@ class _AddNoteSheetState extends State<AddNoteSheet> {
               ),
             ],
           ),
-          if (_attachments.isNotEmpty) ...[
+          if (_attachments
+              .any((path) => !AttachmentHelper.isWebLink(path))) ...[
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: _attachments.map((path) {
+              children: _attachments
+                  .where((path) => !AttachmentHelper.isWebLink(path))
+                  .map((path) {
                 final filename = path.split('/').last.split('\\').last;
                 return GestureDetector(
                   onTap: () => AttachmentHelper.openAttachment(context, path),
@@ -205,7 +269,8 @@ class _AddNoteSheetState extends State<AddNoteSheet> {
               onPressed: _saveNote,
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text('Save Note'),
             ),

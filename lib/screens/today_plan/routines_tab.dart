@@ -420,7 +420,9 @@ class _RoutineCard extends StatelessWidget {
                       const SizedBox(height: 4),
                     ],
                     Text(
-                      '${routine.steps.length} steps • ~${routine.totalEstimatedMinutes} min',
+                      '${routine.steps.length} steps'
+                      '${routine.subtasks.isNotEmpty ? ' • ${routine.subtasks.length} subtasks' : ''}'
+                      ' • ~${routine.subtasks.isNotEmpty ? routine.totalSubtaskMinutes : routine.totalEstimatedMinutes} min',
                       style: TextStyle(
                         fontSize: 12,
                         color: cs.onSurface.withValues(alpha: 0.45),

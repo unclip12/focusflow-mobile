@@ -45,8 +45,10 @@ import 'package:focusflow_mobile/models/todo_item.dart';
 import 'package:focusflow_mobile/models/default_routine_order.dart';
 import 'package:focusflow_mobile/models/daily_flow.dart';
 import 'package:focusflow_mobile/models/activity_log.dart';
+import 'package:focusflow_mobile/models/day_session.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart' as du;
+import 'package:focusflow_mobile/services/timeline_scheduler.dart';
 
 // ── AppNotification ───────────────────────────────────────────────
 enum AppNotificationType { reminder, achievement, revisionDue, streak }
@@ -3979,5 +3981,64 @@ class AppProvider extends ChangeNotifier {
   /// Get activity logs since a specific date.
   Future<List<ActivityLogEntry>> getActivityLogsSince(DateTime since) async {
     return _db.getActivityLogsSince(since.toIso8601String());
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // DAY SESSIONS
+  // ═══════════════════════════════════════════════════════════════
+
+  final Map<String, DaySession> _daySessions = {};
+
+  DaySession? getActiveDaySession(String dateKey) => _daySessions[dateKey];
+
+  void startDaySession(String dateKey) {
+    _daySessions[dateKey] = DaySession(
+      sessionId: _uuid.v4(),
+      dateKey: dateKey,
+      startedAt: DateTime.now(),
+      status: 'running',
+    );
+    notifyListeners();
+  }
+
+  void endDaySession(String dateKey) {
+    final session = _daySessions[dateKey];
+    if (session != null) {
+      _daySessions[dateKey] = session.copyWith(status: 'completed');
+    }
+    notifyListeners();
+  }
+
+  void setCurrentBlock(String dateKey, String blockId) {
+    final session = _daySessions[dateKey];
+    if (session != null) {
+      _daySessions[dateKey] = session.copyWith(currentBlockId: blockId);
+      notifyListeners();
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // TIMELINE SCHEDULING
+  // ═══════════════════════════════════════════════════════════════
+
+  /// Reschedule all tasks from now.
+  Future<void> rescheduleFromNow(String dateKey) async {
+    await rescheduleFrom(dateKey, DateTime.now());
+  }
+
+  /// Reschedule all tasks from a specific time.
+  Future<void> rescheduleFrom(String dateKey, DateTime from) async {
+    final plan = getDayPlan(dateKey);
+    if (plan == null) return;
+    final blocks = plan.blocks ?? const <Block>[];
+    if (blocks.isEmpty) return;
+
+    final scheduled = TimelineScheduler.schedule(
+      blocks: blocks,
+      startTime: from,
+    );
+
+    await upsertDayPlan(plan.copyWith(blocks: scheduled));
+    await syncFlowActivitiesFromDayPlan(dateKey);
   }
 }

@@ -359,6 +359,13 @@ class Block {
 
   final int plannedDurationMinutes;
 
+  // Timeline scheduler fields
+  final bool isEvent;                // fixed in time, never moved by scheduler
+  final String? splitGroupId;        // links split parts of same original task
+  final int? splitPartIndex;         // 1-based: which part this is
+  final int? splitTotalParts;        // how many parts total
+  final int remainingDurationMinutes; // for partially done tasks
+
   // Actual execution
   final String? actualStartTime;
   final String? actualEndTime;
@@ -399,6 +406,11 @@ class Block {
     this.relatedAnkiInfo,
     this.relatedQbankInfo,
     required this.plannedDurationMinutes,
+    this.isEvent = false,
+    this.splitGroupId,
+    this.splitPartIndex,
+    this.splitTotalParts,
+    int? remainingDurationMinutes,
     this.actualStartTime,
     this.actualEndTime,
     this.actualDurationMinutes,
@@ -414,7 +426,7 @@ class Block {
     this.generatedLogIds,
     this.generatedTimeLogIds,
     this.isVirtual,
-  });
+  }) : remainingDurationMinutes = remainingDurationMinutes ?? plannedDurationMinutes;
 
   factory Block.fromJson(Map<String, dynamic> j) => Block(
         id: j['id'] ?? '',
@@ -441,6 +453,11 @@ class Block {
             ? Map<String, dynamic>.from(j['relatedQbankInfo'])
             : null,
         plannedDurationMinutes: j['plannedDurationMinutes'] ?? 0,
+        isEvent: j['isEvent'] ?? false,
+        splitGroupId: j['splitGroupId'],
+        splitPartIndex: j['splitPartIndex'],
+        splitTotalParts: j['splitTotalParts'],
+        remainingDurationMinutes: j['remainingDurationMinutes'],
         actualStartTime: j['actualStartTime'],
         actualEndTime: j['actualEndTime'],
         actualDurationMinutes: j['actualDurationMinutes'],
@@ -489,6 +506,11 @@ class Block {
         if (relatedAnkiInfo != null) 'relatedAnkiInfo': relatedAnkiInfo,
         if (relatedQbankInfo != null) 'relatedQbankInfo': relatedQbankInfo,
         'plannedDurationMinutes': plannedDurationMinutes,
+        'isEvent': isEvent,
+        if (splitGroupId != null) 'splitGroupId': splitGroupId,
+        if (splitPartIndex != null) 'splitPartIndex': splitPartIndex,
+        if (splitTotalParts != null) 'splitTotalParts': splitTotalParts,
+        'remainingDurationMinutes': remainingDurationMinutes,
         if (actualStartTime != null) 'actualStartTime': actualStartTime,
         if (actualEndTime != null) 'actualEndTime': actualEndTime,
         if (actualDurationMinutes != null)
@@ -526,6 +548,11 @@ class Block {
     Map<String, dynamic>? relatedAnkiInfo,
     Map<String, dynamic>? relatedQbankInfo,
     int? plannedDurationMinutes,
+    bool? isEvent,
+    String? splitGroupId,
+    int? splitPartIndex,
+    int? splitTotalParts,
+    int? remainingDurationMinutes,
     String? actualStartTime,
     String? actualEndTime,
     int? actualDurationMinutes,
@@ -558,6 +585,12 @@ class Block {
         relatedQbankInfo: relatedQbankInfo ?? this.relatedQbankInfo,
         plannedDurationMinutes:
             plannedDurationMinutes ?? this.plannedDurationMinutes,
+        isEvent: isEvent ?? this.isEvent,
+        splitGroupId: splitGroupId ?? this.splitGroupId,
+        splitPartIndex: splitPartIndex ?? this.splitPartIndex,
+        splitTotalParts: splitTotalParts ?? this.splitTotalParts,
+        remainingDurationMinutes:
+            remainingDurationMinutes ?? this.remainingDurationMinutes,
         actualStartTime: actualStartTime ?? this.actualStartTime,
         actualEndTime: actualEndTime ?? this.actualEndTime,
         actualDurationMinutes:

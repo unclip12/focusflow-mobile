@@ -46,6 +46,47 @@ class RoutineStep {
       );
 }
 
+class RoutineSubtask {
+  final String id;
+  final String name;
+  final String emoji;
+  final int durationMinutes;
+
+  const RoutineSubtask({
+    required this.id,
+    required this.name,
+    required this.emoji,
+    required this.durationMinutes,
+  });
+
+  factory RoutineSubtask.fromJson(Map<String, dynamic> j) => RoutineSubtask(
+        id: j['id'] ?? '',
+        name: j['name'] ?? '',
+        emoji: j['emoji'] ?? '📋',
+        durationMinutes: j['durationMinutes'] ?? 0,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'emoji': emoji,
+        'durationMinutes': durationMinutes,
+      };
+
+  RoutineSubtask copyWith({
+    String? id,
+    String? name,
+    String? emoji,
+    int? durationMinutes,
+  }) =>
+      RoutineSubtask(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        emoji: emoji ?? this.emoji,
+        durationMinutes: durationMinutes ?? this.durationMinutes,
+      );
+}
+
 class Routine {
   final String id;
   final String name;
@@ -56,6 +97,9 @@ class Routine {
   final String? recurrence; // daily | weekly | until_date
   final String? recurrenceEndDate; // YYYY-MM-DD
   final int? reminderWeekday; // 1=Mon .. 7=Sun
+  final String recurrenceType; // 'none' | 'daily' | 'weekly' | 'monthly'
+  final List<int> recurrenceDays; // for weekly: 1=Mon...7=Sun
+  final List<RoutineSubtask> subtasks;
   final String createdAt;
   final String? updatedAt;
 
@@ -69,6 +113,9 @@ class Routine {
     this.recurrence,
     this.recurrenceEndDate,
     this.reminderWeekday,
+    this.recurrenceType = 'none',
+    this.recurrenceDays = const [],
+    this.subtasks = const [],
     required this.createdAt,
     this.updatedAt,
   });
@@ -86,6 +133,14 @@ class Routine {
         recurrence: j['recurrence'],
         recurrenceEndDate: j['recurrenceEndDate'],
         reminderWeekday: j['reminderWeekday'],
+        recurrenceType: j['recurrenceType'] ?? 'none',
+        recurrenceDays: j['recurrenceDays'] != null
+            ? List<int>.from(j['recurrenceDays'])
+            : const [],
+        subtasks: (j['subtasks'] as List?)
+                ?.map((s) => RoutineSubtask.fromJson(s))
+                .toList() ??
+            const [],
         createdAt: j['createdAt'] ?? '',
         updatedAt: j['updatedAt'],
       );
@@ -100,12 +155,19 @@ class Routine {
         if (recurrence != null) 'recurrence': recurrence,
         if (recurrenceEndDate != null) 'recurrenceEndDate': recurrenceEndDate,
         if (reminderWeekday != null) 'reminderWeekday': reminderWeekday,
+        'recurrenceType': recurrenceType,
+        if (recurrenceDays.isNotEmpty) 'recurrenceDays': recurrenceDays,
+        if (subtasks.isNotEmpty)
+          'subtasks': subtasks.map((s) => s.toJson()).toList(),
         'createdAt': createdAt,
         if (updatedAt != null) 'updatedAt': updatedAt,
       };
 
   int get totalEstimatedMinutes =>
       steps.fold(0, (sum, s) => sum + (s.estimatedMinutes ?? 0));
+
+  int get totalSubtaskMinutes =>
+      subtasks.fold(0, (sum, s) => sum + s.durationMinutes);
 
   Routine copyWith({
     String? id,
@@ -117,6 +179,9 @@ class Routine {
     Object? recurrence = _routineFieldUnset,
     Object? recurrenceEndDate = _routineFieldUnset,
     Object? reminderWeekday = _routineFieldUnset,
+    String? recurrenceType,
+    List<int>? recurrenceDays,
+    List<RoutineSubtask>? subtasks,
     String? createdAt,
     String? updatedAt,
   }) =>
@@ -138,6 +203,9 @@ class Routine {
         reminderWeekday: identical(reminderWeekday, _routineFieldUnset)
             ? this.reminderWeekday
             : reminderWeekday as int?,
+        recurrenceType: recurrenceType ?? this.recurrenceType,
+        recurrenceDays: recurrenceDays ?? this.recurrenceDays,
+        subtasks: subtasks ?? this.subtasks,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
       );
