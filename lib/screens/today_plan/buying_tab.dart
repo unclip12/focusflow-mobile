@@ -264,17 +264,18 @@ class _AddBuyingSheetState extends State<_AddBuyingSheet> {
     final cs = Theme.of(context).colorScheme;
     final mediaQuery = MediaQuery.of(context);
 
-    return AnimatedPadding(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOut,
-      padding: EdgeInsets.only(bottom: mediaQuery.viewInsets.bottom),
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: mediaQuery.viewInsets.bottom + mediaQuery.padding.bottom + 20,
+      ),
       child: SingleChildScrollView(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: mediaQuery.padding.bottom + 20,
-        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

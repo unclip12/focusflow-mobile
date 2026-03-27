@@ -12,6 +12,7 @@ import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/screens/library/add_note_sheet.dart';
 import 'package:focusflow_mobile/screens/library/edit_metadata_sheet.dart';
 import 'package:focusflow_mobile/utils/app_colors.dart';
+import 'package:focusflow_mobile/utils/show_app_bottom_sheet.dart';
 
 // ══════════════════════════════════════════════════════════════════
 // UWorld Detail Sheet — premium liquid-glass redesign
@@ -932,14 +933,16 @@ class _NotesTabState extends State<_NotesTab> {
                 color: DashboardColors.primary,
                 isDark: isDark,
                 onTap: () async {
-                  final added = await showModalBottomSheet<bool>(
+                  final added = await showAppBottomSheet<bool>(
                     context: context,
-                    isScrollControlled: true,
-                    useSafeArea: true,
-                    builder: (_) => AddNoteSheet(
+                    initialChildSize: 0.55,
+                    minChildSize: 0.3,
+                    maxChildSize: 0.95,
+                    builder: (_, scrollController) => AddNoteSheet(
                       itemId: widget.itemId,
                       itemType: widget.itemType,
                       app: widget.app,
+                      scrollController: scrollController,
                     ),
                   );
                   if (added == true) {

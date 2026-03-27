@@ -10,12 +10,14 @@ class AddNoteSheet extends StatefulWidget {
   final String itemId;
   final String itemType;
   final AppProvider app;
+  final ScrollController? scrollController;
 
   const AddNoteSheet({
     super.key,
     required this.itemId,
     required this.itemType,
     required this.app,
+    this.scrollController,
   });
 
   @override
@@ -87,12 +89,13 @@ class _AddNoteSheetState extends State<AddNoteSheet> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return Padding(
+    return SingleChildScrollView(
+      controller: widget.scrollController,
       padding: EdgeInsets.fromLTRB(
         24,
         24,
         24,
-        24 + MediaQuery.of(context).viewInsets.bottom,
+        24 + MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

@@ -333,7 +333,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
 
     return Scaffold(
       backgroundColor: DashboardColors.background(isDark),
-      resizeToAvoidBottomInset: true,
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Positioned.fill(

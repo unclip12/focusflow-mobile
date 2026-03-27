@@ -229,13 +229,25 @@ class _BackupScreenState extends State<BackupScreen> {
   Future<void> _pickAndRestore() async {
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['ffbackup', 'json'],
+        type: FileType.any,
       );
 
       if (result == null || result.files.isEmpty) return;
       final path = result.files.single.path;
       if (path == null) return;
+
+      // Validate extension manually since FileType.any allows all files
+      final lower = path.toLowerCase();
+      if (!lower.endsWith('.ffbackup') && !lower.endsWith('.json')) {
+        if (mounted) {
+          _showSnack(
+            'Please select a .ffbackup or .json backup file.',
+            isError: true,
+          );
+        }
+        return;
+      }
+
       if (!mounted) return;
 
       await _showRestoreConfirm(path);
