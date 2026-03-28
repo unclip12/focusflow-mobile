@@ -60,8 +60,6 @@ const _generalCategories = [
 
 // ── Study task type enums (unchanged) ───────────────────────────
 enum ExamType { usmle, fmge }
-enum UsmleTaskType { faPages, videoLecture, qbankSession, ankiReview, revision, other }
-enum FmgeTaskType { cerebellumLecture, fmgeQbank, subjectReading, revision, other }
 
 enum _TaskPath { study, general }
 
@@ -231,9 +229,8 @@ class AddTaskSheet extends StatefulWidget {
   final String dateKey;
   final TimeOfDay? prefillStartTime;
   final TimeOfDay? prefillEndTime;
-  final String? prefillCategory;  // e.g. 'Revision'
-  final bool showEventToggle;
   final String? prefillCategory;
+  final bool showEventToggle;
 
   const AddTaskSheet({
     super.key,
@@ -242,7 +239,6 @@ class AddTaskSheet extends StatefulWidget {
     this.prefillEndTime,
     this.prefillCategory,
     this.showEventToggle = true,
-    this.prefillCategory,
   });
 
   @override
@@ -305,15 +301,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       _exam = ExamType.usmle;
       _usmleType = UsmleTaskType.revision;
       _step = 3;
-    }
-  }
-
-    // If prefillCategory is 'Revision', jump straight to study > revision
-    if (widget.prefillCategory == 'Revision') {
-      _path = 'study';
-      _exam = ExamType.usmle;
-      _usmleType = UsmleTaskType.revision;
-      _studyStep = 2;
     }
   }
 
@@ -387,19 +374,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
 
   String _fmtHHMM(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-
-  Future<void> _pickTime(bool isStart) async {
-    final initial = isStart ? (_startTime ?? TimeOfDay.now()) : (_endTime ?? TimeOfDay.now());
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: initial,
-      builder: (c, child) => MediaQuery(
-        data: MediaQuery.of(c).copyWith(alwaysUse24HourFormat: false),
-        child: child!,
-      ),
-    );
-    if (picked != null && mounted) setState(() => isStart ? _startTime = picked : _endTime = picked);
-  }
 
   int get _durationMinutes {
     if (_startTime == null || _endTime == null) return 0;
@@ -645,8 +619,8 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       index: existingBlocks.length,
       date: widget.dateKey,
       plannedStartTime:
-          _startTime != null ? _formatTimeOfDay(_startTime!) : '00:00',
-      plannedEndTime: _endTime != null ? _formatTimeOfDay(_endTime!) : '00:00',
+          _startTime != null ? _fmtHHMM(_startTime!) : '00:00',
+      plannedEndTime: _endTime != null ? _fmtHHMM(_endTime!) : '00:00',
       type: BlockType.other,
       title: '${category.emoji} $title',
       description:
@@ -1197,7 +1171,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     fields.add(SizedBox(
       width: double.infinity,
       child: FilledButton.icon(
-        onPressed: _saveStudy,
+        onPressed: _save,
         icon: const Icon(Icons.check_rounded, size: 18),
         label: const Text('Save Task'),
         style: FilledButton.styleFrom(
@@ -1637,43 +1611,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
 // ================================================================
 // Path Card
 // ================================================================
-class _PathCard extends StatelessWidget {
-  final String emoji;
-  final String label;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onTap;
-  const _PathCard({required this.emoji, required this.label, required this.subtitle,
-      required this.color, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
-              colors: [color.withValues(alpha: 0.07), color.withValues(alpha: 0.15)]),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: color.withValues(alpha: 0.25)),
-        ),
-        child: Column(
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 34)),
-            const SizedBox(height: 10),
-            Text(label, textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: color)),
-            const SizedBox(height: 4),
-            Text(subtitle, textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, color: color.withValues(alpha: 0.6))),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // ================================================================
 // Exam Card (unchanged)
 // ================================================================

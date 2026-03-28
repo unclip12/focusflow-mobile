@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
+import 'package:focusflow_mobile/utils/constants.dart';
 import 'free_gap_panel.dart';
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -122,12 +123,6 @@ class _TimelineViewState extends State<TimelineView> {
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _updateSorted();
-  }
-
   static int _toMinutes(String hhmm) {
     final parts = hhmm.split(':');
     if (parts.length != 2) return 0;
@@ -167,9 +162,7 @@ class _TimelineViewState extends State<TimelineView> {
   String _lockedCategoryLabel(Block block) =>
       block.id.startsWith('prayer_') ? 'Prayer' : 'Event';
 
-  String _formatMinutesOfDay(int totalMinutes) => _formatTimeOfDay(
-        _timeOfDayFromMinutes(totalMinutes),
-      );
+  String _formatMinutesOfDay(int totalMinutes) => _minutesToHHMM(totalMinutes);
 
   int _countMovableBlocksBefore(List<_TimelineItem> items, int endExclusive) {
     var count = 0;
@@ -184,21 +177,18 @@ class _TimelineViewState extends State<TimelineView> {
     return count;
   }
 
-  /// Build timeline items including gaps between blocks.
-  List<_TimelineItem> _buildTimelineItems() {
-    final items = <_TimelineItem>[];
-    final sorted = List<Block>.from(widget.blocks)
-      ..sort((a, b) =>
-          _toMinutes(a.plannedStartTime).compareTo(_toMinutes(b.plannedStartTime)));
-  }
-
   // Build list of timeline items (blocks + gaps)
   List<_TimelineItem> _buildTimelineItems() {
+    final sortedBlocks = List<Block>.from(widget.blocks)
+      ..sort(
+        (a, b) => _toMinutes(a.plannedStartTime)
+            .compareTo(_toMinutes(b.plannedStartTime)),
+      );
     final items = <_TimelineItem>[];
-    for (int i = 0; i < _sortedBlocks.length; i++) {
-      final block = _sortedBlocks[i];
+    for (int i = 0; i < sortedBlocks.length; i++) {
+      final block = sortedBlocks[i];
       if (i > 0) {
-        final prevEnd = _toMinutes(_sortedBlocks[i - 1].plannedEndTime);
+        final prevEnd = _toMinutes(sortedBlocks[i - 1].plannedEndTime);
         final curStart = _toMinutes(block.plannedStartTime);
         if (curStart > prevEnd && (curStart - prevEnd) >= 5) {
           items.add(_TimelineItem.gap(gapStartMinutes: prevEnd, gapEndMinutes: curStart));
@@ -208,64 +198,6 @@ class _TimelineViewState extends State<TimelineView> {
     }
     return items;
   }
-
-  // ── Drag reorder: cascade start times for non-locked blocks ──
-  void _onReorder(int oldIndex, int newIndex) {
-    // Extract only draggable (non-locked) blocks in their display order
-    final draggable = _sortedBlocks.where((b) => !_isLocked(b)).toList();
-    if (oldIndex >= draggable.length || newIndex > draggable.length) return;
-    if (newIndex > oldIndex) newIndex -= 1;
-
-    final moved = draggable.removeAt(oldIndex);
-    draggable.insert(newIndex, moved);
-
-    // Re-assign start times sequentially, preserving each block's duration,
-    // keeping locked blocks at their original times and slotting draggable
-    // blocks into the gaps between them.
-    final app = context.read<AppProvider>();
-    final plan = app.getDayPlan(widget.dateKey);
-    if (plan == null) return;
-
-    final allBlocks = List<Block>.from(plan.blocks ?? []);
-
-    // Build new order: interleave locked blocks and reordered draggable blocks
-    // sorted by locked block anchor times, inserting draggable blocks in new order.
-    final locked = _sortedBlocks.where((b) => _isLocked(b)).toList();
-
-    int draggableIdx = 0;
-    // Start cursor after the first locked block's end, or at day start
-    int cursorMin = locked.isNotEmpty
-        ? _toMinutes(locked.first.plannedEndTime)
-        : (_sortedBlocks.isNotEmpty ? _toMinutes(_sortedBlocks.first.plannedStartTime) : 480);
-
-    // Simple sequential cascade: place each draggable block one after another
-    // starting from the earliest non-locked slot.
-    final firstDraggableStart = _sortedBlocks
-        .where((b) => !_isLocked(b))
-        .fold<int>(1440, (min, b) => _toMinutes(b.plannedStartTime) < min
-            ? _toMinutes(b.plannedStartTime) : min);
-
-    int cursor = firstDraggableStart;
-    final updatedBlocks = <Block>[];
-    for (final b in draggable) {
-      final dur = b.plannedDurationMinutes > 0 ? b.plannedDurationMinutes : 30;
-      final newStart = _minutesToHHMM(cursor);
-      final newEnd = _minutesToHHMM(cursor + dur);
-      final idx = allBlocks.indexWhere((x) => x.id == b.id);
-      if (idx >= 0) {
-        allBlocks[idx] = allBlocks[idx].copyWith(
-          plannedStartTime: newStart,
-          plannedEndTime: newEnd,
-        );
-      }
-      cursor += dur;
-    }
-
-    HapticsService.light();
-    app.upsertDayPlan(plan.copyWith(blocks: allBlocks));
-  }
-
-  bool _isLocked(Block b) => b.isEvent || b.id.startsWith('prayer_');
 
   // ── Gap tap ──────────────────────────────────────────────
   void _onGapTap(_TimelineItem gap) {
@@ -284,15 +216,6 @@ class _TimelineViewState extends State<TimelineView> {
         dateKey: widget.dateKey,
       ),
     );
-  }
-
-  // ── Block tap: edit sheet for normal blocks, detail for locked ──
-  void _onBlockTap(Block block) {
-    if (_isLocked(block)) {
-      _showLockedDetailSheet(block);
-    } else {
-      _showEditSheet(block);
-    }
   }
 
   void _onBlockLongPress(Block block) {
@@ -740,7 +663,6 @@ class _BlockCard extends StatelessWidget {
   final Block block;
   final bool isDark;
   final Widget? leading;
-  final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final VoidCallback? onTap;
 
@@ -775,7 +697,8 @@ class _BlockCard extends StatelessWidget {
     final startMin = _toMinutes(block.plannedStartTime);
     final endMin = _toMinutes(block.plannedEndTime);
     final duration = endMin > startMin ? endMin - startMin : block.plannedDurationMinutes;
-    final cardHeight = (duration * 2.0).clamp(56.0, double.infinity);
+    final double cardHeight =
+        (duration * 2.0).clamp(56.0, double.infinity).toDouble();
 
     final isLocked = block.isEvent || block.id.startsWith('prayer_');
     final isDone = block.status == BlockStatus.done;
@@ -859,9 +782,7 @@ class _BlockCard extends StatelessWidget {
                         ),
                       Expanded(
                         child: Text(
-                          block.displayEmoji != null
-                              ? '${block.displayEmoji} ${block.title}'
-                              : block.title,
+                          block.title,
                           style: TextStyle(
                             fontSize: 14, fontWeight: FontWeight.w700,
                             color: isDone ? cs.onSurface.withValues(alpha: 0.4) : cs.onSurface,
@@ -999,7 +920,8 @@ class _GapSlot extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final gapMinutes = endMinutes - startMinutes;
-    final gapHeight = (gapMinutes * 2.0).clamp(48.0, double.infinity);
+    final double gapHeight =
+        (gapMinutes * 2.0).clamp(48.0, double.infinity).toDouble();
 
     final List<int> hourTicks = [];
     final firstHourInGap = (startMinutes ~/ 60) * 60 + 60;

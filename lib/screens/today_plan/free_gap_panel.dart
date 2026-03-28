@@ -4,8 +4,10 @@
 // =============================================================
 
 import 'package:flutter/material.dart';
+import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/routine.dart';
+import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:provider/provider.dart';
 import 'add_task_sheet.dart';
 import 'study_flow_screen.dart';
@@ -290,7 +292,7 @@ class FreeGapPanel extends StatelessWidget {
     );
   }
 
-  void _insertRoutineAsBlock(BuildContext context, Routine routine) {
+  Future<void> _insertRoutineAsBlock(BuildContext context, Routine routine) async {
     final app = context.read<AppProvider>();
     final durationMin = routine.subtasks.isNotEmpty
         ? routine.totalSubtaskMinutes
@@ -299,24 +301,50 @@ class FreeGapPanel extends StatelessWidget {
     final endMin = startMin + durationMin;
     final endH = (endMin ~/ 60).clamp(0, 23);
     final endM = endMin % 60;
-
-    final block = app.buildRoutineBlock(
-      routine: routine,
-      dateKey: dateKey,
-      startTime:
-          '${gapStart.hour.toString().padLeft(2, '0')}:${gapStart.minute.toString().padLeft(2, '0')}',
-      endTime:
-          '${endH.toString().padLeft(2, '0')}:${endM.toString().padLeft(2, '0')}',
+    final startTime =
+        '${gapStart.hour.toString().padLeft(2, '0')}:${gapStart.minute.toString().padLeft(2, '0')}';
+    final endTime =
+        '${endH.toString().padLeft(2, '0')}:${endM.toString().padLeft(2, '0')}';
+    final existingPlan = app.getDayPlan(dateKey);
+    final existingBlocks = List<Block>.from(existingPlan?.blocks ?? const []);
+    final block = Block(
+      id: 'routine-${routine.id}',
+      index: existingBlocks.length,
+      date: dateKey,
+      plannedStartTime: startTime,
+      plannedEndTime: endTime,
+      type: BlockType.other,
+      title: '${routine.icon} ${routine.name}',
+      plannedDurationMinutes: durationMin,
+      status: BlockStatus.notStarted,
+      actualNotes: 'source:routine',
     );
-    if (block != null) {
-      app.addBlockToDayPlan(block, dateKey);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${routine.name} added to timeline'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
+    final allBlocks = [...existingBlocks, block];
+    final updatedPlan = existingPlan?.copyWith(blocks: allBlocks) ??
+        DayPlan(
+          date: dateKey,
+          faPages: const [],
+          faPagesCount: 0,
+          videos: const [],
+          notesFromUser: '',
+          notesFromAI: '',
+          attachments: const [],
+          breaks: const [],
+          blocks: allBlocks,
+          totalStudyMinutesPlanned: 0,
+          totalBreakMinutes: 0,
+        );
+
+    await app.upsertDayPlan(updatedPlan);
+    await app.syncFlowActivitiesFromDayPlan(dateKey);
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${routine.name} added to timeline'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 }
 

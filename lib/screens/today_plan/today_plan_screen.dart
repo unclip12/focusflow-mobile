@@ -370,20 +370,6 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                 Column(
                   children: [
                     // ── Compact Header ─────────────────────────
-                    ValueListenableBuilder<DateTime>(
-                      valueListenable: _clockNotifier,
-                      builder: (_, now, __) => _CompactHeader(
-                        date: _selectedDate,
-                        isToday: _isToday,
-                        currentTime: now,
-                        onPrev: _prevDay,
-                        onNext: _nextDay,
-                        onDateTap: _pickDate,
-                        onStartDay: _showStartDayOverlay,
-                        onStudySession: _openStudyFlow,
-                        onTrackNow: _openTrackNow,
-                        onAddTask: _openAddTaskSheet,
-                      ),
                     _CompactHeader(
                       date: _selectedDate,
                       isToday: _isToday,
@@ -396,14 +382,6 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                       onStudySession: _openStudyFlow,
                       onTrackNow: _openTrackNow,
                       onAddTask: _openAddTaskSheet,
-                    ),
-                    _ThreeTabBar(
-                      controller: _tabCtrl,
-                      onTap: (index) {
-                        if (index == 2) {
-                          _showMoreBottomSheet();
-                        }
-                      },
                     ),
                     // ── Tab Bar ────────────────────────────────
                     _ThreeTabBar(controller: _tabCtrl),
