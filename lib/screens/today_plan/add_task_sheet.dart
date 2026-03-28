@@ -20,6 +20,8 @@ import 'package:focusflow_mobile/utils/focus_batch_calculator.dart';
 // ── Task type enums ──────────────────────────────────────────────
 enum ExamType { usmle, fmge }
 
+enum _TaskPath { study, general }
+
 enum UsmleTaskType {
   faPages,
   videoLecture,
@@ -43,6 +45,124 @@ class _TaskTypeChip {
   final IconData icon;
   const _TaskTypeChip(this.label, this.icon);
 }
+
+class _GeneralTaskCategory {
+  final String label;
+  final String emoji;
+  final Color color;
+  final List<String> suggestions;
+
+  const _GeneralTaskCategory({
+    required this.label,
+    required this.emoji,
+    required this.color,
+    required this.suggestions,
+  });
+}
+
+const _generalTaskCategories = <_GeneralTaskCategory>[
+  _GeneralTaskCategory(
+    label: 'Meal',
+    emoji: '🍽️',
+    color: Color(0xFFF97316),
+    suggestions: [
+      'Breakfast',
+      'Lunch',
+      'Dinner',
+      'Snack',
+      'Cook lunch',
+      'Meal prep',
+      'Cook dinner',
+      'Make tea',
+    ],
+  ),
+  _GeneralTaskCategory(
+    label: 'Exercise',
+    emoji: '🏋️',
+    color: Color(0xFFEF4444),
+    suggestions: [
+      'Morning walk',
+      'Gym',
+      'Workout',
+      'Jogging',
+      'Stretching',
+      'Yoga',
+      'Push-ups',
+      'Running',
+    ],
+  ),
+  _GeneralTaskCategory(
+    label: 'Chores',
+    emoji: '🧹',
+    color: Color(0xFF14B8A6),
+    suggestions: [
+      'Wash clothes',
+      'Wash dishes',
+      'Clean room',
+      'Sweep floor',
+      'Vacuum',
+      'Do laundry',
+      'Iron clothes',
+      'Take out trash',
+    ],
+  ),
+  _GeneralTaskCategory(
+    label: 'Personal',
+    emoji: '🛁',
+    color: Color(0xFF8B5CF6),
+    suggestions: [
+      'Shower',
+      'Get ready',
+      'Morning routine',
+      'Evening routine',
+      'Skincare',
+      'Brush teeth',
+    ],
+  ),
+  _GeneralTaskCategory(
+    label: 'Errands',
+    emoji: '🚗',
+    color: Color(0xFF3B82F6),
+    suggestions: [
+      'Grocery shopping',
+      'Bank',
+      'Doctor visit',
+      'Pharmacy',
+      'Pay bills',
+    ],
+  ),
+  _GeneralTaskCategory(
+    label: 'Social',
+    emoji: '👥',
+    color: Color(0xFFEC4899),
+    suggestions: [
+      'Call family',
+      'Call friend',
+      'Family time',
+      'Meet friend',
+      'Video call',
+    ],
+  ),
+  _GeneralTaskCategory(
+    label: 'Rest',
+    emoji: '🛌',
+    color: Color(0xFF6366F1),
+    suggestions: [
+      'Nap',
+      'Rest',
+      'Power nap',
+      'Relax',
+      'Read for fun',
+      'Watch TV',
+    ],
+  ),
+  _GeneralTaskCategory(
+    label: 'Other',
+    emoji: '⚡',
+    color: Color(0xFF64748B),
+    suggestions: [],
+  ),
+];
 
 const _usmleChips = <UsmleTaskType, _TaskTypeChip>{
   UsmleTaskType.faPages: _TaskTypeChip('FA Pages', Icons.menu_book_rounded),
@@ -74,6 +194,7 @@ class AddTaskSheet extends StatefulWidget {
   final TimeOfDay? prefillStartTime;
   final TimeOfDay? prefillEndTime;
   final bool showEventToggle;
+  final String? prefillCategory;
 
   const AddTaskSheet({
     super.key,
@@ -81,6 +202,7 @@ class AddTaskSheet extends StatefulWidget {
     this.prefillStartTime,
     this.prefillEndTime,
     this.showEventToggle = true,
+    this.prefillCategory,
   });
 
   @override
@@ -90,10 +212,12 @@ class AddTaskSheet extends StatefulWidget {
 class _AddTaskSheetState extends State<AddTaskSheet> {
   static const _uuid = Uuid();
   int _step = 0;
+  _TaskPath? _taskPath;
 
   ExamType? _exam;
   UsmleTaskType? _usmleType;
   FmgeTaskType? _fmgeType;
+  _GeneralTaskCategory? _selectedGeneralCategory;
 
   final _pageCtrl = TextEditingController();
   final _topicCtrl = TextEditingController();
@@ -129,6 +253,12 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     // Pre-fill times from constructor (e.g. from FreeGapPanel)
     _startTime = widget.prefillStartTime;
     _endTime = widget.prefillEndTime;
+    if (widget.prefillCategory == 'Revision') {
+      _taskPath = _TaskPath.study;
+      _exam = ExamType.usmle;
+      _usmleType = UsmleTaskType.revision;
+      _step = 3;
+    }
   }
 
   void _onPageNumberChanged() {
@@ -282,6 +412,166 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         }
       });
     }
+  }
+
+  Future<void> _pickTime12Hour(bool isStart) async {
+    final initial = isStart
+        ? (_startTime ?? TimeOfDay.now())
+        : (_endTime ?? TimeOfDay.now());
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: initial,
+      builder: (c, child) => MediaQuery(
+        data: MediaQuery.of(c).copyWith(alwaysUse24HourFormat: false),
+        child: child!,
+      ),
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        if (isStart) {
+          _startTime = picked;
+        } else {
+          _endTime = picked;
+        }
+      });
+    }
+  }
+
+  int? get _generalDurationMinutes {
+    if (_startTime == null || _endTime == null) return null;
+    final startMinutes = _startTime!.hour * 60 + _startTime!.minute;
+    final endMinutes = _endTime!.hour * 60 + _endTime!.minute;
+    if (endMinutes <= startMinutes) return null;
+    return endMinutes - startMinutes;
+  }
+
+  List<String> get _generalAutocompleteOptions {
+    final query = _titleCtrl.text.trim().toLowerCase();
+    final app = context.read<AppProvider>();
+    final baseSuggestions = _selectedGeneralCategory != null
+        ? _selectedGeneralCategory!.suggestions
+        : _generalTaskCategories
+            .expand((category) => category.suggestions)
+            .toList(growable: false);
+    final options = <String>[
+      ...baseSuggestions,
+      ...app.savedGeneralTaskNames,
+    ];
+
+    final seen = <String>{};
+    return options.where((option) {
+      final normalized = option.trim();
+      if (normalized.isEmpty) return false;
+      final key = normalized.toLowerCase();
+      if (!seen.add(key)) return false;
+      if (query.isEmpty) return true;
+      return key.contains(query);
+    }).take(8).toList(growable: false);
+  }
+
+  void _goToPathSelector() {
+    setState(() {
+      _step = 0;
+      _taskPath = null;
+    });
+  }
+
+  void _openStudyPath() {
+    setState(() {
+      _taskPath = _TaskPath.study;
+      _step = 1;
+    });
+  }
+
+  void _openGeneralPath() {
+    setState(() {
+      _taskPath = _TaskPath.general;
+      _step = 1;
+    });
+  }
+
+  Future<void> _saveGeneralTask() async {
+    final title = _titleCtrl.text.trim();
+    final category = _selectedGeneralCategory;
+    if (category == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please choose a category'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a task name'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final app = context.read<AppProvider>();
+    app.saveGeneralTaskName(title);
+
+    final existing = app.getDayPlan(widget.dateKey);
+    final existingBlocks = List<Block>.from(existing?.blocks ?? const []);
+    final durationMinutes = _generalDurationMinutes ?? 0;
+    final block = Block(
+      id: _uuid.v4(),
+      index: existingBlocks.length,
+      date: widget.dateKey,
+      plannedStartTime:
+          _startTime != null ? _formatTimeOfDay(_startTime!) : '00:00',
+      plannedEndTime: _endTime != null ? _formatTimeOfDay(_endTime!) : '00:00',
+      type: BlockType.other,
+      title: '${category.emoji} $title',
+      description:
+          _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+      plannedDurationMinutes: durationMinutes,
+      isEvent: _isEvent,
+      status: BlockStatus.notStarted,
+    );
+    final allBlocks = [...existingBlocks, block];
+    final updatedPlan = existing?.copyWith(
+          blocks: allBlocks,
+          totalStudyMinutesPlanned: allBlocks
+              .where((b) => b.type != BlockType.breakBlock)
+              .fold<int>(0, (sum, b) => sum + b.plannedDurationMinutes),
+          totalBreakMinutes: allBlocks
+              .where((b) => b.type == BlockType.breakBlock)
+              .fold<int>(0, (sum, b) => sum + b.plannedDurationMinutes),
+        ) ??
+        DayPlan(
+          date: widget.dateKey,
+          faPages: const [],
+          faPagesCount: 0,
+          videos: const [],
+          notesFromUser: '',
+          notesFromAI: '',
+          attachments: const [],
+          breaks: const [],
+          blocks: allBlocks,
+          totalStudyMinutesPlanned: allBlocks
+              .where((b) => b.type != BlockType.breakBlock)
+              .fold<int>(0, (sum, b) => sum + b.plannedDurationMinutes),
+          totalBreakMinutes: allBlocks
+              .where((b) => b.type == BlockType.breakBlock)
+              .fold<int>(0, (sum, b) => sum + b.plannedDurationMinutes),
+        );
+
+    await app.upsertDayPlan(updatedPlan);
+    await app.syncFlowActivitiesFromDayPlan(widget.dateKey);
+
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('"$title" added to timeline'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _save() async {
@@ -523,6 +813,16 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         MediaQuery.of(context).padding.bottom +
         20;
 
+    final headerTitle = _step == 0
+        ? 'Add a task'
+        : _taskPath == _TaskPath.general
+            ? 'General task'
+            : _step == 1
+                ? 'What are you studying today?'
+                : _step == 2
+                    ? 'Choose task type'
+                    : 'Task details';
+
     return Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.92,
@@ -553,15 +853,11 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                   if (_step > 0)
                     IconButton(
                       icon: const Icon(Icons.arrow_back_rounded, size: 20),
-                      onPressed: () => setState(() => _step--),
+                      onPressed: _goToPathSelector,
                     ),
                   Expanded(
                     child: Text(
-                      _step == 0
-                          ? 'What are you studying today?'
-                          : _step == 1
-                              ? 'Choose task type'
-                              : 'Task details',
+                      headerTitle,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -579,15 +875,56 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _step == 0
-                    ? _buildExamSelector(theme, cs)
-                    : _step == 1
-                        ? _buildTaskTypeSelector(theme, cs)
-                        : _buildDetailForm(theme, cs),
+                child: _buildCurrentStep(theme, cs),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCurrentStep(ThemeData theme, ColorScheme cs) {
+    if (_step == 0) {
+      return _buildPathSelector(theme, cs);
+    }
+    if (_taskPath == _TaskPath.general) {
+      return _buildGeneralTaskForm(theme, cs);
+    }
+    if (_step == 1) {
+      return _buildExamSelector(theme, cs);
+    }
+    if (_step == 2) {
+      return _buildTaskTypeSelector(theme, cs);
+    }
+    return _buildDetailForm(theme, cs);
+  }
+
+  Widget _buildPathSelector(ThemeData theme, ColorScheme cs) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Row(
+        children: [
+          Expanded(
+            child: _PathCard(
+              emoji: '📚',
+              label: 'Study Task',
+              subtitle: 'Continue to exam and study-task setup',
+              color: const Color(0xFF6366F1),
+              onTap: _openStudyPath,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: _PathCard(
+              emoji: '🍽️',
+              label: 'General Task',
+              subtitle: 'Add life, health, rest, and errand blocks',
+              color: const Color(0xFFF97316),
+              onTap: _openGeneralPath,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -604,7 +941,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
               color: const Color(0xFF6366F1),
               onTap: () => setState(() {
                 _exam = ExamType.usmle;
-                _step = 1;
+                _step = 2;
               }),
             ),
           ),
@@ -616,7 +953,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
               color: const Color(0xFF10B981),
               onTap: () => setState(() {
                 _exam = ExamType.fmge;
-                _step = 1;
+                _step = 2;
               }),
             ),
           ),
@@ -634,7 +971,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         selected: _usmleType,
         onSelect: (t) => setState(() {
           _usmleType = t;
-          _step = 2;
+          _step = 3;
         }),
       );
     } else {
@@ -645,10 +982,191 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         selected: _fmgeType,
         onSelect: (t) => setState(() {
           _fmgeType = t;
-          _step = 2;
+          _step = 3;
         }),
       );
     }
+  }
+
+  Widget _buildGeneralTaskForm(ThemeData theme, ColorScheme cs) {
+    final selectedCategoryColor = _selectedGeneralCategory?.color ?? cs.primary;
+    final suggestions = _generalAutocompleteOptions;
+    final durationMinutes = _generalDurationMinutes;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Category',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: _generalTaskCategories.map((category) {
+              final isSelected = category == _selectedGeneralCategory;
+              return FilterChip(
+                label: Text('${category.emoji} ${category.label}'),
+                selected: isSelected,
+                onSelected: (_) => setState(() {
+                  _selectedGeneralCategory = category;
+                }),
+                selectedColor: category.color.withValues(alpha: 0.16),
+                checkmarkColor: category.color,
+                labelStyle: TextStyle(
+                  color: isSelected ? category.color : cs.onSurface,
+                  fontWeight: FontWeight.w600,
+                ),
+                side: BorderSide(
+                  color: isSelected
+                      ? category.color
+                      : cs.outline.withValues(alpha: 0.3),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _titleCtrl,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              labelText: 'Task name',
+              hintText: 'What do you need to do?',
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              isDense: true,
+            ),
+            style: const TextStyle(fontSize: 14),
+          ),
+          if (suggestions.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                border:
+                    Border.all(color: cs.outline.withValues(alpha: 0.25)),
+                borderRadius: BorderRadius.circular(12),
+                color: cs.surfaceContainerLowest,
+              ),
+              child: Column(
+                children: suggestions.map((suggestion) {
+                  return ListTile(
+                    dense: true,
+                    leading: Icon(Icons.bolt_rounded,
+                        size: 18, color: selectedCategoryColor),
+                    title: Text(
+                      suggestion,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    onTap: () => setState(() {
+                      _titleCtrl.text = suggestion;
+                      _titleCtrl.selection = TextSelection.fromPosition(
+                        TextPosition(offset: _titleCtrl.text.length),
+                      );
+                    }),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+          if (widget.showEventToggle) ...[
+            const SizedBox(height: 16),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: _isEvent
+                      ? const Color(0xFFEF4444)
+                      : cs.outline.withValues(alpha: 0.25),
+                ),
+                borderRadius: BorderRadius.circular(14),
+                color: _isEvent
+                    ? const Color(0xFFEF4444).withValues(alpha: 0.06)
+                    : cs.surfaceContainerLowest,
+              ),
+              child: SwitchListTile(
+                value: _isEvent,
+                onChanged: (value) => setState(() => _isEvent = value),
+                activeThumbColor: const Color(0xFFEF4444),
+                title: const Text('Fixed Event'),
+                subtitle: _isEvent
+                    ? const Text("Scheduler won't move this block")
+                    : const Text('Keep this block pinned to the chosen time'),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _generalTimeButton(
+                  label: 'Start time',
+                  time: _startTime,
+                  color: selectedCategoryColor,
+                  onTap: () => _pickTime12Hour(true),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _generalTimeButton(
+                  label: 'End time',
+                  time: _endTime,
+                  color: selectedCategoryColor,
+                  onTap: () => _pickTime12Hour(false),
+                ),
+              ),
+            ],
+          ),
+          if (durationMinutes != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Duration: ${_formatDuration(durationMinutes)}',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface.withValues(alpha: 0.75),
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          _field(
+            label: 'Notes',
+            hint: 'Optional notes…',
+            controller: _notesCtrl,
+            maxLines: 2,
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _saveGeneralTask,
+              style: FilledButton.styleFrom(
+                backgroundColor: selectedCategoryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Add Task'),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildChipList<T>(
@@ -1301,6 +1819,58 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     );
   }
 
+  Widget _generalTimeButton({
+    required String label,
+    required TimeOfDay? time,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+        side: BorderSide(color: color.withValues(alpha: 0.5)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: color.withValues(alpha: 0.85),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            time != null ? _formatTimeOfDay12Hour(time) : 'Select time',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: time != null ? color : color.withValues(alpha: 0.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTimeOfDay12Hour(TimeOfDay time) {
+    final now = DateTime.now();
+    return DateFormat('h:mm a')
+        .format(DateTime(now.year, now.month, now.day, time.hour, time.minute));
+  }
+
+  String _formatDuration(int minutes) {
+    final hours = minutes ~/ 60;
+    final mins = minutes % 60;
+    if (hours == 0) return '${mins}min';
+    if (mins == 0) return '${hours}h';
+    return '${hours}h ${mins}min';
+  }
+
   Widget _field({
     required String label,
     required String hint,
@@ -1443,6 +2013,69 @@ class _ExamCard extends StatelessWidget {
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
                 color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PathCard extends StatelessWidget {
+  final String emoji;
+  final String label;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _PathCard({
+    required this.emoji,
+    required this.label,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              color.withValues(alpha: 0.08),
+              color.withValues(alpha: 0.18),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: Column(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 36)),
+            const SizedBox(height: 14),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: color.withValues(alpha: 0.85),
               ),
             ),
           ],

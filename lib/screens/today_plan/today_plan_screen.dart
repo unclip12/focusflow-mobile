@@ -239,7 +239,10 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => AddTaskSheet(dateKey: _dateKey),
+      builder: (_) => AddTaskSheet(
+        dateKey: _dateKey,
+        prefillCategory: null,
+      ),
     );
   }
 
@@ -436,6 +439,9 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     final app = context.watch<AppProvider>();
     final plan = app.getDayPlan(DateFormat('yyyy-MM-dd').format(_selectedDate));
     final realBlocks = List<Block>.from(plan?.blocks ?? []);
+    final totalBlocks = realBlocks.length;
+    final completedBlocks =
+        realBlocks.where((block) => block.status == BlockStatus.done).length;
 
     final List<Block> displayBlocks;
     if (_isToday) {
@@ -566,6 +572,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                     _CompactHeader(
                       date: _selectedDate,
                       isToday: _isToday,
+                      totalBlocks: totalBlocks,
+                      completedBlocks: completedBlocks,
                       onPrev: _prevDay,
                       onNext: _nextDay,
                       onDateTap: _pickDate,
@@ -586,7 +594,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                       child: TabBarView(
                         controller: _tabCtrl,
                         children: [
-                          TimelineView(dateKey: _dateKey, blocks: displayBlocks),
+                          TimelineView(
+                              dateKey: _dateKey, blocks: displayBlocks),
                           RoutinesTab(dateKey: _dateKey),
                           const _MorePlaceholder(),
                         ],
@@ -796,6 +805,8 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
 class _CompactHeader extends StatelessWidget {
   final DateTime date;
   final bool isToday;
+  final int totalBlocks;
+  final int completedBlocks;
   final VoidCallback onPrev;
   final VoidCallback onNext;
   final VoidCallback onDateTap;
@@ -807,6 +818,8 @@ class _CompactHeader extends StatelessWidget {
   const _CompactHeader({
     required this.date,
     required this.isToday,
+    required this.totalBlocks,
+    required this.completedBlocks,
     required this.onPrev,
     required this.onNext,
     required this.onDateTap,
@@ -816,11 +829,23 @@ class _CompactHeader extends StatelessWidget {
     required this.onAddTask,
   });
 
+  String _buildHeaderLabel() {
+    final today = AppDateUtils.getAdjustedDate();
+    final dayOffset = AppDateUtils.daysBetween(today, date);
+    final shortDate = DateFormat('d MMM').format(date);
+
+    if (isToday) return 'Today, $shortDate';
+    if (dayOffset == 1) return 'Tomorrow, $shortDate';
+    return DateFormat('EEEE, d MMM').format(date);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final cs = theme.colorScheme;
+    final blockProgress =
+        totalBlocks == 0 ? 0.0 : completedBlocks / totalBlocks;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -855,7 +880,7 @@ class _CompactHeader extends StatelessWidget {
                       child: Column(
                         children: [
                           Text(
-                            isToday ? 'Today' : DateFormat('EEEE').format(date),
+                            _buildHeaderLabel(),
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w800,
@@ -881,6 +906,50 @@ class _CompactHeader extends StatelessWidget {
                   onTap: onNext,
                 ),
               ],
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : Colors.black.withValues(alpha: 0.03),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.checklist_rounded,
+                    size: 16,
+                    color: DashboardColors.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '$completedBlocks / $totalBlocks done',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(999),
+                      child: LinearProgressIndicator(
+                        value: blockProgress,
+                        minHeight: 3,
+                        backgroundColor: isDark
+                            ? Colors.white.withValues(alpha: 0.12)
+                            : Colors.black.withValues(alpha: 0.08),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          DashboardColors.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             Row(

@@ -27,6 +27,9 @@ class TimelineView extends StatefulWidget {
 }
 
 class _TimelineViewState extends State<TimelineView> {
+  bool _isLockedBlock(Block block) =>
+      block.isEvent || block.id.startsWith('prayer_');
+
   // ── Category Colors ─────────────────────────────────────────
   static Color _categoryColor(Block block) {
     if (block.isEvent || block.id.startsWith('prayer_')) {
@@ -72,6 +75,56 @@ class _TimelineViewState extends State<TimelineView> {
     final parts = hhmm.split(':');
     if (parts.length != 2) return 0;
     return (int.tryParse(parts[0]) ?? 0) * 60 + (int.tryParse(parts[1]) ?? 0);
+  }
+
+  TimeOfDay _timeOfDayFromMinutes(int totalMinutes) => TimeOfDay(
+        hour: totalMinutes ~/ 60,
+        minute: totalMinutes % 60,
+      );
+
+  String _formatTimeString12h(String hhmm) {
+    final minutes = _toMinutes(hhmm);
+    return MaterialLocalizations.of(context).formatTimeOfDay(
+      _timeOfDayFromMinutes(minutes),
+      alwaysUse24HourFormat: false,
+    );
+  }
+
+  String _formatDurationLabel(int minutes) {
+    if (minutes >= 60) {
+      final h = minutes ~/ 60;
+      final m = minutes % 60;
+      return m > 0 ? '${h}h ${m}min' : '${h}h';
+    }
+    return '$minutes min';
+  }
+
+  int _blockDurationMinutes(Block block) {
+    if (block.plannedDurationMinutes > 0) return block.plannedDurationMinutes;
+
+    final duration =
+        _toMinutes(block.plannedEndTime) - _toMinutes(block.plannedStartTime);
+    return duration > 0 ? duration : 0;
+  }
+
+  String _lockedCategoryLabel(Block block) =>
+      block.id.startsWith('prayer_') ? 'Prayer' : 'Event';
+
+  String _formatMinutesOfDay(int totalMinutes) => _formatTimeOfDay(
+        _timeOfDayFromMinutes(totalMinutes),
+      );
+
+  int _countMovableBlocksBefore(List<_TimelineItem> items, int endExclusive) {
+    var count = 0;
+
+    for (var i = 0; i < endExclusive && i < items.length; i++) {
+      final item = items[i];
+      if (!item.isGap && !_isLockedBlock(item.block!)) {
+        count++;
+      }
+    }
+
+    return count;
   }
 
   /// Build timeline items including gaps between blocks.
@@ -121,9 +174,120 @@ class _TimelineViewState extends State<TimelineView> {
   }
 
   void _onBlockLongPress(Block block) {
-    if (block.isEvent || block.id.startsWith('prayer_')) return;
+    if (_isLockedBlock(block)) return;
     HapticsService.medium();
     _showEditSheet(block);
+  }
+
+  void _onBlockTap(Block block) {
+    if (_isLockedBlock(block)) {
+      _showLockedDetailSheet(block);
+      return;
+    }
+    _showEditSheet(block);
+  }
+
+  void _showLockedDetailSheet(Block block) {
+    final cs = Theme.of(context).colorScheme;
+    final color = _categoryColor(block);
+    final duration =
+        _toMinutes(block.plannedEndTime) - _toMinutes(block.plannedStartTime);
+    final note = block.id.startsWith('prayer_')
+        ? 'Prayer time - auto-inserted'
+        : 'Fixed Event - scheduler won\'t move this';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          MediaQuery.of(ctx).padding.bottom + 20,
+        ),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              block.title,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: cs.onSurface,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.lock_rounded, size: 14, color: color),
+                  const SizedBox(width: 6),
+                  Text(
+                    _lockedCategoryLabel(block),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            _LockedDetailRow(
+              icon: Icons.access_time_rounded,
+              text:
+                  '${_formatTimeString12h(block.plannedStartTime)} - ${_formatTimeString12h(block.plannedEndTime)}',
+            ),
+            const SizedBox(height: 12),
+            _LockedDetailRow(
+              icon: Icons.timer_outlined,
+              text: _formatDurationLabel(
+                duration > 0 ? duration : block.plannedDurationMinutes,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _LockedDetailRow(
+              icon: Icons.push_pin_outlined,
+              text: note,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Close'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showEditSheet(Block block) {
@@ -351,6 +515,81 @@ class _TimelineViewState extends State<TimelineView> {
     app.removeBlockFromDayPlan(block.id, widget.dateKey);
   }
 
+  void _onReorder(int oldIndex, int newIndex, List<_TimelineItem> items) {
+    if (oldIndex < 0 || oldIndex >= items.length) return;
+
+    final movedItem = items[oldIndex];
+    if (movedItem.isGap || _isLockedBlock(movedItem.block!)) return;
+
+    final app = context.read<AppProvider>();
+    final plan = app.getDayPlan(widget.dateKey);
+    final planBlocks = plan?.blocks;
+    if (plan == null || planBlocks == null) return;
+
+    final movableBlocks = items
+        .where((item) => !item.isGap && !_isLockedBlock(item.block!))
+        .map((item) => item.block!)
+        .toList();
+    if (movableBlocks.length < 2) return;
+
+    final oldMovableIndex = _countMovableBlocksBefore(items, oldIndex);
+    final adjustedNewIndex = newIndex > oldIndex ? newIndex - 1 : newIndex;
+    final remainingItems = List<_TimelineItem>.from(items)..removeAt(oldIndex);
+    final boundedNewIndex = adjustedNewIndex < 0
+        ? 0
+        : adjustedNewIndex > remainingItems.length
+            ? remainingItems.length
+            : adjustedNewIndex;
+    final newMovableIndex =
+        _countMovableBlocksBefore(remainingItems, boundedNewIndex);
+
+    final reorderedMovable = List<Block>.from(movableBlocks);
+    final movedBlock = reorderedMovable.removeAt(oldMovableIndex);
+    final insertIndex = newMovableIndex < 0
+        ? 0
+        : newMovableIndex > reorderedMovable.length
+            ? reorderedMovable.length
+            : newMovableIndex;
+
+    if (oldMovableIndex == insertIndex) return;
+
+    reorderedMovable.insert(insertIndex, movedBlock);
+
+    final earliestStart = movableBlocks
+        .map((block) => _toMinutes(block.plannedStartTime))
+        .reduce((a, b) => a < b ? a : b);
+
+    final updatedMovableById = <String, Block>{};
+    var currentStart = earliestStart;
+    for (final block in reorderedMovable) {
+      final duration = _blockDurationMinutes(block);
+      final nextEnd = currentStart + duration;
+
+      updatedMovableById[block.id] = block.copyWith(
+        plannedStartTime: _formatMinutesOfDay(currentStart),
+        plannedEndTime: _formatMinutesOfDay(nextEnd),
+      );
+
+      currentStart = nextEnd;
+    }
+
+    final updatedBlocks = planBlocks
+      .map((block) => updatedMovableById[block.id] ?? block)
+      .toList()
+      ..sort(
+        (a, b) =>
+            _toMinutes(a.plannedStartTime).compareTo(_toMinutes(b.plannedStartTime)),
+      );
+
+    final reindexedBlocks = <Block>[
+      for (var i = 0; i < updatedBlocks.length; i++)
+        updatedBlocks[i].copyWith(index: i),
+    ];
+
+    app.upsertDayPlan(plan.copyWith(blocks: reindexedBlocks));
+    HapticsService.light();
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -385,7 +624,8 @@ class _TimelineViewState extends State<TimelineView> {
       );
     }
 
-    return ListView.builder(
+    return ReorderableListView.builder(
+      buildDefaultDragHandles: false,
       padding: EdgeInsets.fromLTRB(
         0,
         8,
@@ -393,23 +633,43 @@ class _TimelineViewState extends State<TimelineView> {
         MediaQuery.of(context).padding.bottom + 72 + 24,
       ),
       itemCount: items.length,
+      onReorder: (oldIndex, newIndex) => _onReorder(oldIndex, newIndex, items),
       itemBuilder: (context, index) {
         final item = items[index];
 
         if (item.isGap) {
-          return _GapSlot(
-            startMinutes: item.gapStartMinutes!,
-            endMinutes: item.gapEndMinutes!,
-            onTap: () => _onGapTap(item),
-            isDark: isDark,
+          return KeyedSubtree(
+            key: ValueKey('gap_${item.gapStartMinutes}_${item.gapEndMinutes}'),
+            child: _GapSlot(
+              startMinutes: item.gapStartMinutes!,
+              endMinutes: item.gapEndMinutes!,
+              onTap: () => _onGapTap(item),
+              isDark: isDark,
+            ),
           );
         }
 
         final block = item.block!;
-        return _BlockCard(
-          block: block,
-          isDark: isDark,
-          onLongPress: () => _onBlockLongPress(block),
+        final isLocked = _isLockedBlock(block);
+
+        return KeyedSubtree(
+          key: ValueKey(block.id),
+          child: _BlockCard(
+            block: block,
+            isDark: isDark,
+            leading: isLocked
+                ? const SizedBox(width: 22)
+                : ReorderableDragStartListener(
+                    index: index,
+                    child: Icon(
+                      Icons.drag_handle_rounded,
+                      size: 18,
+                      color: cs.onSurface.withValues(alpha: 0.35),
+                    ),
+                  ),
+            onTap: () => _onBlockTap(block),
+            onLongPress: () => _onBlockLongPress(block),
+          ),
         );
       },
     );
@@ -448,11 +708,15 @@ class _TimelineItem {
 class _BlockCard extends StatelessWidget {
   final Block block;
   final bool isDark;
+  final Widget? leading;
+  final VoidCallback? onTap;
   final VoidCallback? onLongPress;
 
   const _BlockCard({
     required this.block,
     required this.isDark,
+    this.leading,
+    this.onTap,
     this.onLongPress,
   });
 
@@ -487,6 +751,16 @@ class _BlockCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (leading != null) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: SizedBox(
+                width: 22,
+                child: leading,
+              ),
+            ),
+            const SizedBox(width: 6),
+          ],
           // ── Time Column ──
           SizedBox(
             width: 52,
@@ -536,6 +810,7 @@ class _BlockCard extends StatelessWidget {
           // ── Card ──
           Expanded(
             child: GestureDetector(
+              onTap: onTap,
               onLongPress: onLongPress,
               child: Container(
                 margin: const EdgeInsets.only(bottom: 4),
@@ -690,6 +965,46 @@ class _BlockCard extends StatelessWidget {
 }
 
 // ── Gap Slot ──────────────────────────────────────────────────────
+class _LockedDetailRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _LockedDetailRow({
+    required this.icon,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Icon(
+            icon,
+            size: 18,
+            color: cs.onSurface.withValues(alpha: 0.6),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: cs.onSurface.withValues(alpha: 0.8),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _GapSlot extends StatelessWidget {
   final int startMinutes;
   final int endMinutes;

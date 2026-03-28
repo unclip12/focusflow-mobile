@@ -127,6 +127,9 @@ class AppProvider extends ChangeNotifier {
   final _uuid = const Uuid();
   bool _loaded = false;
   bool get loaded => _loaded;
+  List<String> _savedGeneralTaskNames = [];
+  List<String> get savedGeneralTaskNames =>
+      List.unmodifiable(_savedGeneralTaskNames);
   int _mentorReplyIdx = 0;
 
   // ── Data stores ───────────────────────────────────────────────
@@ -277,6 +280,8 @@ class AppProvider extends ChangeNotifier {
     streakData = sdJson != null ? StreakData.fromJson(sdJson) : StreakData();
 
     final prefs = await SharedPreferences.getInstance();
+    final savedNames = prefs.getStringList('general_task_names') ?? [];
+    _savedGeneralTaskNames = savedNames;
     faViewMode = prefs.getString('faViewMode') ?? 'cards';
     await _refreshRoutineReminderState();
 
@@ -2879,6 +2884,22 @@ class AppProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('faViewMode', mode);
     notifyListeners();
+  }
+
+  void saveGeneralTaskName(String name) {
+    if (name.isEmpty) return;
+    _savedGeneralTaskNames.remove(name); // avoid duplicates
+    _savedGeneralTaskNames.insert(0, name); // most recent first
+    if (_savedGeneralTaskNames.length > 50) {
+      _savedGeneralTaskNames = _savedGeneralTaskNames.sublist(0, 50);
+    }
+    _persistGeneralTaskNames(); // save to SharedPreferences
+    notifyListeners();
+  }
+
+  Future<void> _persistGeneralTaskNames() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('general_task_names', _savedGeneralTaskNames);
   }
 
   // ═══════════════════════════════════════════════════════════════
