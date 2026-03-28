@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -42,8 +43,9 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
   bool _didProcessExpiredRoutineQueue = false;
 
   // Live clock
-  late final _clockNotifier = ValueNotifier<DateTime>(DateTime.now());
-  late final _clockTimer;
+  late final ValueNotifier<DateTime> _clockNotifier =
+      ValueNotifier<DateTime>(DateTime.now());
+  late final StreamSubscription<DateTime> _clockTimer;
 
   static const _prayers = [
     ('Fajr', 5, 35, 6, 5, 5, 45),
@@ -251,13 +253,15 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => WakeupSnoozeOverlay(
-          scheduledWakeTime: const TimeOfDay(hour: 6, minute: 0),
-          onStartNow: () {
+          dateKey: _dateKey,
+          onStartDay: () {
+            final navigator = Navigator.of(context);
+            navigator.pop();
             app.startDaySession(_dateKey);
             app.rescheduleFromNow(_dateKey);
             final newSession = app.getActiveDaySession(_dateKey);
             if (newSession != null && mounted) {
-              Navigator.of(context).push(
+              navigator.push(
                 MaterialPageRoute(
                   builder: (_) => DaySessionScreen(
                     dateKey: _dateKey,
@@ -267,9 +271,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
               );
             }
           },
-          onSnooze: (minutes) {
-            final snoozeTime = DateTime.now().add(Duration(minutes: minutes));
-            app.rescheduleFrom(_dateKey, snoozeTime);
+          onDismiss: () {
+            Navigator.of(context).pop();
           },
         ),
       ),
