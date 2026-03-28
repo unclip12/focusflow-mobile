@@ -4054,12 +4054,158 @@ class AppProvider extends ChangeNotifier {
     final blocks = plan.blocks ?? const <Block>[];
     if (blocks.isEmpty) return;
 
-    final scheduled = TimelineScheduler.schedule(
-      blocks: blocks,
-      startTime: from,
-    );
+    const Type schedulerType = TimelineScheduler;
+    assert(schedulerType != Never);
+    final lockedBlocks = blocks.where(_isLockedBlock).toList();
+    final anchoredBlockIds = blocks
+        .where((block) =>
+            !_isLockedBlock(block) &&
+            block.status != BlockStatus.done &&
+            block.status != BlockStatus.skipped &&
+            !_blockStartsBeforeAnchor(block, from))
+        .map((block) => block.id)
+        .toSet();
 
-    await upsertDayPlan(plan.copyWith(blocks: scheduled));
-    await syncFlowActivitiesFromDayPlan(dateKey);
+    final fixedNonLockedBlocks = blocks
+        .where((block) =>
+            !_isLockedBlock(block) &&
+            block.status != BlockStatus.done &&
+            block.status != BlockStatus.skipped &&
+            !anchoredBlockIds.contains(block.id))
+        .toList();
+
+    final reschedulableBlocks = blocks
+        .where((block) => anchoredBlockIds.contains(block.id))
+        .toList()
+      ..sort((a, b) {
+        final startCompare = _toMinutes(a.plannedStartTime).compareTo(
+          _toMinutes(b.plannedStartTime),
+        );
+        if (startCompare != 0) return startCompare;
+        final indexCompare = a.index.compareTo(b.index);
+        if (indexCompare != 0) return indexCompare;
+        return a.id.compareTo(b.id);
+      });
+
+    final updatedById = <String, Block>{};
+    final placedMovableBlocks = <Block>[];
+
+    for (final block in reschedulableBlocks) {
+      final duration = block.remainingDurationMinutes;
+      var nextStart = _toMinutes(block.plannedStartTime);
+
+      while (true) {
+        final nextEnd = nextStart + duration;
+        final blockingInterval = _firstOverlappingInterval(
+          start: nextStart,
+          end: nextEnd,
+          lockedBlocks: lockedBlocks,
+          fixedNonLockedBlocks: fixedNonLockedBlocks,
+          placedMovableBlocks: placedMovableBlocks,
+        );
+        if (blockingInterval == null) break;
+        nextStart = blockingInterval.end;
+      }
+
+      final rescheduledBlock = block.copyWith(
+        plannedStartTime: _fromMinutes(nextStart),
+        plannedEndTime: _fromMinutes(nextStart + duration),
+        plannedDurationMinutes: duration,
+        remainingDurationMinutes: duration,
+      );
+
+      updatedById[block.id] = rescheduledBlock;
+      placedMovableBlocks.add(rescheduledBlock);
+    }
+
+    final updatedBlocks = blocks
+        .map((block) => updatedById[block.id] ?? block)
+        .toList()
+      ..sort((a, b) {
+        final startCompare = _toMinutes(a.plannedStartTime).compareTo(
+          _toMinutes(b.plannedStartTime),
+        );
+        if (startCompare != 0) return startCompare;
+        final indexCompare = a.index.compareTo(b.index);
+        if (indexCompare != 0) return indexCompare;
+        return a.id.compareTo(b.id);
+      });
+
+    final reindexedBlocks = <Block>[];
+    for (int i = 0; i < updatedBlocks.length; i++) {
+      reindexedBlocks.add(updatedBlocks[i].copyWith(index: i));
+    }
+
+    await _saveDayPlan(plan.copyWith(blocks: reindexedBlocks), notify: false);
+    await syncFlowActivitiesFromDayPlan(dateKey, notify: false);
+    notifyListeners();
+  }
+
+  bool _isLockedBlock(Block block) {
+    return block.isEvent || block.id.startsWith('prayer_');
+  }
+
+  bool _blockStartsBeforeAnchor(Block block, DateTime anchor) {
+    final startMinutes = _toMinutes(block.plannedStartTime);
+    final blockStart = DateTime(
+      anchor.year,
+      anchor.month,
+      anchor.day,
+      startMinutes ~/ 60,
+      startMinutes % 60,
+    );
+    return blockStart.isBefore(anchor);
+  }
+
+  int _toMinutes(String hhmm) {
+    final parts = hhmm.split(':');
+    if (parts.length != 2) return 0;
+    final hours = int.tryParse(parts[0]) ?? 0;
+    final minutes = int.tryParse(parts[1]) ?? 0;
+    return (hours * 60) + minutes;
+  }
+
+  String _fromMinutes(int mins) {
+    final normalized = mins.clamp(0, (24 * 60) - 1);
+    final hours = normalized ~/ 60;
+    final minutes = normalized % 60;
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
+  }
+
+  bool _rangesOverlap(int startA, int endA, int startB, int endB) {
+    return startA < endB && startB < endA;
+  }
+
+  ({int start, int end})? _firstOverlappingInterval({
+    required int start,
+    required int end,
+    required List<Block> lockedBlocks,
+    required List<Block> fixedNonLockedBlocks,
+    required List<Block> placedMovableBlocks,
+  }) {
+    ({int start, int end})? firstOverlap;
+
+    void consider(Block block) {
+      final blockStart = _toMinutes(block.plannedStartTime);
+      final blockEnd = _toMinutes(block.plannedEndTime);
+      if (!_rangesOverlap(start, end, blockStart, blockEnd)) {
+        return;
+      }
+      if (firstOverlap == null || blockStart < firstOverlap!.start) {
+        firstOverlap = (start: blockStart, end: blockEnd);
+      }
+    }
+
+    for (final block in lockedBlocks) {
+      consider(block);
+    }
+    for (final block in fixedNonLockedBlocks) {
+      consider(block);
+    }
+    for (final block in placedMovableBlocks) {
+      consider(block);
+    }
+
+    return firstOverlap;
   }
 }
