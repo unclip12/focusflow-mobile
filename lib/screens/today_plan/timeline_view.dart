@@ -35,12 +35,6 @@ String _formatDuration(int minutes) {
   return '$minutes min';
 }
 
-int _toMinutes(String hhmm) {
-  final parts = hhmm.split(':');
-  if (parts.length != 2) return 0;
-  return (int.tryParse(parts[0]) ?? 0) * 60 + (int.tryParse(parts[1]) ?? 0);
-}
-
 String _minutesToHHMM(int minutes) {
   final h = (minutes ~/ 60).clamp(0, 23);
   final m = minutes % 60;

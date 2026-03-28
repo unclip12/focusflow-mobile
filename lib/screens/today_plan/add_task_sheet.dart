@@ -18,46 +18,6 @@ import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/focus_batch_calculator.dart';
 
 // ── General task categories ──────────────────────────────────────
-class _GeneralCategory {
-  final String label;
-  final String emoji;
-  final Color color;
-  final List<String> suggestions;
-  const _GeneralCategory(this.label, this.emoji, this.color, this.suggestions);
-}
-
-const _generalCategories = [
-  _GeneralCategory('Meal', '🍽️', Color(0xFFEF4444), [
-    'Breakfast', 'Lunch', 'Dinner', 'Snack', 'Cook lunch', 'Meal prep',
-    'Cook dinner', 'Make tea', 'Make coffee',
-  ]),
-  _GeneralCategory('Exercise', '🏋️', Color(0xFF10B981), [
-    'Morning walk', 'Gym', 'Workout', 'Jogging', 'Stretching',
-    'Yoga', 'Push-ups', 'Running', 'Cycling',
-  ]),
-  _GeneralCategory('Chores', '🧹', Color(0xFF3B82F6), [
-    'Wash clothes', 'Wash dishes', 'Clean room', 'Sweep floor',
-    'Vacuum', 'Do laundry', 'Iron clothes', 'Take out trash', 'Mop floor',
-  ]),
-  _GeneralCategory('Personal', '🛀', Color(0xFF8B5CF6), [
-    'Shower', 'Get ready', 'Morning routine', 'Evening routine',
-    'Skincare', 'Shave', 'Brush teeth', 'Hair care',
-  ]),
-  _GeneralCategory('Errands', '🚗', Color(0xFFF59E0B), [
-    'Grocery shopping', 'Bank', 'Doctor visit', 'Pharmacy',
-    'Post office', 'Pay bills', 'Pick up parcel',
-  ]),
-  _GeneralCategory('Social', '👥', Color(0xFFEC4899), [
-    'Call family', 'Call friend', 'Family time', 'Meet friend',
-    'Video call', 'Birthday party',
-  ]),
-  _GeneralCategory('Rest', '🛌', Color(0xFF64748B), [
-    'Nap', 'Rest', 'Power nap', 'Relax', 'Read for fun',
-    'Watch TV', 'Gaming',
-  ]),
-  _GeneralCategory('Other', '⚡', Color(0xFF6366F1), []),
-];
-
 // ── Study task type enums (unchanged) ───────────────────────────
 enum ExamType { usmle, fmge }
 
@@ -255,7 +215,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   String? _path;
 
   // ── Study path state ─────────────────────────────────
-  int _studyStep = 0;  // 0=exam, 1=type, 2=detail
   ExamType? _exam;
   UsmleTaskType? _usmleType;
   FmgeTaskType? _fmgeType;
@@ -281,11 +240,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   Map<String, dynamic>? _trackerInfo;
 
   // ── General path state ──────────────────────────────
-  _GeneralCategory? _generalCat;
   final _generalTitleCtrl = TextEditingController();
   final _generalNotesCtrl = TextEditingController();
   bool _isEvent = false;
-  List<String> _autocompleteResults = [];
 
   // ── Shared ───────────────────────────────────────────
   TimeOfDay? _startTime;
@@ -307,7 +264,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   @override
   void dispose() {
     _pageCtrl.removeListener(_onPageNumberChanged);
-    _generalTitleCtrl.removeListener(_onGeneralTitleChanged);
     _pageCtrl.dispose(); _topicCtrl.dispose(); _titleCtrl.dispose();
     _notesCtrl.dispose(); _deckCtrl.dispose(); _durationCtrl.dispose();
     _questionCtrl.dispose(); _cardsCtrl.dispose();
@@ -316,30 +272,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   }
 
   // ── Autocomplete for general tasks ──────────────────────
-  void _onGeneralTitleChanged() {
-    final text = _generalTitleCtrl.text.toLowerCase();
-    if (text.isEmpty) { setState(() => _autocompleteResults = []); return; }
-
-    // Suggestions from selected category + all categories
-    final List<String> pool = [
-      if (_generalCat != null) ..._generalCat!.suggestions,
-      ...(_generalCat == null
-          ? _generalCategories.expand((c) => c.suggestions)
-          : []),
-    ];
-
-    // Also add previously saved task names from AppProvider
-    final savedNames = context.read<AppProvider>().savedGeneralTaskNames;
-    final all = [...savedNames, ...pool];
-
-    final results = all
-        .where((s) => s.toLowerCase().contains(text))
-        .toSet()
-        .take(6)
-        .toList();
-    setState(() => _autocompleteResults = results);
-  }
-
   void _onPageNumberChanged() {
     final text = _pageCtrl.text.trim();
     if (text.isEmpty) { if (_trackerInfo != null) setState(() => _trackerInfo = null); return; }
@@ -383,61 +315,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   }
 
   // ── Save general task ────────────────────────────────
-  Future<void> _saveGeneral() async {
-    final title = _generalTitleCtrl.text.trim();
-    if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a task name')),
-      );
-      return;
-    }
-    if (!mounted) return;
-    final app = context.read<AppProvider>();
-
-    // Save name for future autocomplete
-    app.saveGeneralTaskName(title);
-
-    final startStr = _startTime != null ? _fmtHHMM(_startTime!) : '00:00';
-    final endStr = _endTime != null ? _fmtHHMM(_endTime!) : '00:00';
-    final dur = _durationMinutes;
-
-    final block = Block(
-      id: _uuid.v4(),
-      index: 0,
-      date: widget.dateKey,
-      plannedStartTime: startStr,
-      plannedEndTime: endStr,
-      type: BlockType.other,
-      title: '${_generalCat?.emoji ?? '⚡'} $title',
-      plannedDurationMinutes: dur,
-      isEvent: _isEvent,
-      status: BlockStatus.notStarted,
-    );
-
-    final existing = app.getDayPlan(widget.dateKey);
-    final existingBlocks = List<Block>.from(existing?.blocks ?? []);
-    final allBlocks = [...existingBlocks, block];
-
-    final plan = existing?.copyWith(blocks: allBlocks) ??
-        DayPlan(
-          date: widget.dateKey,
-          faPages: const [], faPagesCount: 0,
-          videos: const [], notesFromUser: '', notesFromAI: '',
-          attachments: const [], breaks: const [],
-          blocks: allBlocks,
-          totalStudyMinutesPlanned: 0,
-          totalBreakMinutes: 0,
-        );
-
-    await app.upsertDayPlan(plan);
-    if (mounted) {
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('"$title" added to timeline')),
-      );
-    }
-  }
-
   // ── Save study task (unchanged logic) ─────────────────
   String get _studyTaskTitle {
     if (_exam == ExamType.usmle) {

@@ -441,7 +441,6 @@ class _MoreTabViewState extends State<_MoreTabView>
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       children: [
