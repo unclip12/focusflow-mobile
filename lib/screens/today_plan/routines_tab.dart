@@ -1,5 +1,6 @@
 // =============================================================
-// RoutinesTab — List of user-created routines with management
+// RoutinesTab — Tapping a routine opens settings, not runner
+// Start button separate. Subtask previews. Recurrence badge.
 // =============================================================
 
 import 'package:flutter/material.dart';
@@ -22,7 +23,6 @@ class RoutinesTab extends StatelessWidget {
     final routines = app.routines;
     final todayLogs = app.getRoutineLogsForDate(dateKey);
 
-    // Split into prayer & custom
     final prayerRoutines =
         routines.where((r) => r.id.startsWith('prayer_')).toList();
     final customRoutines =
@@ -30,7 +30,7 @@ class RoutinesTab extends StatelessWidget {
 
     return Column(
       children: [
-        // ── Header ────────────────────────────────────────────
+        // Header
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: Row(
@@ -52,8 +52,6 @@ class RoutinesTab extends StatelessWidget {
             ],
           ),
         ),
-
-        // ── Routines list ─────────────────────────────────────
         Expanded(
           child: routines.isEmpty
               ? Center(
@@ -63,21 +61,15 @@ class RoutinesTab extends StatelessWidget {
                       Icon(Icons.repeat_rounded,
                           size: 48, color: cs.primary.withValues(alpha: 0.25)),
                       const SizedBox(height: 12),
-                      Text(
-                        'No routines yet',
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: cs.onSurface.withValues(alpha: 0.5),
-                        ),
-                      ),
+                      Text('No routines yet',
+                          style: TextStyle(
+                              fontSize: 15,
+                              color: cs.onSurface.withValues(alpha: 0.5))),
                       const SizedBox(height: 4),
-                      Text(
-                        'Create a morning or evening routine',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: cs.onSurface.withValues(alpha: 0.35),
-                        ),
-                      ),
+                      Text('Create a morning or evening routine',
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: cs.onSurface.withValues(alpha: 0.35))),
                       const SizedBox(height: 16),
                       FilledButton.icon(
                         onPressed: () => _showEditor(context, null),
@@ -85,120 +77,44 @@ class RoutinesTab extends StatelessWidget {
                         label: const Text('Create Routine'),
                         style: FilledButton.styleFrom(
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
+                              borderRadius: BorderRadius.circular(12))),
                       ),
                     ],
                   ),
                 )
               : ListView(
                   padding: EdgeInsets.fromLTRB(
-                    16,
-                    4,
-                    16,
-                    MediaQuery.of(context).padding.bottom + 72 + 24,
-                  ),
+                      16, 4, 16,
+                      MediaQuery.of(context).padding.bottom + 72 + 24),
                   children: [
-                    // ── Study Session Card ────────────
                     _StudySessionCard(dateKey: dateKey),
                     const SizedBox(height: 12),
 
-                    // ── Prayer Routines Section ──
                     if (prayerRoutines.isNotEmpty) ...[
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8, top: 4),
-                        child: Row(
-                          children: [
-                            const Text('🕌', style: TextStyle(fontSize: 16)),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Prayer Routines',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: cs.onSurface.withValues(alpha: 0.7),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF059669)
-                                    .withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                '${prayerRoutines.length}',
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF059669),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      _SectionHeader(emoji: '🕌', label: 'Prayer Routines', count: prayerRoutines.length),
                       ...prayerRoutines.map((r) {
-                        final wasRun = todayLogs
-                            .any((l) => l.routineId == r.id && l.completed);
+                        final wasRun = todayLogs.any((l) => l.routineId == r.id && l.completed);
                         return _RoutineCard(
                           routine: r,
                           wasRunToday: wasRun,
+                          // Tap = open editor/settings
+                          onTap: () => _showEditor(context, r),
                           onStart: () => _startRoutine(context, r),
-                          onEdit: () => _showEditor(context, r),
                           onDelete: () => _deleteRoutine(context, r),
                         );
                       }),
                       const SizedBox(height: 12),
                     ],
 
-                    // ── Custom Routines Section ──
                     if (customRoutines.isNotEmpty) ...[
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          children: [
-                            const Text('🔄', style: TextStyle(fontSize: 16)),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Custom Routines',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: cs.onSurface.withValues(alpha: 0.7),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: cs.primary.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                '${customRoutines.length}',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: cs.primary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      _SectionHeader(emoji: '🔄', label: 'Custom Routines', count: customRoutines.length),
                       ...customRoutines.map((r) {
-                        final wasRun = todayLogs
-                            .any((l) => l.routineId == r.id && l.completed);
+                        final wasRun = todayLogs.any((l) => l.routineId == r.id && l.completed);
                         return _RoutineCard(
                           routine: r,
                           wasRunToday: wasRun,
+                          onTap: () => _showEditor(context, r),
                           onStart: () => _startRoutine(context, r),
-                          onEdit: () => _showEditor(context, r),
                           onDelete: () => _deleteRoutine(context, r),
                         );
                       }),
@@ -224,8 +140,7 @@ class RoutinesTab extends StatelessWidget {
       isScrollControlled: true,
       useSafeArea: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => RoutineEditorSheet(existing: existing),
     );
   }
@@ -238,9 +153,8 @@ class RoutinesTab extends StatelessWidget {
         content: Text('Delete "${r.name}" and all its steps?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
           TextButton(
             onPressed: () {
               context.read<AppProvider>().deleteRoutine(r.id);
@@ -254,50 +168,94 @@ class RoutinesTab extends StatelessWidget {
   }
 }
 
+class _SectionHeader extends StatelessWidget {
+  final String emoji;
+  final String label;
+  final int count;
+  const _SectionHeader({required this.emoji, required this.label, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, top: 4),
+      child: Row(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 16)),
+          const SizedBox(width: 6),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: cs.onSurface.withValues(alpha: 0.7))),
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+            decoration: BoxDecoration(
+              color: cs.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text('$count',
+                style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: cs.primary)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Routine Card ────────────────────────────────────────────────
 class _RoutineCard extends StatelessWidget {
   final Routine routine;
   final bool wasRunToday;
-  final VoidCallback onStart;
-  final VoidCallback onEdit;
+  final VoidCallback onTap;    // opens settings/editor
+  final VoidCallback onStart;  // launches runner
   final VoidCallback onDelete;
 
   const _RoutineCard({
     required this.routine,
     required this.wasRunToday,
+    required this.onTap,
     required this.onStart,
-    required this.onEdit,
     required this.onDelete,
   });
 
   String? _formatReminderTime() {
-    final reminderTime = routine.reminderTime;
-    if (reminderTime == null || reminderTime.isEmpty) return null;
+    final t = routine.reminderTime;
+    if (t == null || t.isEmpty) return null;
     try {
-      final parsed = DateFormat('HH:mm').parseStrict(reminderTime);
+      final parsed = DateFormat('HH:mm').parseStrict(t);
       return DateFormat.jm().format(parsed);
     } catch (_) {
-      return reminderTime;
+      return t;
     }
   }
 
-  String? _recurrenceLabel() {
-    if (routine.reminderTime == null) return null;
-
-    switch (routine.recurrence ?? 'daily') {
+  String _recurrenceBadge() {
+    switch (routine.recurrenceType) {
+      case 'daily': return 'Daily';
       case 'weekly':
-        return 'Weekly';
-      case 'until_date':
-        final endDate = routine.recurrenceEndDate;
-        if (endDate == null || endDate.isEmpty) return 'Until date';
-        try {
-          final parsed = DateTime.parse(endDate);
-          return 'Until ${DateFormat('dd MMM').format(parsed)}';
-        } catch (_) {
-          return 'Until $endDate';
-        }
+        if (routine.recurrenceDays.isEmpty) return 'Weekly';
+        const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+        return routine.recurrenceDays
+            .map((d) => days[(d - 1).clamp(0, 6)])
+            .join(', ');
+      case 'monthly': return 'Monthly';
       default:
-        return 'Daily';
+        switch (routine.recurrence ?? '') {
+          case 'daily': return 'Daily';
+          case 'weekly': return 'Weekly';
+          case 'until_date':
+            final ed = routine.recurrenceEndDate;
+            if (ed == null) return 'Until date';
+            try {
+              return 'Until ${DateFormat('dd MMM').format(DateTime.parse(ed))}';
+            } catch (_) { return 'Until $ed'; }
+          default: return '';
+        }
     }
   }
 
@@ -306,7 +264,10 @@ class _RoutineCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final routineColor = Color(routine.color);
     final reminderLabel = _formatReminderTime();
-    final recurrenceLabel = _recurrenceLabel();
+    final recLabel = _recurrenceBadge();
+    final durationMin = routine.subtasks.isNotEmpty
+        ? routine.totalSubtaskMinutes
+        : routine.totalEstimatedMinutes;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -314,142 +275,193 @@ class _RoutineCard extends StatelessWidget {
       elevation: 0,
       color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
       child: InkWell(
-        onTap: onStart,
+        onTap: onTap, // TAP = settings/editor
         borderRadius: BorderRadius.circular(14),
         child: Padding(
           padding: const EdgeInsets.all(14),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Icon
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: routineColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Center(
-                  child:
-                      Text(routine.icon, style: const TextStyle(fontSize: 22)),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              Row(
+                children: [
+                  // Icon
+                  Container(
+                    width: 44, height: 44,
+                    decoration: BoxDecoration(
+                      color: routineColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Text(routine.icon,
+                          style: const TextStyle(fontSize: 22))),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            routine.name,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: cs.onSurface,
-                            ),
-                          ),
-                        ),
-                        if (wasRunToday)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF10B981)
-                                  .withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              '✓ Done',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF10B981),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(routine.name,
+                                  style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: cs.onSurface))),
+                            if (wasRunToday)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981)
+                                      .withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text('✓ Done',
+                                    style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF10B981))),
                               ),
-                            ),
-                          ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            if (reminderLabel != null)
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.access_time_rounded, size: 13,
+                                      color: cs.onSurface.withValues(alpha: 0.55)),
+                                  const SizedBox(width: 3),
+                                  Text(reminderLabel,
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: cs.onSurface.withValues(alpha: 0.7))),
+                                ],
+                              ),
+                            if (recLabel.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: routineColor.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(recLabel,
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: routineColor)),
+                              ),
+                          ],
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    if (reminderLabel != null || recurrenceLabel != null) ...[
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
+                  ),
+                ],
+              ),
+
+              // Subtask preview chips
+              if (routine.subtasks.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: routine.subtasks.take(4).map((s) =>
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: cs.onSurface.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text('${s.emoji} ${s.name} (${s.durationMinutes}m)',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: cs.onSurface.withValues(alpha: 0.6))),
+                    )
+                  ).toList()
+                    ..addAll(routine.subtasks.length > 4
+                      ? [Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: cs.primary.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text('+${routine.subtasks.length - 4} more',
+                              style: TextStyle(fontSize: 11, color: cs.primary)),
+                        )]
+                      : []),
+                ),
+              ],
+
+              const SizedBox(height: 10),
+
+              // Bottom row: duration + buttons
+              Row(
+                children: [
+                  Text(
+                    '${routine.steps.length} step${routine.steps.length == 1 ? '' : 's'}'
+                    ' · ~${durationMin > 0 ? durationMin : routine.totalEstimatedMinutes} min',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurface.withValues(alpha: 0.45)),
+                  ),
+                  const Spacer(),
+                  // Settings tap hint
+                  Text('Tap to edit settings',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: cs.onSurface.withValues(alpha: 0.3))),
+                  const SizedBox(width: 10),
+                  // Explicit Start button
+                  GestureDetector(
+                    onTap: onStart,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: routineColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (reminderLabel != null)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.access_time_rounded,
-                                  size: 14,
-                                  color: cs.onSurface.withValues(alpha: 0.55),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  reminderLabel,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: cs.onSurface.withValues(alpha: 0.7),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          if (recurrenceLabel != null)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: routineColor.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                recurrenceLabel,
-                                style: TextStyle(
-                                  fontSize: 11,
+                          Icon(Icons.play_arrow_rounded,
+                              size: 14, color: routineColor),
+                          const SizedBox(width: 4),
+                          Text('Start',
+                              style: TextStyle(
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w700,
-                                  color: routineColor,
-                                ),
-                              ),
-                            ),
+                                  color: routineColor)),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                    ],
-                    Text(
-                      '${routine.steps.length} steps'
-                      '${routine.subtasks.isNotEmpty ? ' • ${routine.subtasks.length} subtasks' : ''}'
-                      ' • ~${routine.subtasks.isNotEmpty ? routine.totalSubtaskMinutes : routine.totalEstimatedMinutes} min',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: cs.onSurface.withValues(alpha: 0.45),
-                      ),
                     ),
-                  ],
-                ),
-              ),
-              // Actions
-              PopupMenuButton<String>(
-                itemBuilder: (_) => [
-                  const PopupMenuItem(value: 'start', child: Text('Start')),
-                  const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                  const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                  ),
+                  const SizedBox(width: 4),
+                  PopupMenuButton<String>(
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(value: 'edit', child: Text('Edit / Settings')),
+                      const PopupMenuItem(value: 'start', child: Text('Start')),
+                      const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                    ],
+                    onSelected: (v) {
+                      switch (v) {
+                        case 'edit': onTap();
+                        case 'start': onStart();
+                        case 'delete': onDelete();
+                      }
+                    },
+                    icon: Icon(Icons.more_vert_rounded,
+                        size: 18, color: cs.onSurface.withValues(alpha: 0.3)),
+                  ),
                 ],
-                onSelected: (v) {
-                  switch (v) {
-                    case 'start':
-                      onStart();
-                    case 'edit':
-                      onEdit();
-                    case 'delete':
-                      onDelete();
-                  }
-                },
-                icon: Icon(Icons.more_vert_rounded,
-                    size: 20, color: cs.onSurface.withValues(alpha: 0.3)),
               ),
             ],
           ),
@@ -499,14 +511,12 @@ class _StudySessionCard extends StatelessWidget {
             ),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: const Color(0xFF8B5CF6).withValues(alpha: 0.2),
-            ),
+                color: const Color(0xFF8B5CF6).withValues(alpha: 0.2)),
           ),
           child: Row(
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 48, height: 48,
                 decoration: BoxDecoration(
                   color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(14),
@@ -519,21 +529,17 @@ class _StudySessionCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Start Study Session',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: cs.onSurface,
-                      ),
-                    ),
+                    Text('Start Study Session',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: cs.onSurface)),
                     const SizedBox(height: 3),
                     Text(
                       'Next: Page $nextPage · $totalRead/$totalPages done',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: cs.onSurface.withValues(alpha: 0.5),
-                      ),
+                          fontSize: 12,
+                          color: cs.onSurface.withValues(alpha: 0.5)),
                     ),
                   ],
                 ),
