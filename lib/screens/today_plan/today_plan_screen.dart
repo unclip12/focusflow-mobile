@@ -178,8 +178,9 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     _selectedDate = AppDateUtils.getAdjustedDate();
     _tabCtrl = TabController(length: 3, vsync: this);
     // Tick clock every minute
-    _clockTimer = Stream.periodic(const Duration(seconds: 30), (_) => DateTime.now())
-        .listen((dt) => _clockNotifier.value = dt);
+    _clockTimer =
+        Stream.periodic(const Duration(seconds: 30), (_) => DateTime.now())
+            .listen((dt) => _clockNotifier.value = dt);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _schedulePrayerNotifications();
       _showExpiredRoutineDialogs();
@@ -198,11 +199,11 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
   bool get _isToday =>
       AppDateUtils.isSameDay(_selectedDate, AppDateUtils.getAdjustedDate());
 
-  void _prevDay() =>
-      _setStateIfMounted(() => _selectedDate = _selectedDate.subtract(const Duration(days: 1)));
+  void _prevDay() => _setStateIfMounted(
+      () => _selectedDate = _selectedDate.subtract(const Duration(days: 1)));
 
-  void _nextDay() =>
-      _setStateIfMounted(() => _selectedDate = _selectedDate.add(const Duration(days: 1)));
+  void _nextDay() => _setStateIfMounted(
+      () => _selectedDate = _selectedDate.add(const Duration(days: 1)));
 
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
@@ -309,7 +310,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     final now = DateTime.now().toIso8601String();
     final blocks = List<Block>.from(plan.blocks ?? []);
     for (int i = 0; i < blocks.length; i++) {
-      if (blocks[i].status == BlockStatus.inProgress && blocks[i].id != block.id) {
+      if (blocks[i].status == BlockStatus.inProgress &&
+          blocks[i].id != block.id) {
         blocks[i] = blocks[i].copyWith(status: BlockStatus.paused);
       }
     }
@@ -357,35 +359,25 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     } else {
       displayBlocks = List<Block>.from(realBlocks);
     }
-    displayBlocks.sort((a, b) => a.plannedStartTime.compareTo(b.plannedStartTime));
+    displayBlocks
+        .sort((a, b) => a.plannedStartTime.compareTo(b.plannedStartTime));
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      extendBody: true,
       backgroundColor: DashboardColors.background(isDark),
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Positioned.fill(child: AuroraBackground(isDark: isDark)),
           SafeArea(
+            bottom: false,
             child: Stack(
               children: [
                 Column(
                   children: [
                     // ── Compact Header ─────────────────────────
-                    _CompactHeader(
-                      date: _selectedDate,
-                      isToday: _isToday,
-                      totalBlocks: totalBlocks,
-                      completedBlocks: completedBlocks,
-                      onPrev: _prevDay,
-                      onNext: _nextDay,
-                      onDateTap: _pickDate,
-                      onStartDay: _showStartDayOverlay,
-                      onStudySession: _openStudyFlow,
-                      onTrackNow: _openTrackNow,
-                      onAddTask: _openAddTaskSheet,
-                    ),
                     // ── Tab Bar ────────────────────────────────
                     _ThreeTabBar(controller: _tabCtrl),
                     // ── Tab Views ──────────────────────────────
@@ -393,8 +385,21 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                       child: TabBarView(
                         controller: _tabCtrl,
                         children: [
-                          TimelineView(
-                              dateKey: _dateKey, blocks: displayBlocks),
+                          _TodayTimelineTab(
+                            date: _selectedDate,
+                            isToday: _isToday,
+                            totalBlocks: totalBlocks,
+                            completedBlocks: completedBlocks,
+                            onPrev: _prevDay,
+                            onNext: _nextDay,
+                            onDateTap: _pickDate,
+                            onStartDay: _showStartDayOverlay,
+                            onStudySession: _openStudyFlow,
+                            onTrackNow: _openTrackNow,
+                            onAddTask: _openAddTaskSheet,
+                            dateKey: _dateKey,
+                            blocks: displayBlocks,
+                          ),
                           RoutinesTab(dateKey: _dateKey),
                           // More tab: inline sub-tabs (Todo + Buying)
                           _MoreTabView(dateKey: _dateKey),
@@ -418,6 +423,68 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
 }
 
 // ── More Tab: inline Todo + Buying sub-tabs ────────────────────
+class _TodayTimelineTab extends StatelessWidget {
+  final DateTime date;
+  final bool isToday;
+  final int totalBlocks;
+  final int completedBlocks;
+  final VoidCallback onPrev;
+  final VoidCallback onNext;
+  final VoidCallback onDateTap;
+  final VoidCallback onStartDay;
+  final VoidCallback onStudySession;
+  final VoidCallback onTrackNow;
+  final VoidCallback onAddTask;
+  final String dateKey;
+  final List<Block> blocks;
+
+  const _TodayTimelineTab({
+    required this.date,
+    required this.isToday,
+    required this.totalBlocks,
+    required this.completedBlocks,
+    required this.onPrev,
+    required this.onNext,
+    required this.onDateTap,
+    required this.onStartDay,
+    required this.onStudySession,
+    required this.onTrackNow,
+    required this.onAddTask,
+    required this.dateKey,
+    required this.blocks,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return NestedScrollView(
+      headerSliverBuilder: (context, innerBoxIsScrolled) {
+        return [
+          SliverToBoxAdapter(
+            child: _CompactHeader(
+              date: date,
+              isToday: isToday,
+              totalBlocks: totalBlocks,
+              completedBlocks: completedBlocks,
+              onPrev: onPrev,
+              onNext: onNext,
+              onDateTap: onDateTap,
+              onStartDay: onStartDay,
+              onStudySession: onStudySession,
+              onTrackNow: onTrackNow,
+              onAddTask: onAddTask,
+            ),
+          ),
+        ];
+      },
+      body: TimelineView(
+        dateKey: dateKey,
+        blocks: blocks,
+        onAddTask: onAddTask,
+      ),
+    );
+  }
+}
+
 class _MoreTabView extends StatefulWidget {
   final String dateKey;
   const _MoreTabView({required this.dateKey});
@@ -467,10 +534,10 @@ class _MoreTabViewState extends State<_MoreTabView>
               controller: _subTabCtrl,
               dividerColor: Colors.transparent,
               indicatorSize: TabBarIndicatorSize.tab,
-              labelStyle: const TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w700),
-              unselectedLabelStyle: const TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w600),
+              labelStyle:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              unselectedLabelStyle:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               indicator: BoxDecoration(
                 color: DashboardColors.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
@@ -522,22 +589,30 @@ class _CelebrationOverlayState extends State<_CelebrationOverlay>
       if (status == AnimationStatus.completed) widget.onComplete?.call();
     });
     _ctrl.forward();
-    _particles = List.generate(24, (_) => _Particle(
-      x: _rng.nextDouble(),
-      y: _rng.nextDouble() * 0.3,
-      vx: (_rng.nextDouble() - 0.5) * 0.6,
-      vy: -0.5 - _rng.nextDouble() * 0.5,
-      size: 4 + _rng.nextDouble() * 6,
-      color: [
-        const Color(0xFF6366F1), const Color(0xFF10B981),
-        const Color(0xFFF59E0B), const Color(0xFFEF4444),
-        const Color(0xFF8B5CF6), const Color(0xFF3B82F6),
-      ][_rng.nextInt(6)],
-    ));
+    _particles = List.generate(
+        24,
+        (_) => _Particle(
+              x: _rng.nextDouble(),
+              y: _rng.nextDouble() * 0.3,
+              vx: (_rng.nextDouble() - 0.5) * 0.6,
+              vy: -0.5 - _rng.nextDouble() * 0.5,
+              size: 4 + _rng.nextDouble() * 6,
+              color: [
+                const Color(0xFF6366F1),
+                const Color(0xFF10B981),
+                const Color(0xFFF59E0B),
+                const Color(0xFFEF4444),
+                const Color(0xFF8B5CF6),
+                const Color(0xFF3B82F6),
+              ][_rng.nextInt(6)],
+            ));
   }
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -556,19 +631,25 @@ class _CelebrationOverlayState extends State<_CelebrationOverlay>
                     scale: t < 0.2 ? t / 0.2 : 1.0,
                     duration: Duration.zero,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 14),
                       decoration: BoxDecoration(
                         color: const Color(0xFF10B981),
                         borderRadius: BorderRadius.circular(16),
-                        boxShadow: [BoxShadow(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.3),
-                          blurRadius: 20, spreadRadius: 4,
-                        )],
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                const Color(0xFF10B981).withValues(alpha: 0.3),
+                            blurRadius: 20,
+                            spreadRadius: 4,
+                          )
+                        ],
                       ),
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.check_circle_rounded, color: Colors.white, size: 24),
+                          Icon(Icons.check_circle_rounded,
+                              color: Colors.white, size: 24),
                           SizedBox(width: 8),
                           Text('Block Complete! 🎉',
                               style: TextStyle(
@@ -591,8 +672,10 @@ class _CelebrationOverlayState extends State<_CelebrationOverlay>
                   child: Opacity(
                     opacity: opacity,
                     child: Container(
-                      width: p.size, height: p.size,
-                      decoration: BoxDecoration(color: p.color, shape: BoxShape.circle),
+                      width: p.size,
+                      height: p.size,
+                      decoration:
+                          BoxDecoration(color: p.color, shape: BoxShape.circle),
                     ),
                   ),
                 );
@@ -608,8 +691,13 @@ class _CelebrationOverlayState extends State<_CelebrationOverlay>
 class _Particle {
   final double x, y, vx, vy, size;
   final Color color;
-  const _Particle({required this.x, required this.y, required this.vx,
-      required this.vy, required this.size, required this.color});
+  const _Particle(
+      {required this.x,
+      required this.y,
+      required this.vx,
+      required this.vy,
+      required this.size,
+      required this.color});
 }
 
 // ── Compact Header ─────────────────────────────────────────────
@@ -678,7 +766,8 @@ class _CompactHeader extends StatelessWidget {
           children: [
             Row(
               children: [
-                _HeaderArrowButton(icon: Icons.arrow_back_rounded, onTap: onPrev),
+                _HeaderArrowButton(
+                    icon: Icons.arrow_back_rounded, onTap: onPrev),
                 Expanded(
                   child: InkWell(
                     onTap: onDateTap,
@@ -708,7 +797,8 @@ class _CompactHeader extends StatelessWidget {
                     ),
                   ),
                 ),
-                _HeaderArrowButton(icon: Icons.arrow_forward_rounded, onTap: onNext),
+                _HeaderArrowButton(
+                    icon: Icons.arrow_forward_rounded, onTap: onNext),
               ],
             ),
             const SizedBox(height: 14),
@@ -758,21 +848,27 @@ class _CompactHeader extends StatelessWidget {
             const SizedBox(height: 16),
             Row(
               children: [
-                Expanded(child: _HeaderActionButton(
-                    emoji: '🌅', label: 'Start Day', onTap: onStartDay)),
+                Expanded(
+                    child: _HeaderActionButton(
+                        emoji: '🌅', label: 'Start Day', onTap: onStartDay)),
                 const SizedBox(width: 12),
-                Expanded(child: _HeaderActionButton(
-                    emoji: '📚', label: 'Study Session', onTap: onStudySession)),
+                Expanded(
+                    child: _HeaderActionButton(
+                        emoji: '📚',
+                        label: 'Study Session',
+                        onTap: onStudySession)),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _HeaderActionButton(
-                    emoji: '📊', label: 'Track Now', onTap: onTrackNow)),
+                Expanded(
+                    child: _HeaderActionButton(
+                        emoji: '📊', label: 'Track Now', onTap: onTrackNow)),
                 const SizedBox(width: 12),
-                Expanded(child: _HeaderActionButton(
-                    emoji: '➕', label: 'Add Task', onTap: onAddTask)),
+                Expanded(
+                    child: _HeaderActionButton(
+                        emoji: '➕', label: 'Add Task', onTap: onAddTask)),
               ],
             ),
           ],

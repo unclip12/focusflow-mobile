@@ -7,7 +7,6 @@
 //   • LONG-PRESS non-locked block → drag to reorder → start times cascade
 // =============================================================
 
-import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
@@ -27,19 +26,40 @@ String _to12h(String hhmm) {
   return '$h12:${m.toString().padLeft(2, '0')} $suffix';
 }
 
-String _formatDuration(int minutes) {
-  if (minutes >= 60) {
-    final h = minutes ~/ 60; final m = minutes % 60;
-    return m > 0 ? '${h}h ${m}min' : '${h}h';
-  }
-  return '$minutes min';
-}
-
 String _minutesToHHMM(int minutes) {
   final h = (minutes ~/ 60).clamp(0, 23);
   final m = minutes % 60;
   return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
 }
+
+String _to12hShort(String hhmm) {
+  final parts = hhmm.split(':');
+  if (parts.length != 2) return hhmm;
+  final h24 = int.tryParse(parts[0]) ?? 0;
+  final m = int.tryParse(parts[1]) ?? 0;
+  final h12 = h24 % 12 == 0 ? 12 : h24 % 12;
+  return '$h12:${m.toString().padLeft(2, '0')}';
+}
+
+String _formatGapDurationCompact(int minutes) {
+  final h = minutes ~/ 60;
+  final m = minutes % 60;
+  if (h > 0 && m > 0) return '${h}h ${m}m';
+  if (h > 0) return '${h}h';
+  return '${m}m';
+}
+
+const double _kTimelineHandleWidth = 22;
+const double _kTimelineHandleGap = 6;
+const double _kTimelineLeadingWidth =
+    _kTimelineHandleWidth + _kTimelineHandleGap;
+const double _kTimelineTimeWidth = 44;
+const double _kTimelineTimeToPillGap = 10;
+const double _kTimelinePillWidth = 56;
+const double _kTimelineContentGap = 14;
+const double _kTimelineStatusSize = 20;
+const Color _kTimelinePillColor = Color(0xFF414248);
+const Color _kTimelineGapAccent = Color(0xFFFF8E88);
 
 // ── Category helpers ────────────────────────────────────────────
 Color _categoryColor(Block block) {
@@ -82,8 +102,14 @@ String _categoryLabel(Block block) {
 class TimelineView extends StatefulWidget {
   final List<Block> blocks;
   final String dateKey;
+  final VoidCallback? onAddTask;
 
-  const TimelineView({super.key, required this.blocks, required this.dateKey});
+  const TimelineView({
+    super.key,
+    required this.blocks,
+    required this.dateKey,
+    this.onAddTask,
+  });
 
   @override
   State<TimelineView> createState() => _TimelineViewState();
@@ -350,7 +376,7 @@ class _TimelineViewState extends State<TimelineView> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
-          String _fmt(TimeOfDay? t) {
+          String fmt(TimeOfDay? t) {
             if (t == null) return '--';
             final h12 = t.hour % 12 == 0 ? 12 : t.hour % 12;
             final suffix = t.hour < 12 ? 'AM' : 'PM';
@@ -397,7 +423,7 @@ class _TimelineViewState extends State<TimelineView> {
                       if (picked != null) setS(() => startTime = picked);
                     },
                     icon: const Icon(Icons.access_time_rounded, size: 16),
-                    label: Text(_fmt(startTime)),
+                    label: Text(fmt(startTime)),
                   )),
                   const SizedBox(width: 8),
                   Expanded(child: OutlinedButton.icon(
@@ -411,7 +437,7 @@ class _TimelineViewState extends State<TimelineView> {
                       if (picked != null) setS(() => endTime = picked);
                     },
                     icon: const Icon(Icons.access_time_rounded, size: 16),
-                    label: Text(_fmt(endTime)),
+                    label: Text(fmt(endTime)),
                   )),
                 ]),
                 const SizedBox(height: 12),
@@ -608,6 +634,7 @@ class _TimelineViewState extends State<TimelineView> {
               startMinutes: item.gapStartMinutes!,
               endMinutes: item.gapEndMinutes!,
               onTap: () => _onGapTap(item),
+              onAddTask: widget.onAddTask,
               isDark: isDark,
             ),
           );
@@ -653,6 +680,7 @@ class _TimelineItem {
 }
 
 // ── Block Card ────────────────────────────────────────────────────
+/*
 class _BlockCard extends StatelessWidget {
   final Block block;
   final bool isDark;
@@ -674,74 +702,130 @@ class _BlockCard extends StatelessWidget {
     return (int.tryParse(parts[0]) ?? 0) * 60 + (int.tryParse(parts[1]) ?? 0);
   }
 
-  String _formatDuration(int minutes) {
-    if (minutes >= 60) {
-      final h = minutes ~/ 60;
-      final m = minutes % 60;
-      return m > 0 ? '${h}h ${m}min' : '${h}h';
+  Color _statusRingColor(ColorScheme cs, Color accent) {
+    switch (block.status) {
+      case BlockStatus.done:
+        return const Color(0xFF10B981);
+      case BlockStatus.skipped:
+        return cs.onSurface.withValues(alpha: 0.28);
+      case BlockStatus.paused:
+        return const Color(0xFFF59E0B);
+      case BlockStatus.inProgress:
+      case BlockStatus.notStarted:
+        return accent;
     }
-    return '$minutes min';
+  }
+
+  IconData _iconForBlock() {
+    final lowerTitle = block.title.toLowerCase();
+
+    if (lowerTitle.contains('wake') ||
+        lowerTitle.contains('rise') ||
+        lowerTitle.contains('morning')) {
+      return Icons.alarm_rounded;
+    }
+    if (lowerTitle.contains('wind down') ||
+        lowerTitle.contains('sleep') ||
+        lowerTitle.contains('night')) {
+      return Icons.dark_mode_rounded;
+    }
+    if (block.id.startsWith('prayer_')) return Icons.mosque_rounded;
+
+    switch (block.type) {
+      case BlockType.video:
+        return Icons.play_circle_fill_rounded;
+      case BlockType.revisionFa:
+      case BlockType.studySession:
+        return Icons.menu_book_rounded;
+      case BlockType.anki:
+        return Icons.style_rounded;
+      case BlockType.qbank:
+        return Icons.quiz_rounded;
+      case BlockType.fmgeRevision:
+        return Icons.school_rounded;
+      case BlockType.breakBlock:
+        return Icons.coffee_rounded;
+      case BlockType.mixed:
+        return Icons.dashboard_rounded;
+      case BlockType.other:
+        return block.isEvent ? Icons.event_rounded : Icons.task_alt_rounded;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final color = _categoryColor(block);
-    final label = _categoryLabel(block);
+    final accent = _categoryColor(block);
     final startMin = _toMinutes(block.plannedStartTime);
     final endMin = _toMinutes(block.plannedEndTime);
-    final duration = endMin > startMin ? endMin - startMin : block.plannedDurationMinutes;
+    final duration =
+        endMin > startMin ? endMin - startMin : block.plannedDurationMinutes;
     final double cardHeight =
-        (duration * 2.0).clamp(56.0, double.infinity).toDouble();
+        (duration * 2.0).clamp(64.0, double.infinity).toDouble();
 
-    final isLocked = block.isEvent || block.id.startsWith('prayer_');
     final isDone = block.status == BlockStatus.done;
-    final isSkipped = block.status == BlockStatus.skipped;
     final isSplit = block.splitTotalParts != null && block.splitTotalParts! > 1;
+    final ringColor = _statusRingColor(cs, accent);
 
-    final startLabel = _to12h(block.plannedStartTime);
-    final endLabel = _to12h(block.plannedEndTime);
+    final startLabel = _to12hShort(block.plannedStartTime);
+    final rangeLabel =
+        '${_to12h(block.plannedStartTime)} - ${_to12h(block.plannedEndTime)}';
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: GestureDetector(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          height: cardHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           if (leading != null) ...[
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: SizedBox(
-                width: 22,
+                width: _kTimelineHandleWidth,
                 child: leading,
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: _kTimelineHandleGap),
           ],
           // ── Time Column ──
           SizedBox(
-            width: 60,
+            width: _kTimelineTimeWidth,
             child: Padding(
-              padding: const EdgeInsets.only(top: 10, right: 4),
+              padding: const EdgeInsets.only(top: 4),
               child: Text(startLabel, textAlign: TextAlign.right,
                   style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-                      color: cs.onSurface.withValues(alpha: 0.65),
+                      color: cs.onSurface.withValues(alpha: 0.45),
                       fontFeatures: const [FontFeature.tabularFigures()])),
             ),
           ),
-          // Dot + line
-          Column(children: [
-            const SizedBox(height: 12),
-            Container(width: 10, height: 10, decoration: BoxDecoration(
-              color: isDone ? const Color(0xFF10B981)
-                  : isSkipped ? cs.onSurface.withValues(alpha: 0.2) : color,
-              shape: BoxShape.circle,
-            )),
-            Container(width: 2, height: cardHeight - 10,
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.black.withValues(alpha: 0.06)),
-          ]),
-          const SizedBox(width: 10),
+              const SizedBox(width: _kTimelineTimeToPillGap),
+              Container(
+                width: _kTimelinePillWidth,
+                height: cardHeight,
+                decoration: BoxDecoration(
+                  color: _kTimelinePillColor,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: isDark ? 0.08 : 0.18),
+                  ),
+                ),
+                child: Center(
+                  child: Tooltip(
+                    message: _categoryLabel(block),
+                    child: Icon(
+                      _iconForBlock(),
+                      size: 24,
+                      color: accent,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: _kTimelineContentGap),
           // Card
           Expanded(
             child: GestureDetector(
@@ -768,34 +852,20 @@ class _BlockCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(children: [
-                      if (isLocked)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 4),
-                          child: Icon(Icons.lock_rounded, size: 13, color: color),
-                        ),
-                      Expanded(
-                        child: Text(
-                          block.title,
-                          style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w700,
-                            color: isDone ? cs.onSurface.withValues(alpha: 0.4) : cs.onSurface,
-                            decoration: isDone ? TextDecoration.lineThrough : null,
-                          ),
-                          maxLines: 2, overflow: TextOverflow.ellipsis,
-                        ),
+                    Text(
+                      block.title,
+                      style: TextStyle(
+                        fontSize: 22,
+                        height: 1.05,
+                        fontWeight: FontWeight.w700,
+                        color: isDone
+                            ? cs.onSurface.withValues(alpha: 0.5)
+                            : cs.onSurface,
+                        decoration: isDone ? TextDecoration.lineThrough : null,
                       ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(label, style: TextStyle(
-                            fontSize: 10, fontWeight: FontWeight.w700, color: color)),
-                      ),
-                    ]),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     const SizedBox(height: 5),
                     Row(children: [
                       Icon(Icons.access_time_rounded, size: 11,
@@ -861,6 +931,233 @@ class _BlockCard extends StatelessWidget {
 }
 
 // ── Gap Slot ──────────────────────────────────────────────────────
+*/
+
+class _BlockCard extends StatelessWidget {
+  final Block block;
+  final bool isDark;
+  final Widget? leading;
+  final VoidCallback? onLongPress;
+  final VoidCallback? onTap;
+
+  const _BlockCard({
+    required this.block,
+    required this.isDark,
+    this.leading,
+    this.onTap,
+    this.onLongPress,
+  });
+
+  static int _toMinutes(String hhmm) {
+    final parts = hhmm.split(':');
+    if (parts.length != 2) return 0;
+    return (int.tryParse(parts[0]) ?? 0) * 60 + (int.tryParse(parts[1]) ?? 0);
+  }
+
+  Color _statusRingColor(ColorScheme cs, Color accent) {
+    switch (block.status) {
+      case BlockStatus.done:
+        return const Color(0xFF10B981);
+      case BlockStatus.skipped:
+        return cs.onSurface.withValues(alpha: 0.28);
+      case BlockStatus.paused:
+        return const Color(0xFFF59E0B);
+      case BlockStatus.inProgress:
+      case BlockStatus.notStarted:
+        return accent;
+    }
+  }
+
+  IconData _iconForBlock() {
+    final lowerTitle = block.title.toLowerCase();
+
+    if (lowerTitle.contains('wake') ||
+        lowerTitle.contains('rise') ||
+        lowerTitle.contains('morning')) {
+      return Icons.alarm_rounded;
+    }
+    if (lowerTitle.contains('wind down') ||
+        lowerTitle.contains('sleep') ||
+        lowerTitle.contains('night')) {
+      return Icons.dark_mode_rounded;
+    }
+    if (block.id.startsWith('prayer_')) return Icons.mosque_rounded;
+
+    switch (block.type) {
+      case BlockType.video:
+        return Icons.play_circle_fill_rounded;
+      case BlockType.revisionFa:
+      case BlockType.studySession:
+        return Icons.menu_book_rounded;
+      case BlockType.anki:
+        return Icons.style_rounded;
+      case BlockType.qbank:
+        return Icons.quiz_rounded;
+      case BlockType.fmgeRevision:
+        return Icons.school_rounded;
+      case BlockType.breakBlock:
+        return Icons.coffee_rounded;
+      case BlockType.mixed:
+        return Icons.dashboard_rounded;
+      case BlockType.other:
+        return block.isEvent ? Icons.event_rounded : Icons.task_alt_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final accent = _categoryColor(block);
+    final startMin = _toMinutes(block.plannedStartTime);
+    final endMin = _toMinutes(block.plannedEndTime);
+    final duration =
+        endMin > startMin ? endMin - startMin : block.plannedDurationMinutes;
+    final cardHeight =
+        (duration * 2.0).clamp(64.0, double.infinity).toDouble();
+    final isDone = block.status == BlockStatus.done;
+    final isSplit = block.splitTotalParts != null && block.splitTotalParts! > 1;
+    final ringColor = _statusRingColor(cs, accent);
+    final startLabel = _to12hShort(block.plannedStartTime);
+    final rangeLabel =
+        '${_to12h(block.plannedStartTime)} - ${_to12h(block.plannedEndTime)}';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: GestureDetector(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          height: cardHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (leading != null) ...[
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: SizedBox(
+                    width: _kTimelineHandleWidth,
+                    child: leading,
+                  ),
+                ),
+                const SizedBox(width: _kTimelineHandleGap),
+              ],
+              SizedBox(
+                width: _kTimelineTimeWidth,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    startLabel,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface.withValues(alpha: 0.45),
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: _kTimelineTimeToPillGap),
+              Container(
+                width: _kTimelinePillWidth,
+                height: cardHeight,
+                decoration: BoxDecoration(
+                  color: _kTimelinePillColor,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: isDark ? 0.08 : 0.18),
+                  ),
+                ),
+                child: Center(
+                  child: Tooltip(
+                    message: _categoryLabel(block),
+                    child: Icon(
+                      _iconForBlock(),
+                      size: 24,
+                      color: accent,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: _kTimelineContentGap),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        block.title,
+                        style: TextStyle(
+                          fontSize: 22,
+                          height: 1.05,
+                          fontWeight: FontWeight.w700,
+                          color: isDone
+                              ? cs.onSurface.withValues(alpha: 0.5)
+                              : cs.onSurface,
+                          decoration: isDone ? TextDecoration.lineThrough : null,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        rangeLabel,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: cs.onSurface.withValues(alpha: 0.42),
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      if (isSplit) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Part ${block.splitPartIndex} of ${block.splitTotalParts}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurface.withValues(alpha: 0.32),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Container(
+                  width: _kTimelineStatusSize,
+                  height: _kTimelineStatusSize,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: ringColor, width: 2),
+                  ),
+                  child: block.status == BlockStatus.done
+                      ? Center(
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF10B981),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        )
+                      : null,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _LockedDetailRow extends StatelessWidget {
   final IconData icon;
   final String text;
@@ -901,6 +1198,7 @@ class _LockedDetailRow extends StatelessWidget {
   }
 }
 
+/*
 class _GapSlot extends StatelessWidget {
   final int startMinutes;
   final int endMinutes;
@@ -1035,6 +1333,195 @@ class _GapSlot extends StatelessWidget {
 }
 
 // ── Dashed Line Painter ───────────────────────────────────────────────
+*/
+
+class _GapSlot extends StatelessWidget {
+  final int startMinutes;
+  final int endMinutes;
+  final VoidCallback onTap;
+  final VoidCallback? onAddTask;
+  final bool isDark;
+
+  const _GapSlot({
+    required this.startMinutes,
+    required this.endMinutes,
+    required this.onTap,
+    required this.isDark,
+    this.onAddTask,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final gapMinutes = endMinutes - startMinutes;
+    final gapHeight =
+        (gapMinutes * 2.0).clamp(78.0, double.infinity).toDouble();
+
+    final hourTicks = <int>[];
+    final firstHourInGap = (startMinutes ~/ 60) * 60 + 60;
+    for (int tick = firstHourInGap; tick < endMinutes; tick += 60) {
+      hourTicks.add(tick);
+    }
+
+    final startLabel = _to12hShort(_minutesToHHMM(startMinutes));
+    final durationLabel = _formatGapDurationCompact(gapMinutes);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          height: gapHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(width: _kTimelineLeadingWidth),
+              SizedBox(
+                width: _kTimelineTimeWidth,
+                height: gapHeight,
+                child: Stack(
+                  children: [
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: Text(
+                        startLabel,
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurface.withValues(alpha: 0.36),
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ),
+                    ...hourTicks.map((tick) {
+                      final fraction = (tick - startMinutes) / gapMinutes;
+                      final topPos = fraction * gapHeight;
+                      return Positioned(
+                        top: topPos - 6,
+                        right: 0,
+                        child: Text(
+                          _to12hShort(_minutesToHHMM(tick)),
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurface.withValues(alpha: 0.24),
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+              const SizedBox(width: _kTimelineTimeToPillGap),
+              SizedBox(
+                width: _kTimelinePillWidth,
+                height: gapHeight,
+                child: Center(
+                  child: CustomPaint(
+                    size: Size(2, gapHeight),
+                    painter: _DashedLinePainter(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.12)
+                          : Colors.black.withValues(alpha: 0.14),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: _kTimelineContentGap),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.access_time_outlined,
+                            size: 15,
+                            color: cs.onSurface.withValues(alpha: 0.38),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: RichText(
+                              text: TextSpan(
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: cs.onSurface.withValues(alpha: 0.42),
+                                  height: 1.35,
+                                ),
+                                children: [
+                                  const TextSpan(text: 'Use '),
+                                  TextSpan(
+                                    text: durationLabel,
+                                    style: const TextStyle(
+                                      color: _kTimelineGapAccent,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const TextSpan(
+                                    text: ' wisely. Create away!',
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: onAddTask ?? onTap,
+                        icon: const Icon(
+                          Icons.add_rounded,
+                          size: 16,
+                          color: _kTimelineGapAccent,
+                        ),
+                        label: const Text(
+                          'Add Task',
+                          style: TextStyle(
+                            color: _kTimelineGapAccent,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 34),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 0,
+                          ),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                          backgroundColor: isDark
+                              ? const Color(0xFF2D2E33)
+                              : Colors.white.withValues(alpha: 0.94),
+                          side: BorderSide(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : Colors.black.withValues(alpha: 0.08),
+                          ),
+                          shape: const StadiumBorder(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: _kTimelineStatusSize + 10),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _DashedLinePainter extends CustomPainter {
   final Color color;
   const _DashedLinePainter({required this.color});
