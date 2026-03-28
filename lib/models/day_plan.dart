@@ -351,6 +351,13 @@ class Block {
   final String title;
   final String? description;
   final List<BlockTask>? tasks;
+  final String? colorHex;
+  final int? alertOffsetMinutes;
+  final String? alertType;
+  final String recurrenceType;
+  final List<int> recurrenceDays;
+  final List<String> subtaskTitles;
+  final List<bool> subtaskCompleted;
 
   final String? relatedVideoId;
   final List<int>? relatedFaPages;
@@ -401,6 +408,13 @@ class Block {
     required this.title,
     this.description,
     this.tasks,
+    this.colorHex,
+    this.alertOffsetMinutes,
+    this.alertType,
+    this.recurrenceType = 'none',
+    this.recurrenceDays = const [],
+    this.subtaskTitles = const [],
+    this.subtaskCompleted = const [],
     this.relatedVideoId,
     this.relatedFaPages,
     this.relatedAnkiInfo,
@@ -442,6 +456,19 @@ class Block {
                 .map((t) => BlockTask.fromJson(t))
                 .toList()
             : null,
+        colorHex: j['colorHex'],
+        alertOffsetMinutes: j['alertOffsetMinutes'],
+        alertType: j['alertType'],
+        recurrenceType: j['recurrenceType'] ?? 'none',
+        recurrenceDays: j['recurrenceDays'] != null
+            ? List<int>.from(j['recurrenceDays'])
+            : const [],
+        subtaskTitles: j['subtaskTitles'] != null
+            ? List<String>.from(j['subtaskTitles'])
+            : const [],
+        subtaskCompleted: j['subtaskCompleted'] != null
+            ? List<bool>.from(j['subtaskCompleted'])
+            : const [],
         relatedVideoId: j['relatedVideoId'],
         relatedFaPages: j['relatedFaPages'] != null
             ? List<int>.from(j['relatedFaPages'])
@@ -501,6 +528,13 @@ class Block {
         'title': title,
         if (description != null) 'description': description,
         if (tasks != null) 'tasks': tasks!.map((t) => t.toJson()).toList(),
+        'colorHex': colorHex,
+        'alertOffsetMinutes': alertOffsetMinutes,
+        'alertType': alertType,
+        'recurrenceType': recurrenceType,
+        'recurrenceDays': recurrenceDays,
+        'subtaskTitles': subtaskTitles,
+        'subtaskCompleted': subtaskCompleted,
         if (relatedVideoId != null) 'relatedVideoId': relatedVideoId,
         if (relatedFaPages != null) 'relatedFaPages': relatedFaPages,
         if (relatedAnkiInfo != null) 'relatedAnkiInfo': relatedAnkiInfo,
@@ -543,6 +577,13 @@ class Block {
     String? title,
     String? description,
     List<BlockTask>? tasks,
+    String? colorHex,
+    int? alertOffsetMinutes,
+    String? alertType,
+    String? recurrenceType,
+    List<int>? recurrenceDays,
+    List<String>? subtaskTitles,
+    List<bool>? subtaskCompleted,
     String? relatedVideoId,
     List<int>? relatedFaPages,
     Map<String, dynamic>? relatedAnkiInfo,
@@ -579,6 +620,13 @@ class Block {
         title: title ?? this.title,
         description: description ?? this.description,
         tasks: tasks ?? this.tasks,
+        colorHex: colorHex ?? this.colorHex,
+        alertOffsetMinutes: alertOffsetMinutes ?? this.alertOffsetMinutes,
+        alertType: alertType ?? this.alertType,
+        recurrenceType: recurrenceType ?? this.recurrenceType,
+        recurrenceDays: recurrenceDays ?? this.recurrenceDays,
+        subtaskTitles: subtaskTitles ?? this.subtaskTitles,
+        subtaskCompleted: subtaskCompleted ?? this.subtaskCompleted,
         relatedVideoId: relatedVideoId ?? this.relatedVideoId,
         relatedFaPages: relatedFaPages ?? this.relatedFaPages,
         relatedAnkiInfo: relatedAnkiInfo ?? this.relatedAnkiInfo,

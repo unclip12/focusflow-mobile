@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 
+import 'alert_repeat_sheet.dart';
 import 'time_picker_sheet.dart';
 
 class BlockEditorUpdate {
@@ -60,6 +61,7 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
     Color(0xFF8E78D4),
     Color(0xFF6D7A86),
   ];
+  static const _weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   late final TextEditingController _titleController;
   late final TextEditingController _notesController;
@@ -69,6 +71,10 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
   late bool _isEvent;
   late BlockType _selectedType;
   late String _selectedEmoji;
+  late int _alertOffsetMinutes;
+  late String _alertType;
+  late String _recurrenceType;
+  late List<int> _recurrenceDays;
 
   bool _isSaving = false;
   Color _headerColor = _defaultHeaderColor;
@@ -83,6 +89,10 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
     _isEvent = widget.block.isEvent;
     _selectedType = widget.block.type;
     _selectedEmoji = _leadingEmoji(widget.block.title) ?? _defaultEmoji(widget.block);
+    _alertOffsetMinutes = -1;
+    _alertType = 'nudge';
+    _recurrenceType = 'none';
+    _recurrenceDays = <int>[];
     _titleController = TextEditingController(text: _stripLeadingEmoji(widget.block.title));
     _notesController = TextEditingController(text: widget.block.description ?? '');
   }
@@ -366,49 +376,90 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
     });
   }
 
-  Future<void> _showStubSheet(String title, String body) async {
-    await showModalBottomSheet<void>(
+  Future<void> _openAlertRepeatSheet() async {
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (sheetContext) => Container(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          18,
-          20,
-          MediaQuery.of(sheetContext).padding.bottom + 18,
-        ),
-        decoration: const BoxDecoration(
-          color: _bodyColor,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style: const TextStyle(
-                    color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 10),
-            Text(body,
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.68), height: 1.5)),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: _accentColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                ),
-                onPressed: () => Navigator.of(sheetContext).pop(),
-                child: const Text('Close'),
-              ),
-            ),
-          ],
-        ),
+      builder: (_) => AlertRepeatSheet(
+        initialAlertOffset: _alertOffsetMinutes,
+        initialAlertType: _alertType,
+        initialRecurrenceType: _recurrenceType,
+        initialRecurrenceDays: _recurrenceDays,
       ),
     );
+    if (result == null || !mounted) return;
+    setState(() {
+      _alertOffsetMinutes = result['alertOffsetMinutes'] as int? ?? _alertOffsetMinutes;
+      _alertType = result['alertType'] as String? ?? _alertType;
+      _recurrenceType = result['recurrenceType'] as String? ?? _recurrenceType;
+      _recurrenceDays = List<int>.from(result['recurrenceDays'] as List<dynamic>? ?? _recurrenceDays)
+        ..sort();
+    });
+  }
+
+  String _alertOffsetLabel(int value) {
+    switch (value) {
+      case -1:
+        return 'None';
+      case 0:
+        return 'At time of task';
+      case -5:
+        return '5 min before';
+      case -10:
+        return '10 min before';
+      case -15:
+        return '15 min before';
+      case -30:
+        return '30 min before';
+      case -60:
+        return '1 hr before';
+      default:
+        return '${value.abs()} min before';
+    }
+  }
+
+  String _alertTypeLabel(String value) {
+    switch (value) {
+      case 'notification':
+        return 'Notification';
+      case 'alarm':
+        return 'Alarm';
+      case 'nudge':
+      default:
+        return 'Nudge';
+    }
+  }
+
+  String _recurrenceTypeLabel(String value) {
+    switch (value) {
+      case 'daily':
+        return 'Every day';
+      case 'weekly':
+        return 'Every week';
+      case 'monthly':
+        return 'Every month';
+      case 'yearly':
+        return 'Every year';
+      case 'none':
+      default:
+        return 'None';
+    }
+  }
+
+  String _alertRowSummary() {
+    if (_alertOffsetMinutes == -1) return 'None';
+    return '${_alertOffsetLabel(_alertOffsetMinutes)}  •  ${_alertTypeLabel(_alertType)}';
+  }
+
+  String _repeatRowSummary() {
+    if (_recurrenceType != 'weekly') return _recurrenceTypeLabel(_recurrenceType);
+    final labels = _recurrenceDays
+        .where((day) => day >= 0 && day < _weekdayLabels.length)
+        .map((day) => _weekdayLabels[day])
+        .toList(growable: false);
+    if (labels.isEmpty) return 'Every week';
+    return 'Every week  •  ${labels.join(', ')}';
   }
 
   Future<void> _save() async {
@@ -567,14 +618,18 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                             onTap: _pickTime,
                           ),
                           _ActionRow(
-                            icon: Icons.notifications_off_rounded,
+                            icon: Icons.notifications_rounded,
                             iconColor: const Color(0xFFB78A88),
-                            title: '1 Alert',
-                            trailing: 'Nudge',
-                            onTap: () => _showStubSheet(
-                              'Alerts',
-                              'Alert and repeat settings are part of a later batch, so this row opens a placeholder sheet for now.',
-                            ),
+                            title: 'Alert',
+                            trailing: _alertRowSummary(),
+                            onTap: _openAlertRepeatSheet,
+                          ),
+                          _ActionRow(
+                            icon: Icons.repeat_rounded,
+                            iconColor: const Color(0xFFB78A88),
+                            title: 'Repeat',
+                            trailing: _repeatRowSummary(),
+                            onTap: _openAlertRepeatSheet,
                           ),
                         ],
                       ),
@@ -843,14 +898,19 @@ class _ActionRow extends StatelessWidget {
               ),
             ),
             if (trailing.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: Text(
-                  trailing,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.56),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
+              Flexible(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Text(
+                    trailing,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.56),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ),
