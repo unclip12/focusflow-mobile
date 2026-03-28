@@ -1037,7 +1037,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
               child: SwitchListTile(
                 value: _isEvent,
                 onChanged: (value) => setState(() => _isEvent = value),
-                activeThumbColor: const Color(0xFFEF4444),
                 title: const Text('Fixed Event'),
                 subtitle: _isEvent
                     ? const Text("Scheduler won't move this block")
