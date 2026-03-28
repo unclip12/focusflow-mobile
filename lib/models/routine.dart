@@ -55,14 +55,14 @@ class RoutineSubtask {
   const RoutineSubtask({
     required this.id,
     required this.name,
-    required this.emoji,
-    required this.durationMinutes,
+    this.emoji = '📌',
+    this.durationMinutes = 0,
   });
 
   factory RoutineSubtask.fromJson(Map<String, dynamic> j) => RoutineSubtask(
         id: j['id'] ?? '',
         name: j['name'] ?? '',
-        emoji: j['emoji'] ?? '📋',
+        emoji: j['emoji'] ?? '📌',
         durationMinutes: j['durationMinutes'] ?? 0,
       );
 
@@ -123,7 +123,7 @@ class Routine {
   factory Routine.fromJson(Map<String, dynamic> j) => Routine(
         id: j['id'] ?? '',
         name: j['name'] ?? '',
-        icon: j['icon'] ?? '🔄',
+        icon: j['icon'] ?? 'ðŸ”„',
         color: j['color'] ?? 0xFF6366F1,
         steps: (j['steps'] as List?)
                 ?.map((s) => RoutineStep.fromJson(s))
@@ -167,7 +167,7 @@ class Routine {
       steps.fold(0, (sum, s) => sum + (s.estimatedMinutes ?? 0));
 
   int get totalSubtaskMinutes =>
-      subtasks.fold(0, (sum, s) => sum + s.durationMinutes);
+      subtasks.fold(0, (s, t) => s + t.durationMinutes);
 
   Routine copyWith({
     String? id,
@@ -211,7 +211,7 @@ class Routine {
       );
 }
 
-// ── Routine Log — records actual execution timings ──────────────
+// Routine log records actual execution timings.
 
 class RoutineLogEntry {
   final String stepId;
