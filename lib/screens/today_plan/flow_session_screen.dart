@@ -37,7 +37,9 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
   int _activityElapsed = 0;
   int _totalElapsed = 0;
   Timer? _tickTimer;
+  Timer? _resumePulseTimer;
   bool _localPaused = false;
+  bool _showResumeAtFullOpacity = true;
 
   // ── Quote rotation ──────────────────────────────────────────
   Timer? _quoteTimer;
@@ -76,6 +78,7 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
     WakelockPlus.enable();
 
     _startTimers();
+    _startResumePulse();
   }
 
   void _startTimers() {
@@ -91,6 +94,20 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
       _setStateIfMounted(
         () => _currentQuote = kFocusQuotes[_rng.nextInt(kFocusQuotes.length)],
       );
+    });
+  }
+
+  void _startResumePulse() {
+    _resumePulseTimer = Timer.periodic(const Duration(milliseconds: 800), (_) {
+      if (_localPaused) {
+        _setStateIfMounted(() {
+          _showResumeAtFullOpacity = !_showResumeAtFullOpacity;
+        });
+        return;
+      }
+      if (!_showResumeAtFullOpacity) {
+        _setStateIfMounted(() => _showResumeAtFullOpacity = true);
+      }
     });
   }
 
@@ -119,6 +136,7 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
     WidgetsBinding.instance.removeObserver(this);
     _tickTimer?.cancel();
     _quoteTimer?.cancel();
+    _resumePulseTimer?.cancel();
     WakelockPlus.disable();
     super.dispose();
   }
@@ -131,6 +149,15 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
       return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
     }
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  String _to12h(String hhmm) {
+    final parts = hhmm.split(':');
+    final h24 = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 0 : 0;
+    final m = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+    final suffix = h24 < 12 ? 'AM' : 'PM';
+    final h12 = h24 % 12 == 0 ? 12 : h24 % 12;
+    return '$h12:${m.toString().padLeft(2, '0')} $suffix';
   }
 
   // ── Actions ──────────────────────────────────────────────────
@@ -327,6 +354,34 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
     return null;
   }
 
+  Block? _blockForCurrentActivity(AppProvider app, FlowActivity? activity) {
+    if (activity == null || !activity.id.startsWith('task-')) return null;
+
+    final blockId = activity.id.substring(5);
+    final planBlocks =
+        app.getDayPlan(widget.dateKey)?.blocks ?? const <Block>[];
+    for (final block in planBlocks) {
+      if (block.id == blockId) {
+        return block;
+      }
+    }
+    return null;
+  }
+
+  Block? _nextBlockAfterCurrent(AppProvider app, Block? currentBlock) {
+    if (currentBlock == null) return null;
+
+    final sortedBlocks =
+        List<Block>.from(app.getDayPlan(widget.dateKey)?.blocks ?? const [])
+          ..sort((a, b) => a.index.compareTo(b.index));
+    final currentIndex =
+        sortedBlocks.indexWhere((block) => block.id == currentBlock.id);
+    if (currentIndex < 0 || currentIndex + 1 >= sortedBlocks.length) {
+      return null;
+    }
+    return sortedBlocks[currentIndex + 1];
+  }
+
   List<StudyTask> _plannedQueueFromBlock(Block block) {
     final notes = block.reflectionNotes;
     if (notes == null || notes.isEmpty) {
@@ -447,6 +502,8 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
     // Current active activity
     final currentActivity = flow?.nextPendingActivity;
     final isFlowPaused = flow?.isPaused == true || flow?.isStopped == true;
+    final currentBlock = _blockForCurrentActivity(app, currentActivity);
+    final nextBlock = _nextBlockAfterCurrent(app, currentBlock);
     final studySessionBlock =
         _studySessionBlockForActivity(app, currentActivity);
     final plannedQueue = studySessionBlock != null
@@ -590,6 +647,17 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  if (currentBlock != null &&
+                      currentBlock.plannedEndTime.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Ends at ${_to12h(currentBlock.plannedEndTime)}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurface.withValues(alpha: 0.58),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ] else ...[
                   Icon(Icons.check_circle_rounded,
                       size: 64, color: const Color(0xFF10B981)),
@@ -669,12 +737,16 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
                       // Pause / Resume
                       if (_localPaused)
                         Expanded(
-                          child: _ActionButton(
-                            icon: Icons.play_arrow_rounded,
-                            label: 'Resume',
-                            color: Colors.white,
-                            backgroundColor: const Color(0xFF3B82F6),
-                            onTap: _resumeFlow,
+                          child: AnimatedOpacity(
+                            duration: const Duration(milliseconds: 800),
+                            opacity: _showResumeAtFullOpacity ? 1.0 : 0.6,
+                            child: _ActionButton(
+                              icon: Icons.play_arrow_rounded,
+                              label: 'Resume',
+                              color: Colors.white,
+                              backgroundColor: const Color(0xFF3B82F6),
+                              onTap: _resumeFlow,
+                            ),
                           ),
                         )
                       else
@@ -736,6 +808,57 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
                 ),
 
                 const SizedBox(height: 24),
+
+                if (nextBlock != null)
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest.withValues(alpha: 0.38),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border(
+                        left: BorderSide(
+                          color: cs.primary.withValues(alpha: 0.75),
+                          width: 4,
+                        ),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Up next',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: cs.onSurface.withValues(alpha: 0.55),
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          nextBlock.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: cs.onSurface.withValues(alpha: 0.82),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${_to12h(nextBlock.plannedStartTime)} • ${_formatDurationLabel(nextBlock.plannedDurationMinutes)}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.onSurface.withValues(alpha: 0.56),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             );
           },
