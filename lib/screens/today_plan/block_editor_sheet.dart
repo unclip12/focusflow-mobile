@@ -655,7 +655,6 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                                 ),
                                 Switch(
                                   value: _isEvent,
-                                  activeThumbColor: _accentColor,
                                   onChanged: (value) => setState(() => _isEvent = value),
                                 ),
                               ],
