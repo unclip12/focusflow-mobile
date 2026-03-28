@@ -13,6 +13,7 @@ import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
+import 'block_editor_sheet.dart';
 import 'free_gap_panel.dart';
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -356,160 +357,106 @@ class _TimelineViewState extends State<TimelineView> {
   }
 
   void _showEditSheet(Block block) {
-    final cs = Theme.of(context).colorScheme;
-    final nameCtrl = TextEditingController(text: block.title);
-    TimeOfDay? startTime;
-    TimeOfDay? endTime;
-    bool isEvent = block.isEvent;
-
-    final sp = block.plannedStartTime.split(':');
-    if (sp.length == 2) startTime = TimeOfDay(
-        hour: int.tryParse(sp[0]) ?? 0, minute: int.tryParse(sp[1]) ?? 0);
-    final ep = block.plannedEndTime.split(':');
-    if (ep.length == 2) endTime = TimeOfDay(
-        hour: int.tryParse(ep[0]) ?? 0, minute: int.tryParse(ep[1]) ?? 0);
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) {
-          String fmt(TimeOfDay? t) {
-            if (t == null) return '--';
-            final h12 = t.hour % 12 == 0 ? 12 : t.hour % 12;
-            final suffix = t.hour < 12 ? 'AM' : 'PM';
-            return '$h12:${t.minute.toString().padLeft(2, '0')} $suffix';
-          }
-
-          return Container(
-            padding: EdgeInsets.fromLTRB(20, 20, 20,
-                MediaQuery.of(ctx).viewInsets.bottom + MediaQuery.of(ctx).padding.bottom + 20),
-            decoration: BoxDecoration(
-              color: cs.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(child: Container(width: 40, height: 4,
-                    decoration: BoxDecoration(
-                      color: cs.onSurface.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(2),
-                    ))),
-                const SizedBox(height: 16),
-                Text('Edit Block', style: TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface)),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Block name',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(children: [
-                  Expanded(child: OutlinedButton.icon(
-                    onPressed: () async {
-                      final picked = await showTimePicker(
-                        context: ctx, initialTime: startTime ?? TimeOfDay.now(),
-                        builder: (c, child) => MediaQuery(
-                            data: MediaQuery.of(c).copyWith(alwaysUse24HourFormat: false),
-                            child: child!),
-                      );
-                      if (picked != null) setS(() => startTime = picked);
-                    },
-                    icon: const Icon(Icons.access_time_rounded, size: 16),
-                    label: Text(fmt(startTime)),
-                  )),
-                  const SizedBox(width: 8),
-                  Expanded(child: OutlinedButton.icon(
-                    onPressed: () async {
-                      final picked = await showTimePicker(
-                        context: ctx, initialTime: endTime ?? TimeOfDay.now(),
-                        builder: (c, child) => MediaQuery(
-                            data: MediaQuery.of(c).copyWith(alwaysUse24HourFormat: false),
-                            child: child!),
-                      );
-                      if (picked != null) setS(() => endTime = picked);
-                    },
-                    icon: const Icon(Icons.access_time_rounded, size: 16),
-                    label: Text(fmt(endTime)),
-                  )),
-                ]),
-                const SizedBox(height: 12),
-                SwitchListTile(
-                  title: const Text('Fixed Event', style: TextStyle(fontSize: 14)),
-                  subtitle: isEvent
-                      ? Text('Event times are fixed and won\'t be moved by the scheduler',
-                          style: TextStyle(fontSize: 11,
-                              color: cs.error.withValues(alpha: 0.7)))
-                      : null,
-                  value: isEvent,
-                  onChanged: (v) => setS(() => isEvent = v),
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                ),
-                const SizedBox(height: 16),
-                Row(children: [
-                  Expanded(child: OutlinedButton.icon(
-                    onPressed: () { Navigator.pop(ctx); _deleteBlock(block); },
-                    icon: Icon(Icons.delete_outline_rounded, size: 16, color: cs.error),
-                    label: Text('Delete', style: TextStyle(color: cs.error)),
-                    style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: cs.error.withValues(alpha: 0.3))),
-                  )),
-                  const SizedBox(width: 8),
-                  Expanded(child: FilledButton.icon(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _saveBlockEdit(block, nameCtrl.text.trim(), startTime, endTime, isEvent);
-                    },
-                    icon: const Icon(Icons.check_rounded, size: 16),
-                    label: const Text('Save'),
-                  )),
-                ]),
-              ],
-            ),
-          );
+      builder: (_) => BlockEditorSheet(
+        block: block,
+        onSave: (update) => _saveBlockEdit(block, update),
+        onDelete: () {
+          Navigator.of(context).pop();
+          _deleteBlock(block);
         },
       ),
     );
   }
 
-  String _fmtTimeOfDay(TimeOfDay t) =>
-      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  List<Block> _reindexBlocks(List<Block> blocks) {
+    return <Block>[
+      for (var i = 0; i < blocks.length; i++) blocks[i].copyWith(index: i),
+    ];
+  }
 
-  void _saveBlockEdit(Block block, String newTitle,
-      TimeOfDay? newStart, TimeOfDay? newEnd, bool newIsEvent) {
+  DayPlan _emptyPlanForDate(String dateKey, List<Block> blocks) {
+    return DayPlan(
+      date: dateKey,
+      faPages: const [],
+      faPagesCount: 0,
+      videos: const [],
+      notesFromUser: '',
+      notesFromAI: '',
+      attachments: const [],
+      breaks: const [],
+      blocks: blocks,
+      totalStudyMinutesPlanned: 0,
+      totalBreakMinutes: 0,
+    );
+  }
+
+  DateTime _anchorForStartTime(String hhmm) {
+    final minutes = _toMinutes(hhmm);
+    final now = DateTime.now();
+    return DateTime(
+      now.year,
+      now.month,
+      now.day,
+      minutes ~/ 60,
+      minutes % 60,
+    );
+  }
+
+  Future<void> _saveBlockEdit(Block block, BlockEditorUpdate update) async {
     final app = context.read<AppProvider>();
-    final plan = app.getDayPlan(widget.dateKey);
-    if (plan == null) return;
-    final blocks = List<Block>.from(plan.blocks ?? []);
-    final idx = blocks.indexWhere((b) => b.id == block.id);
-    if (idx < 0) return;
+    final sourcePlan = app.getDayPlan(widget.dateKey);
+    if (sourcePlan == null) return;
+    final sourceBlocks = List<Block>.from(sourcePlan.blocks ?? []);
+    final sourceIndex = sourceBlocks.indexWhere((b) => b.id == block.id);
+    if (sourceIndex < 0) return;
 
-    final startStr = newStart != null ? _fmtTimeOfDay(newStart) : block.plannedStartTime;
-    final endStr = newEnd != null ? _fmtTimeOfDay(newEnd) : block.plannedEndTime;
-    final durMinutes = _toMinutes(endStr) - _toMinutes(startStr);
-
-    blocks[idx] = blocks[idx].copyWith(
-      title: newTitle.isNotEmpty ? newTitle : block.title,
-      plannedStartTime: startStr,
-      plannedEndTime: endStr,
-      plannedDurationMinutes: durMinutes > 0 ? durMinutes : block.plannedDurationMinutes,
-      remainingDurationMinutes: durMinutes > 0 ? durMinutes : block.remainingDurationMinutes,
-      isEvent: newIsEvent,
+    final updatedBlock = sourceBlocks[sourceIndex].copyWith(
+      date: update.dateKey,
+      title: update.title.isNotEmpty ? update.title : block.title,
+      description: update.description,
+      plannedStartTime: update.plannedStartTime,
+      plannedEndTime: update.plannedEndTime,
+      plannedDurationMinutes: update.plannedDurationMinutes,
+      remainingDurationMinutes: update.plannedDurationMinutes > 0
+          ? update.plannedDurationMinutes
+          : block.remainingDurationMinutes,
+      isEvent: update.isEvent,
+      type: update.type,
     );
 
-    app.upsertDayPlan(plan.copyWith(blocks: blocks));
-    app.rescheduleFrom(
-      widget.dateKey,
-      DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day,
-          newStart?.hour ?? 0, newStart?.minute ?? 0),
+    if (update.dateKey == widget.dateKey) {
+      sourceBlocks[sourceIndex] = updatedBlock;
+      await app.upsertDayPlan(
+        sourcePlan.copyWith(blocks: _reindexBlocks(sourceBlocks)),
+      );
+      await app.rescheduleFrom(
+        widget.dateKey,
+        _anchorForStartTime(update.plannedStartTime),
+      );
+      return;
+    }
+
+    sourceBlocks.removeAt(sourceIndex);
+    final updatedSourceBlocks = _reindexBlocks(sourceBlocks);
+    await app.upsertDayPlan(sourcePlan.copyWith(blocks: updatedSourceBlocks));
+    await app.syncFlowActivitiesFromDayPlan(widget.dateKey);
+
+    final targetPlan = app.getDayPlan(update.dateKey);
+    final targetBlocks = List<Block>.from(targetPlan?.blocks ?? const <Block>[]);
+    targetBlocks.add(updatedBlock.copyWith(index: targetBlocks.length, date: update.dateKey));
+    final updatedTargetBlocks = _reindexBlocks(targetBlocks);
+    await app.upsertDayPlan(
+      targetPlan?.copyWith(blocks: updatedTargetBlocks) ??
+          _emptyPlanForDate(update.dateKey, updatedTargetBlocks),
+    );
+    await app.rescheduleFrom(
+      update.dateKey,
+      _anchorForStartTime(update.plannedStartTime),
     );
   }
 
