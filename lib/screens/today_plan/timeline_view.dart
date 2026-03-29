@@ -131,6 +131,31 @@ const double _kTimelineStatusSize = 20;
 const Color _kTimelineAccent = Color(0xFFE8837A);
 const Color _kTimelineComplete = Color(0xFF10B981);
 const Color _kTimelineGapAccent = _kTimelineAccent;
+const double _kGapRowMinHeight = 80;
+const double _kGapRowHorizontalPadding = 16;
+const double _kGapRowVerticalPadding = 8;
+const double _kGapButtonHeight = 36;
+const double _kGapButtonHorizontalPadding = 20;
+const double _kGapPromptToButtonSpacing = 6;
+const double _kGapButtonToDividerSpacing = 8;
+const double _kGapDividerToFutureSpacing = 8;
+const double _kGapFutureToButtonSpacing = 6;
+const double _kGapSectionBottomSpacing = 12;
+
+double _gapSlotHeight(
+  int minutes, {
+  required bool hasPastSection,
+  required bool hasFutureSection,
+}) {
+  final scaledHeight = _scaledTimelineHeight(minutes);
+  final contentMinHeight = hasPastSection && hasFutureSection
+      ? 168.0
+      : (hasPastSection || hasFutureSection ? 108.0 : _kGapRowMinHeight);
+  return math.max(
+    _kGapRowMinHeight,
+    math.max(scaledHeight, contentMinHeight),
+  );
+}
 
 Color _colorFromHex(String? value, {Color fallback = _kTimelineAccent}) {
   if (value == null || value.trim().isEmpty) return fallback;
@@ -1023,13 +1048,15 @@ class _TimelineViewState extends State<TimelineView> {
                     itemBuilder: (context, index) {
                       final item = items[index];
                       if (item.isGap) {
-                        final gapHeight = _timelinePillHeight(
-                          item.gapEndMinutes! - item.gapStartMinutes!,
-                        );
                         final gapState = _buildGapActionState(
                           gapStartMinutes: item.gapStartMinutes!,
                           gapEndMinutes: item.gapEndMinutes!,
                           dayStartMinutes: bounds.startMinutes,
+                        );
+                        final gapHeight = _gapSlotHeight(
+                          item.gapEndMinutes! - item.gapStartMinutes!,
+                          hasPastSection: gapState.canAddLog,
+                          hasFutureSection: gapState.canAddTask,
                         );
                         return KeyedSubtree(
                           key: ValueKey(
@@ -2179,8 +2206,13 @@ class _GapSlot extends StatelessWidget {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
     final gapMinutes = endMinutes - startMinutes;
-    final scaledGapHeight = _scaledTimelineHeight(gapMinutes);
-    final gapHeight = scaledGapHeight < 56.0 ? 56.0 : scaledGapHeight;
+    final hasPastSection = showPastPrompt;
+    final hasFutureSection = onAddTask != null;
+    final gapHeight = _gapSlotHeight(
+      gapMinutes,
+      hasPastSection: hasPastSection,
+      hasFutureSection: hasFutureSection,
+    );
 
     final hourTicks = <int>[];
     final firstHourInGap = (startMinutes ~/ 60) * 60 + 60;
@@ -2204,237 +2236,293 @@ class _GapSlot extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
-        child: SizedBox(
-          height: gapHeight,
-          child: Stack(
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(width: _kTimelineLeadingWidth),
-                  SizedBox(
-                    width: _kTimelineTimeWidth,
-                    height: gapHeight,
-                    child: Stack(
-                      children: [
-                        Positioned(
-                          top: 0,
-                          right: 0,
-                          child: Text(
-                            startLabel,
-                            textAlign: TextAlign.right,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: onSurface.withValues(alpha: 0.58),
-                              fontFeatures: [FontFeature.tabularFigures()],
-                            ),
-                          ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: gapHeight),
+          child: SizedBox(
+            height: gapHeight,
+            child: Stack(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(width: _kTimelineLeadingWidth),
+                    SizedBox(
+                      width: _kTimelineTimeWidth,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: _kGapRowVerticalPadding,
                         ),
-                        ...hourTicks.map((tick) {
-                          final fraction = (tick - startMinutes) / gapMinutes;
-                          final topPos = fraction * gapHeight;
-                          return Positioned(
-                            top: topPos - 6,
-                            right: 0,
-                            child: Text(
-                              _to12hShort(_minutesToHHMM(tick)),
-                              textAlign: TextAlign.right,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                                color: onSurface.withValues(alpha: 0.45),
-                                fontFeatures: [FontFeature.tabularFigures()],
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              top: 0,
+                              right: 0,
+                              child: Text(
+                                startLabel,
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: onSurface.withValues(alpha: 0.58),
+                                  fontFeatures: [FontFeature.tabularFigures()],
+                                ),
                               ),
                             ),
-                          );
-                        }),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: _kTimelineTimeToPillGap),
-                  SizedBox(
-                    width: _kTimelinePillWidth,
-                    height: gapHeight,
-                    child: Center(
-                      child: CustomPaint(
-                        size: Size(2, gapHeight),
-                        painter: _DashedLinePainter(
-                          color: onSurface.withValues(alpha: 0.14),
+                            ...hourTicks.map((tick) {
+                              final fraction =
+                                  (tick - startMinutes) / gapMinutes;
+                              final topPos = fraction *
+                                  (gapHeight - (_kGapRowVerticalPadding * 2));
+                              return Positioned(
+                                top: topPos - 6,
+                                right: 0,
+                                child: Text(
+                                  _to12hShort(_minutesToHHMM(tick)),
+                                  textAlign: TextAlign.right,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500,
+                                    color: onSurface.withValues(alpha: 0.45),
+                                    fontFeatures: [FontFeature.tabularFigures()],
+                                  ),
+                                ),
+                              );
+                            }),
+                          ],
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: _kTimelineContentGap),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (showPastPrompt) ...[
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(
-                                  Icons.edit_note_rounded,
-                                  size: 16,
-                                  color: onSurface.withValues(alpha: 0.45),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'What did you do here?',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: onSurface.withValues(alpha: 0.55),
-                                    ),
+                    const SizedBox(width: _kTimelineTimeToPillGap),
+                    SizedBox(
+                      width: _kTimelinePillWidth,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: _kGapRowVerticalPadding,
+                        ),
+                        child: Center(
+                          child: CustomPaint(
+                            size: Size(
+                              2,
+                              gapHeight - (_kGapRowVerticalPadding * 2),
+                            ),
+                            painter: _DashedLinePainter(
+                              color: onSurface.withValues(alpha: 0.14),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: _kTimelineContentGap),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: _kGapRowHorizontalPadding,
+                          vertical: _kGapRowVerticalPadding,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (hasPastSection) ...[
+                              _GapHintRow(
+                                icon: Icons.edit_note_rounded,
+                                iconColor: onSurface.withValues(alpha: 0.45),
+                                child: Text(
+                                  'What did you do here?',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: onSurface.withValues(alpha: 0.55),
                                   ),
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                          ],
-                          if (!showPastPrompt || futureDurationMinutes > 0) ...[
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Icons.access_time_outlined,
-                                  size: 15,
-                                  color: _kTimelineAccent,
+                              ),
+                              if (onAddLog != null) ...[
+                                const SizedBox(
+                                  height: _kGapPromptToButtonSpacing,
                                 ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: RichText(
-                                    text: TextSpan(
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                        color: onSurface.withValues(alpha: 0.6),
-                                        height: 1.35,
-                                      ),
-                                      children: [
-                                        const TextSpan(text: 'Use '),
-                                        TextSpan(
-                                          text: futureLabel,
-                                          style: const TextStyle(
-                                            color: _kTimelineGapAccent,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                        TextSpan(
-                                          text: showPastPrompt
-                                              ? ' from here onward.'
-                                              : ' wisely. Create away!',
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                          ],
-                          Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: [
-                              if (onAddLog != null)
-                                OutlinedButton.icon(
+                                _GapActionButton(
                                   onPressed: onAddLog,
                                   icon: Icon(
                                     Icons.add_rounded,
                                     size: 16,
                                     color: onSurface.withValues(alpha: 0.6),
                                   ),
-                                  label: Text(
-                                    'Add Log',
-                                    style: TextStyle(
-                                      color: onSurface.withValues(alpha: 0.72),
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                                  label: 'Add Log',
+                                  labelStyle: TextStyle(
+                                    color: onSurface.withValues(alpha: 0.72),
+                                    fontWeight: FontWeight.w700,
                                   ),
-                                  style: OutlinedButton.styleFrom(
-                                    minimumSize: const Size(0, 34),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                      vertical: 0,
-                                    ),
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                    visualDensity: VisualDensity.compact,
-                                    backgroundColor:
-                                        theme.scaffoldBackgroundColor,
-                                    side: BorderSide(
-                                      color: onSurface.withValues(alpha: 0.22),
-                                    ),
-                                    shape: const StadiumBorder(),
+                                  side: BorderSide(
+                                    color: onSurface.withValues(alpha: 0.22),
                                   ),
+                                  backgroundColor:
+                                      theme.scaffoldBackgroundColor,
                                 ),
-                              if (onAddTask != null)
-                                OutlinedButton.icon(
-                                  onPressed: onAddTask,
-                                  icon: const Icon(
-                                    Icons.add_rounded,
-                                    size: 16,
-                                    color: _kTimelineGapAccent,
-                                  ),
-                                  label: const Text(
-                                    'Add Task',
-                                    style: TextStyle(
-                                      color: _kTimelineGapAccent,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  style: OutlinedButton.styleFrom(
-                                    minimumSize: const Size(0, 34),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                      vertical: 0,
-                                    ),
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                    visualDensity: VisualDensity.compact,
-                                    backgroundColor:
-                                        theme.scaffoldBackgroundColor,
-                                    side: const BorderSide(
-                                      color: _kTimelineGapAccent,
-                                    ),
-                                    shape: const StadiumBorder(),
-                                  ),
+                              ],
+                              if (hasFutureSection) ...[
+                                const SizedBox(
+                                  height: _kGapButtonToDividerSpacing,
+                                ),
+                                Divider(
+                                  height: 1,
+                                  thickness: 1,
+                                  color: onSurface.withValues(alpha: 0.12),
+                                ),
+                                const SizedBox(
+                                  height: _kGapDividerToFutureSpacing,
+                                ),
+                              ] else
+                                const SizedBox(
+                                  height: _kGapSectionBottomSpacing,
                                 ),
                             ],
-                          ),
-                          if (onAddTask == null && onAddLog == null)
-                            Text(
-                              durationLabel,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: onSurface.withValues(alpha: 0.45),
+                            if (hasFutureSection) ...[
+                              _GapHintRow(
+                                icon: Icons.access_time_outlined,
+                                iconColor: _kTimelineAccent,
+                                child: RichText(
+                                  text: TextSpan(
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: _kTimelineGapAccent,
+                                      height: 1.35,
+                                    ),
+                                    children: [
+                                      const TextSpan(text: 'Use '),
+                                      TextSpan(
+                                        text: futureLabel,
+                                        style: const TextStyle(
+                                          color: _kTimelineGapAccent,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      TextSpan(
+                                        text: hasPastSection
+                                            ? ' from here onward'
+                                            : ' wisely...',
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                            ),
-                        ],
+                              const SizedBox(
+                                height: _kGapFutureToButtonSpacing,
+                              ),
+                              _GapActionButton(
+                                onPressed: onAddTask,
+                                icon: const Icon(
+                                  Icons.add_rounded,
+                                  size: 16,
+                                  color: _kTimelineGapAccent,
+                                ),
+                                label: 'Add Task',
+                                labelStyle: const TextStyle(
+                                  color: _kTimelineGapAccent,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                side: const BorderSide(
+                                  color: _kTimelineGapAccent,
+                                ),
+                                backgroundColor: theme.scaffoldBackgroundColor,
+                              ),
+                              const SizedBox(height: _kGapSectionBottomSpacing),
+                            ],
+                            if (!hasPastSection && !hasFutureSection)
+                              Text(
+                                durationLabel,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: onSurface.withValues(alpha: 0.45),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: _kTimelineStatusSize + 10),
+                  ],
+                ),
+                if (nowIndicatorTop != null)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    top: nowIndicatorTop,
+                    child: IgnorePointer(
+                      child: _NowLineOverlay(
+                        label: nowLabel,
+                        backgroundColor: theme.cardColor,
                       ),
                     ),
                   ),
-                  const SizedBox(width: _kTimelineStatusSize + 10),
-                ],
-              ),
-              if (nowIndicatorTop != null)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  top: nowIndicatorTop,
-                  child: _NowLineOverlay(
-                    label: nowLabel,
-                    backgroundColor: theme.cardColor,
-                  ),
-                ),
-            ],
+              ],
+            ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GapHintRow extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final Widget child;
+
+  const _GapHintRow({
+    required this.icon,
+    required this.iconColor,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: iconColor),
+        const SizedBox(width: 8),
+        Expanded(child: child),
+      ],
+    );
+  }
+}
+
+class _GapActionButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+  final Widget icon;
+  final String label;
+  final TextStyle labelStyle;
+  final BorderSide side;
+  final Color backgroundColor;
+
+  const _GapActionButton({
+    required this.onPressed,
+    required this.icon,
+    required this.label,
+    required this.labelStyle,
+    required this.side,
+    required this.backgroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: _kGapButtonHeight,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: icon,
+        label: Text(label, style: labelStyle),
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, _kGapButtonHeight),
+          padding: const EdgeInsets.symmetric(
+            horizontal: _kGapButtonHorizontalPadding,
+          ),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
+          backgroundColor: backgroundColor,
+          side: side,
+          shape: const StadiumBorder(),
         ),
       ),
     );
