@@ -30,6 +30,8 @@ class StudySessionPicker extends StatefulWidget {
 class _StudySessionPickerState extends State<StudySessionPicker> {
   final List<StudyTask> _queue = [];
   static const _plannedStudySessionKind = 'planned_study_session';
+  static const double _kQueuePickerBottomActionClearance = 104;
+  static const double _kQueuePickerActionScrollPadding = 192;
 
   List<Block> _plannedSessionBlocks(AppProvider app) {
     final plan = app.getDayPlan(widget.dateKey);
@@ -1361,7 +1363,8 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                     16,
                     0,
                     16,
-                    MediaQuery.of(ctx).padding.bottom + 72 + 20,
+                    MediaQuery.of(ctx).padding.bottom +
+                        _kQueuePickerActionScrollPadding,
                   ),
                   itemCount: pages.length,
                   itemBuilder: (ctx, i) {
@@ -1412,7 +1415,8 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                   left: 16,
                   top: 16,
                   right: 16,
-                  bottom: MediaQuery.of(ctx).padding.bottom + 16,
+                  bottom: MediaQuery.of(ctx).padding.bottom +
+                      _kQueuePickerBottomActionClearance,
                 ),
                 child: SizedBox(
                   width: double.infinity,
@@ -1573,7 +1577,8 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                     16,
                     0,
                     16,
-                    MediaQuery.of(ctx).padding.bottom + 20,
+                    MediaQuery.of(ctx).padding.bottom +
+                        _kQueuePickerActionScrollPadding,
                   ),
                   itemCount: topics.length,
                   itemBuilder: (ctx, i) {
@@ -1616,7 +1621,13 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  MediaQuery.of(ctx).padding.bottom +
+                      _kQueuePickerBottomActionClearance,
+                ),
                 child: SizedBox(
                   width: double.infinity,
                   child: FilledButton(
@@ -1747,7 +1758,8 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                       16,
                       0,
                       16,
-                      MediaQuery.of(ctx).padding.bottom + 20,
+                      MediaQuery.of(ctx).padding.bottom +
+                          _kQueuePickerActionScrollPadding,
                     ),
                     itemCount: categoryVideos.length,
                     itemBuilder: (ctx, i) {
@@ -1803,7 +1815,13 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                   ),
                 ),
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  MediaQuery.of(ctx).padding.bottom +
+                      _kQueuePickerBottomActionClearance,
+                ),
                 child: SizedBox(
                   width: double.infinity,
                   child: FilledButton(
@@ -1908,7 +1926,8 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                       16,
                       0,
                       16,
-                      MediaQuery.of(ctx).padding.bottom + 20,
+                      MediaQuery.of(ctx).padding.bottom +
+                          _kQueuePickerActionScrollPadding,
                     ),
                     itemCount: chapters.length,
                     itemBuilder: (ctx, i) {
@@ -1953,10 +1972,16 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                     },
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: SizedBox(
-                    width: double.infinity,
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  MediaQuery.of(ctx).padding.bottom +
+                      _kQueuePickerBottomActionClearance,
+                ),
+                child: SizedBox(
+                  width: double.infinity,
                     child: FilledButton(
                       onPressed: selectedChapters.isEmpty
                           ? null
