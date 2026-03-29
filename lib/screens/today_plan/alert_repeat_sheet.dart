@@ -117,118 +117,123 @@ class _AlertRepeatSheetState extends State<AlertRepeatSheet> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).padding.bottom + 20;
     final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
+    final scaffoldBackgroundColor = Theme.of(context).scaffoldBackgroundColor;
 
-    return FractionallySizedBox(
-      heightFactor: 0.92,
-      child: AnimatedPadding(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        padding: EdgeInsets.only(bottom: keyboardInset),
-        child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-          child: Material(
-            color: _bodyColor,
-            child: SafeArea(
-              top: false,
-              child: Column(
-                children: [
-                  const SizedBox(height: 12),
-                  Container(
-                    width: 44,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(999),
+    return Material(
+      color: scaffoldBackgroundColor,
+      child: FractionallySizedBox(
+        heightFactor: 0.92,
+        child: AnimatedPadding(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: EdgeInsets.only(bottom: keyboardInset),
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+            child: Material(
+              color: _bodyColor,
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 12),
+                    Container(
+                      width: 44,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(16, 20, 16, bottomInset),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const _SectionTitle('Alert'),
-                          const SizedBox(height: 10),
-                          _OptionGroup<int>(
-                            options: _alertOptions,
-                            selectedValue: _alertOffsetMinutes,
-                            onSelected: (value) =>
-                                setState(() => _alertOffsetMinutes = value),
-                          ),
-                          const SizedBox(height: 24),
-                          const _SectionTitle('Alert Type'),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: List<Widget>.generate(
-                                _alertTypeOptions.length, (index) {
-                              final option = _alertTypeOptions[index];
-                              return Expanded(
-                                child: Padding(
-                                  padding: EdgeInsets.only(
-                                    right: index == _alertTypeOptions.length - 1
-                                        ? 0
-                                        : 8,
-                                  ),
-                                  child: _SelectionChip(
-                                    label: option.label,
-                                    selected: _alertType == option.value,
-                                    onTap: () => setState(
-                                        () => _alertType = option.value),
-                                  ),
-                                ),
-                              );
-                            }),
-                          ),
-                          const SizedBox(height: 24),
-                          const _SectionTitle('Repeat'),
-                          const SizedBox(height: 10),
-                          _OptionGroup<String>(
-                            options: _repeatOptions,
-                            selectedValue: _recurrenceType,
-                            onSelected: (value) =>
-                                setState(() => _recurrenceType = value),
-                          ),
-                          if (_recurrenceType == 'weekly') ...[
-                            const SizedBox(height: 14),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.fromLTRB(16, 20, 16, bottomInset),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const _SectionTitle('Alert'),
+                            const SizedBox(height: 10),
+                            _OptionGroup<int>(
+                              options: _alertOptions,
+                              selectedValue: _alertOffsetMinutes,
+                              onSelected: (value) =>
+                                  setState(() => _alertOffsetMinutes = value),
+                            ),
+                            const SizedBox(height: 24),
+                            const _SectionTitle('Alert Type'),
+                            const SizedBox(height: 10),
+                            Row(
                               children: List<Widget>.generate(
-                                  _weekdayToggleLabels.length, (index) {
-                                return _WeekdayChip(
-                                  label: _weekdayToggleLabels[index],
-                                  selected: _recurrenceDays.contains(index),
-                                  onTap: () => _toggleRecurrenceDay(index),
+                                  _alertTypeOptions.length, (index) {
+                                final option = _alertTypeOptions[index];
+                                return Expanded(
+                                  child: Padding(
+                                    padding: EdgeInsets.only(
+                                      right:
+                                          index == _alertTypeOptions.length - 1
+                                              ? 0
+                                              : 8,
+                                    ),
+                                    child: _SelectionChip(
+                                      label: option.label,
+                                      selected: _alertType == option.value,
+                                      onTap: () => setState(
+                                          () => _alertType = option.value),
+                                    ),
+                                  ),
                                 );
                               }),
                             ),
-                          ],
-                          const SizedBox(height: 28),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              style: FilledButton.styleFrom(
-                                backgroundColor: _accentColor,
-                                foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 18),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                textStyle: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              onPressed: _handleDone,
-                              child: const Text('Done'),
+                            const SizedBox(height: 24),
+                            const _SectionTitle('Repeat'),
+                            const SizedBox(height: 10),
+                            _OptionGroup<String>(
+                              options: _repeatOptions,
+                              selectedValue: _recurrenceType,
+                              onSelected: (value) =>
+                                  setState(() => _recurrenceType = value),
                             ),
-                          ),
-                        ],
+                            if (_recurrenceType == 'weekly') ...[
+                              const SizedBox(height: 14),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: List<Widget>.generate(
+                                    _weekdayToggleLabels.length, (index) {
+                                  return _WeekdayChip(
+                                    label: _weekdayToggleLabels[index],
+                                    selected: _recurrenceDays.contains(index),
+                                    onTap: () => _toggleRecurrenceDay(index),
+                                  );
+                                }),
+                              ),
+                            ],
+                            const SizedBox(height: 28),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: _accentColor,
+                                  foregroundColor: Colors.white,
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 18),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  textStyle: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                onPressed: _handleDone,
+                                child: const Text('Done'),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

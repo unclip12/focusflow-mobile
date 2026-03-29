@@ -564,339 +564,359 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
     final durationLabel = _formatDuration(_durationMinutes);
     final dateLabel = DateFormat('EEE, MMM d, yyyy').format(_selectedDate);
     final relativeLabel = _relativeDateLabel(_selectedDate);
+    final scaffoldBackgroundColor = Theme.of(context).scaffoldBackgroundColor;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final bottomPadding = MediaQuery.of(context).padding.bottom + 20;
 
-    return FractionallySizedBox(
-      heightFactor: 0.96,
-      child: AnimatedPadding(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        padding: EdgeInsets.only(bottom: bottomInset),
-        child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
-          child: Material(
-            color: _bodyColor,
-            child: Column(
-              children: [
-                Container(
-                  color: _headerColor,
-                  padding: EdgeInsets.fromLTRB(
-                    18,
-                    18,
-                    18,
-                    MediaQuery.of(context).padding.top + 18,
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          _CircleIconButton(
-                            icon: Icons.close_rounded,
-                            onTap: () => Navigator.of(context).pop(),
-                          ),
-                          const Spacer(),
-                          _StatusRing(status: widget.block.status),
-                        ],
+    return Material(
+      color: scaffoldBackgroundColor,
+      child: FractionallySizedBox(
+        heightFactor: 0.96,
+        child: AnimatedPadding(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: EdgeInsets.only(bottom: bottomInset),
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
+            child: Material(
+              color: _bodyColor,
+              child: Column(
+                children: [
+                  ColoredBox(
+                    color: _headerColor,
+                    child: Container(
+                      color: _headerColor,
+                      padding: EdgeInsets.fromLTRB(
+                        18,
+                        18,
+                        18,
+                        MediaQuery.of(context).padding.top + 18,
                       ),
-                      const SizedBox(height: 10),
-                      Stack(
-                        clipBehavior: Clip.none,
-                        alignment: Alignment.center,
+                      child: Column(
                         children: [
-                          InkWell(
-                            onTap: _pickEmoji,
-                            borderRadius: BorderRadius.circular(999),
-                            child: Container(
-                              width: 82,
-                              height: 82,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF49494D),
-                                shape: BoxShape.circle,
-                                border:
-                                    Border.all(color: Colors.white, width: 3),
+                          Row(
+                            children: [
+                              _CircleIconButton(
+                                icon: Icons.close_rounded,
+                                onTap: () => Navigator.of(context).pop(),
                               ),
-                              alignment: Alignment.center,
-                              child: Text(_selectedEmoji,
-                                  style: const TextStyle(fontSize: 34)),
+                              const Spacer(),
+                              _StatusRing(status: widget.block.status),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Stack(
+                            clipBehavior: Clip.none,
+                            alignment: Alignment.center,
+                            children: [
+                              InkWell(
+                                onTap: _pickEmoji,
+                                borderRadius: BorderRadius.circular(999),
+                                child: Container(
+                                  width: 82,
+                                  height: 82,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF49494D),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.white, width: 3),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(_selectedEmoji,
+                                      style: const TextStyle(fontSize: 34)),
+                                ),
+                              ),
+                              Positioned(
+                                bottom: -10,
+                                child: Material(
+                                  color: _accentColor,
+                                  shape: const CircleBorder(),
+                                  child: InkWell(
+                                    onTap: _pickHeaderColor,
+                                    customBorder: const CircleBorder(),
+                                    child: const SizedBox(
+                                      width: 34,
+                                      height: 34,
+                                      child: Icon(Icons.palette_outlined,
+                                          color: Colors.white, size: 18),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            '$timeLabel ($durationLabel)',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          Positioned(
-                            bottom: -10,
-                            child: Material(
-                              color: _accentColor,
-                              shape: const CircleBorder(),
-                              child: InkWell(
-                                onTap: _pickHeaderColor,
-                                customBorder: const CircleBorder(),
-                                child: const SizedBox(
-                                  width: 34,
-                                  height: 34,
-                                  child: Icon(Icons.palette_outlined,
-                                      color: Colors.white, size: 18),
+                          const SizedBox(height: 4),
+                          ColoredBox(
+                            color: _headerColor,
+                            child: TextField(
+                              controller: _titleController,
+                              scrollPadding: const EdgeInsets.only(bottom: 24),
+                              onChanged: (value) {
+                                final suggestion =
+                                    TaskSuggestionsService.suggest(value);
+                                setState(() {
+                                  if (!_userChangedEmoji) {
+                                    _selectedEmoji = suggestion.emoji;
+                                  }
+                                  if (!_userChangedColor) {
+                                    _colorHex = suggestion.colorHex;
+                                    _headerColor =
+                                        _colorFromHex(suggestion.colorHex);
+                                  }
+                                  _selectedType = suggestion.category;
+                                });
+                              },
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                              ),
+                              cursorColor: Colors.white,
+                              decoration: const InputDecoration(
+                                hintText: 'Task title',
+                                hintStyle: TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                border: UnderlineInputBorder(
+                                  borderSide: BorderSide(color: Colors.white54),
+                                ),
+                                enabledBorder: UnderlineInputBorder(
+                                  borderSide: BorderSide(color: Colors.white54),
+                                ),
+                                focusedBorder: UnderlineInputBorder(
+                                  borderSide: BorderSide(color: Colors.white54),
                                 ),
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 24),
-                      Text(
-                        '$timeLabel ($durationLabel)',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      TextField(
-                        controller: _titleController,
-                        scrollPadding: const EdgeInsets.only(bottom: 24),
-                        onChanged: (value) {
-                          final suggestion =
-                              TaskSuggestionsService.suggest(value);
-                          setState(() {
-                            if (!_userChangedEmoji) {
-                              _selectedEmoji = suggestion.emoji;
-                            }
-                            if (!_userChangedColor) {
-                              _colorHex = suggestion.colorHex;
-                              _headerColor = _colorFromHex(suggestion.colorHex);
-                            }
-                            _selectedType = suggestion.category;
-                          });
-                        },
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 30,
-                          fontWeight: FontWeight.w800,
-                        ),
-                        cursorColor: Colors.white,
-                        decoration: const InputDecoration(
-                          hintText: 'Task title',
-                          hintStyle: TextStyle(
-                            color: Colors.white54,
-                            fontSize: 30,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          enabledBorder: UnderlineInputBorder(
-                              borderSide: BorderSide(color: Colors.white54)),
-                          focusedBorder: UnderlineInputBorder(
-                              borderSide: BorderSide(color: Colors.white)),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _Card(
-                          children: [
-                            _ActionRow(
-                              icon: Icons.calendar_today_rounded,
-                              iconColor: _accentColor,
-                              title: dateLabel,
-                              trailing: relativeLabel,
-                              onTap: _pickDate,
-                            ),
-                            _ActionRow(
-                              icon: Icons.access_time_filled_rounded,
-                              iconColor: _accentColor,
-                              title: timeLabel,
-                              trailing: durationLabel,
-                              onTap: _pickTime,
-                            ),
-                            _ActionRow(
-                              icon: Icons.notifications_rounded,
-                              iconColor: const Color(0xFFB78A88),
-                              title: 'Alert',
-                              trailing: _alertRowSummary(),
-                              onTap: _openAlertRepeatSheet,
-                            ),
-                            _ActionRow(
-                              icon: Icons.repeat_rounded,
-                              iconColor: const Color(0xFFB78A88),
-                              title: 'Repeat',
-                              trailing: _repeatRowSummary(),
-                              onTap: _openAlertRepeatSheet,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        _Card(
-                          children: [
-                            Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(16, 14, 16, 12),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.event_rounded,
-                                      color:
-                                          Colors.white.withValues(alpha: 0.75)),
-                                  const SizedBox(width: 12),
-                                  const Expanded(
-                                    child: Text(
-                                      'Fixed Event',
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _Card(
+                            children: [
+                              _ActionRow(
+                                icon: Icons.calendar_today_rounded,
+                                iconColor: _accentColor,
+                                title: dateLabel,
+                                trailing: relativeLabel,
+                                onTap: _pickDate,
+                              ),
+                              _ActionRow(
+                                icon: Icons.access_time_filled_rounded,
+                                iconColor: _accentColor,
+                                title: timeLabel,
+                                trailing: durationLabel,
+                                onTap: _pickTime,
+                              ),
+                              _ActionRow(
+                                icon: Icons.notifications_rounded,
+                                iconColor: const Color(0xFFB78A88),
+                                title: 'Alert',
+                                trailing: _alertRowSummary(),
+                                onTap: _openAlertRepeatSheet,
+                              ),
+                              _ActionRow(
+                                icon: Icons.repeat_rounded,
+                                iconColor: const Color(0xFFB78A88),
+                                title: 'Repeat',
+                                trailing: _repeatRowSummary(),
+                                onTap: _openAlertRepeatSheet,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          _Card(
+                            children: [
+                              Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.event_rounded,
+                                        color: Colors.white
+                                            .withValues(alpha: 0.75)),
+                                    const SizedBox(width: 12),
+                                    const Expanded(
+                                      child: Text(
+                                        'Fixed Event',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                    Switch(
+                                      value: _isEvent,
+                                      onChanged: (value) =>
+                                          setState(() => _isEvent = value),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
+                                child: Divider(
+                                    height: 1,
+                                    color:
+                                        Colors.white.withValues(alpha: 0.08)),
+                              ),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.category_outlined,
+                                        color: Colors.white
+                                            .withValues(alpha: 0.75)),
+                                    const SizedBox(width: 12),
+                                    const Text(
+                                      'Block Type',
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 16,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
-                                  ),
-                                  Switch(
-                                    value: _isEvent,
-                                    onChanged: (value) =>
-                                        setState(() => _isEvent = value),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 16),
-                              child: Divider(
-                                  height: 1,
-                                  color: Colors.white.withValues(alpha: 0.08)),
-                            ),
-                            Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.category_outlined,
-                                      color:
-                                          Colors.white.withValues(alpha: 0.75)),
-                                  const SizedBox(width: 12),
-                                  const Text(
-                                    'Block Type',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.05),
-                                      borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(
+                                    const Spacer(),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12),
+                                      decoration: BoxDecoration(
                                         color: Colors.white
-                                            .withValues(alpha: 0.08),
-                                      ),
-                                    ),
-                                    child: DropdownButtonHideUnderline(
-                                      child: DropdownButton<BlockType>(
-                                        value: _selectedType,
-                                        dropdownColor: _cardColor,
-                                        iconEnabledColor: Colors.white70,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w700,
+                                            .withValues(alpha: 0.05),
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.08),
                                         ),
-                                        onChanged: (value) {
-                                          if (value != null)
-                                            setState(
-                                                () => _selectedType = value);
-                                        },
-                                        items: BlockType.values
-                                            .map((type) =>
-                                                DropdownMenuItem<BlockType>(
-                                                  value: type,
-                                                  child: Text(_typeLabel(type)),
-                                                ))
-                                            .toList(growable: false),
+                                      ),
+                                      child: DropdownButtonHideUnderline(
+                                        child: DropdownButton<BlockType>(
+                                          value: _selectedType,
+                                          dropdownColor: _cardColor,
+                                          iconEnabledColor: Colors.white70,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                          onChanged: (value) {
+                                            if (value != null)
+                                              setState(
+                                                  () => _selectedType = value);
+                                          },
+                                          items: BlockType.values
+                                              .map((type) =>
+                                                  DropdownMenuItem<BlockType>(
+                                                    value: type,
+                                                    child:
+                                                        Text(_typeLabel(type)),
+                                                  ))
+                                              .toList(growable: false),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 16),
-                              child: Divider(
-                                  height: 1,
-                                  color: Colors.white.withValues(alpha: 0.08)),
-                            ),
-                            Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.radio_button_unchecked_rounded,
-                                      color:
-                                          Colors.white.withValues(alpha: 0.75)),
-                                  const SizedBox(width: 12),
-                                  const Text(
-                                    'Status',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  Text(
-                                    _statusLabel(widget.block.status),
-                                    style: TextStyle(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.7),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
+                                child: Divider(
+                                    height: 1,
+                                    color:
+                                        Colors.white.withValues(alpha: 0.08)),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 18),
-                        TextButton(
-                          onPressed: widget.onDelete,
-                          child: const Text(
-                            'Delete Block',
-                            style: TextStyle(
-                              color: _accentColor,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
+                              Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.radio_button_unchecked_rounded,
+                                        color: Colors.white
+                                            .withValues(alpha: 0.75)),
+                                    const SizedBox(width: 12),
+                                    const Text(
+                                      'Status',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Text(
+                                      _statusLabel(widget.block.status),
+                                      style: TextStyle(
+                                        color:
+                                            Colors.white.withValues(alpha: 0.7),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 18),
+                          TextButton(
+                            onPressed: widget.onDelete,
+                            child: const Text(
+                              'Delete Block',
+                              style: TextStyle(
+                                color: _accentColor,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: _accentColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 18),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(999),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: _accentColor,
+                                foregroundColor: Colors.white,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 18),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                textStyle: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
-                              textStyle: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                              ),
+                              onPressed: _isSaving ? null : _save,
+                              child: Text(
+                                  _isSaving ? 'Saving...' : 'Save Changes'),
                             ),
-                            onPressed: _isSaving ? null : _save,
-                            child:
-                                Text(_isSaving ? 'Saving...' : 'Save Changes'),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

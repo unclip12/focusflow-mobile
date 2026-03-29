@@ -471,353 +471,360 @@ class _TimePickerSheetState extends State<TimePickerSheet> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).padding.bottom + 16;
     final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
+    final scaffoldBackgroundColor = Theme.of(context).scaffoldBackgroundColor;
 
-    return FractionallySizedBox(
-      heightFactor: 0.94,
-      child: AnimatedPadding(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        padding: EdgeInsets.only(bottom: keyboardInset),
-        child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
-          child: Material(
-            color: _kBodyColor,
-            child: SafeArea(
-              top: false,
-              child: Column(
-                children: [
-                  Container(
-                    color: widget.headerColor,
-                    padding: const EdgeInsets.fromLTRB(18, 18, 18, 22),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            _HeaderCircleButton(
-                              icon: Icons.close_rounded,
-                              onTap: () => Navigator.of(context).pop(),
-                            ),
-                            const Spacer(),
-                            const SizedBox(width: 44),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          width: 76,
-                          height: 76,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF4B4B4F),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 3),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            widget.emoji,
-                            style: const TextStyle(fontSize: 34),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _formatRangeSummary(),
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(18, 18, 18, bottomInset),
+    return Material(
+      color: scaffoldBackgroundColor,
+      child: FractionallySizedBox(
+        heightFactor: 0.94,
+        child: AnimatedPadding(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: EdgeInsets.only(bottom: keyboardInset),
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
+            child: Material(
+              color: _kBodyColor,
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  children: [
+                    Container(
+                      color: widget.headerColor,
+                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 22),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _SectionHeader(
-                            label: 'Time',
-                            trailing: PopupMenuButton<_TimeMenuAction>(
-                              onSelected: _handleMenuAction,
-                              color: const Color(0xFF2A2A2D),
-                              position: PopupMenuPosition.under,
-                              surfaceTintColor: Colors.transparent,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18),
+                          Row(
+                            children: [
+                              _HeaderCircleButton(
+                                icon: Icons.close_rounded,
+                                onTap: () => Navigator.of(context).pop(),
                               ),
-                              icon: Container(
-                                width: 30,
-                                height: 30,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.08),
-                                  shape: BoxShape.circle,
-                                ),
-                                alignment: Alignment.center,
-                                child: const Icon(
-                                  Icons.more_horiz_rounded,
-                                  color: Colors.white70,
-                                  size: 18,
-                                ),
-                              ),
-                              itemBuilder: (context) => [
-                                const PopupMenuItem(
-                                  value: _TimeMenuAction.changeDay,
-                                  child: Text('Change Day'),
-                                ),
-                                const PopupMenuItem(
-                                  value: _TimeMenuAction.setTimezone,
-                                  child: Text('Set Timezone'),
-                                ),
-                                const PopupMenuItem(
-                                  value: _TimeMenuAction.changeToAllDay,
-                                  child: Text('Change to All-Day'),
-                                ),
-                                const PopupMenuItem(
-                                  value: _TimeMenuAction.addToInbox,
-                                  child: Text('Add to Inbox'),
-                                ),
-                                const PopupMenuDivider(),
-                                PopupMenuItem<_TimeMenuAction>(
-                                  enabled: false,
-                                  child: Row(
-                                    children: [
-                                      Text(
-                                        'Time Picker',
-                                        style: TextStyle(
-                                          color: Colors.white
-                                              .withValues(alpha: 0.72),
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      const Spacer(),
-                                      Icon(
-                                        Icons.chevron_right_rounded,
-                                        color:
-                                            Colors.white.withValues(alpha: 0.5),
-                                        size: 16,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                CheckedPopupMenuItem<_TimeMenuAction>(
-                                  value: _TimeMenuAction.standardMode,
-                                  checked:
-                                      _pickerMode == _TimePickerMode.standard,
-                                  child: const Padding(
-                                    padding: EdgeInsets.only(left: 10),
-                                    child: Text('Standard'),
-                                  ),
-                                ),
-                                CheckedPopupMenuItem<_TimeMenuAction>(
-                                  value: _TimeMenuAction.detailedMode,
-                                  checked:
-                                      _pickerMode == _TimePickerMode.detailed,
-                                  child: const Padding(
-                                    padding: EdgeInsets.only(left: 10),
-                                    child: Text('Detailed'),
-                                  ),
-                                ),
-                              ],
-                            ),
+                              const Spacer(),
+                              const SizedBox(width: 44),
+                            ],
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 8),
                           Container(
+                            width: 76,
+                            height: 76,
                             decoration: BoxDecoration(
-                              color: _kCardColor,
-                              borderRadius: BorderRadius.circular(28),
+                              color: const Color(0xFF4B4B4F),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 3),
                             ),
-                            padding: const EdgeInsets.fromLTRB(12, 16, 12, 18),
-                            child: Column(
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        'Start time',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: Colors.white
-                                              .withValues(alpha: 0.55),
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 20),
-                                    Expanded(
-                                      child: Text(
-                                        'End time',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: Colors.white
-                                              .withValues(alpha: 0.55),
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 14),
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: _TimeWheelGroup(
-                                        hourWheel: _WheelColumn(
-                                          controller: _startHourController,
-                                          itemCount: 12 * _loopingCycles,
-                                          selectedRawItem: _startHourItem,
-                                          labelBuilder: (rawIndex) =>
-                                              '${_selectedIndex(rawIndex, 12) + 1}',
-                                          onSelectedItemChanged: (rawIndex) =>
-                                              _updateStartSelection(
-                                                  hourItem: rawIndex),
-                                        ),
-                                        minuteWheel: _WheelColumn(
-                                          controller: _startMinuteController,
-                                          itemCount: _minuteValues.length *
-                                              _loopingCycles,
-                                          selectedRawItem: _startMinuteItem,
-                                          labelBuilder: (rawIndex) =>
-                                              _minuteValues[_selectedIndex(
-                                                      rawIndex,
-                                                      _minuteValues.length)]
-                                                  .toString()
-                                                  .padLeft(2, '0'),
-                                          onSelectedItemChanged: (rawIndex) =>
-                                              _updateStartSelection(
-                                                  minuteItem: rawIndex),
-                                        ),
-                                        periodWheel: _WheelColumn(
-                                          controller: _startPeriodController,
-                                          itemCount:
-                                              _periods.length * _loopingCycles,
-                                          selectedRawItem: _startPeriodItem,
-                                          labelBuilder: (rawIndex) => _periods[
-                                              _selectedIndex(
-                                                  rawIndex, _periods.length)],
-                                          onSelectedItemChanged: (rawIndex) =>
-                                              _updateStartSelection(
-                                                  periodItem: rawIndex),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: 20,
-                                      height: _wheelHeight,
-                                      child: Center(
-                                        child: Icon(
-                                          Icons.arrow_forward_rounded,
-                                          color: Colors.white
-                                              .withValues(alpha: 0.75),
-                                          size: 20,
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: _TimeWheelGroup(
-                                        hourWheel: _WheelColumn(
-                                          controller: _endHourController,
-                                          itemCount: 12 * _loopingCycles,
-                                          selectedRawItem: _endHourItem,
-                                          labelBuilder: (rawIndex) =>
-                                              '${_selectedIndex(rawIndex, 12) + 1}',
-                                          onSelectedItemChanged: (rawIndex) =>
-                                              _updateEndSelection(
-                                                  hourItem: rawIndex),
-                                        ),
-                                        minuteWheel: _WheelColumn(
-                                          controller: _endMinuteController,
-                                          itemCount: _minuteValues.length *
-                                              _loopingCycles,
-                                          selectedRawItem: _endMinuteItem,
-                                          labelBuilder: (rawIndex) =>
-                                              _minuteValues[_selectedIndex(
-                                                      rawIndex,
-                                                      _minuteValues.length)]
-                                                  .toString()
-                                                  .padLeft(2, '0'),
-                                          onSelectedItemChanged: (rawIndex) =>
-                                              _updateEndSelection(
-                                                  minuteItem: rawIndex),
-                                        ),
-                                        periodWheel: _WheelColumn(
-                                          controller: _endPeriodController,
-                                          itemCount:
-                                              _periods.length * _loopingCycles,
-                                          selectedRawItem: _endPeriodItem,
-                                          labelBuilder: (rawIndex) => _periods[
-                                              _selectedIndex(
-                                                  rawIndex, _periods.length)],
-                                          onSelectedItemChanged: (rawIndex) =>
-                                              _updateEndSelection(
-                                                  periodItem: rawIndex),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                            alignment: Alignment.center,
+                            child: Text(
+                              widget.emoji,
+                              style: const TextStyle(fontSize: 34),
                             ),
                           ),
-                          const SizedBox(height: 26),
-                          const _SectionHeader(label: 'Duration'),
-                          const SizedBox(height: 14),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: _durationOptions.map((duration) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(right: 10),
-                                  child: _DurationChip(
-                                    label: _durationChipLabel(duration),
-                                    selected: duration == _selectedDuration,
-                                    onTap: () => _selectDuration(duration),
-                                  ),
-                                );
-                              }).toList(growable: false),
+                          const SizedBox(height: 16),
+                          Text(
+                            _formatRangeSummary(),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const SizedBox(height: 32),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              style: FilledButton.styleFrom(
-                                backgroundColor: _kAccentColor,
-                                foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 18),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                textStyle: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              onPressed: () {
-                                Navigator.of(context).pop(<String, dynamic>{
-                                  'startTime': _hhmmFromMinutes(_startMinutes),
-                                  'durationMinutes': _selectedDuration,
-                                });
-                              },
-                              child: const Text('Continue'),
+                          const SizedBox(height: 4),
+                          Text(
+                            widget.title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                ],
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.fromLTRB(18, 18, 18, bottomInset),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _SectionHeader(
+                              label: 'Time',
+                              trailing: PopupMenuButton<_TimeMenuAction>(
+                                onSelected: _handleMenuAction,
+                                color: const Color(0xFF2A2A2D),
+                                position: PopupMenuPosition.under,
+                                surfaceTintColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                                icon: Container(
+                                  width: 30,
+                                  height: 30,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.08),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: const Icon(
+                                    Icons.more_horiz_rounded,
+                                    color: Colors.white70,
+                                    size: 18,
+                                  ),
+                                ),
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(
+                                    value: _TimeMenuAction.changeDay,
+                                    child: Text('Change Day'),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: _TimeMenuAction.setTimezone,
+                                    child: Text('Set Timezone'),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: _TimeMenuAction.changeToAllDay,
+                                    child: Text('Change to All-Day'),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: _TimeMenuAction.addToInbox,
+                                    child: Text('Add to Inbox'),
+                                  ),
+                                  const PopupMenuDivider(),
+                                  PopupMenuItem<_TimeMenuAction>(
+                                    enabled: false,
+                                    child: Row(
+                                      children: [
+                                        Text(
+                                          'Time Picker',
+                                          style: TextStyle(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.72),
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        Icon(
+                                          Icons.chevron_right_rounded,
+                                          color: Colors.white
+                                              .withValues(alpha: 0.5),
+                                          size: 16,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  CheckedPopupMenuItem<_TimeMenuAction>(
+                                    value: _TimeMenuAction.standardMode,
+                                    checked:
+                                        _pickerMode == _TimePickerMode.standard,
+                                    child: const Padding(
+                                      padding: EdgeInsets.only(left: 10),
+                                      child: Text('Standard'),
+                                    ),
+                                  ),
+                                  CheckedPopupMenuItem<_TimeMenuAction>(
+                                    value: _TimeMenuAction.detailedMode,
+                                    checked:
+                                        _pickerMode == _TimePickerMode.detailed,
+                                    child: const Padding(
+                                      padding: EdgeInsets.only(left: 10),
+                                      child: Text('Detailed'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: _kCardColor,
+                                borderRadius: BorderRadius.circular(28),
+                              ),
+                              padding:
+                                  const EdgeInsets.fromLTRB(12, 16, 12, 18),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          'Start time',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.55),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 20),
+                                      Expanded(
+                                        child: Text(
+                                          'End time',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.55),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: _TimeWheelGroup(
+                                          hourWheel: _WheelColumn(
+                                            controller: _startHourController,
+                                            itemCount: 12 * _loopingCycles,
+                                            selectedRawItem: _startHourItem,
+                                            labelBuilder: (rawIndex) =>
+                                                '${_selectedIndex(rawIndex, 12) + 1}',
+                                            onSelectedItemChanged: (rawIndex) =>
+                                                _updateStartSelection(
+                                                    hourItem: rawIndex),
+                                          ),
+                                          minuteWheel: _WheelColumn(
+                                            controller: _startMinuteController,
+                                            itemCount: _minuteValues.length *
+                                                _loopingCycles,
+                                            selectedRawItem: _startMinuteItem,
+                                            labelBuilder: (rawIndex) =>
+                                                _minuteValues[_selectedIndex(
+                                                        rawIndex,
+                                                        _minuteValues.length)]
+                                                    .toString()
+                                                    .padLeft(2, '0'),
+                                            onSelectedItemChanged: (rawIndex) =>
+                                                _updateStartSelection(
+                                                    minuteItem: rawIndex),
+                                          ),
+                                          periodWheel: _WheelColumn(
+                                            controller: _startPeriodController,
+                                            itemCount: _periods.length *
+                                                _loopingCycles,
+                                            selectedRawItem: _startPeriodItem,
+                                            labelBuilder: (rawIndex) =>
+                                                _periods[_selectedIndex(
+                                                    rawIndex, _periods.length)],
+                                            onSelectedItemChanged: (rawIndex) =>
+                                                _updateStartSelection(
+                                                    periodItem: rawIndex),
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        width: 20,
+                                        height: _wheelHeight,
+                                        child: Center(
+                                          child: Icon(
+                                            Icons.arrow_forward_rounded,
+                                            color: Colors.white
+                                                .withValues(alpha: 0.75),
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: _TimeWheelGroup(
+                                          hourWheel: _WheelColumn(
+                                            controller: _endHourController,
+                                            itemCount: 12 * _loopingCycles,
+                                            selectedRawItem: _endHourItem,
+                                            labelBuilder: (rawIndex) =>
+                                                '${_selectedIndex(rawIndex, 12) + 1}',
+                                            onSelectedItemChanged: (rawIndex) =>
+                                                _updateEndSelection(
+                                                    hourItem: rawIndex),
+                                          ),
+                                          minuteWheel: _WheelColumn(
+                                            controller: _endMinuteController,
+                                            itemCount: _minuteValues.length *
+                                                _loopingCycles,
+                                            selectedRawItem: _endMinuteItem,
+                                            labelBuilder: (rawIndex) =>
+                                                _minuteValues[_selectedIndex(
+                                                        rawIndex,
+                                                        _minuteValues.length)]
+                                                    .toString()
+                                                    .padLeft(2, '0'),
+                                            onSelectedItemChanged: (rawIndex) =>
+                                                _updateEndSelection(
+                                                    minuteItem: rawIndex),
+                                          ),
+                                          periodWheel: _WheelColumn(
+                                            controller: _endPeriodController,
+                                            itemCount: _periods.length *
+                                                _loopingCycles,
+                                            selectedRawItem: _endPeriodItem,
+                                            labelBuilder: (rawIndex) =>
+                                                _periods[_selectedIndex(
+                                                    rawIndex, _periods.length)],
+                                            onSelectedItemChanged: (rawIndex) =>
+                                                _updateEndSelection(
+                                                    periodItem: rawIndex),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 26),
+                            const _SectionHeader(label: 'Duration'),
+                            const SizedBox(height: 14),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: _durationOptions.map((duration) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 10),
+                                    child: _DurationChip(
+                                      label: _durationChipLabel(duration),
+                                      selected: duration == _selectedDuration,
+                                      onTap: () => _selectDuration(duration),
+                                    ),
+                                  );
+                                }).toList(growable: false),
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: _kAccentColor,
+                                  foregroundColor: Colors.white,
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 18),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  textStyle: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                onPressed: () {
+                                  Navigator.of(context).pop(<String, dynamic>{
+                                    'startTime':
+                                        _hhmmFromMinutes(_startMinutes),
+                                    'durationMinutes': _selectedDuration,
+                                  });
+                                },
+                                child: const Text('Continue'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

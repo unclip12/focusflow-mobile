@@ -16,6 +16,7 @@ class FocusFlowApp extends StatelessWidget {
 
     return MaterialApp.router(
       title: 'FocusFlow',
+      restorationScopeId: 'app',
       theme: AppTheme.getTheme(
         settings.currentTheme,
         settings.isDarkMode,

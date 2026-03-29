@@ -7,6 +7,9 @@
 //   • LONG-PRESS non-locked block ? drag to reorder ? start times cascade
 // =============================================================
 
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
@@ -127,6 +130,25 @@ class TimelineView extends StatefulWidget {
 }
 
 class _TimelineViewState extends State<TimelineView> {
+  late DateTime _currentTime;
+  Timer? _nowTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentTime = DateTime.now();
+    _nowTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!mounted) return;
+      setState(() => _currentTime = DateTime.now());
+    });
+  }
+
+  @override
+  void dispose() {
+    _nowTimer?.cancel();
+    super.dispose();
+  }
+
   bool _isLockedBlock(Block block) =>
       block.isEvent || block.id.startsWith('prayer_');
 
@@ -217,29 +239,290 @@ class _TimelineViewState extends State<TimelineView> {
     return count;
   }
 
+  bool get _isViewingToday {
+    final selectedDate = DateTime.tryParse(widget.dateKey);
+    if (selectedDate == null) return false;
+    return selectedDate.year == _currentTime.year &&
+        selectedDate.month == _currentTime.month &&
+        selectedDate.day == _currentTime.day;
+  }
+
+  int get _currentMinutesOfDay => _currentTime.hour * 60 + _currentTime.minute;
+
+  int _roundUpToNextFiveMinutes(int minutes) => ((minutes + 4) ~/ 5) * 5;
+
+  String _formatCurrentTimeLabel() {
+    return MaterialLocalizations.of(context).formatTimeOfDay(
+      TimeOfDay(hour: _currentTime.hour, minute: _currentTime.minute),
+      alwaysUse24HourFormat: false,
+    );
+  }
+
+  int _sumMinutesByType(List<Block> blocks, bool Function(Block block) test) {
+    return blocks
+        .where(test)
+        .fold<int>(0, (sum, block) => sum + block.plannedDurationMinutes);
+  }
+
+  _TimelineBounds _resolveTimelineBounds() {
+    final plan = context.read<AppProvider>().getDayPlan(widget.dateKey);
+    final blockStarts = widget.blocks
+        .map((block) => _toMinutes(block.plannedStartTime))
+        .toList(growable: false);
+    final blockEnds = widget.blocks
+        .map((block) => _toMinutes(block.plannedEndTime))
+        .toList(growable: false);
+
+    final planStart = (plan?.startTimePlanned?.isNotEmpty ?? false)
+        ? _toMinutes(plan!.startTimePlanned!)
+        : null;
+    final planEnd = (plan?.estimatedEndTime?.isNotEmpty ?? false)
+        ? _toMinutes(plan!.estimatedEndTime!)
+        : null;
+
+    var startMinutes = planStart ??
+        (blockStarts.isNotEmpty
+            ? blockStarts.reduce((a, b) => a < b ? a : b)
+            : _currentMinutesOfDay);
+    var endMinutes = planEnd ??
+        (blockEnds.isNotEmpty
+            ? blockEnds.reduce((a, b) => a > b ? a : b)
+            : _currentMinutesOfDay + 60);
+
+    if (blockStarts.isNotEmpty) {
+      startMinutes = math.min(
+        startMinutes,
+        blockStarts.reduce((a, b) => a < b ? a : b),
+      );
+    }
+    if (blockEnds.isNotEmpty) {
+      endMinutes = math.max(
+        endMinutes,
+        blockEnds.reduce((a, b) => a > b ? a : b),
+      );
+    }
+
+    startMinutes = startMinutes.clamp(0, (24 * 60) - 1);
+    endMinutes = endMinutes.clamp(0, 24 * 60);
+    if (endMinutes <= startMinutes) {
+      endMinutes = math.min(24 * 60, startMinutes + 60);
+    }
+
+    return _TimelineBounds(
+      startMinutes: startMinutes,
+      endMinutes: endMinutes,
+    );
+  }
+
+  double? _lineOffsetForRange({
+    required int startMinutes,
+    required int endMinutes,
+    required double height,
+  }) {
+    final duration = endMinutes - startMinutes;
+    if (!_isViewingToday || duration <= 0) return null;
+    if (_currentMinutesOfDay < startMinutes ||
+        _currentMinutesOfDay >= endMinutes) {
+      return null;
+    }
+
+    final fraction = (_currentMinutesOfDay - startMinutes) / duration;
+    return (fraction * height).clamp(0.0, height);
+  }
+
+  double _pastFractionForBlock({
+    required int startMinutes,
+    required int endMinutes,
+  }) {
+    if (!_isViewingToday || endMinutes <= startMinutes) return 0;
+    if (_currentMinutesOfDay <= startMinutes) return 0;
+    if (_currentMinutesOfDay >= endMinutes) return 1;
+    return ((_currentMinutesOfDay - startMinutes) / (endMinutes - startMinutes))
+        .clamp(0.0, 1.0);
+  }
+
+  Block _buildDraftBlock({
+    required int startMinutes,
+    required int endMinutes,
+    required String title,
+    String? description,
+    bool isEvent = false,
+    BlockType type = BlockType.other,
+  }) {
+    final safeStart = startMinutes.clamp(0, (24 * 60) - 2);
+    var safeEnd = endMinutes.clamp(safeStart + 1, 24 * 60);
+    if (safeEnd <= safeStart) {
+      safeEnd = math.min(24 * 60, safeStart + 60);
+    }
+
+    return Block(
+      id: 'draft_${DateTime.now().microsecondsSinceEpoch}',
+      index: 0,
+      date: widget.dateKey,
+      plannedStartTime: _formatMinutesOfDay(safeStart),
+      plannedEndTime: _formatMinutesOfDay(safeEnd % (24 * 60)),
+      type: type,
+      title: title,
+      description: description,
+      plannedDurationMinutes: safeEnd - safeStart,
+      isEvent: isEvent,
+      status: BlockStatus.notStarted,
+    );
+  }
+
+  Future<void> _saveNewBlock(BlockEditorUpdate update, String blockId) async {
+    final app = context.read<AppProvider>();
+    final existingPlan = app.getDayPlan(update.dateKey);
+    final existingBlocks = List<Block>.from(existingPlan?.blocks ?? const []);
+    final newBlock = Block(
+      id: blockId,
+      index: existingBlocks.length,
+      date: update.dateKey,
+      plannedStartTime: update.plannedStartTime,
+      plannedEndTime: update.plannedEndTime,
+      type: update.type,
+      title: update.title,
+      description: update.description,
+      plannedDurationMinutes: update.plannedDurationMinutes,
+      isEvent: update.isEvent,
+      status: BlockStatus.notStarted,
+    );
+
+    final allBlocks = [...existingBlocks, newBlock]..sort(
+        (a, b) => _toMinutes(a.plannedStartTime)
+            .compareTo(_toMinutes(b.plannedStartTime)),
+      );
+    final reindexedBlocks = <Block>[
+      for (var i = 0; i < allBlocks.length; i++)
+        allBlocks[i].copyWith(index: i),
+    ];
+
+    final updatedPlan = existingPlan?.copyWith(
+          blocks: reindexedBlocks,
+          totalStudyMinutesPlanned: _sumMinutesByType(
+            reindexedBlocks,
+            (block) => block.type != BlockType.breakBlock,
+          ),
+          totalBreakMinutes: _sumMinutesByType(
+            reindexedBlocks,
+            (block) => block.type == BlockType.breakBlock,
+          ),
+        ) ??
+        DayPlan(
+          date: update.dateKey,
+          faPages: const [],
+          faPagesCount: 0,
+          videos: const [],
+          notesFromUser: '',
+          notesFromAI: '',
+          attachments: const [],
+          breaks: const [],
+          blocks: reindexedBlocks,
+          totalStudyMinutesPlanned: _sumMinutesByType(
+            reindexedBlocks,
+            (block) => block.type != BlockType.breakBlock,
+          ),
+          totalBreakMinutes: _sumMinutesByType(
+            reindexedBlocks,
+            (block) => block.type == BlockType.breakBlock,
+          ),
+        );
+
+    await app.upsertDayPlan(updatedPlan);
+    await app.syncFlowActivitiesFromDayPlan(update.dateKey);
+  }
+
+  Future<void> _showNewBlockEditor(Block draftBlock) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => BlockEditorSheet(
+        block: draftBlock,
+        onSave: (update) => _saveNewBlock(update, draftBlock.id),
+        onDelete: () => Navigator.of(context).pop(),
+      ),
+    );
+  }
+
+  Future<void> _openAddLogEditor({
+    required int gapStartMinutes,
+    required int gapEndMinutes,
+    required int dayStartMinutes,
+  }) {
+    final logStartMinutes = math.max(gapStartMinutes, dayStartMinutes);
+    final logEndMinutes = math.min(gapEndMinutes, _currentMinutesOfDay);
+    if (logEndMinutes <= logStartMinutes) return Future.value();
+
+    final retroDraft = _buildDraftBlock(
+      startMinutes: logStartMinutes,
+      endMinutes: logEndMinutes,
+      title: 'Retroactive Log',
+      description: 'Retroactive log entry',
+    );
+
+    return _showNewBlockEditor(retroDraft);
+  }
+
+  _GapActionState _buildGapActionState({
+    required int gapStartMinutes,
+    required int gapEndMinutes,
+    required int dayStartMinutes,
+  }) {
+    final logStartMinutes = math.max(gapStartMinutes, dayStartMinutes);
+    final logEndMinutes = math.min(gapEndMinutes, _currentMinutesOfDay);
+    final futureStartMinutes = math.max(
+        gapStartMinutes, _roundUpToNextFiveMinutes(_currentMinutesOfDay));
+
+    return _GapActionState(
+      canAddLog: _isViewingToday && logEndMinutes > logStartMinutes,
+      canAddTask: widget.onAddTask != null &&
+          (!_isViewingToday || futureStartMinutes < gapEndMinutes),
+      taskStartMinutes: _isViewingToday ? futureStartMinutes : gapStartMinutes,
+      logStartMinutes: logStartMinutes,
+      logEndMinutes: logEndMinutes,
+      futureMinutes: math.max(
+          0,
+          gapEndMinutes -
+              (_isViewingToday ? futureStartMinutes : gapStartMinutes)),
+    );
+  }
+
   // Build list of timeline items (blocks + gaps)
-  List<_TimelineItem> _buildTimelineItems() {
+  List<_TimelineItem> _buildTimelineItems(_TimelineBounds bounds) {
     final sortedBlocks = List<Block>.from(widget.blocks)
       ..sort(
         (a, b) => _toMinutes(a.plannedStartTime)
             .compareTo(_toMinutes(b.plannedStartTime)),
       );
     final items = <_TimelineItem>[];
-    for (int i = 0; i < sortedBlocks.length; i++) {
-      final block = sortedBlocks[i];
-      if (i > 0) {
-        final prevEnd = _toMinutes(sortedBlocks[i - 1].plannedEndTime);
-        final curStart = _toMinutes(block.plannedStartTime);
-        if (curStart > prevEnd && (curStart - prevEnd) >= 5) {
-          items.add(_TimelineItem.gap(
-              gapStartMinutes: prevEnd, gapEndMinutes: curStart));
-        } else if (curStart < prevEnd) {
-          items.add(
-            const _TimelineItem.warning('Tasks are overlapping'),
-          );
-        }
+    var cursor = bounds.startMinutes;
+    for (final block in sortedBlocks) {
+      final blockStart = _toMinutes(block.plannedStartTime);
+      final blockEnd = _toMinutes(block.plannedEndTime);
+      if (blockStart > cursor && (blockStart - cursor) >= 5) {
+        items.add(
+          _TimelineItem.gap(
+            gapStartMinutes: cursor,
+            gapEndMinutes: blockStart,
+          ),
+        );
+      } else if (blockStart < cursor && items.isNotEmpty) {
+        items.add(
+          const _TimelineItem.warning('Tasks are overlapping'),
+        );
       }
       items.add(_TimelineItem.block(block));
+      cursor = math.max(cursor, blockEnd);
+    }
+    if (bounds.endMinutes > cursor && (bounds.endMinutes - cursor) >= 5) {
+      items.add(
+        _TimelineItem.gap(
+          gapStartMinutes: cursor,
+          gapEndMinutes: bounds.endMinutes,
+        ),
+      );
     }
     return items;
   }
@@ -591,8 +874,10 @@ class _TimelineViewState extends State<TimelineView> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
-    final items = _buildTimelineItems();
+    final bounds = _resolveTimelineBounds();
+    final items = _buildTimelineItems(bounds);
     final bottomPadding = MediaQuery.of(context).padding.bottom + 96;
+    final nowLabel = _formatCurrentTimeLabel();
 
     return Container(
       clipBehavior: Clip.antiAlias,
@@ -655,6 +940,14 @@ class _TimelineViewState extends State<TimelineView> {
                     itemBuilder: (context, index) {
                       final item = items[index];
                       if (item.isGap) {
+                        final gapHeight = _timelinePillHeight(
+                          item.gapEndMinutes! - item.gapStartMinutes!,
+                        );
+                        final gapState = _buildGapActionState(
+                          gapStartMinutes: item.gapStartMinutes!,
+                          gapEndMinutes: item.gapEndMinutes!,
+                          dayStartMinutes: bounds.startMinutes,
+                        );
                         return KeyedSubtree(
                           key: ValueKey(
                             'gap_${item.gapStartMinutes}_${item.gapEndMinutes}',
@@ -663,11 +956,26 @@ class _TimelineViewState extends State<TimelineView> {
                             startMinutes: item.gapStartMinutes!,
                             endMinutes: item.gapEndMinutes!,
                             onTap: () => _onGapTap(item),
-                            onAddTask: widget.onAddTask == null
+                            onAddTask: !gapState.canAddTask
                                 ? null
                                 : () => widget.onAddTask!(
-                                      startMinutes: item.gapStartMinutes,
+                                      startMinutes: gapState.taskStartMinutes,
                                     ),
+                            onAddLog: !gapState.canAddLog
+                                ? null
+                                : () => _openAddLogEditor(
+                                      gapStartMinutes: gapState.logStartMinutes,
+                                      gapEndMinutes: gapState.logEndMinutes,
+                                      dayStartMinutes: bounds.startMinutes,
+                                    ),
+                            futureDurationMinutes: gapState.futureMinutes,
+                            showPastPrompt: gapState.canAddLog,
+                            nowLineOffset: _lineOffsetForRange(
+                              startMinutes: item.gapStartMinutes!,
+                              endMinutes: item.gapEndMinutes!,
+                              height: gapHeight,
+                            ),
+                            nowLabel: nowLabel,
                           ),
                         );
                       }
@@ -689,6 +997,18 @@ class _TimelineViewState extends State<TimelineView> {
                           leading: const SizedBox(width: 22),
                           onTap: () => _onBlockTap(block),
                           onLongPress: () => _onBlockLongPress(block),
+                          pastFraction: _pastFractionForBlock(
+                            startMinutes: _toMinutes(block.plannedStartTime),
+                            endMinutes: _toMinutes(block.plannedEndTime),
+                          ),
+                          nowLineOffset: _lineOffsetForRange(
+                            startMinutes: _toMinutes(block.plannedStartTime),
+                            endMinutes: _toMinutes(block.plannedEndTime),
+                            height: _timelinePillHeight(
+                              _blockDurationMinutes(block),
+                            ),
+                          ),
+                          nowLabel: nowLabel,
                         ),
                       );
                     },
@@ -732,6 +1052,34 @@ class _TimelineItem {
         );
 }
 
+class _TimelineBounds {
+  final int startMinutes;
+  final int endMinutes;
+
+  const _TimelineBounds({
+    required this.startMinutes,
+    required this.endMinutes,
+  });
+}
+
+class _GapActionState {
+  final bool canAddTask;
+  final bool canAddLog;
+  final int taskStartMinutes;
+  final int logStartMinutes;
+  final int logEndMinutes;
+  final int futureMinutes;
+
+  const _GapActionState({
+    required this.canAddTask,
+    required this.canAddLog,
+    required this.taskStartMinutes,
+    required this.logStartMinutes,
+    required this.logEndMinutes,
+    required this.futureMinutes,
+  });
+}
+
 // -- Block Card ----------------------------------------------------
 /*
 class _BlockCard extends StatelessWidget {
@@ -739,12 +1087,18 @@ class _BlockCard extends StatelessWidget {
   final Widget? leading;
   final VoidCallback? onLongPress;
   final VoidCallback? onTap;
+  final double pastFraction;
+  final double? nowLineOffset;
+  final String nowLabel;
 
   const _BlockCard({
     required this.block,
     this.leading,
     this.onTap,
     this.onLongPress,
+    this.pastFraction = 0,
+    this.nowLineOffset,
+    required this.nowLabel,
   });
 
   static int _toMinutes(String hhmm) {
@@ -989,12 +1343,18 @@ class _BlockCard extends StatelessWidget {
   final Widget? leading;
   final VoidCallback? onLongPress;
   final VoidCallback? onTap;
+  final double pastFraction;
+  final double? nowLineOffset;
+  final String nowLabel;
 
   const _BlockCard({
     required this.block,
     this.leading,
     this.onTap,
     this.onLongPress,
+    this.pastFraction = 0,
+    this.nowLineOffset,
+    required this.nowLabel,
   });
 
   static int _toMinutes(String hhmm) {
@@ -1055,6 +1415,11 @@ class _BlockCard extends StatelessWidget {
     final startLabel = _to12hShort(block.plannedStartTime);
     final rangeLabel =
         '${_to12h(block.plannedStartTime)} - ${_to12h(block.plannedEndTime)}';
+    final double? nowIndicatorTop = nowLineOffset == null
+        ? null
+        : (nowLineOffset! - 9)
+            .clamp(0.0, math.max(0.0, cardHeight - 20))
+            .toDouble();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1064,115 +1429,210 @@ class _BlockCard extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         child: SizedBox(
           height: cardHeight,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
             children: [
-              if (leading != null) ...[
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: SizedBox(
-                    width: _kTimelineHandleWidth,
-                    child: leading,
-                  ),
-                ),
-                const SizedBox(width: _kTimelineHandleGap),
-              ],
-              SizedBox(
-                width: _kTimelineTimeWidth,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    startLabel,
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: onSurface.withValues(alpha: 0.58),
-                      fontFeatures: [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: _kTimelineTimeToPillGap),
-              Container(
-                width: _kTimelinePillWidth,
-                height: cardHeight,
-                decoration: BoxDecoration(
-                  color: pillColor,
-                  borderRadius: BorderRadius.circular(28),
-                ),
-                child: Center(
-                  child: Tooltip(
-                    message: _categoryLabel(block),
-                    child: Icon(
-                      _iconForBlock(),
-                      size: 24,
-                      color: isDone ? onSurface : Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: _kTimelineContentGap),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        block.title,
-                        style: TextStyle(
-                          fontSize: 17,
-                          height: 1.12,
-                          fontWeight: FontWeight.w700,
-                          color: isDone
-                              ? onSurface.withValues(alpha: 0.68)
-                              : onSurface,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (leading != null) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: SizedBox(
+                        width: _kTimelineHandleWidth,
+                        child: leading,
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        rangeLabel,
+                    ),
+                    const SizedBox(width: _kTimelineHandleGap),
+                  ],
+                  SizedBox(
+                    width: _kTimelineTimeWidth,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        startLabel,
+                        textAlign: TextAlign.right,
                         style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: onSurface.withValues(alpha: 0.6),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: onSurface.withValues(alpha: 0.58),
                           fontFeatures: [FontFeature.tabularFigures()],
                         ),
                       ),
-                      if (isSplit) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          'Part ${block.splitPartIndex} of ${block.splitTotalParts}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: onSurface.withValues(alpha: 0.6),
-                          ),
+                    ),
+                  ),
+                  const SizedBox(width: _kTimelineTimeToPillGap),
+                  Container(
+                    width: _kTimelinePillWidth,
+                    height: cardHeight,
+                    decoration: BoxDecoration(
+                      color: pillColor,
+                      borderRadius: BorderRadius.circular(28),
+                    ),
+                    child: Center(
+                      child: Tooltip(
+                        message: _categoryLabel(block),
+                        child: Icon(
+                          _iconForBlock(),
+                          size: 24,
+                          color: isDone ? onSurface : Colors.white,
                         ),
-                      ],
-                    ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: _kTimelineContentGap),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            block.title,
+                            style: TextStyle(
+                              fontSize: 17,
+                              height: 1.12,
+                              fontWeight: FontWeight.w700,
+                              color: isDone
+                                  ? onSurface.withValues(alpha: 0.68)
+                                  : onSurface,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            rangeLabel,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: onSurface.withValues(alpha: 0.6),
+                              fontFeatures: [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                          if (isSplit) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Part ${block.splitPartIndex} of ${block.splitTotalParts}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: onSurface.withValues(alpha: 0.6),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Container(
+                      width: _kTimelineStatusSize,
+                      height: _kTimelineStatusSize,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDone ? _kTimelineComplete : Colors.transparent,
+                        border: isDone
+                            ? null
+                            : Border.all(color: pillColor, width: 2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (pastFraction > 0)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  child: IgnorePointer(
+                    child: Container(
+                      height: cardHeight * pastFraction,
+                      color: onSurface.withValues(alpha: 0.08),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Container(
-                  width: _kTimelineStatusSize,
-                  height: _kTimelineStatusSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isDone ? _kTimelineComplete : Colors.transparent,
-                    border:
-                        isDone ? null : Border.all(color: pillColor, width: 2),
+              if (nowIndicatorTop != null)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: nowIndicatorTop,
+                  child: _NowLineOverlay(
+                    label: nowLabel,
+                    backgroundColor: theme.cardColor,
                   ),
                 ),
-              ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NowLineOverlay extends StatelessWidget {
+  final String label;
+  final Color backgroundColor;
+
+  const _NowLineOverlay({
+    required this.label,
+    required this.backgroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: SizedBox(
+        height: 20,
+        child: Stack(
+          children: [
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 9,
+              child: Container(
+                height: 2,
+                color: _kTimelineAccent,
+              ),
+            ),
+            const Positioned(
+              left: 0,
+              top: 6,
+              child: SizedBox(
+                width: 8,
+                height: 8,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: _kTimelineAccent,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 14,
+              top: 0,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      color: _kTimelineAccent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1408,12 +1868,22 @@ class _GapSlot extends StatelessWidget {
   final int endMinutes;
   final VoidCallback onTap;
   final VoidCallback? onAddTask;
+  final VoidCallback? onAddLog;
+  final int futureDurationMinutes;
+  final bool showPastPrompt;
+  final double? nowLineOffset;
+  final String nowLabel;
 
   const _GapSlot({
     required this.startMinutes,
     required this.endMinutes,
     required this.onTap,
     this.onAddTask,
+    this.onAddLog,
+    this.futureDurationMinutes = 0,
+    this.showPastPrompt = false,
+    this.nowLineOffset,
+    required this.nowLabel,
   });
 
   @override
@@ -1432,6 +1902,14 @@ class _GapSlot extends StatelessWidget {
 
     final startLabel = _to12hShort(_minutesToHHMM(startMinutes));
     final durationLabel = _formatGapDurationCompact(gapMinutes);
+    final futureLabel = _formatGapDurationCompact(
+      futureDurationMinutes > 0 ? futureDurationMinutes : gapMinutes,
+    );
+    final double? nowIndicatorTop = nowLineOffset == null
+        ? null
+        : (nowLineOffset! - 9)
+            .clamp(0.0, math.max(0.0, gapHeight - 20))
+            .toDouble();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -1440,137 +1918,233 @@ class _GapSlot extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         child: SizedBox(
           height: gapHeight,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
             children: [
-              const SizedBox(width: _kTimelineLeadingWidth),
-              SizedBox(
-                width: _kTimelineTimeWidth,
-                height: gapHeight,
-                child: Stack(
-                  children: [
-                    Positioned(
-                      top: 0,
-                      right: 0,
-                      child: Text(
-                        startLabel,
-                        textAlign: TextAlign.right,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: onSurface.withValues(alpha: 0.58),
-                          fontFeatures: [FontFeature.tabularFigures()],
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(width: _kTimelineLeadingWidth),
+                  SizedBox(
+                    width: _kTimelineTimeWidth,
+                    height: gapHeight,
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: Text(
+                            startLabel,
+                            textAlign: TextAlign.right,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: onSurface.withValues(alpha: 0.58),
+                              fontFeatures: [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                        ),
+                        ...hourTicks.map((tick) {
+                          final fraction = (tick - startMinutes) / gapMinutes;
+                          final topPos = fraction * gapHeight;
+                          return Positioned(
+                            top: topPos - 6,
+                            right: 0,
+                            child: Text(
+                              _to12hShort(_minutesToHHMM(tick)),
+                              textAlign: TextAlign.right,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: onSurface.withValues(alpha: 0.45),
+                                fontFeatures: [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: _kTimelineTimeToPillGap),
+                  SizedBox(
+                    width: _kTimelinePillWidth,
+                    height: gapHeight,
+                    child: Center(
+                      child: CustomPaint(
+                        size: Size(2, gapHeight),
+                        painter: _DashedLinePainter(
+                          color: onSurface.withValues(alpha: 0.14),
                         ),
                       ),
                     ),
-                    ...hourTicks.map((tick) {
-                      final fraction = (tick - startMinutes) / gapMinutes;
-                      final topPos = fraction * gapHeight;
-                      return Positioned(
-                        top: topPos - 6,
-                        right: 0,
-                        child: Text(
-                          _to12hShort(_minutesToHHMM(tick)),
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                            color: onSurface.withValues(alpha: 0.45),
-                            fontFeatures: [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                      );
-                    }),
-                  ],
-                ),
-              ),
-              const SizedBox(width: _kTimelineTimeToPillGap),
-              SizedBox(
-                width: _kTimelinePillWidth,
-                height: gapHeight,
-                child: Center(
-                  child: CustomPaint(
-                    size: Size(2, gapHeight),
-                    painter: _DashedLinePainter(
-                      color: onSurface.withValues(alpha: 0.14),
-                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: _kTimelineContentGap),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                  const SizedBox(width: _kTimelineContentGap),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(
-                            Icons.access_time_outlined,
-                            size: 15,
-                            color: _kTimelineAccent,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: RichText(
-                              text: TextSpan(
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: onSurface.withValues(alpha: 0.6),
-                                  height: 1.35,
+                          if (showPastPrompt) ...[
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.edit_note_rounded,
+                                  size: 16,
+                                  color: onSurface.withValues(alpha: 0.45),
                                 ),
-                                children: [
-                                  const TextSpan(text: 'Use '),
-                                  TextSpan(
-                                    text: durationLabel,
-                                    style: const TextStyle(
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'What did you do here?',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: onSurface.withValues(alpha: 0.55),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+                          if (!showPastPrompt || futureDurationMinutes > 0) ...[
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(
+                                  Icons.access_time_outlined,
+                                  size: 15,
+                                  color: _kTimelineAccent,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: RichText(
+                                    text: TextSpan(
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: onSurface.withValues(alpha: 0.6),
+                                        height: 1.35,
+                                      ),
+                                      children: [
+                                        const TextSpan(text: 'Use '),
+                                        TextSpan(
+                                          text: futureLabel,
+                                          style: const TextStyle(
+                                            color: _kTimelineGapAccent,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text: showPastPrompt
+                                              ? ' from here onward.'
+                                              : ' wisely. Create away!',
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
+                              if (onAddLog != null)
+                                OutlinedButton.icon(
+                                  onPressed: onAddLog,
+                                  icon: Icon(
+                                    Icons.add_rounded,
+                                    size: 16,
+                                    color: onSurface.withValues(alpha: 0.6),
+                                  ),
+                                  label: Text(
+                                    'Add Log',
+                                    style: TextStyle(
+                                      color: onSurface.withValues(alpha: 0.72),
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size(0, 34),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 0,
+                                    ),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    visualDensity: VisualDensity.compact,
+                                    backgroundColor:
+                                        theme.scaffoldBackgroundColor,
+                                    side: BorderSide(
+                                      color: onSurface.withValues(alpha: 0.22),
+                                    ),
+                                    shape: const StadiumBorder(),
+                                  ),
+                                ),
+                              if (onAddTask != null)
+                                OutlinedButton.icon(
+                                  onPressed: onAddTask,
+                                  icon: const Icon(
+                                    Icons.add_rounded,
+                                    size: 16,
+                                    color: _kTimelineGapAccent,
+                                  ),
+                                  label: const Text(
+                                    'Add Task',
+                                    style: TextStyle(
                                       color: _kTimelineGapAccent,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
-                                  const TextSpan(text: ' wisely. Create away!'),
-                                ],
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size(0, 34),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 0,
+                                    ),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    visualDensity: VisualDensity.compact,
+                                    backgroundColor:
+                                        theme.scaffoldBackgroundColor,
+                                    side: const BorderSide(
+                                      color: _kTimelineGapAccent,
+                                    ),
+                                    shape: const StadiumBorder(),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          if (onAddTask == null && onAddLog == null)
+                            Text(
+                              durationLabel,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: onSurface.withValues(alpha: 0.45),
                               ),
                             ),
-                          ),
                         ],
                       ),
-                      const SizedBox(height: 10),
-                      OutlinedButton.icon(
-                        onPressed: onAddTask ?? onTap,
-                        icon: const Icon(
-                          Icons.add_rounded,
-                          size: 16,
-                          color: _kTimelineGapAccent,
-                        ),
-                        label: const Text(
-                          'Add Task',
-                          style: TextStyle(
-                            color: _kTimelineGapAccent,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 34),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 0,
-                          ),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                          backgroundColor: theme.scaffoldBackgroundColor,
-                          side: const BorderSide(color: _kTimelineGapAccent),
-                          shape: const StadiumBorder(),
-                        ),
-                      ),
-                    ],
+                    ),
+                  ),
+                  const SizedBox(width: _kTimelineStatusSize + 10),
+                ],
+              ),
+              if (nowIndicatorTop != null)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: nowIndicatorTop,
+                  child: _NowLineOverlay(
+                    label: nowLabel,
+                    backgroundColor: theme.cardColor,
                   ),
                 ),
-              ),
-              const SizedBox(width: _kTimelineStatusSize + 10),
             ],
           ),
         ),
