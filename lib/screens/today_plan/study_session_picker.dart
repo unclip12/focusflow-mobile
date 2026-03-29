@@ -19,9 +19,114 @@ import 'package:provider/provider.dart';
 import 'study_flow_screen.dart';
 import 'package:focusflow_mobile/utils/show_app_bottom_sheet.dart';
 
+class PlannedStudySessionData {
+  final List<StudyTask> tasks;
+  final int estimatedDurationMinutes;
+
+  const PlannedStudySessionData({
+    required this.tasks,
+    required this.estimatedDurationMinutes,
+  });
+
+  int get itemCount => StudyTask.totalItemCount(tasks);
+}
+
+class PlannedStudySessionPayload {
+  static const kind = 'planned_study_session';
+
+  static PlannedStudySessionData? fromBlock(Block block) {
+    final notes = block.reflectionNotes;
+    if (notes == null || notes.isEmpty) {
+      return null;
+    }
+
+    try {
+      final decoded = jsonDecode(notes);
+      if (decoded is! Map<String, dynamic> || decoded['kind'] != kind) {
+        return null;
+      }
+
+      final tasks = StudyTask.fromJsonList(decoded['tasks']);
+      final estimatedMinutes = decoded['estimatedDurationMinutes'] as int?;
+      return PlannedStudySessionData(
+        tasks: tasks,
+        estimatedDurationMinutes:
+            estimatedMinutes != null && estimatedMinutes > 0
+                ? estimatedMinutes
+                : StudyTask.estimateQueueDurationMinutes(tasks),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Map<String, dynamic> toJson(
+    List<StudyTask> tasks,
+    int estimatedMinutes,
+  ) {
+    return {
+      'kind': kind,
+      'estimatedDurationMinutes': estimatedMinutes,
+      'tasks': StudyTask.toJsonList(tasks),
+    };
+  }
+
+  static String encode(List<StudyTask> tasks, int estimatedMinutes) {
+    return jsonEncode(toJson(tasks, estimatedMinutes));
+  }
+
+  static String buildTitle(List<StudyTask> tasks) {
+    final parts = <String>[];
+    final faPages = tasks
+        .where((task) => task.type == 'FA')
+        .expand((task) => task.pageNumbers)
+        .toList()
+      ..sort();
+    if (faPages.isNotEmpty) {
+      if (faPages.length == 1) {
+        parts.add('FA p.${faPages.first}');
+      } else {
+        parts.add('FA pp.${faPages.first}-${faPages.last}');
+      }
+    }
+    if (tasks.any((task) => task.type == 'UWORLD')) {
+      parts.add('UWorld');
+    }
+    if (tasks.any(
+      (task) => task.type == 'SKETCHY_MICRO' || task.type == 'SKETCHY_PHARM',
+    )) {
+      parts.add('Sketchy');
+    }
+    if (tasks.any((task) => task.type == 'PATHOMA')) {
+      parts.add('Pathoma');
+    }
+    if (tasks.any((task) => task.type == 'VIDEO_LECTURE')) {
+      parts.add('Library Videos');
+    }
+    if (parts.isEmpty && tasks.isNotEmpty) {
+      parts.add(tasks.first.label);
+    }
+
+    if (parts.isEmpty) {
+      return 'Study Session';
+    }
+    return 'Study Session • ${parts.join(' + ')}';
+  }
+}
+
 class StudySessionPicker extends StatefulWidget {
   final String dateKey;
-  const StudySessionPicker({super.key, required this.dateKey});
+  final String? targetBlockId;
+  final String? boundPlannedStartTime;
+  final String? boundPlannedEndTime;
+
+  const StudySessionPicker({
+    super.key,
+    required this.dateKey,
+    this.targetBlockId,
+    this.boundPlannedStartTime,
+    this.boundPlannedEndTime,
+  });
 
   @override
   State<StudySessionPicker> createState() => _StudySessionPickerState();
@@ -29,9 +134,11 @@ class StudySessionPicker extends StatefulWidget {
 
 class _StudySessionPickerState extends State<StudySessionPicker> {
   final List<StudyTask> _queue = [];
-  static const _plannedStudySessionKind = 'planned_study_session';
+  static const _plannedStudySessionKind = PlannedStudySessionPayload.kind;
   static const double _kQueuePickerBottomActionClearance = 104;
   static const double _kQueuePickerActionScrollPadding = 192;
+
+  bool get _isBlockBound => widget.targetBlockId != null;
 
   List<Block> _plannedSessionBlocks(AppProvider app) {
     final plan = app.getDayPlan(widget.dateKey);
@@ -47,38 +154,14 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
   }
 
   List<StudyTask> _plannedQueueFromBlock(Block block) {
-    final notes = block.reflectionNotes;
-    if (notes == null || notes.isEmpty) {
-      return const <StudyTask>[];
-    }
-    try {
-      final decoded = jsonDecode(notes);
-      if (decoded is! Map<String, dynamic>) {
-        return const <StudyTask>[];
-      }
-      if (decoded['kind'] != _plannedStudySessionKind) {
-        return const <StudyTask>[];
-      }
-      return StudyTask.fromJsonList(decoded['tasks']);
-    } catch (_) {
-      return const <StudyTask>[];
-    }
+    return PlannedStudySessionPayload.fromBlock(block)?.tasks ??
+        const <StudyTask>[];
   }
 
   int _plannedQueueMinutesFromBlock(Block block) {
-    final notes = block.reflectionNotes;
-    if (notes != null && notes.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(notes);
-        if (decoded is Map<String, dynamic>) {
-          final minutes = decoded['estimatedDurationMinutes'] as int?;
-          if (minutes != null && minutes > 0) {
-            return minutes;
-          }
-        }
-      } catch (_) {
-        // Fall back to queue-derived estimate.
-      }
+    final plannedData = PlannedStudySessionPayload.fromBlock(block);
+    if (plannedData != null && plannedData.estimatedDurationMinutes > 0) {
+      return plannedData.estimatedDurationMinutes;
     }
     if (block.plannedDurationMinutes > 0) {
       return block.plannedDurationMinutes;
@@ -144,9 +227,8 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
         prefix: preset?.prefix ?? entry.key,
         icon: preset?.icon ?? Icons.ondemand_video_rounded,
         color: preset?.color ?? const Color(0xFF6366F1),
-        orderIndex: entry.value
-            .map((lecture) => lecture.orderIndex)
-            .fold<int>(1 << 20, (minOrder, order) => order < minOrder ? order : minOrder),
+        orderIndex: entry.value.map((lecture) => lecture.orderIndex).fold<int>(
+            1 << 20, (minOrder, order) => order < minOrder ? order : minOrder),
       );
     }).toList()
       ..sort((a, b) {
@@ -515,7 +597,8 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
     }
 
     var plannedQueue = _queueWithPlanningDefaults(_queue);
-    TimeOfDay selectedTime = TimeOfDay.now();
+    TimeOfDay selectedTime =
+        _isBlockBound ? _boundStartTime() : TimeOfDay.now();
 
     await showAppBottomSheet(
       context: context,
@@ -689,7 +772,7 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Scheduled Start',
+                    _isBlockBound ? 'Selected Task Time' : 'Scheduled Start',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
@@ -697,39 +780,68 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      final picked = await showTimePicker(
-                        context: sheetContext,
-                        initialTime: selectedTime,
-                      );
-                      if (picked != null) {
-                        setSheetState(() {
-                          selectedTime = picked;
-                        });
-                      }
-                    },
-                    icon: const Icon(Icons.schedule_rounded, size: 18),
-                    label: Text(selectedTime.format(sheetContext)),
-                    style: OutlinedButton.styleFrom(
+                  if (_isBlockBound)
+                    Container(
+                      width: double.infinity,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
                         vertical: 14,
                       ),
-                      shape: RoundedRectangleBorder(
+                      decoration: BoxDecoration(
+                        color:
+                            cs.surfaceContainerHighest.withValues(alpha: 0.45),
                         borderRadius: BorderRadius.circular(12),
                       ),
+                      child: Text(
+                        '${_formatPlannedTime(widget.boundPlannedStartTime ?? '')} - ${_formatPlannedTime(widget.boundPlannedEndTime ?? '')}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                    )
+                  else
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final picked = await showTimePicker(
+                          context: sheetContext,
+                          initialTime: selectedTime,
+                        );
+                        if (picked != null) {
+                          setSheetState(() {
+                            selectedTime = picked;
+                          });
+                        }
+                      },
+                      icon: const Icon(Icons.schedule_rounded, size: 18),
+                      label: Text(selectedTime.format(sheetContext)),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
-                  ),
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: () => _savePlannedSession(
-                        sheetContext,
-                        plannedQueue,
-                        selectedTime,
-                      ),
+                      onPressed: () => _isBlockBound
+                          ? _persistBoundSession(
+                              plannedQueue: plannedQueue,
+                              scheduledTime: selectedTime,
+                              startNow: false,
+                              sheetContext: sheetContext,
+                            )
+                          : _savePlannedSession(
+                              sheetContext,
+                              plannedQueue,
+                              selectedTime,
+                            ),
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF8B5CF6),
                         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1298,6 +1410,11 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
   }
 
   void _startSession() {
+    if (_isBlockBound) {
+      unawaited(_bindQueuedTasksToBoundBlock(startNow: true));
+      return;
+    }
+
     final navigator = Navigator.of(context);
     final queueSnapshot = List<StudyTask>.from(_queue);
     navigator.pop();
@@ -1307,6 +1424,173 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
           builder: (_) => StudyFlowScreen(
             dateKey: widget.dateKey,
             queuedTasks: queueSnapshot,
+          ),
+        ),
+      );
+    });
+  }
+
+  TimeOfDay _boundStartTime() {
+    final plannedStartTime = widget.boundPlannedStartTime;
+    if (plannedStartTime == null || plannedStartTime.isEmpty) {
+      return TimeOfDay.now();
+    }
+    return _timeOfDayFromString(plannedStartTime) ?? TimeOfDay.now();
+  }
+
+  int _boundSlotDurationMinutes() {
+    final start = _timeOfDayFromString(widget.boundPlannedStartTime ?? '');
+    final end = _timeOfDayFromString(widget.boundPlannedEndTime ?? '');
+    if (start == null || end == null) {
+      return 0;
+    }
+
+    final startMinutes = start.hour * 60 + start.minute;
+    final endMinutes = end.hour * 60 + end.minute;
+    final duration = endMinutes - startMinutes;
+    return duration > 0 ? duration : 0;
+  }
+
+  Future<void> _bindQueuedTasksToBoundBlock({required bool startNow}) async {
+    if (_queue.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Add at least one task to start this study session.'),
+        ),
+      );
+      return;
+    }
+
+    await _persistBoundSession(
+      plannedQueue: _queueWithPlanningDefaults(_queue),
+      scheduledTime: _boundStartTime(),
+      startNow: startNow,
+    );
+  }
+
+  Future<void> _persistBoundSession({
+    required List<StudyTask> plannedQueue,
+    required TimeOfDay scheduledTime,
+    required bool startNow,
+    BuildContext? sheetContext,
+  }) async {
+    final targetBlockId = widget.targetBlockId;
+    if (targetBlockId == null || targetBlockId.isEmpty) {
+      return;
+    }
+
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final app = context.read<AppProvider>();
+    final existingPlan = app.getDayPlan(widget.dateKey);
+    final existingBlocks = existingPlan?.blocks ?? const <Block>[];
+    final targetIndex =
+        existingBlocks.indexWhere((block) => block.id == targetBlockId);
+    if (targetIndex < 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Unable to update the selected study task')),
+      );
+      return;
+    }
+
+    final estimatedMinutes =
+        StudyTask.estimateQueueDurationMinutes(plannedQueue);
+    final scheduledAt = _sessionStartDateTime(scheduledTime);
+    final targetBlock = existingBlocks[targetIndex];
+    final slotDuration = _boundSlotDurationMinutes();
+    final updatedBlock = targetBlock.copyWith(
+      type: BlockType.studySession,
+      title: _buildStudySessionTitle(plannedQueue),
+      plannedDurationMinutes:
+          slotDuration > 0 ? slotDuration : targetBlock.plannedDurationMinutes,
+      status: BlockStatus.notStarted,
+      reflectionNotes: jsonEncode(
+        _plannedStudySessionPayload(plannedQueue, estimatedMinutes),
+      ),
+    );
+
+    final updatedBlocks = List<Block>.from(existingBlocks);
+    updatedBlocks[targetIndex] = updatedBlock;
+    final totalStudyMinutes = updatedBlocks
+        .where((entry) => entry.type != BlockType.breakBlock)
+        .fold<int>(0, (sum, entry) => sum + entry.plannedDurationMinutes);
+    final totalBreakMinutes = updatedBlocks
+        .where((entry) => entry.type == BlockType.breakBlock)
+        .fold<int>(0, (sum, entry) => sum + entry.plannedDurationMinutes);
+    final updatedPlan = existingPlan?.copyWith(
+          blocks: updatedBlocks,
+          totalStudyMinutesPlanned: totalStudyMinutes,
+          totalBreakMinutes: totalBreakMinutes,
+        ) ??
+        DayPlan(
+          date: widget.dateKey,
+          faPages: const [],
+          faPagesCount: 0,
+          videos: const [],
+          notesFromUser: '',
+          notesFromAI: '',
+          attachments: const [],
+          breaks: const [],
+          blocks: updatedBlocks,
+          totalStudyMinutesPlanned: totalStudyMinutes,
+          totalBreakMinutes: totalBreakMinutes,
+        );
+
+    await app.upsertDayPlan(updatedPlan);
+    await app.syncFlowActivitiesFromDayPlan(widget.dateKey);
+
+    if (scheduledAt.isAfter(DateTime.now())) {
+      await NotificationService.instance.scheduleStudySessionReminder(
+        id: _notificationIdForBlock(updatedBlock.id),
+        blockTitle: updatedBlock.title,
+        when: scheduledAt,
+        dateKey: updatedBlock.date,
+        blockId: updatedBlock.id,
+      );
+    }
+
+    if (!mounted) return;
+    if (sheetContext != null && sheetContext.mounted) {
+      Navigator.of(sheetContext).pop();
+    } else {
+      navigator.pop();
+    }
+
+    if (!startNow) {
+      Future.microtask(() {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              'Study session saved to ${DateFormat('h:mm a').format(scheduledAt)}',
+            ),
+          ),
+        );
+      });
+      return;
+    }
+
+    final startedAt = DateTime.now();
+    await Future<void>.microtask(() async {
+      await navigator.push(
+        MaterialPageRoute(
+          builder: (_) => StudyFlowScreen(
+            dateKey: widget.dateKey,
+            queuedTasks: plannedQueue,
+            onComplete: () {
+              final completedAt = DateTime.now();
+              unawaited(
+                app.completeDayPlanBlock(
+                  widget.dateKey,
+                  updatedBlock.id,
+                  startedAt: startedAt,
+                  completedAt: completedAt,
+                  durationSeconds: completedAt.difference(startedAt).inSeconds,
+                ),
+              );
+            },
           ),
         ),
       );
@@ -1974,16 +2258,16 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                     },
                   ),
                 ),
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  16,
-                  16,
-                  MediaQuery.of(ctx).padding.bottom +
-                      _kQueuePickerBottomActionClearance,
-                ),
-                child: SizedBox(
-                  width: double.infinity,
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    16,
+                    16,
+                    MediaQuery.of(ctx).padding.bottom +
+                        _kQueuePickerBottomActionClearance,
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
                     child: FilledButton(
                       onPressed: selectedChapters.isEmpty
                           ? null
@@ -2697,7 +2981,8 @@ class _LibrarySubjectVideoScreen extends StatefulWidget {
       _LibrarySubjectVideoScreenState();
 }
 
-class _LibrarySubjectVideoScreenState extends State<_LibrarySubjectVideoScreen> {
+class _LibrarySubjectVideoScreenState
+    extends State<_LibrarySubjectVideoScreen> {
   static const double _kBottomActionClearance = 104;
   final Set<int> _selectedLectureIds = <int>{};
 
@@ -2744,8 +3029,8 @@ class _LibrarySubjectVideoScreenState extends State<_LibrarySubjectVideoScreen> 
                 final lecture = lectures[index];
                 final lectureId = lecture.id;
                 final isDisabled = lecture.isComplete || lectureId == null;
-                final isSelected =
-                    lectureId != null && _selectedLectureIds.contains(lectureId);
+                final isSelected = lectureId != null &&
+                    _selectedLectureIds.contains(lectureId);
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   decoration: BoxDecoration(
@@ -2778,8 +3063,9 @@ class _LibrarySubjectVideoScreenState extends State<_LibrarySubjectVideoScreen> 
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        decoration:
-                            lecture.isComplete ? TextDecoration.lineThrough : null,
+                        decoration: lecture.isComplete
+                            ? TextDecoration.lineThrough
+                            : null,
                         color: lecture.isComplete
                             ? cs.onSurface.withValues(alpha: 0.45)
                             : cs.onSurface,

@@ -22,7 +22,8 @@ import 'package:focusflow_mobile/utils/date_utils.dart';
 import 'block_editor_sheet.dart';
 import 'free_gap_panel.dart';
 import 'routine_runner_screen.dart';
-import 'study_session_screen.dart';
+import 'study_flow_screen.dart';
+import 'study_session_picker.dart';
 
 // -- Helpers --------------------------------------------------
 typedef TimelineAddTaskCallback = Future<void> Function(
@@ -799,12 +800,7 @@ class _TimelineViewState extends State<TimelineView> {
       return;
     }
     if (_opensStudySession(block)) {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => StudySessionScreen(block: block),
-        ),
-      );
+      await _openStudyBlock(block);
       return;
     }
     _showEditSheet(block);
@@ -848,13 +844,15 @@ class _TimelineViewState extends State<TimelineView> {
 
   Future<void> _openRoutineBlock(Block block) async {
     final app = context.read<AppProvider>();
+    final sourceDateKey = block.date.isNotEmpty ? block.date : widget.dateKey;
     final routine = app.getRoutineForBlock(block);
     if (routine == null) {
       _showEditSheet(block);
       return;
     }
 
-    final latestLog = app.getLatestCompletedRoutineLog(routine.id, widget.dateKey);
+    final latestLog =
+        app.getLatestCompletedRoutineLog(routine.id, sourceDateKey);
     if (latestLog != null) {
       await Navigator.of(context).push(
         MaterialPageRoute(
@@ -880,9 +878,52 @@ class _TimelineViewState extends State<TimelineView> {
       MaterialPageRoute(
         builder: (_) => RoutineRunnerScreen(
           routine: routine,
-          dateKey: widget.dateKey,
+          dateKey: sourceDateKey,
           sourceBlockId: block.id,
         ),
+      ),
+    );
+  }
+
+  Future<void> _openStudyBlock(Block block) async {
+    final sourceDateKey = block.date.isNotEmpty ? block.date : widget.dateKey;
+    final plannedSession = PlannedStudySessionPayload.fromBlock(block);
+    if (plannedSession != null && plannedSession.tasks.isNotEmpty) {
+      final app = context.read<AppProvider>();
+      final startedAt = DateTime.now();
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => StudyFlowScreen(
+            dateKey: sourceDateKey,
+            queuedTasks: plannedSession.tasks,
+            onComplete: () {
+              final completedAt = DateTime.now();
+              unawaited(
+                app.completeDayPlanBlock(
+                  sourceDateKey,
+                  block.id,
+                  startedAt: startedAt,
+                  completedAt: completedAt,
+                  durationSeconds: completedAt.difference(startedAt).inSeconds,
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StudySessionPicker(
+        dateKey: sourceDateKey,
+        targetBlockId: block.id,
+        boundPlannedStartTime: block.plannedStartTime,
+        boundPlannedEndTime: block.plannedEndTime,
       ),
     );
   }
@@ -1138,9 +1179,7 @@ class _TimelineViewState extends State<TimelineView> {
   }
 
   void _deleteBlock(Block block) {
-    context
-        .read<AppProvider>()
-        .removeBlockFromDayPlan(
+    context.read<AppProvider>().removeBlockFromDayPlan(
           block.id,
           block.date.isNotEmpty ? block.date : widget.dateKey,
         );
@@ -1343,15 +1382,15 @@ class _TimelineViewState extends State<TimelineView> {
             leading: const SizedBox(width: 22),
             onTap: () => _onBlockTap(block),
             onLongPress: () => _onBlockLongPress(block),
-            onStatusTap:
-                _isLockedBlock(block) ||
-                        block.status == BlockStatus.done ||
-                        slice.relation == _TimelineBlockRelation.carryIn
-                    ? null
-                    : () => _markBlockDone(block),
-            onAdjacentDateTap: slice.adjacentDate == null || widget.onOpenDate == null
+            onStatusTap: _isLockedBlock(block) ||
+                    block.status == BlockStatus.done ||
+                    slice.relation == _TimelineBlockRelation.carryIn
                 ? null
-                : () => widget.onOpenDate!(slice.adjacentDate!),
+                : () => _markBlockDone(block),
+            onAdjacentDateTap:
+                slice.adjacentDate == null || widget.onOpenDate == null
+                    ? null
+                    : () => widget.onOpenDate!(slice.adjacentDate!),
             pastFraction: _pastFractionForBlock(
               startMinutes: slice.visibleStartMinutes,
               endMinutes: slice.visibleEndMinutes,
@@ -2247,8 +2286,8 @@ class _BlockCard extends StatelessWidget {
                           labelColor: onSurface.withValues(alpha: 0.52),
                           actualLabelColor: onSurfaceVariant,
                           checkIconColor: onSurface,
-                          plannedLabel:
-                              _to12hShort(_minutesToHHMM(slice.visibleEndMinutes % (24 * 60))),
+                          plannedLabel: _to12hShort(_minutesToHHMM(
+                              slice.visibleEndMinutes % (24 * 60))),
                           actualLabel: _to12hShort(actualEndTime),
                           plannedHeight: plannedTrackHeight,
                           actualHeight: actualTrackHeight,
