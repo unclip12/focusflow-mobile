@@ -19,7 +19,7 @@ import 'block_editor_sheet.dart';
 import 'day_session_screen.dart';
 import 'routine_editor_sheet.dart';
 import 'routines_tab.dart';
-import 'study_session_screen.dart';
+import 'study_session_picker.dart';
 import 'todo_tab.dart';
 import 'track_now_screen.dart';
 import 'package:focusflow_mobile/screens/today_plan/timeline_view.dart';
@@ -252,27 +252,12 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
   }
 
   void _openStudySession() {
-    final app = context.read<AppProvider>();
-    final blocks = app.getDayPlan(_dateKey)?.blocks ?? const <Block>[];
-
-    Block? selectedBlock;
-    for (final block in blocks) {
-      if (block.isEvent || block.id.startsWith('prayer_')) continue;
-      if (block.type == BlockType.breakBlock) continue;
-      selectedBlock = block;
-      break;
-    }
-
-    final studyBlock = selectedBlock ??
-        _buildDraftBlock(
-          type: BlockType.studySession,
-          title: 'Study Session',
-        );
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => StudySessionScreen(block: studyBlock),
-      ),
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StudySessionPicker(dateKey: _dateKey),
     );
   }
 
