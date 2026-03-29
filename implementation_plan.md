@@ -2,7 +2,7 @@
 
 ---
 
-## ✅ Completed Batches (1–12)
+## ✅ Completed Batches (1–33)
 
 | Batch | File(s) | Status |
 |---|---|---|
@@ -18,106 +18,37 @@
 | 10 | `screens/today_plan/routine_editor_sheet.dart` — subtask reorder, emoji, duration steppers, recurrence | ✅ Done |
 | 11 | `screens/today_plan/today_plan_screen.dart` — pre-existing error fixes | ✅ Done |
 | 12 | `screens/today_plan/wakeup_snooze_overlay.dart` — full-screen overlay, countdown ring, snooze notifications | ✅ Done |
+| 13 | `timeline_view.dart` — tall rounded pill, emoji icon, time labels, status circle, dashed connector, free gap row | ✅ Done |
+| 14 | `today_plan_screen.dart` — extendBody, bottom padding, scroll-away header + weekly strip | ✅ Done |
+| 15 | `block_editor_sheet.dart` — color header, emoji/color pickers, white underline title, date/time/alert rows | ✅ Done |
+| 16 | `time_picker_sheet.dart` — drum-roll pickers, Standard/Detailed toggle, duration sync | ✅ Done |
+| 17 | `alert_repeat_sheet.dart` — alert offsets, alert types, repeat options, weekday chips | ✅ Done |
+| 18 | `today_plan_screen.dart` + `timeline_view.dart` — dark theme, salmon pills, weekly strip, scroll-away date header | ✅ Done |
+| 19 | `time_picker_sheet.dart` — paired drum-roll pickers, looping ListWheelScrollView, duration chip row | ✅ Done |
+| 20 | `timeline_view.dart` + `app_provider.dart` — removed auto-complete, keyboard white screen fix across all sheets | ✅ Done |
+| 21 | `study_session_screen.dart` + `timeline_view.dart` — study session full screen, tap routing for study blocks | ✅ Done |
+| 22 | `day_session_screen.dart` — real progress from BlockStatus.done, 12hr times, dark palette | ✅ Done |
+| 23 | `today_plan_screen.dart` + `timeline_view.dart` — all entry points wire to BlockEditorSheet | ✅ Done |
+| 24 | `task_suggestions_service.dart` + `block_editor_sheet.dart` — 500+ keyword smart emoji/category auto-suggest | ✅ Done |
+| 25 | `today_plan_screen.dart` + `timeline_view.dart` — theme fix, top quick-action grid restored, compact pills, overlap warning | ✅ Done |
+| 26 | `today_plan_screen.dart` — Study Session button routes to existing study_session_picker.dart | ✅ Done |
+| 27 | `timeline_view.dart` — live now-line, smart Add Task (future only), Add Log (past gaps) | ✅ Done |
+| 28 | `app.dart` + `app_theme.dart` + all sheets — root-cause keyboard white screen fix | ✅ Done |
+| 29 | `study_session_picker.dart` — Videos from Library section (ENT, PSM, Ophtha) | ✅ Done |
+| 30 | `AndroidManifest.xml` + `app_theme.dart` + `block_editor_sheet.dart` + `routine_editor_sheet.dart` — keyboard inset padding, bottom sheet theme | ✅ Done |
+| 31 | `study_session_picker.dart` — ENT/PSM/Ophtha navigate to real VideoLecturesTab | ✅ Done |
+| 32 | `day_session_screen.dart` — exclude retroactive logs, Done Early persists, theme uses app theme | ✅ Done |
+| 33 | `timeline_view.dart` + `day_plan.dart` — dual-track planned vs actual, status circle marks done | ✅ Done |
 
 ---
 
-## 🔄 In Progress — Timeline & Task Creation Redesign (Batches 13–17)
+## 🗒️ Known Minor Items (non-blocking)
 
-> **Goal**: Redesign the timeline visual, task creation sheet, time picker sheet,
-> and fix scroll/layout issues to match the reference screenshots.
-> Do NOT replace full files — surgical changes only.
-
----
-
-### Batch 13 — Timeline Block Visual Redesign
-**File**: `lib/screens/today_plan/timeline_view.dart`  
-**Status**: 🔲 Not started
-
-**Changes**:
-- Replace current block rendering with tall rounded pill/capsule icon container on LEFT
-- Pill height stretches proportionally to block duration
-- Block emoji/icon centered inside pill
-- Time labels on far LEFT (e.g. `8:00`, `9:35`)
-- Block title + time range text to RIGHT of pill
-- Status circle (hollow ring) on far RIGHT
-- Dashed vertical connector line between blocks with a time gap
-- Free gap row: clock icon + `"Use Xh Xm wisely. Create away!"` with free time in salmon/pink + `Add Task` pill button
-- Keep all existing tap/swipe/long-press behaviors
-
----
-
-### Batch 14 — Layout & Scroll Fixes
-**File**: `lib/screens/today_plan/today_plan_screen.dart`  
-**Status**: 🔲 Not started
-
-**Changes**:
-- Add `extendBody: true` to the Scaffold so content renders behind nav bar
-- Add `MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight` as bottom padding to scrollable content
-- Make the weekly calendar strip + date header scroll away with content (NOT sticky/pinned)
-- Full page scrolls up so only timeline is visible when user scrolls down
-
----
-
-### Batch 15 — Task Creation Sheet Redesign (Step 1 — Basic Info)
-**File**: `lib/screens/today_plan/block_editor_sheet.dart`  
-**Status**: 🔲 Not started
-
-**Changes**:
-- Color header at top (salmon/block color background)
-- X close button top-left
-- Large circle icon (tappable → emoji picker) top-center
-- Color palette icon below icon circle (tappable → color picker)
-- Title text field (white underline style, large)
-- Status circle top-right
-- Below header on dark background:
-  - Date row: calendar icon + date + relative label ("Tomorrow") + chevron
-  - Time row: clock icon + time range + duration + chevron → opens Batch 16 sheet
-  - Alert row: bell-off icon + "1 Alert" + "Nudge" + chevron
-- Repeat row: refresh icon + "Repeat" + PRO badge pill
-- Subtask/notes card: checkbox + "Add Subtask" + gear icon + divider + notes placeholder
-- "Create Task" full-width salmon CTA button
-- Keep all existing fields: `isEvent`, `BlockType`, `BlockStatus`, `date`, `plannedStartTime`, `plannedEndTime`, `plannedDurationMinutes`
-
----
-
-### Batch 16 — Time Picker Sheet (Step 2)
-**File**: `lib/screens/today_plan/time_picker_sheet.dart` *(new file)*  
-**Status**: 🔲 Not started
-
-**Changes**:
-- Same color header as Batch 15 (block color background, title, icon)
-- "Time" section: scrollable list of 15-min interval time slots
-  - Selected slot shown as salmon rounded pill (e.g. `8:05 – 9:35 AM`)
-- "Duration" section: horizontal segmented selector
-  - Options: `1`, `15`, `30`, `45`, `1h`, `1.5h` (minutes, except last two)
-  - Selected option shown as salmon pill
-- "Continue" full-width salmon button → returns picked time + duration to Batch 15 sheet
-- 12-hour AM/PM format throughout
-
----
-
-### Batch 17 — Alert & Repeat Sheet
-**File**: `lib/screens/today_plan/alert_repeat_sheet.dart` *(new file)*  
-**Status**: 🔲 Not started
-
-**Changes**:
-- Alert options: None, At time, 5 min before, 10 min before, 15 min before, 30 min before
-- Alert type selector: Nudge | Notification | Alarm
-- Repeat options: None | Daily | Weekly (with weekday chips M T W T F S S) | Monthly
-- Returns `alertOffset`, `alertType`, `recurrenceType`, `recurrenceDays` back to block editor
-- Wire into existing `NotificationService.scheduleAt(...)` call
-
----
-
-## 📋 Batch Order & Dependencies
-
-```
-Batch 13 (timeline visuals)  ← independent, start first
-Batch 14 (scroll/layout)     ← independent, run in parallel with 13
-Batch 15 (task sheet UI)     ← depends on 13 + 14 being done
-Batch 16 (time picker)       ← depends on 15
-Batch 17 (alert/repeat)      ← depends on 15
-```
+- 5 `deprecated_member_use` info warnings for `value:` in:
+  - `add_task_sheet.dart:1452`
+  - `tracker_sheets.dart:394, 409, 588, 839`
+  - These are `DropdownButtonFormField` — replace `value:` with the current API when upgrading Flutter SDK
+- 57 pub dependency update notices (not errors)
 
 ---
 
@@ -126,3 +57,7 @@ Batch 17 (alert/repeat)      ← depends on 15
 - Flutter SDK on build machine may differ from local — always use `value:` not `initialValue:` for `DropdownButtonFormField`
 - Run `flutter analyze <file>` after every batch before marking done
 - Full `flutter analyze --no-fatal-infos` after every 2 batches
+- `actualStartTime` and `actualEndTime` already existed in `Block` model at `day_plan.dart:377-378`
+- `BlockType` is defined in `lib/utils/constants.dart` (not `day_plan.dart`)
+- `BlockStatus` done terminal state uses `BlockStatus.done` (not `.completed`)
+- `Block.description` is used for retroactive log detection (no `notes` field on Block)
