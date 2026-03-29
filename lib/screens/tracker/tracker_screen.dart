@@ -273,7 +273,7 @@ class _TrackerScreenState extends State<TrackerScreen>
                   ),
                 ),
                 trailing: isActive
-                    ? const Icon(Icons.check_rounded,
+                    ? Icon(Icons.check_rounded,
                         color: DashboardColors.primary)
                     : null,
                 onTap: () {

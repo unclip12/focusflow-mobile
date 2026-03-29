@@ -905,7 +905,7 @@ class _SortMenuButton extends StatelessWidget {
           ),
           if (isSelected) ...[
             const Spacer(),
-            const Icon(Icons.check_rounded,
+            Icon(Icons.check_rounded,
                 size: 14, color: DashboardColors.primary),
           ],
         ],

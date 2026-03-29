@@ -8,13 +8,13 @@ class AnimatedProgressBar extends StatefulWidget {
   const AnimatedProgressBar({
     super.key,
     required this.progress,
-    this.color = DashboardColors.primary,
+    this.color,
     this.delay = Duration.zero,
     this.height = 6,
   });
 
   final double progress;
-  final Color color;
+  final Color? color;
   final Duration delay;
   final double height;
 
@@ -69,6 +69,7 @@ class _AnimatedProgressBarState extends State<AnimatedProgressBar> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = widget.color ?? DashboardColors.primary;
     final trackColor = isDark
         ? const Color.fromRGBO(255, 255, 255, 0.10)
         : DashboardColors.primary.withValues(alpha: 0.10);
@@ -89,10 +90,10 @@ class _AnimatedProgressBarState extends State<AnimatedProgressBar> {
                 widthFactor: value.clamp(0, 1),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    gradient: DashboardColors.progressGradient(widget.color),
+                    gradient: DashboardColors.progressGradient(color),
                     boxShadow: <BoxShadow>[
                       BoxShadow(
-                        color: widget.color.withValues(alpha: 0.38),
+                        color: color.withValues(alpha: 0.38),
                         blurRadius: 12,
                       ),
                     ],

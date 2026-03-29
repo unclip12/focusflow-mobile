@@ -7,11 +7,11 @@ import 'package:focusflow_mobile/models/pathoma_chapter.dart';
 import 'package:focusflow_mobile/models/revision_item.dart';
 import 'package:focusflow_mobile/models/sketchy_video.dart';
 import 'package:focusflow_mobile/models/uworld_topic.dart';
+import 'package:focusflow_mobile/models/video_lecture.dart';
 import 'package:intl/intl.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
-import 'package:focusflow_mobile/screens/tracker/video_lectures_tab.dart';
 import 'package:focusflow_mobile/services/notification_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:provider/provider.dart';
@@ -106,19 +106,56 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
     return '$prefix — $unwatchedCount unwatched videos';
   }
 
-  void _openLibrarySubject(
+  Future<void> _openLibrarySubject(
     BuildContext context, {
-    required String title,
-    required String subjectQuery,
-  }) {
-    Navigator.of(context).push(
+    required _LibrarySubjectOption option,
+  }) async {
+    final tasks = await Navigator.of(context).push<List<StudyTask>>(
       MaterialPageRoute(
         builder: (_) => _LibrarySubjectVideoScreen(
-          title: title,
-          subjectQuery: subjectQuery,
+          title: option.title,
+          subject: option.subject,
+          color: option.color,
+          icon: option.icon,
         ),
       ),
     );
+    if (!mounted || tasks == null || tasks.isEmpty) {
+      return;
+    }
+    setState(() {
+      _queue.addAll(tasks);
+    });
+  }
+
+  List<_LibrarySubjectOption> _librarySubjectOptions(AppProvider app) {
+    final grouped = <String, List<VideoLecture>>{};
+    for (final lecture in app.videoLectures) {
+      grouped.putIfAbsent(lecture.subject, () => <VideoLecture>[]).add(lecture);
+    }
+
+    final options = grouped.entries.map((entry) {
+      final preset = _librarySubjectPresets[entry.key];
+      return _LibrarySubjectOption(
+        subject: entry.key,
+        title: preset?.title ?? entry.key,
+        prefix: preset?.prefix ?? entry.key,
+        icon: preset?.icon ?? Icons.ondemand_video_rounded,
+        color: preset?.color ?? const Color(0xFF6366F1),
+        orderIndex: entry.value
+            .map((lecture) => lecture.orderIndex)
+            .fold<int>(1 << 20, (minOrder, order) => order < minOrder ? order : minOrder),
+      );
+    }).toList()
+      ..sort((a, b) {
+        final orderCompare = a.orderIndex.compareTo(b.orderIndex);
+        if (orderCompare != 0) {
+          return orderCompare;
+        }
+        return a.subject.compareTo(b.subject);
+      });
+
+    return options;
   }
 
   List<StudyTask> _queueWithPlanningDefaults(Iterable<StudyTask> tasks) {
@@ -170,6 +207,9 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
     }
     if (tasks.any((task) => task.type == 'PATHOMA')) {
       parts.add('Pathoma');
+    }
+    if (tasks.any((task) => task.type == 'VIDEO_LECTURE')) {
+      parts.add('Library Videos');
     }
     if (parts.isEmpty && tasks.isNotEmpty) {
       parts.add(tasks.first.label);
@@ -332,6 +372,14 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
       case 'PATHOMA':
         for (final id in task.topicIds) {
           final item = _findRevisionItem(app, 'pathoma-ch-$id');
+          if (item != null) {
+            revisions.add(item);
+          }
+        }
+        break;
+      case 'VIDEO_LECTURE':
+        for (final id in task.topicIds) {
+          final item = _findRevisionItem(app, 'video-lecture-$id');
           if (item != null) {
             revisions.add(item);
           }
@@ -801,6 +849,7 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
     final app = context.watch<AppProvider>();
     final settingsProvider = context.watch<SettingsProvider>();
     final plannedBlocks = _plannedSessionBlocks(app);
+    final librarySubjects = _librarySubjectOptions(app);
     final nextPage = app.getNextContinuePage();
     final targetPages = app.getTodayTargetPages(
       count: settingsProvider.dailyFAGoal,
@@ -1070,53 +1119,29 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                         ),
                       ),
                     ),
-                    _OptionCard(
-                      icon: Icons.headphones_rounded,
-                      color: const Color(0xFFF59E0B),
-                      title: 'ENT',
-                      subtitle: _videoLibrarySubtitle(
-                        app: app,
-                        subject: 'ENT',
-                        prefix: 'Ear, Nose & Throat',
-                      ),
-                      onTap: () => _openLibrarySubject(
-                        context,
-                        title: 'ENT',
-                        subjectQuery: 'ENT',
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    _OptionCard(
-                      icon: Icons.public_rounded,
-                      color: const Color(0xFF10B981),
-                      title: 'PSM',
-                      subtitle: _videoLibrarySubtitle(
-                        app: app,
-                        subject: 'Preventive & Social Medicine',
-                        prefix: 'Preventive & Social Medicine',
-                      ),
-                      onTap: () => _openLibrarySubject(
-                        context,
-                        title: 'PSM',
-                        subjectQuery: 'Preventive & Social Medicine',
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    _OptionCard(
-                      icon: Icons.visibility_rounded,
-                      color: const Color(0xFF3B82F6),
-                      title: 'Ophthalmology',
-                      subtitle: _videoLibrarySubtitle(
-                        app: app,
-                        subject: 'Ophthalmology',
-                        prefix: 'Ophtha',
-                      ),
-                      onTap: () => _openLibrarySubject(
-                        context,
-                        title: 'Ophthalmology',
-                        subjectQuery: 'Ophthalmology',
-                      ),
-                    ),
+                    ...librarySubjects.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final option = entry.value;
+                      return Padding(
+                        padding: EdgeInsets.only(
+                          bottom: index == librarySubjects.length - 1 ? 0 : 10,
+                        ),
+                        child: _OptionCard(
+                          icon: option.icon,
+                          color: option.color,
+                          title: option.title,
+                          subtitle: _videoLibrarySubtitle(
+                            app: app,
+                            subject: option.subject,
+                            prefix: option.prefix,
+                          ),
+                          onTap: () => _openLibrarySubject(
+                            context,
+                            option: option,
+                          ),
+                        ),
+                      );
+                    }),
                     const SizedBox(height: 20),
                     if (_queue.isNotEmpty) ...[
                       Padding(
@@ -1230,6 +1255,12 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
         return const Icon(
           Icons.ondemand_video_rounded,
           color: Color(0xFFEF4444),
+          size: 20,
+        );
+      case 'VIDEO_LECTURE':
+        return const Icon(
+          Icons.ondemand_video_rounded,
+          color: Color(0xFFF59E0B),
           size: 20,
         );
       default:
@@ -2410,30 +2441,251 @@ class _OptionCard extends StatelessWidget {
   }
 }
 
-class _LibrarySubjectVideoScreen extends StatelessWidget {
+class _LibrarySubjectVideoScreen extends StatefulWidget {
   final String title;
-  final String subjectQuery;
+  final String subject;
+  final Color color;
+  final IconData icon;
 
   const _LibrarySubjectVideoScreen({
     required this.title,
-    required this.subjectQuery,
+    required this.subject,
+    required this.color,
+    required this.icon,
   });
+
+  @override
+  State<_LibrarySubjectVideoScreen> createState() =>
+      _LibrarySubjectVideoScreenState();
+}
+
+class _LibrarySubjectVideoScreenState extends State<_LibrarySubjectVideoScreen> {
+  static const double _kBottomActionClearance = 104;
+  final Set<int> _selectedLectureIds = <int>{};
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
+    final cs = Theme.of(context).colorScheme;
+    final lectures = app.videoLectures
+        .where(
+          (lecture) =>
+              lecture.subject.toLowerCase() == widget.subject.toLowerCase(),
+        )
+        .toList()
+      ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+    final selectedLectures = lectures
+        .where(
+          (lecture) =>
+              lecture.id != null && _selectedLectureIds.contains(lecture.id),
+        )
+        .toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(title),
+        title: Text(widget.title),
       ),
-      body: VideoLecturesTab(
-        app: app,
-        selectionMode: false,
-        selectedItems: const <String>{},
-        onToggleSelect: (_) {},
-        searchQuery: subjectQuery,
+      body: lectures.isEmpty
+          ? Center(
+              child: Text(
+                'No videos available for ${widget.title}',
+                style: TextStyle(
+                  color: cs.onSurface.withValues(alpha: 0.55),
+                ),
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                _kBottomActionClearance + 120,
+              ),
+              itemCount: lectures.length,
+              itemBuilder: (context, index) {
+                final lecture = lectures[index];
+                final lectureId = lecture.id;
+                final isDisabled = lecture.isComplete || lectureId == null;
+                final isSelected =
+                    lectureId != null && _selectedLectureIds.contains(lectureId);
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isSelected
+                          ? widget.color.withValues(alpha: 0.4)
+                          : cs.outline.withValues(alpha: 0.08),
+                    ),
+                  ),
+                  child: CheckboxListTile(
+                    value: lecture.isComplete ? true : isSelected,
+                    onChanged: isDisabled
+                        ? null
+                        : (value) {
+                            setState(() {
+                              if (value == true) {
+                                _selectedLectureIds.add(lectureId);
+                              } else {
+                                _selectedLectureIds.remove(lectureId);
+                              }
+                            });
+                          },
+                    activeColor: widget.color,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    secondary: Icon(widget.icon, color: widget.color),
+                    title: Text(
+                      lecture.customTitle ?? lecture.title,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        decoration:
+                            lecture.isComplete ? TextDecoration.lineThrough : null,
+                        color: lecture.isComplete
+                            ? cs.onSurface.withValues(alpha: 0.45)
+                            : cs.onSurface,
+                      ),
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(999),
+                            child: LinearProgressIndicator(
+                              value: lecture.progressPercent,
+                              minHeight: 4,
+                              backgroundColor:
+                                  cs.onSurface.withValues(alpha: 0.08),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                lecture.isComplete
+                                    ? Colors.green
+                                    : widget.color,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            lecture.isComplete
+                                ? 'Watched • ${lecture.durationLabel}'
+                                : '${lecture.remainingLabel} • ${lecture.subject}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: cs.onSurface.withValues(alpha: 0.55),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(16, 12, 16, _kBottomActionClearance),
+        child: SizedBox(
+          height: 56,
+          child: FilledButton(
+            onPressed: selectedLectures.isEmpty
+                ? null
+                : () {
+                    final tasks = selectedLectures
+                        .where((lecture) => lecture.id != null)
+                        .map(
+                          (lecture) => StudyTask(
+                            id: [
+                              'VIDEO_LECTURE',
+                              lecture.id.toString(),
+                              DateTime.now().microsecondsSinceEpoch.toString(),
+                            ].join('|'),
+                            type: 'VIDEO_LECTURE',
+                            label: lecture.customTitle ?? lecture.title,
+                            detail:
+                                '${lecture.subject} • ${lecture.remainingLabel}',
+                            topicIds: <int>[lecture.id!],
+                            plannedDurationMinutes: lecture.remainingMinutes > 0
+                                ? lecture.remainingMinutes
+                                : lecture.durationMinutes,
+                          ),
+                        )
+                        .toList();
+                    Navigator.of(context).pop(tasks);
+                  },
+            style: FilledButton.styleFrom(
+              backgroundColor: widget.color,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: Text(
+              selectedLectures.isEmpty
+                  ? 'Select videos'
+                  : 'Add ${selectedLectures.length} videos to queue',
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
 }
+
+class _LibrarySubjectOption {
+  final String subject;
+  final String title;
+  final String prefix;
+  final IconData icon;
+  final Color color;
+  final int orderIndex;
+
+  const _LibrarySubjectOption({
+    required this.subject,
+    required this.title,
+    required this.prefix,
+    required this.icon,
+    required this.color,
+    required this.orderIndex,
+  });
+}
+
+class _LibrarySubjectPreset {
+  final String title;
+  final String prefix;
+  final IconData icon;
+  final Color color;
+
+  const _LibrarySubjectPreset({
+    required this.title,
+    required this.prefix,
+    required this.icon,
+    required this.color,
+  });
+}
+
+const Map<String, _LibrarySubjectPreset> _librarySubjectPresets =
+    <String, _LibrarySubjectPreset>{
+  'ENT': _LibrarySubjectPreset(
+    title: 'ENT',
+    prefix: 'Ear, Nose & Throat',
+    icon: Icons.headphones_rounded,
+    color: Color(0xFFF59E0B),
+  ),
+  'Preventive & Social Medicine': _LibrarySubjectPreset(
+    title: 'PSM',
+    prefix: 'Preventive & Social Medicine',
+    icon: Icons.public_rounded,
+    color: Color(0xFF10B981),
+  ),
+  'Ophthalmology': _LibrarySubjectPreset(
+    title: 'Ophthalmology',
+    prefix: 'Ophtha',
+    icon: Icons.visibility_rounded,
+    color: Color(0xFF3B82F6),
+  ),
+};

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
@@ -9,8 +8,11 @@ import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/screens/session/session_screen.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/services/notification_service.dart';
+import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart';
+import 'package:focusflow_mobile/widgets/app_scaffold.dart';
+import 'package:focusflow_mobile/widgets/liquid_glass_card.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -24,7 +26,11 @@ import 'todo_tab.dart';
 import 'track_now_screen.dart';
 import 'package:focusflow_mobile/screens/today_plan/timeline_view.dart';
 
-const Color _kTodayPlanAccent = Color(0xFFE8837A);
+Color _todayPlanAccent(BuildContext context) =>
+    Theme.of(context).colorScheme.primary;
+
+Color _todayPlanAccentSoft(BuildContext context) =>
+    Theme.of(context).colorScheme.secondary;
 
 class TodayPlanScreen extends StatefulWidget {
   const TodayPlanScreen({super.key});
@@ -471,18 +477,16 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     displayBlocks
         .sort((a, b) => a.plannedStartTime.compareTo(b.plannedStartTime));
 
-    return Scaffold(
-      extendBody: true,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      resizeToAvoidBottomInset: false,
-      body: SafeArea(
-        bottom: false,
-        child: Stack(
+    return AppScaffold(
+      screenName: "Today's Plan",
+      showHeader: false,
+      body: Stack(
           children: [
             Column(
               children: [
                 // ── Compact Header ─────────────────────────
                 // ── Tab Bar ────────────────────────────────
+                const SizedBox(height: 8),
                 _ThreeTabBar(controller: _tabCtrl),
                 // ── Tab Views ──────────────────────────────
                 Expanded(
@@ -514,14 +518,13 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                 ),
               ],
             ),
-            if (_completedBlockId != null)
-              _CelebrationOverlay(
-                onComplete: () =>
-                    _setStateIfMounted(() => _completedBlockId = null),
-              ),
+          if (_completedBlockId != null)
+            _CelebrationOverlay(
+              onComplete: () =>
+                  _setStateIfMounted(() => _completedBlockId = null),
+            ),
           ],
         ),
-      ),
     );
   }
 }
@@ -562,8 +565,6 @@ class _TodayTimelineTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return NestedScrollView(
       headerSliverBuilder: (context, innerBoxIsScrolled) {
         return [
@@ -585,17 +586,15 @@ class _TodayTimelineTab extends StatelessWidget {
           ),
         ];
       },
-      body: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            color: theme.cardColor.withValues(alpha: 0.85),
-            child: TimelineView(
-              dateKey: dateKey,
-              blocks: blocks,
-              onAddTask: onAddTask,
-            ),
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+        child: LiquidGlassCard(
+          padding: EdgeInsets.zero,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          child: TimelineView(
+            dateKey: dateKey,
+            blocks: blocks,
+            onAddTask: onAddTask,
           ),
         ),
       ),
@@ -630,31 +629,31 @@ class _MoreTabViewState extends State<_MoreTabView>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final accent = _todayPlanAccent(context);
+    final accentSoft = _todayPlanAccentSoft(context);
     return Column(
       children: [
         // Sub-tab bar
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: Container(
-            decoration: BoxDecoration(
-              color: theme.cardColor.withValues(alpha: 0.85),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: theme.dividerColor,
-                width: 0.5,
-              ),
-            ),
+          child: LiquidGlassCard(
+            padding: const EdgeInsets.all(4),
+            borderRadius: BorderRadius.circular(18),
             child: TabBar(
               controller: _subTabCtrl,
               dividerColor: Colors.transparent,
+              labelColor: accent,
+              unselectedLabelColor:
+                  theme.colorScheme.onSurface.withValues(alpha: 0.62),
               indicatorSize: TabBarIndicatorSize.tab,
               labelStyle:
                   const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
               unselectedLabelStyle:
                   const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               indicator: BoxDecoration(
-                color: _kTodayPlanAccent.withValues(alpha: 0.12),
+                color: accent.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: accentSoft.withValues(alpha: 0.22)),
               ),
               tabs: const [
                 Tab(text: 'To-Do'),
@@ -724,10 +723,12 @@ class _CelebrationOverlayState extends State<_CelebrationOverlay>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final accent = _todayPlanAccent(context);
+    final accentSoft = _todayPlanAccentSoft(context);
     final particleColors = <Color>[
-      _kTodayPlanAccent,
-      cs.primary,
-      cs.secondary,
+      accent,
+      accentSoft,
+      DashboardColors.primaryViolet,
       cs.onSurfaceVariant,
       theme.disabledColor,
       cs.primary.withValues(alpha: 0.7),
@@ -875,6 +876,7 @@ class _CompactHeader extends StatelessWidget {
     final app = context.watch<AppProvider>();
     final weekDates = _buildWeekDates();
     final theme = Theme.of(context);
+    final accent = _todayPlanAccent(context);
     final onSurface = theme.colorScheme.onSurface;
     final progress = totalBlocks == 0 ? 0.0 : completedBlocks / totalBlocks;
     final dateLabel = isToday
@@ -883,13 +885,18 @@ class _CompactHeader extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      child: LiquidGlassCard(
+        borderRadius: BorderRadius.circular(28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           Container(
             decoration: BoxDecoration(
-              color: theme.cardColor,
+              color: theme.cardColor.withValues(alpha: 0.32),
               borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: accent.withValues(alpha: 0.08),
+              ),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
             child: Row(
@@ -942,8 +949,7 @@ class _CompactHeader extends StatelessWidget {
               value: progress.clamp(0.0, 1.0),
               minHeight: 6,
               backgroundColor: onSurface.withValues(alpha: 0.08),
-              valueColor:
-                  const AlwaysStoppedAnimation<Color>(_kTodayPlanAccent),
+              valueColor: AlwaysStoppedAnimation<Color>(accent),
             ),
           ),
           const SizedBox(height: 14),
@@ -1013,7 +1019,8 @@ class _CompactHeader extends StatelessWidget {
                 ),
             ],
           ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1037,6 +1044,7 @@ class _WeekDayColumn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final accent = _todayPlanAccent(context);
     final onSurface = theme.colorScheme.onSurface;
 
     return InkWell(
@@ -1062,10 +1070,10 @@ class _WeekDayColumn extends StatelessWidget {
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isSelected ? _kTodayPlanAccent : Colors.transparent,
+                color: isSelected ? accent : Colors.transparent,
                 border: Border.all(
                   color: isSelected
-                      ? _kTodayPlanAccent
+                      ? accent
                       : onSurface.withValues(alpha: 0.08),
                 ),
               ),
@@ -1086,7 +1094,7 @@ class _WeekDayColumn extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (hasBlocks)
-                    const _WeekIndicatorDot(color: _kTodayPlanAccent),
+                    _WeekIndicatorDot(color: accent),
                   if (hasBlocks && hasNightRoutine) const SizedBox(width: 4),
                   if (hasNightRoutine)
                     _WeekIndicatorDot(color: theme.colorScheme.onSurfaceVariant),
@@ -1131,34 +1139,30 @@ class _ThreeTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final accent = _todayPlanAccent(context);
+    final accentSoft = _todayPlanAccentSoft(context);
     final onSurface = theme.colorScheme.onSurface;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Container(
-        decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: onSurface.withValues(alpha: 0.08),
-            width: 1,
-          ),
-        ),
+      child: LiquidGlassCard(
+        padding: const EdgeInsets.all(4),
+        borderRadius: BorderRadius.circular(20),
         child: TabBar(
           controller: controller,
           dividerColor: Colors.transparent,
           indicatorSize: TabBarIndicatorSize.tab,
-          labelColor: onSurface,
+          labelColor: accent,
           unselectedLabelColor: onSurface.withValues(alpha: 0.58),
           labelStyle:
               const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
           unselectedLabelStyle:
               const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           indicator: BoxDecoration(
-            color: _kTodayPlanAccent.withValues(alpha: 0.16),
+            color: accent.withValues(alpha: 0.16),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: _kTodayPlanAccent.withValues(alpha: 0.28),
+              color: accentSoft.withValues(alpha: 0.24),
             ),
           ),
           tabs: const [
@@ -1183,11 +1187,12 @@ class _DateArrowButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = _todayPlanAccent(context);
     return IconButton(
       onPressed: onTap,
       style: IconButton.styleFrom(
-        backgroundColor: _kTodayPlanAccent.withValues(alpha: 0.12),
-        foregroundColor: _kTodayPlanAccent,
+        backgroundColor: accent.withValues(alpha: 0.12),
+        foregroundColor: accent,
         minimumSize: const Size(42, 42),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
@@ -1214,40 +1219,30 @@ class _QuickActionCard extends StatelessWidget {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
 
-    return Material(
-      color: theme.cardColor,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          height: 92,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: onSurface.withValues(alpha: 0.08),
+    return LiquidGlassCard(
+      onTap: onTap,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      borderRadius: BorderRadius.circular(22),
+      child: SizedBox(
+        height: 68,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              emoji,
+              style: const TextStyle(fontSize: 22),
             ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                emoji,
-                style: const TextStyle(fontSize: 22),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              style: TextStyle(
+                color: onSurface,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
               ),
-              const SizedBox(height: 10),
-              Text(
-                label,
-                style: TextStyle(
-                  color: onSurface,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

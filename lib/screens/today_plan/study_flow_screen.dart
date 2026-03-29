@@ -5,6 +5,7 @@ import 'package:focusflow_mobile/models/fa_page.dart';
 import 'package:focusflow_mobile/models/pathoma_chapter.dart';
 import 'package:focusflow_mobile/models/sketchy_video.dart';
 import 'package:focusflow_mobile/models/time_log_entry.dart';
+import 'package:focusflow_mobile/models/video_lecture.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/models/uworld_topic.dart';
@@ -55,8 +56,8 @@ class StudyTask {
   }
 
   int get estimatedDurationMinutes {
-    if (plannedDurationMinutes != null) {
-      return plannedDurationMinutes!.clamp(5, 120);
+    if (plannedDurationMinutes != null && plannedDurationMinutes! > 0) {
+      return plannedDurationMinutes!;
     }
 
     final count = itemCount > 0 ? itemCount : 1;
@@ -70,6 +71,8 @@ class StudyTask {
         return count * 25;
       case 'PATHOMA':
         return count * 30;
+      case 'VIDEO_LECTURE':
+        return count * 20;
       default:
         return count * 20;
     }
@@ -142,6 +145,7 @@ class StudyTask {
     required List<SketchyVideo> sketchyMicroVideos,
     required List<SketchyVideo> sketchyPharmVideos,
     required List<PathomaChapter> pathomaChapters,
+    required List<VideoLecture> videoLectures,
   }) {
     final uworldById = <int, UWorldTopic>{
       for (final topic in uworldTopics)
@@ -158,6 +162,10 @@ class StudyTask {
     final pathomaById = <int, PathomaChapter>{
       for (final chapter in pathomaChapters)
         if (chapter.id != null) chapter.id!: chapter,
+    };
+    final videoLectureById = <int, VideoLecture>{
+      for (final lecture in videoLectures)
+        if (lecture.id != null) lecture.id!: lecture,
     };
 
     return tasks.expand((task) {
@@ -226,6 +234,24 @@ class StudyTask {
               topicIds: <int>[chapterId],
               questionCount: 0,
               plannedDurationMinutes: _atomicPlannedDurationMinutes(task),
+            );
+          });
+        case 'VIDEO_LECTURE':
+          if (task.topicIds.isEmpty) {
+            return <StudyTask>[task];
+          }
+          return task.topicIds.map((lectureId) {
+            final lecture = videoLectureById[lectureId];
+            return task.copyWith(
+              id: '${task.id}#video-lecture:$lectureId',
+              detail: lecture == null
+                  ? task.detail
+                  : (lecture.customTitle ?? lecture.title),
+              pageNumbers: const <int>[],
+              topicIds: <int>[lectureId],
+              questionCount: 0,
+              plannedDurationMinutes:
+                  lecture?.remainingMinutes ?? _atomicPlannedDurationMinutes(task),
             );
           });
         default:
@@ -399,6 +425,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       sketchyMicroVideos: app.sketchyMicroVideos,
       sketchyPharmVideos: app.sketchyPharmVideos,
       pathomaChapters: app.pathomaChapters,
+      videoLectures: app.videoLectures,
     );
     final settingsProvider = context.read<SettingsProvider>();
 
@@ -845,6 +872,9 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
         case 'PATHOMA':
           await app.advancePathomaRevision(itemId);
           break;
+        case 'VIDEO_LECTURE':
+          await app.toggleVideoLectureWatched(itemId, true);
+          break;
       }
     }
 
@@ -934,6 +964,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       case 'SKETCHY_MICRO':
       case 'SKETCHY_PHARM':
       case 'PATHOMA':
+      case 'VIDEO_LECTURE':
         return TimeLogCategory.video;
       default:
         return TimeLogCategory.study;
@@ -1012,6 +1043,19 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
     return chapters;
   }
 
+  List<VideoLecture> _selectedLibraryVideos(AppProvider app) {
+    final selectedIds = _currentTask?.topicIds.toSet() ?? const <int>{};
+    if (selectedIds.isEmpty) {
+      return const <VideoLecture>[];
+    }
+
+    final lectures = app.videoLectures
+        .where((lecture) => lecture.id != null && selectedIds.contains(lecture.id))
+        .toList()
+      ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+    return lectures;
+  }
+
   List<_QueuedTaskListItem> _selectedSupplementalItems(AppProvider app) {
     final task = _currentTask;
     if (task == null) {
@@ -1038,6 +1082,15 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
               ),
             )
             .toList();
+      case 'VIDEO_LECTURE':
+        return _selectedLibraryVideos(app)
+            .map(
+              (lecture) => _QueuedTaskListItem(
+                title: lecture.customTitle ?? lecture.title,
+                subtitle: '${lecture.subject} • ${lecture.remainingLabel}',
+              ),
+            )
+            .toList();
       default:
         if (task.topicIds.isEmpty) {
           return const <_QueuedTaskListItem>[];
@@ -1061,6 +1114,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       case 'SKETCHY_PHARM':
         return Icons.play_circle_fill_rounded;
       case 'PATHOMA':
+      case 'VIDEO_LECTURE':
         return Icons.ondemand_video_rounded;
       default:
         return Icons.menu_book_rounded;
@@ -1077,6 +1131,8 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
         return const Color(0xFF14B8A6);
       case 'PATHOMA':
         return const Color(0xFFEF4444);
+      case 'VIDEO_LECTURE':
+        return const Color(0xFFF59E0B);
       default:
         return const Color(0xFF8B5CF6);
     }

@@ -442,7 +442,7 @@ class _NavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const activeColor = DashboardColors.primary;
+    final activeColor = DashboardColors.primary;
     final inactiveColor =
         isDark ? DashboardColors.textSecondary : DashboardColors.textSecondary;
 

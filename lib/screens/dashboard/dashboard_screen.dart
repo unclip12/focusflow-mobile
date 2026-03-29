@@ -1498,7 +1498,7 @@ class _WeeklyStudyBars extends StatelessWidget {
   final List<_WeeklyStudyPoint> points;
   final bool isDark;
 
-  static const List<Color> _barColors = <Color>[
+  static final List<Color> _barColors = <Color>[
     DashboardColors.primaryLight,
     DashboardColors.primary,
     DashboardColors.primaryViolet,
@@ -2179,7 +2179,7 @@ class _SubjectBreakdownCard extends StatelessWidget {
   final int maxMinutes;
   final bool isDark;
 
-  static const List<Color> _subjectColors = <Color>[
+  static final List<Color> _subjectColors = <Color>[
     DashboardColors.primary,
     DashboardColors.primaryViolet,
     DashboardColors.primaryLight,
@@ -2768,7 +2768,7 @@ class _SparklinePainter extends CustomPainter {
       ..shader = ui.Gradient.linear(
         Offset.zero,
         Offset(size.width, 0),
-        const <Color>[
+        <Color>[
           DashboardColors.primary,
           DashboardColors.primaryLight,
         ],

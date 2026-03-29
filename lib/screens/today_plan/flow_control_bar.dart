@@ -69,7 +69,7 @@ class FlowControlBar extends StatelessWidget {
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
+                  gradient: LinearGradient(
                     colors: [
                       DashboardColors.primary,
                       DashboardColors.primaryDeep,

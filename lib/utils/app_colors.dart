@@ -3,59 +3,66 @@ import 'package:flutter/material.dart';
 class DashboardColors {
   DashboardColors._();
 
-  static const Color lightBackground = Color(0xFFF8F7FF);
-  static const Color darkBackground = Color(0xFF0E0E1A);
+  static Color _lightBackground = const Color(0xFFF4F6FB);
+  static Color _darkBackground = const Color(0xFF16171F);
+  static Color _lightSurface = const Color(0xFFFFFFFF);
+  static Color _darkSurface = const Color(0xFF21222D);
+  static Color _primary = const Color(0xFF6366F1);
+  static Color _secondary = const Color(0xFF818CF8);
 
   static const Color lightTextPrimary = Color(0xFF1E1E2E);
   static const Color darkTextPrimary = Color(0xFFF4F4FF);
   static const Color textSecondary = Color(0xFF6B7280);
 
-  static const Color primary = Color(0xFF6366F1);
-  static const Color primaryLight = Color(0xFF818CF8);
-  static const Color primaryViolet = Color(0xFF8B5CF6);
-  static const Color primaryLavender = Color(0xFFA78BFA);
-  static const Color primaryDeep = Color(0xFF4F46E5);
-  static const Color primaryDeeper = Color(0xFF4338CA);
-
   static const Color success = Color(0xFF22C55E);
   static const Color warning = Color(0xFFF59E0B);
   static const Color danger = Color(0xFFEF4444);
 
-  static const Color glassLight = Color.fromRGBO(255, 255, 255, 0.40);
-  static const Color glassDark = Color.fromRGBO(255, 255, 255, 0.12);
-  static const Color glassBorderLight = Color.fromRGBO(255, 255, 255, 0.45);
-  static const Color glassBorderDark = Color.fromRGBO(99, 102, 241, 0.30);
-
-  static const Color navGlassDark = Color.fromRGBO(14, 14, 26, 0.75);
-  static const Color countdownTrackDark = Color.fromRGBO(255, 255, 255, 0.06);
-  static const Color countdownTrackLight = Color.fromRGBO(99, 102, 241, 0.10);
-
   static const Color budgetSleep = Color(0xFF1E1E2E);
-  static const Color quoteCardFill = Color.fromRGBO(99, 102, 241, 0.10);
-  static const Color quoteCardBorder = Color.fromRGBO(99, 102, 241, 0.15);
-
   static const Color shimmerBright = Color.fromRGBO(255, 255, 255, 0.15);
   static const Color shimmerSoft = Color.fromRGBO(255, 255, 255, 0.08);
   static const Color shimmerTransparent = Color.fromRGBO(255, 255, 255, 0.0);
 
-  static const List<Color> darkAuroraBlobs = <Color>[
-    Color(0xFF6366F1),
-    Color(0xFF818CF8),
-    Color(0xFF4338CA),
-    Color(0xFF8B5CF6),
-    Color(0xFF4F46E5),
-  ];
+  static Color get primary => _primary;
+  static Color get primaryLight => _secondary;
+  static Color get primaryViolet => _blend(_primary, _secondary, 0.45);
+  static Color get primaryLavender => _shiftLightness(_secondary, 0.10);
+  static Color get primaryDeep => _shiftLightness(_primary, -0.10);
+  static Color get primaryDeeper => _shiftLightness(_primary, -0.18);
 
-  static const List<Color> lightAuroraBlobs = <Color>[
-    Color(0xFFCDD5FF),
-    Color(0xFFD8D4FE),
-    Color(0xFFDBE3FF),
-    Color(0xFFE9D5FF),
-    Color(0xFFC7D2FE),
-  ];
+  static Color get glassLight => Colors.white.withValues(alpha: 0.40);
+  static Color get glassDark => Colors.white.withValues(alpha: 0.12);
+  static Color get glassBorderLight => Colors.white.withValues(alpha: 0.45);
+  static Color get glassBorderDark => _primary.withValues(alpha: 0.30);
+
+  static Color get navGlassDark => _darkBackground.withValues(alpha: 0.75);
+  static Color get countdownTrackDark =>
+      Colors.white.withValues(alpha: 0.06);
+  static Color get countdownTrackLight => _primary.withValues(alpha: 0.10);
+
+  static Color get quoteCardFill => _primary.withValues(alpha: 0.10);
+  static Color get quoteCardBorder => _primary.withValues(alpha: 0.15);
+
+  static void applyThemeValues({
+    required Color primary,
+    required Color secondary,
+    required Color lightBackground,
+    required Color lightSurface,
+    required Color darkBackground,
+    required Color darkSurface,
+  }) {
+    _primary = primary;
+    _secondary = secondary;
+    _lightBackground = lightBackground;
+    _darkBackground = darkBackground;
+    _lightSurface = lightSurface;
+    _darkSurface = darkSurface;
+  }
 
   static Color background(bool isDark) =>
-      isDark ? darkBackground : lightBackground;
+      isDark ? _darkBackground : _lightBackground;
+
+  static Color surface(bool isDark) => isDark ? _darkSurface : _lightSurface;
 
   static Color textPrimary(bool isDark) =>
       isDark ? darkTextPrimary : lightTextPrimary;
@@ -69,10 +76,27 @@ class DashboardColors {
       isDark ? countdownTrackDark : countdownTrackLight;
 
   static Color navGlass(bool isDark) =>
-      isDark ? navGlassDark : const Color.fromRGBO(255, 255, 255, 0.82);
+      isDark ? navGlassDark : Colors.white.withValues(alpha: 0.82);
 
-  static List<Color> auroraBlobs(bool isDark) =>
-      isDark ? darkAuroraBlobs : lightAuroraBlobs;
+  static List<Color> auroraBlobs(bool isDark) {
+    if (isDark) {
+      return <Color>[
+        _primary,
+        _secondary,
+        primaryDeep,
+        primaryViolet,
+        primaryDeeper,
+      ];
+    }
+
+    return <Color>[
+      _shiftLightness(_primary, 0.30),
+      _shiftLightness(_secondary, 0.22),
+      _shiftLightness(primaryViolet, 0.26),
+      _shiftLightness(primaryDeep, 0.34),
+      _shiftLightness(primaryLight, 0.28),
+    ];
+  }
 
   static LinearGradient progressGradient(Color color) {
     return LinearGradient(
@@ -86,13 +110,23 @@ class DashboardColors {
   }
 
   static LinearGradient verticalAccentGradient() {
-    return const LinearGradient(
+    return LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: <Color>[
-        primary,
+        _primary,
         primaryViolet,
       ],
     );
+  }
+
+  static Color _blend(Color a, Color b, double t) {
+    return Color.lerp(a, b, t) ?? a;
+  }
+
+  static Color _shiftLightness(Color color, double delta) {
+    final hsl = HSLColor.fromColor(color);
+    final lightness = (hsl.lightness + delta).clamp(0.0, 1.0);
+    return hsl.withLightness(lightness).toColor();
   }
 }

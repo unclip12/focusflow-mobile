@@ -103,12 +103,14 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final background = (isDark ? const Color(0xFF6366F1) : Colors.white)
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final accent = theme.colorScheme.primary;
+    final accentSoft = theme.colorScheme.secondary;
+    final background = (isDark ? accent : Colors.white)
         .withValues(alpha: isDark ? 0.07 : 0.55);
-    final borderColor =
-        const Color(0xFF6366F1).withValues(alpha: isDark ? 0.28 : 0.15);
-    final glowBaseColor = widget.glowColor ?? const Color(0xFF6366F1);
+    final borderColor = accent.withValues(alpha: isDark ? 0.28 : 0.15);
+    final glowBaseColor = widget.glowColor ?? accent;
     final glowColor = glowBaseColor.withValues(alpha: isDark ? 0.12 : 0.08);
     final glowShadow = BoxShadow(
       color: glowColor,
@@ -200,7 +202,7 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
                                         alpha: isDark ? 0.10 : 0.20,
                                       ),
                                       Colors.transparent,
-                                      const Color(0xFF6366F1).withValues(
+                                      accentSoft.withValues(
                                         alpha: isDark ? 0.06 : 0.03,
                                       ),
                                     ],
