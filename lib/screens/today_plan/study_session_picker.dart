@@ -830,6 +830,8 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
         id: _notificationIdForBlock(block.id),
         blockTitle: title,
         when: scheduledAt,
+        dateKey: block.date,
+        blockId: block.id,
       );
     }
 

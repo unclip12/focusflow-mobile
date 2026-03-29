@@ -215,6 +215,7 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
                   title: 'Flow Paused ⏸️',
                   body: 'Your pause is over — ready to continue?',
                   when: DateTime.now().add(Duration(minutes: pauseMinutes)),
+                  intent: NotificationIntent.daySession(dateKey: widget.dateKey),
                 );
                 _setStateIfMounted(() => _localPaused = true);
                 Navigator.pop(ctx);
@@ -285,6 +286,8 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
                     title: 'Resume Your Flow ▶️',
                     body: 'Time to get back to your daily plan!',
                     when: remindAt,
+                    intent:
+                        NotificationIntent.daySession(dateKey: widget.dateKey),
                   );
                 }
                 app.stopFlow(widget.dateKey, remindAt: remindAt);

@@ -43,7 +43,11 @@ class Routes {
 }
 
 // ── Router ──────────────────────────────────────────────────────
+final GlobalKey<NavigatorState> appNavigatorKey =
+    GlobalKey<NavigatorState>(debugLabel: 'appNavigator');
+
 final GoRouter appRouter = GoRouter(
+  navigatorKey: appNavigatorKey,
   initialLocation: '/splash',
   routes: [
     // ── Splash: handles all DB + seed init, then auto-navigates ─

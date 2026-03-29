@@ -84,6 +84,7 @@ class _WakeupSnoozeOverlayState extends State<WakeupSnoozeOverlay>
         when: when,
         channelId: 'routine_reminder',
         channelName: 'Routine Reminders',
+        intent: NotificationIntent.todayPlan(dateKey: widget.dateKey),
       );
     } catch (error) {
       debugPrint('Failed to schedule wake-up snooze: $error');

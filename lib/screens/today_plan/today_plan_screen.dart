@@ -22,6 +22,7 @@ import 'day_session_screen.dart';
 import 'routine_editor_sheet.dart';
 import 'routines_tab.dart';
 import 'study_session_picker.dart';
+import 'study_session_screen.dart';
 import 'todo_tab.dart';
 import 'track_now_screen.dart';
 import 'package:focusflow_mobile/screens/today_plan/timeline_view.dart';
@@ -47,6 +48,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
   String? _completedBlockId;
   late TabController _tabCtrl;
   bool _didProcessExpiredRoutineQueue = false;
+  TodayPlanLaunchRequest? _processingNotificationLaunch;
 
   // Live clock
   late final ValueNotifier<DateTime> _clockNotifier =
@@ -110,6 +112,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
           title: '${p.$1} 🕌',
           body: 'Time to head to the mosque — ${p.$1} prayer in 10 minutes.',
           when: notifTime,
+          intent: NotificationIntent.todayPlan(dateKey: _dateKey),
         );
       }
     }
@@ -178,11 +181,93 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     await _processNextExpiredRoutineDialog(app);
   }
 
+  void _onTodayPlanLaunchChanged() {
+    final request = NotificationService.instance.todayPlanLaunchNotifier.value;
+    if (request == null) return;
+    unawaited(_handleTodayPlanLaunchRequest(request));
+  }
+
+  Future<void> _handleTodayPlanLaunchRequest(
+    TodayPlanLaunchRequest request,
+  ) async {
+    if (!mounted) return;
+    if (!identical(
+      NotificationService.instance.todayPlanLaunchNotifier.value,
+      request,
+    )) {
+      return;
+    }
+    if (identical(_processingNotificationLaunch, request)) return;
+
+    _processingNotificationLaunch = request;
+    try {
+      final requestedDate =
+          request.dateKey != null ? DateTime.tryParse(request.dateKey!) : null;
+      if (requestedDate != null) {
+        _setStateIfMounted(() {
+          _selectedDate = DateTime(
+            requestedDate.year,
+            requestedDate.month,
+            requestedDate.day,
+          );
+        });
+      }
+
+      _tabCtrl.animateTo(request.opensRoutinesTab ? _routinesTabIndex : 0);
+      await _refreshSelectedDateBlocks();
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      if (!mounted) return;
+
+      final app = context.read<AppProvider>();
+      if (request.openDaySession) {
+        final session = app.getActiveDaySession(_dateKey);
+        if (session != null) {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => DaySessionScreen(
+                dateKey: _dateKey,
+                session: session,
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      if (request.blockId == null) return;
+
+      final plan = app.getDayPlan(_dateKey);
+      Block? block;
+      for (final candidate in plan?.blocks ?? const <Block>[]) {
+        if (candidate.id == request.blockId) {
+          block = candidate;
+          break;
+        }
+      }
+      if (block == null) return;
+
+      if (block.type == BlockType.studySession) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => StudySessionScreen(block: block!),
+          ),
+        );
+      }
+    } finally {
+      NotificationService.instance.clearTodayPlanLaunchRequest(request);
+      if (identical(_processingNotificationLaunch, request)) {
+        _processingNotificationLaunch = null;
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _selectedDate = AppDateUtils.getAdjustedDate();
     _tabCtrl = TabController(length: 3, vsync: this);
+    NotificationService.instance.todayPlanLaunchNotifier
+        .addListener(_onTodayPlanLaunchChanged);
     // Tick clock every minute
     _clockTimer =
         Stream.periodic(const Duration(seconds: 30), (_) => DateTime.now())
@@ -191,11 +276,17 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
       _schedulePrayerNotifications();
       _showExpiredRoutineDialogs();
       unawaited(_refreshSelectedDateBlocks());
+      final request = NotificationService.instance.todayPlanLaunchNotifier.value;
+      if (request != null) {
+        unawaited(_handleTodayPlanLaunchRequest(request));
+      }
     });
   }
 
   @override
   void dispose() {
+    NotificationService.instance.todayPlanLaunchNotifier
+        .removeListener(_onTodayPlanLaunchChanged);
     _clockTimer.cancel();
     _clockNotifier.dispose();
     _tabCtrl.dispose();

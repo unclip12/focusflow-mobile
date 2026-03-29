@@ -9,6 +9,7 @@ import 'package:focusflow_mobile/services/uworld_seed.dart';
 import 'package:focusflow_mobile/services/sketchy_micro_seed.dart';
 import 'package:focusflow_mobile/services/sketchy_pharm_seed.dart';
 import 'package:focusflow_mobile/services/pathoma_seed.dart';
+import 'package:focusflow_mobile/services/notification_service.dart';
 
 /// SplashScreen — shown on every launch.
 /// Performs ALL heavy init (DB open, FA seed, Sketchy, Pathoma, UWorld)
@@ -79,6 +80,9 @@ class _SplashScreenState extends State<SplashScreen>
       _setStatus('Ready!');
       await Future.delayed(const Duration(milliseconds: 300));
       if (mounted) {
+        final handledIntent =
+            await NotificationService.instance.tryDispatchPendingIntent();
+        if (handledIntent || !mounted) return;
         final prefs = await SharedPreferences.getInstance();
         final lastTab = prefs.getString('lastActiveTab') ?? 'dashboard';
         if (!mounted) return;

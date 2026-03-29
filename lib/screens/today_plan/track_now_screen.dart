@@ -361,6 +361,7 @@ class _TrackNowScreenState extends State<TrackNowScreen>
     // Fire notification: session complete
     unawaited(NotificationService.instance.showFocusTimerDone(
       activityName: name.isNotEmpty ? name : 'Activity',
+      dateKey: widget.dateKey,
     ));
 
     if (mounted) {

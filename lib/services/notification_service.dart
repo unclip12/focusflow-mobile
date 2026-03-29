@@ -3,11 +3,142 @@
 // Channels: focus_timer | revision_due | streak_reminder | daily_summary
 // =============================================================
 
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:focusflow_mobile/app_router.dart';
 import 'package:focusflow_mobile/models/routine.dart';
-import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz_data;
+import 'package:timezone/timezone.dart' as tz;
+
+typedef NotificationIntentHandler = Future<bool> Function(
+  NotificationIntent intent,
+);
+
+class NotificationIntentTarget {
+  NotificationIntentTarget._();
+
+  static const String route = 'route';
+  static const String todayPlan = 'today_plan';
+  static const String todayPlanBlock = 'today_plan_block';
+  static const String daySession = 'day_session';
+}
+
+class NotificationIntent {
+  final String targetType;
+  final String? routeName;
+  final String? dateKey;
+  final String? blockId;
+  final String? activityId;
+  final String? routineId;
+
+  const NotificationIntent({
+    required this.targetType,
+    this.routeName,
+    this.dateKey,
+    this.blockId,
+    this.activityId,
+    this.routineId,
+  });
+
+  factory NotificationIntent.route(String routeName) {
+    return NotificationIntent(
+      targetType: NotificationIntentTarget.route,
+      routeName: routeName,
+    );
+  }
+
+  factory NotificationIntent.todayPlan({
+    String? dateKey,
+    String? activityId,
+    String? routineId,
+  }) {
+    return NotificationIntent(
+      targetType: NotificationIntentTarget.todayPlan,
+      routeName: Routes.todaysPlan,
+      dateKey: dateKey,
+      activityId: activityId,
+      routineId: routineId,
+    );
+  }
+
+  factory NotificationIntent.todayPlanBlock({
+    required String dateKey,
+    required String blockId,
+  }) {
+    return NotificationIntent(
+      targetType: NotificationIntentTarget.todayPlanBlock,
+      routeName: Routes.todaysPlan,
+      dateKey: dateKey,
+      blockId: blockId,
+    );
+  }
+
+  factory NotificationIntent.daySession({required String dateKey}) {
+    return NotificationIntent(
+      targetType: NotificationIntentTarget.daySession,
+      routeName: Routes.todaysPlan,
+      dateKey: dateKey,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'targetType': targetType,
+      if (routeName != null) 'routeName': routeName,
+      if (dateKey != null) 'dateKey': dateKey,
+      if (blockId != null) 'blockId': blockId,
+      if (activityId != null) 'activityId': activityId,
+      if (routineId != null) 'routineId': routineId,
+    };
+  }
+
+  String toPayload() => jsonEncode(toJson());
+
+  factory NotificationIntent.fromJson(Map<String, dynamic> json) {
+    return NotificationIntent(
+      targetType: json['targetType'] as String? ??
+          NotificationIntentTarget.route,
+      routeName: json['routeName'] as String?,
+      dateKey: json['dateKey'] as String?,
+      blockId: json['blockId'] as String?,
+      activityId: json['activityId'] as String?,
+      routineId: json['routineId'] as String?,
+    );
+  }
+
+  static NotificationIntent? tryParse(String? payload) {
+    if (payload == null || payload.isEmpty) return null;
+
+    try {
+      final decoded = jsonDecode(payload);
+      if (decoded is! Map<String, dynamic>) return null;
+      return NotificationIntent.fromJson(decoded);
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+class TodayPlanLaunchRequest {
+  final String? dateKey;
+  final String? blockId;
+  final String? activityId;
+  final String? routineId;
+  final bool openDaySession;
+
+  const TodayPlanLaunchRequest({
+    this.dateKey,
+    this.blockId,
+    this.activityId,
+    this.routineId,
+    this.openDaySession = false,
+  });
+
+  bool get opensRoutinesTab => routineId != null;
+}
 
 class NotificationService {
   NotificationService._();
@@ -16,7 +147,12 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
+  final ValueNotifier<TodayPlanLaunchRequest?> todayPlanLaunchNotifier =
+      ValueNotifier<TodayPlanLaunchRequest?>(null);
+
   bool _initialised = false;
+  NotificationIntent? _pendingIntent;
+  NotificationIntentHandler? _intentHandler;
 
   // ── Notification IDs ──────────────────────────────────────────
   static const int _timerDoneId = 1001;
@@ -32,7 +168,7 @@ class NotificationService {
   static const String _chStudySession = 'study_session';
   static const String _chRoutineReminder = 'routine_reminder';
 
-  // ── Android channels ─────────────────────────────────────────
+  // ── Android channels ──────────────────────────────────────────
   static const _timerChannel = AndroidNotificationChannel(
     _chFocusTimer,
     'Focus Timer',
@@ -100,7 +236,17 @@ class NotificationService {
       iOS: iosSettings,
     );
 
-    await _plugin.initialize(settings);
+    await _plugin.initialize(
+      settings,
+      onDidReceiveNotificationResponse: _onDidReceiveNotificationResponse,
+    );
+
+    final launchDetails = await _plugin.getNotificationAppLaunchDetails();
+    if (launchDetails?.didNotificationLaunchApp ?? false) {
+      _queueIntent(NotificationIntent.tryParse(
+        launchDetails?.notificationResponse?.payload,
+      ));
+    }
 
     // Create Android channels
     final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
@@ -123,7 +269,53 @@ class NotificationService {
     return granted ?? true;
   }
 
+  void registerIntentHandler(NotificationIntentHandler handler) {
+    _intentHandler = handler;
+    unawaited(tryDispatchPendingIntent());
+  }
+
+  Future<bool> tryDispatchPendingIntent() async {
+    final handler = _intentHandler;
+    final intent = _pendingIntent;
+    if (handler == null || intent == null) return false;
+
+    final handled = await handler(intent);
+    if (handled && identical(_pendingIntent, intent)) {
+      _pendingIntent = null;
+    }
+    return handled;
+  }
+
+  void publishTodayPlanLaunchRequest(TodayPlanLaunchRequest request) {
+    todayPlanLaunchNotifier.value = null;
+    todayPlanLaunchNotifier.value = request;
+  }
+
+  void clearTodayPlanLaunchRequest(TodayPlanLaunchRequest request) {
+    if (identical(todayPlanLaunchNotifier.value, request)) {
+      todayPlanLaunchNotifier.value = null;
+    }
+  }
+
+  void _queueIntent(NotificationIntent? intent) {
+    if (intent == null) return;
+    _pendingIntent = intent;
+    unawaited(tryDispatchPendingIntent());
+  }
+
+  void _onDidReceiveNotificationResponse(NotificationResponse response) {
+    _queueIntent(NotificationIntent.tryParse(response.payload));
+  }
+
   int _routineNotificationId(String routineId) => routineId.hashCode;
+
+  String _dateKey(DateTime date) {
+    final local = date.toLocal();
+    final year = local.year.toString().padLeft(4, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    return '$year-$month-$day';
+  }
 
   DateTime _today() {
     final now = DateTime.now();
@@ -202,10 +394,13 @@ class NotificationService {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────
   // FOCUS TIMER — show immediately when timer ends
-  // ─────────────────────────────────────────────────────────────
-  Future<void> showFocusTimerDone({required String activityName}) async {
+  // ──────────────────────────────────────────────────────────────
+  Future<void> showFocusTimerDone({
+    required String activityName,
+    String? dateKey,
+  }) async {
     await _plugin.show(
       _timerDoneId,
       '🎉 Session Complete!',
@@ -229,12 +424,15 @@ class NotificationService {
           presentSound: true,
         ),
       ),
+      payload: NotificationIntent.todayPlan(
+        dateKey: dateKey ?? _dateKey(DateTime.now()),
+      ).toPayload(),
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────
   // REVISION DUE — scheduled daily at chosen time
-  // ─────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────
   Future<void> scheduleDailyRevisionReminder({
     required int revisionCount,
     TimeOfDay time = const TimeOfDay(hour: 8, minute: 0),
@@ -272,13 +470,14 @@ class NotificationService {
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time, // repeats daily
+      matchDateTimeComponents: DateTimeComponents.time,
+      payload: NotificationIntent.route(Routes.revision).toPayload(),
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────
   // STREAK AT RISK — show immediately if streak is at risk
-  // ─────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────
   Future<void> showStreakRisk({required int streakDays}) async {
     await _plugin.show(
       _streakRiskId,
@@ -298,12 +497,13 @@ class NotificationService {
           presentSound: true,
         ),
       ),
+      payload: NotificationIntent.todayPlan().toPayload(),
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────
   // MORNING SUMMARY — scheduled daily at 8 AM
-  // ─────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────
   Future<void> scheduleMorningSummary({
     int dueCount = 0,
     int pagesPlanned = 0,
@@ -342,19 +542,21 @@ class NotificationService {
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time, // repeats daily
+      matchDateTimeComponents: DateTimeComponents.time,
+      payload: NotificationIntent.todayPlan().toPayload(),
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────
   // SHOW IMMEDIATE — generic helper for quick one-off toasts
-  // ─────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────
   Future<void> showImmediate({
     required int id,
     required String title,
     required String body,
     String channelId = _chDailySummary,
     String channelName = 'Daily Summary',
+    NotificationIntent? intent,
   }) async {
     await _plugin.show(
       id,
@@ -373,13 +575,14 @@ class NotificationService {
           presentSound: true,
         ),
       ),
+      payload: intent?.toPayload(),
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────
   // SCHEDULE AT — compatibility helper used by existing screens
   // (prayer reminders, pause/stop flow reminders)
-  // ─────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────
   Future<void> scheduleAt({
     required int id,
     required String title,
@@ -387,6 +590,7 @@ class NotificationService {
     required DateTime when,
     String channelId = _chDailySummary,
     String channelName = 'Daily Summary',
+    NotificationIntent? intent,
   }) async {
     final tzWhen = tz.TZDateTime.from(when, tz.local);
     await _plugin.zonedSchedule(
@@ -410,6 +614,7 @@ class NotificationService {
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
+      payload: intent?.toPayload(),
     );
   }
 
@@ -417,6 +622,8 @@ class NotificationService {
     required int id,
     required String blockTitle,
     required DateTime when,
+    required String dateKey,
+    required String blockId,
   }) async {
     await _plugin.cancel(id);
     await _plugin.zonedSchedule(
@@ -441,6 +648,10 @@ class NotificationService {
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
+      payload: NotificationIntent.todayPlanBlock(
+        dateKey: dateKey,
+        blockId: blockId,
+      ).toPayload(),
     );
   }
 
@@ -456,6 +667,9 @@ class NotificationService {
     final details = _routineReminderDetails();
     final title = routine.name;
     final body = 'Time for your ${routine.name} routine';
+    final payload = NotificationIntent.todayPlan(
+      routineId: routine.id,
+    ).toPayload();
 
     if (recurrence == 'weekly') {
       final weekday = routine.reminderWeekday;
@@ -474,6 +688,7 @@ class NotificationService {
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        payload: payload,
       );
       return;
     }
@@ -504,6 +719,7 @@ class NotificationService {
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,
+      payload: payload,
     );
   }
 
