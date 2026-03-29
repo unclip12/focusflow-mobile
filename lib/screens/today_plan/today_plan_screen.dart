@@ -704,14 +704,10 @@ class _TodayTimelineTab extends StatelessWidget {
       },
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-        child: LiquidGlassCard(
-          padding: EdgeInsets.zero,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          child: TimelineView(
-            dateKey: dateKey,
-            blocks: blocks,
-            onAddTask: onAddTask,
-          ),
+        child: TimelineView(
+          dateKey: dateKey,
+          blocks: blocks,
+          onAddTask: onAddTask,
         ),
       ),
     );
