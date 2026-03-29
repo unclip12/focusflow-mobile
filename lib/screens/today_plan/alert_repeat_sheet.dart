@@ -19,12 +19,7 @@ class AlertRepeatSheet extends StatefulWidget {
 }
 
 class _AlertRepeatSheetState extends State<AlertRepeatSheet> {
-  static const _bodyColor = Color(0xFF1C1C1E);
-  static const _cardColor = Color(0xFF252528);
-  static const _surfaceColor = Color(0xFF2E2E33);
   static const _accentColor = Color(0xFFFF8E88);
-  static const _mutedTextColor = Color(0xFF9B9BA1);
-  static const _borderColor = Color(0xFF35353A);
   static const _weekdayToggleLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   static const _alertOptions = <_SelectionOption<int>>[
     _SelectionOption(label: 'None', value: -1),
@@ -115,9 +110,11 @@ class _AlertRepeatSheetState extends State<AlertRepeatSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final bottomInset = MediaQuery.of(context).padding.bottom + 20;
     final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
-    final scaffoldBackgroundColor = Theme.of(context).scaffoldBackgroundColor;
+    final scaffoldBackgroundColor = theme.scaffoldBackgroundColor;
 
     return Material(
       color: scaffoldBackgroundColor,
@@ -130,7 +127,7 @@ class _AlertRepeatSheetState extends State<AlertRepeatSheet> {
           child: ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
             child: Material(
-              color: _bodyColor,
+              color: colorScheme.surface,
               child: SafeArea(
                 top: false,
                 child: Column(
@@ -140,7 +137,7 @@ class _AlertRepeatSheetState extends State<AlertRepeatSheet> {
                       width: 44,
                       height: 5,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
+                        color: colorScheme.onSurface.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
@@ -260,10 +257,11 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     return Text(
       title,
-      style: const TextStyle(
-        color: Colors.white,
+      style: TextStyle(
+        color: onSurface,
         fontSize: 22,
         fontWeight: FontWeight.w800,
       ),
@@ -284,10 +282,15 @@ class _OptionGroup<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final borderColor = theme.colorScheme.onSurface.withValues(
+      alpha: theme.brightness == Brightness.dark ? 0.1 : 0.08,
+    );
     return Container(
       decoration: BoxDecoration(
-        color: _AlertRepeatSheetState._cardColor,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         children: List<Widget>.generate(options.length, (index) {
@@ -304,7 +307,7 @@ class _OptionGroup<T> extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Divider(
                     height: 1,
-                    color: Colors.white.withValues(alpha: 0.08),
+                    color: borderColor,
                   ),
                 ),
             ],
@@ -328,6 +331,7 @@ class _OptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -342,8 +346,8 @@ class _OptionTile extends StatelessWidget {
                   label,
                   style: TextStyle(
                     color: selected
-                        ? Colors.white
-                        : Colors.white.withValues(alpha: 0.88),
+                        ? onSurface
+                        : onSurface.withValues(alpha: 0.88),
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
@@ -377,6 +381,14 @@ class _SelectionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final unselectedSurface = theme.brightness == Brightness.dark
+        ? Colors.white.withValues(alpha: 0.05)
+        : colorScheme.primary.withValues(alpha: 0.08);
+    final borderColor = colorScheme.onSurface.withValues(
+      alpha: theme.brightness == Brightness.dark ? 0.12 : 0.1,
+    );
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -388,12 +400,10 @@ class _SelectionChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected
                 ? _AlertRepeatSheetState._accentColor
-                : _AlertRepeatSheetState._surfaceColor,
+                : unselectedSurface,
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
-              color: selected
-                  ? Colors.transparent
-                  : _AlertRepeatSheetState._borderColor,
+              color: selected ? Colors.transparent : borderColor,
             ),
           ),
           alignment: Alignment.center,
@@ -404,7 +414,7 @@ class _SelectionChip extends StatelessWidget {
             style: TextStyle(
               color: selected
                   ? Colors.white
-                  : _AlertRepeatSheetState._mutedTextColor,
+                  : colorScheme.onSurface.withValues(alpha: 0.68),
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
@@ -428,6 +438,14 @@ class _WeekdayChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final unselectedSurface = theme.brightness == Brightness.dark
+        ? Colors.white.withValues(alpha: 0.05)
+        : colorScheme.primary.withValues(alpha: 0.08);
+    final borderColor = colorScheme.onSurface.withValues(
+      alpha: theme.brightness == Brightness.dark ? 0.12 : 0.1,
+    );
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -440,12 +458,10 @@ class _WeekdayChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected
                 ? _AlertRepeatSheetState._accentColor
-                : _AlertRepeatSheetState._surfaceColor,
+                : unselectedSurface,
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
-              color: selected
-                  ? Colors.transparent
-                  : _AlertRepeatSheetState._borderColor,
+              color: selected ? Colors.transparent : borderColor,
             ),
           ),
           alignment: Alignment.center,
@@ -454,7 +470,7 @@ class _WeekdayChip extends StatelessWidget {
             style: TextStyle(
               color: selected
                   ? Colors.white
-                  : _AlertRepeatSheetState._mutedTextColor,
+                  : colorScheme.onSurface.withValues(alpha: 0.68),
               fontSize: 15,
               fontWeight: FontWeight.w800,
             ),

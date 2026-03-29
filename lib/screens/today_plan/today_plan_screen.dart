@@ -276,7 +276,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
       _schedulePrayerNotifications();
       _showExpiredRoutineDialogs();
       unawaited(_refreshSelectedDateBlocks());
-      final request = NotificationService.instance.todayPlanLaunchNotifier.value;
+      final request =
+          NotificationService.instance.todayPlanLaunchNotifier.value;
       if (request != null) {
         unawaited(_handleTodayPlanLaunchRequest(request));
       }
@@ -597,50 +598,51 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
       screenName: "Today's Plan",
       showHeader: false,
       body: Stack(
-          children: [
-            Column(
-              children: [
-                // ── Compact Header ─────────────────────────
-                // ── Tab Bar ────────────────────────────────
-                const SizedBox(height: 8),
-                _ThreeTabBar(controller: _tabCtrl),
-                // ── Tab Views ──────────────────────────────
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabCtrl,
-                    children: [
-                      _TodayTimelineTab(
-                        date: _selectedDate,
-                        isToday: _isToday,
-                        totalBlocks: totalBlocks,
-                        completedBlocks: completedBlocks,
-                        onPrev: _prevDay,
-                        onNext: _nextDay,
-                        onDateTap: _pickDate,
-                        onStartDay: _openDaySession,
-                        onStudySession: _openStudySession,
-                        onTrackNow: _openTrackNow,
-                        onAddTask: _openAddTaskSheet,
-                        onSelectDate: (selected) => _setStateIfMounted(
-                          () => _selectedDate = selected,
-                        ),
-                        dateKey: _dateKey,
-                        blocks: displayBlocks,
-                      ),
-                      RoutinesTab(dateKey: _dateKey),
-                      _MoreTabView(dateKey: _dateKey),
-                    ],
-                  ),
+        children: [
+          Column(
+            children: [
+              // ── Compact Header ─────────────────────────
+              // ── Tab Bar ────────────────────────────────
+              const SizedBox(height: 8),
+              _ThreeTabBar(controller: _tabCtrl),
+              // ── Tab Views ──────────────────────────────
+              Expanded(
+                child: TabBarView(
+                  controller: _tabCtrl,
+                  children: [
+                    _TodayTimelineTab(
+                      date: _selectedDate,
+                      isToday: _isToday,
+                      totalBlocks: totalBlocks,
+                      completedBlocks: completedBlocks,
+                      onPrev: _prevDay,
+                      onNext: _nextDay,
+                      onDateTap: _pickDate,
+                      onStartDay: _openDaySession,
+                      onStudySession: _openStudySession,
+                      onTrackNow: _openTrackNow,
+                      onAddTask: _openAddTaskSheet,
+                      onSelectDate: (selected) {
+                        _setStateIfMounted(() => _selectedDate = selected);
+                        unawaited(_refreshSelectedDateBlocks());
+                      },
+                      dateKey: _dateKey,
+                      blocks: displayBlocks,
+                    ),
+                    RoutinesTab(dateKey: _dateKey),
+                    _MoreTabView(dateKey: _dateKey),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
           if (_completedBlockId != null)
             _CelebrationOverlay(
               onComplete: () =>
                   _setStateIfMounted(() => _completedBlockId = null),
             ),
-          ],
-        ),
+        ],
+      ),
     );
   }
 }
@@ -1002,135 +1004,135 @@ class _CompactHeader extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-          Container(
-            decoration: BoxDecoration(
-              color: theme.cardColor.withValues(alpha: 0.32),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: accent.withValues(alpha: 0.08),
-              ),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-            child: Row(
-              children: [
-                _DateArrowButton(
-                  icon: Icons.chevron_left_rounded,
-                  onTap: onPrev,
+            Container(
+              decoration: BoxDecoration(
+                color: theme.cardColor.withValues(alpha: 0.32),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: accent.withValues(alpha: 0.08),
                 ),
-                Expanded(
-                  child: InkWell(
-                    onTap: onDateTap,
-                    borderRadius: BorderRadius.circular(16),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      child: Text(
-                        dateLabel,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: onSurface,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              child: Row(
+                children: [
+                  _DateArrowButton(
+                    icon: Icons.chevron_left_rounded,
+                    onTap: onPrev,
+                  ),
+                  Expanded(
+                    child: InkWell(
+                      onTap: onDateTap,
+                      borderRadius: BorderRadius.circular(16),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        child: Text(
+                          dateLabel,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: onSurface,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
                   ),
+                  _DateArrowButton(
+                    icon: Icons.chevron_right_rounded,
+                    onTap: onNext,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              '$completedBlocks / $totalBlocks done',
+              style: TextStyle(
+                color: onSurface,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: progress.clamp(0.0, 1.0),
+                minHeight: 6,
+                backgroundColor: onSurface.withValues(alpha: 0.08),
+                valueColor: AlwaysStoppedAnimation<Color>(accent),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: _QuickActionCard(
+                    emoji: '🌅',
+                    label: 'Start Day',
+                    onTap: onStartDay,
+                  ),
                 ),
-                _DateArrowButton(
-                  icon: Icons.chevron_right_rounded,
-                  onTap: onNext,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _QuickActionCard(
+                    emoji: '📚',
+                    label: 'Study Session',
+                    onTap: onStudySession,
+                  ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            '$completedBlocks / $totalBlocks done',
-            style: TextStyle(
-              color: onSurface,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: progress.clamp(0.0, 1.0),
-              minHeight: 6,
-              backgroundColor: onSurface.withValues(alpha: 0.08),
-              valueColor: AlwaysStoppedAnimation<Color>(accent),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _QuickActionCard(
-                  emoji: '🌅',
-                  label: 'Start Day',
-                  onTap: onStartDay,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _QuickActionCard(
-                  emoji: '📚',
-                  label: 'Study Session',
-                  onTap: onStudySession,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _QuickActionCard(
-                  emoji: '📊',
-                  label: 'Track Now',
-                  onTap: onTrackNow,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _QuickActionCard(
-                  emoji: '➕',
-                  label: 'Add Task',
-                  onTap: onAddTask,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              for (final weekDate in weekDates)
+            const SizedBox(height: 12),
+            Row(
+              children: [
                 Expanded(
-                  child: _WeekDayColumn(
-                    date: weekDate,
-                    isSelected: AppDateUtils.isSameDay(weekDate, date),
-                    hasBlocks: (app
-                                .getDayPlan(
-                                  DateFormat('yyyy-MM-dd').format(weekDate),
-                                )
-                                ?.blocks ??
-                            const <Block>[])
-                        .isNotEmpty,
-                    hasNightRoutine: (app
-                                .getDayPlan(
-                                  DateFormat('yyyy-MM-dd').format(weekDate),
-                                )
-                                ?.blocks ??
-                            const <Block>[])
-                        .any(_isNightRoutine),
-                    onTap: () => onSelectDate(weekDate),
+                  child: _QuickActionCard(
+                    emoji: '📊',
+                    label: 'Track Now',
+                    onTap: onTrackNow,
                   ),
                 ),
-            ],
-          ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _QuickActionCard(
+                    emoji: '➕',
+                    label: 'Add Task',
+                    onTap: onAddTask,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                for (final weekDate in weekDates)
+                  Expanded(
+                    child: _WeekDayColumn(
+                      date: weekDate,
+                      isSelected: AppDateUtils.isSameDay(weekDate, date),
+                      hasBlocks: (app
+                                  .getDayPlan(
+                                    DateFormat('yyyy-MM-dd').format(weekDate),
+                                  )
+                                  ?.blocks ??
+                              const <Block>[])
+                          .isNotEmpty,
+                      hasNightRoutine: (app
+                                  .getDayPlan(
+                                    DateFormat('yyyy-MM-dd').format(weekDate),
+                                  )
+                                  ?.blocks ??
+                              const <Block>[])
+                          .any(_isNightRoutine),
+                      onTap: () => onSelectDate(weekDate),
+                    ),
+                  ),
+              ],
+            ),
           ],
         ),
       ),
@@ -1184,9 +1186,8 @@ class _WeekDayColumn extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: isSelected ? accent : Colors.transparent,
                 border: Border.all(
-                  color: isSelected
-                      ? accent
-                      : onSurface.withValues(alpha: 0.08),
+                  color:
+                      isSelected ? accent : onSurface.withValues(alpha: 0.08),
                 ),
               ),
               child: Text(
@@ -1205,11 +1206,11 @@ class _WeekDayColumn extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (hasBlocks)
-                    _WeekIndicatorDot(color: accent),
+                  if (hasBlocks) _WeekIndicatorDot(color: accent),
                   if (hasBlocks && hasNightRoutine) const SizedBox(width: 4),
                   if (hasNightRoutine)
-                    _WeekIndicatorDot(color: theme.colorScheme.onSurfaceVariant),
+                    _WeekIndicatorDot(
+                        color: theme.colorScheme.onSurfaceVariant),
                 ],
               ),
             ),

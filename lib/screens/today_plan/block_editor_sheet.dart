@@ -55,8 +55,6 @@ class BlockEditorSheet extends StatefulWidget {
 }
 
 class _BlockEditorSheetState extends State<BlockEditorSheet> {
-  static const _bodyColor = Color(0xFF1C1C1E);
-  static const _cardColor = Color(0xFF252528);
   static const _accentColor = Color(0xFFFF8E88);
   static const _defaultHeaderColor = Color(0xFFD77A78);
   static const _emojiOptions = <String>[
@@ -311,12 +309,20 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
   }
 
   Future<void> _pickEmoji() async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final cardColor = theme.cardColor;
+    final secondarySurface = theme.brightness == Brightness.dark
+        ? Colors.white.withValues(alpha: 0.08)
+        : colorScheme.primary.withValues(alpha: 0.08);
     final value = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: _cardColor,
-        title:
-            const Text('Choose emoji', style: TextStyle(color: Colors.white)),
+        backgroundColor: cardColor,
+        title: Text(
+          'Choose emoji',
+          style: TextStyle(color: colorScheme.onSurface),
+        ),
         content: Wrap(
           spacing: 10,
           runSpacing: 10,
@@ -329,7 +335,7 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
+                    color: secondarySurface,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   alignment: Alignment.center,
@@ -349,6 +355,12 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
   }
 
   Future<void> _pickHeaderColor() async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final bodyColor = colorScheme.surface;
+    final titleColor = colorScheme.onSurface;
+    final secondaryText = titleColor.withValues(alpha: 0.68);
+    final borderColor = titleColor.withValues(alpha: 0.2);
     final value = await showModalBottomSheet<Color>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -359,8 +371,8 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
           20,
           MediaQuery.of(sheetContext).padding.bottom + 18,
         ),
-        decoration: const BoxDecoration(
-          color: _bodyColor,
+        decoration: BoxDecoration(
+          color: bodyColor,
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: Column(
@@ -369,16 +381,12 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
           children: [
             const Text(
               'Sheet accent',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
             Text(
               'This affects the editor only. Blocks do not have a persisted color field.',
-              style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6), height: 1.4),
+              style: TextStyle(color: secondaryText, height: 1.4),
             ),
             const SizedBox(height: 18),
             Wrap(
@@ -396,7 +404,9 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                         color: color,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.75),
+                          color: _colorHex == _hexFromColor(color)
+                              ? Colors.white
+                              : borderColor,
                           width: _colorHex == _hexFromColor(color) ? 3 : 1,
                         ),
                       ),
@@ -556,9 +566,8 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
           plannedStartTime: _toHhmm(_selectedStartTime),
           plannedEndTime: _toHhmm(end),
           plannedDurationMinutes: _durationMinutes,
-          alertOffsetMinutes: _alertOffsetMinutes == -1
-              ? null
-              : _alertOffsetMinutes,
+          alertOffsetMinutes:
+              _alertOffsetMinutes == -1 ? null : _alertOffsetMinutes,
           alertType: _alertOffsetMinutes == -1 ? null : _alertType,
           recurrenceType: _recurrenceType,
           recurrenceDays: List<int>.from(_recurrenceDays)..sort(),
@@ -574,6 +583,21 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final titleColor = colorScheme.onSurface;
+    final secondaryText = titleColor.withValues(alpha: 0.7);
+    final dividerColor = titleColor.withValues(
+      alpha: theme.brightness == Brightness.dark ? 0.1 : 0.08,
+    );
+    final bodyColor = colorScheme.surface;
+    final cardColor = theme.cardColor;
+    final inputFillColor = theme.brightness == Brightness.dark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.white.withValues(alpha: 0.88);
+    final dropdownFillColor = theme.brightness == Brightness.dark
+        ? Colors.white.withValues(alpha: 0.05)
+        : colorScheme.primary.withValues(alpha: 0.08);
     final timeLabel = _formatRange(_selectedStartTime, _durationMinutes);
     final durationLabel = _formatDuration(_durationMinutes);
     final dateLabel = DateFormat('EEE, MMM d, yyyy').format(_selectedDate);
@@ -591,7 +615,7 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
           child: ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
             child: Material(
-              color: _bodyColor,
+              color: bodyColor,
               child: SingleChildScrollView(
                 physics: const ClampingScrollPhysics(),
                 padding: EdgeInsets.only(bottom: bottomPadding),
@@ -631,7 +655,8 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                                     width: 82,
                                     height: 82,
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF49494D),
+                                      color:
+                                          Colors.white.withValues(alpha: 0.22),
                                       shape: BoxShape.circle,
                                       border: Border.all(
                                           color: Colors.white, width: 3),
@@ -672,49 +697,51 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                             const SizedBox(height: 4),
                             ColoredBox(
                               color: _headerColor,
-                              child: TextField(
-                                controller: _titleController,
-                                scrollPadding:
-                                    const EdgeInsets.only(bottom: 24),
-                                onChanged: (value) {
-                                  final suggestion =
-                                      TaskSuggestionsService.suggest(value);
-                                  setState(() {
-                                    if (!_userChangedEmoji) {
-                                      _selectedEmoji = suggestion.emoji;
-                                    }
-                                    if (!_userChangedColor) {
-                                      _colorHex = suggestion.colorHex;
-                                      _headerColor =
-                                          _colorFromHex(suggestion.colorHex);
-                                    }
-                                    _selectedType = suggestion.category;
-                                  });
-                                },
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: inputFillColor,
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.28),
+                                  ),
                                 ),
-                                cursorColor: Colors.white,
-                                decoration: const InputDecoration(
-                                  hintText: 'Task title',
-                                  hintStyle: TextStyle(
-                                    color: Colors.white54,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                  border: UnderlineInputBorder(
-                                    borderSide:
-                                        BorderSide(color: Colors.white54),
-                                  ),
-                                  enabledBorder: UnderlineInputBorder(
-                                    borderSide:
-                                        BorderSide(color: Colors.white54),
-                                  ),
-                                  focusedBorder: UnderlineInputBorder(
-                                    borderSide:
-                                        BorderSide(color: Colors.white54),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16),
+                                  child: TextField(
+                                    controller: _titleController,
+                                    scrollPadding:
+                                        const EdgeInsets.only(bottom: 24),
+                                    onChanged: (value) {
+                                      final suggestion =
+                                          TaskSuggestionsService.suggest(value);
+                                      setState(() {
+                                        if (!_userChangedEmoji) {
+                                          _selectedEmoji = suggestion.emoji;
+                                        }
+                                        if (!_userChangedColor) {
+                                          _colorHex = suggestion.colorHex;
+                                          _headerColor = _colorFromHex(
+                                              suggestion.colorHex);
+                                        }
+                                        _selectedType = suggestion.category;
+                                      });
+                                    },
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                    cursorColor: Colors.white,
+                                    decoration: const InputDecoration(
+                                      hintText: 'Task title',
+                                      hintStyle: TextStyle(
+                                        color: Colors.white54,
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                      border: InputBorder.none,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -768,15 +795,16 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                                     const EdgeInsets.fromLTRB(16, 14, 16, 12),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.event_rounded,
-                                        color: Colors.white
-                                            .withValues(alpha: 0.75)),
+                                    Icon(
+                                      Icons.event_rounded,
+                                      color: secondaryText,
+                                    ),
                                     const SizedBox(width: 12),
-                                    const Expanded(
+                                    Expanded(
                                       child: Text(
                                         'Fixed Event',
                                         style: TextStyle(
-                                          color: Colors.white,
+                                          color: titleColor,
                                           fontSize: 16,
                                           fontWeight: FontWeight.w700,
                                         ),
@@ -794,23 +822,24 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                                 padding:
                                     const EdgeInsets.symmetric(horizontal: 16),
                                 child: Divider(
-                                    height: 1,
-                                    color:
-                                        Colors.white.withValues(alpha: 0.08)),
+                                  height: 1,
+                                  color: dividerColor,
+                                ),
                               ),
                               Padding(
                                 padding:
                                     const EdgeInsets.fromLTRB(16, 12, 16, 16),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.category_outlined,
-                                        color: Colors.white
-                                            .withValues(alpha: 0.75)),
+                                    Icon(
+                                      Icons.category_outlined,
+                                      color: secondaryText,
+                                    ),
                                     const SizedBox(width: 12),
-                                    const Text(
+                                    Text(
                                       'Block Type',
                                       style: TextStyle(
-                                        color: Colors.white,
+                                        color: titleColor,
                                         fontSize: 16,
                                         fontWeight: FontWeight.w700,
                                       ),
@@ -820,21 +849,19 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 12),
                                       decoration: BoxDecoration(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.05),
+                                        color: dropdownFillColor,
                                         borderRadius: BorderRadius.circular(14),
                                         border: Border.all(
-                                          color: Colors.white
-                                              .withValues(alpha: 0.08),
+                                          color: dividerColor,
                                         ),
                                       ),
                                       child: DropdownButtonHideUnderline(
                                         child: DropdownButton<BlockType>(
                                           value: _selectedType,
-                                          dropdownColor: _cardColor,
-                                          iconEnabledColor: Colors.white70,
-                                          style: const TextStyle(
-                                            color: Colors.white,
+                                          dropdownColor: cardColor,
+                                          iconEnabledColor: secondaryText,
+                                          style: TextStyle(
+                                            color: titleColor,
                                             fontWeight: FontWeight.w700,
                                           ),
                                           onChanged: (value) {
@@ -860,23 +887,24 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                                 padding:
                                     const EdgeInsets.symmetric(horizontal: 16),
                                 child: Divider(
-                                    height: 1,
-                                    color:
-                                        Colors.white.withValues(alpha: 0.08)),
+                                  height: 1,
+                                  color: dividerColor,
+                                ),
                               ),
                               Padding(
                                 padding:
                                     const EdgeInsets.fromLTRB(16, 14, 16, 16),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.radio_button_unchecked_rounded,
-                                        color: Colors.white
-                                            .withValues(alpha: 0.75)),
+                                    Icon(
+                                      Icons.radio_button_unchecked_rounded,
+                                      color: secondaryText,
+                                    ),
                                     const SizedBox(width: 12),
-                                    const Text(
+                                    Text(
                                       'Status',
                                       style: TextStyle(
-                                        color: Colors.white,
+                                        color: titleColor,
                                         fontSize: 16,
                                         fontWeight: FontWeight.w700,
                                       ),
@@ -885,8 +913,7 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                                     Text(
                                       _statusLabel(widget.block.status),
                                       style: TextStyle(
-                                        color:
-                                            Colors.white.withValues(alpha: 0.7),
+                                        color: secondaryText,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -1005,10 +1032,15 @@ class _Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final borderColor = theme.colorScheme.onSurface.withValues(
+      alpha: theme.brightness == Brightness.dark ? 0.1 : 0.08,
+    );
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF252528),
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: borderColor),
       ),
       child: Column(children: children),
     );
@@ -1032,6 +1064,7 @@ class _ActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(24),
@@ -1044,8 +1077,8 @@ class _ActionRow extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: onSurface,
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                 ),
@@ -1061,7 +1094,7 @@ class _ActionRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.right,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.56),
+                      color: onSurface.withValues(alpha: 0.56),
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
                     ),
@@ -1069,7 +1102,7 @@ class _ActionRow extends StatelessWidget {
                 ),
               ),
             Icon(Icons.chevron_right_rounded,
-                color: Colors.white.withValues(alpha: 0.45)),
+                color: onSurface.withValues(alpha: 0.45)),
           ],
         ),
       ),
