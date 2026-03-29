@@ -377,6 +377,8 @@ class AppTheme {
       dividerTheme: DividerThemeData(color: border, thickness: 0.5),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: surface,
+        modalBackgroundColor: surface,
+        surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(radius + 8)),
         ),

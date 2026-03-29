@@ -25,7 +25,10 @@ typedef TimelineAddTaskCallback = Future<void> Function(
     {int? startMinutes, bool isEvent});
 
 String _to12h(String hhmm) {
-  final parts = hhmm.split(':');
+  final normalized = _normalizeTimeValue(hhmm);
+  if (normalized == null) return hhmm;
+
+  final parts = normalized.split(':');
   if (parts.length != 2) return hhmm;
   final h24 = int.tryParse(parts[0]) ?? 0;
   final m = int.tryParse(parts[1]) ?? 0;
@@ -40,8 +43,57 @@ String _minutesToHHMM(int minutes) {
   return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
 }
 
+String? _normalizeTimeValue(String? raw) {
+  if (raw == null) return null;
+
+  final value = raw.trim();
+  if (value.isEmpty) return null;
+
+  final parsedDateTime = DateTime.tryParse(value);
+  if (parsedDateTime != null) {
+    return _minutesToHHMM(parsedDateTime.hour * 60 + parsedDateTime.minute);
+  }
+
+  final match = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(value);
+  if (match == null) return null;
+
+  final hour = int.tryParse(match.group(1)!);
+  final minute = int.tryParse(match.group(2)!);
+  if (hour == null || minute == null) return null;
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+
+  return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+}
+
+int? _minutesFromTimeValue(String? raw) {
+  final normalized = _normalizeTimeValue(raw);
+  if (normalized == null) return null;
+
+  final parts = normalized.split(':');
+  return (int.tryParse(parts[0]) ?? 0) * 60 + (int.tryParse(parts[1]) ?? 0);
+}
+
+int _durationFromTimeRange(
+  String start,
+  String end, {
+  required int fallbackMinutes,
+}) {
+  final startMinutes = _minutesFromTimeValue(start);
+  final endMinutes = _minutesFromTimeValue(end);
+  if (startMinutes == null ||
+      endMinutes == null ||
+      endMinutes <= startMinutes) {
+    return fallbackMinutes;
+  }
+
+  return endMinutes - startMinutes;
+}
+
 String _to12hShort(String hhmm) {
-  final parts = hhmm.split(':');
+  final normalized = _normalizeTimeValue(hhmm);
+  if (normalized == null) return hhmm;
+
+  final parts = normalized.split(':');
   if (parts.length != 2) return hhmm;
   final h24 = int.tryParse(parts[0]) ?? 0;
   final m = int.tryParse(parts[1]) ?? 0;
@@ -569,6 +621,37 @@ class _TimelineViewState extends State<TimelineView> {
     _showEditSheet(block);
   }
 
+  Future<void> _markBlockDone(Block block) async {
+    if (_isLockedBlock(block) || block.status == BlockStatus.done) return;
+
+    final app = context.read<AppProvider>();
+    final plan = app.getDayPlan(widget.dateKey);
+    final planBlocks = plan?.blocks;
+    if (plan == null || planBlocks == null) return;
+
+    final blockIndex =
+        planBlocks.indexWhere((candidate) => candidate.id == block.id);
+    if (blockIndex < 0) return;
+
+    final now = DateTime.now();
+    final nowTime = _minutesToHHMM(now.hour * 60 + now.minute);
+    final updatedBlocks = List<Block>.from(planBlocks);
+    final existingBlock = updatedBlocks[blockIndex];
+
+    updatedBlocks[blockIndex] = existingBlock.copyWith(
+      status: BlockStatus.done,
+      actualStartTime:
+          existingBlock.actualStartTime ?? existingBlock.plannedStartTime,
+      actualEndTime: nowTime,
+    );
+
+    await app.upsertDayPlan(plan.copyWith(blocks: updatedBlocks));
+    if (!mounted) return;
+
+    setState(() => _currentTime = now);
+    HapticsService.light();
+  }
+
   void _showLockedDetailSheet(Block block) {
     final cs = Theme.of(context).colorScheme;
     final color = _categoryColor(block);
@@ -997,6 +1080,10 @@ class _TimelineViewState extends State<TimelineView> {
                           leading: const SizedBox(width: 22),
                           onTap: () => _onBlockTap(block),
                           onLongPress: () => _onBlockLongPress(block),
+                          onStatusTap: _isLockedBlock(block) ||
+                                  block.status == BlockStatus.done
+                              ? null
+                              : () => _markBlockDone(block),
                           pastFraction: _pastFractionForBlock(
                             startMinutes: _toMinutes(block.plannedStartTime),
                             endMinutes: _toMinutes(block.plannedEndTime),
@@ -1087,6 +1174,7 @@ class _BlockCard extends StatelessWidget {
   final Widget? leading;
   final VoidCallback? onLongPress;
   final VoidCallback? onTap;
+  final VoidCallback? onStatusTap;
   final double pastFraction;
   final double? nowLineOffset;
   final String nowLabel;
@@ -1096,6 +1184,7 @@ class _BlockCard extends StatelessWidget {
     this.leading,
     this.onTap,
     this.onLongPress,
+    this.onStatusTap,
     this.pastFraction = 0,
     this.nowLineOffset,
     required this.nowLabel,
@@ -1343,6 +1432,7 @@ class _BlockCard extends StatelessWidget {
   final Widget? leading;
   final VoidCallback? onLongPress;
   final VoidCallback? onTap;
+  final VoidCallback? onStatusTap;
   final double pastFraction;
   final double? nowLineOffset;
   final String nowLabel;
@@ -1352,6 +1442,7 @@ class _BlockCard extends StatelessWidget {
     this.leading,
     this.onTap,
     this.onLongPress,
+    this.onStatusTap,
     this.pastFraction = 0,
     this.nowLineOffset,
     required this.nowLabel,
@@ -1399,6 +1490,151 @@ class _BlockCard extends StatelessWidget {
     }
   }
 
+  Widget _buildSinglePill({
+    required double height,
+    required Color color,
+    required Color iconColor,
+  }) {
+    return Container(
+      width: _kTimelinePillWidth,
+      height: height,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Center(
+        child: Tooltip(
+          message: _categoryLabel(block),
+          child: Icon(
+            _iconForBlock(),
+            size: 24,
+            color: iconColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDualTrackPills({
+    required double cardHeight,
+    required Color plannedColor,
+    required Color actualColor,
+    required Color labelColor,
+    required String plannedLabel,
+    required String actualLabel,
+    required double plannedHeight,
+    required double actualHeight,
+  }) {
+    return SizedBox(
+      width: 60,
+      height: cardHeight,
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  plannedLabel,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: labelColor,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  actualLabel,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: _kTimelineAccent,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Container(
+                      width: 28,
+                      height: plannedHeight,
+                      decoration: BoxDecoration(
+                        color: plannedColor,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Container(
+                      width: 28,
+                      height: actualHeight,
+                      decoration: BoxDecoration(
+                        color: actualColor,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.check_rounded,
+                          size: 14,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusIndicator(
+      {required bool isDone, required Color pillColor}) {
+    final indicator = Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Container(
+        width: _kTimelineStatusSize,
+        height: _kTimelineStatusSize,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isDone ? _kTimelineComplete : Colors.transparent,
+          border: isDone ? null : Border.all(color: pillColor, width: 2),
+        ),
+      ),
+    );
+
+    if (onStatusTap == null) return indicator;
+
+    return GestureDetector(
+      onTap: onStatusTap,
+      behavior: HitTestBehavior.opaque,
+      child: indicator,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1406,20 +1642,47 @@ class _BlockCard extends StatelessWidget {
     final accent = _baseBlockColor(block);
     final startMin = _toMinutes(block.plannedStartTime);
     final endMin = _toMinutes(block.plannedEndTime);
-    final duration =
+    final plannedDuration =
         endMin > startMin ? endMin - startMin : block.plannedDurationMinutes;
-    final cardHeight = _timelinePillHeight(duration);
     final isDone = block.status == BlockStatus.done;
     final isSplit = block.splitTotalParts != null && block.splitTotalParts! > 1;
     final pillColor = isDone ? onSurface.withValues(alpha: 0.16) : accent;
     final startLabel = _to12hShort(block.plannedStartTime);
     final rangeLabel =
         '${_to12h(block.plannedStartTime)} - ${_to12h(block.plannedEndTime)}';
+    final actualStartTime =
+        _normalizeTimeValue(block.actualStartTime) ?? block.plannedStartTime;
+    final actualEndTime = _normalizeTimeValue(block.actualEndTime);
+    final hasDifferentActualRange = actualEndTime != null &&
+        (actualStartTime != block.plannedStartTime ||
+            actualEndTime != block.plannedEndTime);
+    final showDualTrack = isDone && hasDifferentActualRange;
+    final actualDuration = actualEndTime == null
+        ? plannedDuration
+        : _durationFromTimeRange(
+            actualStartTime,
+            actualEndTime,
+            fallbackMinutes: plannedDuration,
+          );
+    final plannedTrackHeight =
+        math.max(18.0, _scaledTimelineHeight(plannedDuration));
+    final actualTrackHeight =
+        math.max(18.0, _scaledTimelineHeight(actualDuration));
+    final dualTrackHeight =
+        math.max(plannedTrackHeight, actualTrackHeight) + 22;
+    final cardHeight = showDualTrack
+        ? math.max(_timelinePillHeight(plannedDuration), dualTrackHeight)
+        : _timelinePillHeight(plannedDuration);
     final double? nowIndicatorTop = nowLineOffset == null
         ? null
         : (nowLineOffset! - 9)
             .clamp(0.0, math.max(0.0, cardHeight - 20))
             .toDouble();
+    final plannedMetaLabel =
+        'Planned: ${_to12h(block.plannedStartTime)} - ${_to12h(block.plannedEndTime)}';
+    final actualMetaLabel = actualEndTime == null
+        ? null
+        : 'Actual: ${_to12h(actualStartTime)} - ${_to12h(actualEndTime)}';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1461,24 +1724,23 @@ class _BlockCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: _kTimelineTimeToPillGap),
-                  Container(
-                    width: _kTimelinePillWidth,
-                    height: cardHeight,
-                    decoration: BoxDecoration(
-                      color: pillColor,
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                    child: Center(
-                      child: Tooltip(
-                        message: _categoryLabel(block),
-                        child: Icon(
-                          _iconForBlock(),
-                          size: 24,
-                          color: isDone ? onSurface : Colors.white,
+                  showDualTrack
+                      ? _buildDualTrackPills(
+                          cardHeight: cardHeight,
+                          plannedColor:
+                              const Color(0xFF8E8E93).withValues(alpha: 0.4),
+                          actualColor: accent,
+                          labelColor: onSurface.withValues(alpha: 0.52),
+                          plannedLabel: _to12hShort(block.plannedEndTime),
+                          actualLabel: _to12hShort(actualEndTime),
+                          plannedHeight: plannedTrackHeight,
+                          actualHeight: actualTrackHeight,
+                        )
+                      : _buildSinglePill(
+                          height: cardHeight,
+                          color: pillColor,
+                          iconColor: isDone ? onSurface : Colors.white,
                         ),
-                      ),
-                    ),
-                  ),
                   const SizedBox(width: _kTimelineContentGap),
                   Expanded(
                     child: Padding(
@@ -1500,15 +1762,54 @@ class _BlockCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 6),
-                          Text(
-                            rangeLabel,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: onSurface.withValues(alpha: 0.6),
-                              fontFeatures: [FontFeature.tabularFigures()],
+                          if (showDualTrack) ...[
+                            Text(
+                              plannedMetaLabel,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: onSurface.withValues(alpha: 0.58),
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures()
+                                ],
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    actualMetaLabel!,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: accent,
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures(),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.check_rounded,
+                                  size: 14,
+                                  color: accent,
+                                ),
+                              ],
+                            ),
+                          ] else
+                            Text(
+                              rangeLabel,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: onSurface.withValues(alpha: 0.6),
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures()
+                                ],
+                              ),
+                            ),
                           if (isSplit) ...[
                             const SizedBox(height: 8),
                             Text(
@@ -1525,20 +1826,7 @@ class _BlockCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Container(
-                      width: _kTimelineStatusSize,
-                      height: _kTimelineStatusSize,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isDone ? _kTimelineComplete : Colors.transparent,
-                        border: isDone
-                            ? null
-                            : Border.all(color: pillColor, width: 2),
-                      ),
-                    ),
-                  ),
+                  _buildStatusIndicator(isDone: isDone, pillColor: pillColor),
                 ],
               ),
               if (pastFraction > 0)

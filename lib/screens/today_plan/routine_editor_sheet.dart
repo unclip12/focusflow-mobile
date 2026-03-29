@@ -1046,15 +1046,14 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
         maxChildSize: 0.95,
         minChildSize: 0.5,
         expand: false,
-        builder: (context, scroll) => AnimatedPadding(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
+        builder: (context, scroll) => Padding(
           padding:
               EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
           child: Material(
             color: scaffoldBackgroundColor,
             child: SingleChildScrollView(
               controller: scroll,
+              physics: const ClampingScrollPhysics(),
               padding: EdgeInsets.fromLTRB(
                 20,
                 0,

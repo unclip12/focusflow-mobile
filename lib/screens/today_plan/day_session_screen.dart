@@ -30,11 +30,7 @@ class DaySessionScreen extends StatefulWidget {
 }
 
 class _DaySessionScreenState extends State<DaySessionScreen> {
-  static const _backgroundColor = Color(0xFF0D0D0D);
-  static const _cardColor = Color(0xFF1C1C1E);
   static const _accentColor = Color(0xFFE8837A);
-  static const _primaryTextColor = Colors.white;
-  static const _secondaryTextColor = Color(0xFF9A9AA0);
 
   Timer? _timer;
   int _elapsedSeconds = 0;
@@ -52,9 +48,18 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
   }
 
   void _startTimer() {
+    _elapsedSeconds = _sessionElapsedSeconds(widget.session.startedAt);
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _elapsedSeconds++);
+      if (!mounted) return;
+      setState(() {
+        _elapsedSeconds = _sessionElapsedSeconds(widget.session.startedAt);
+      });
     });
+  }
+
+  int _sessionElapsedSeconds(DateTime sessionStartedAt) {
+    final elapsed = DateTime.now().difference(sessionStartedAt).inSeconds;
+    return elapsed < 0 ? 0 : elapsed;
   }
 
   String _formatElapsed(int seconds) {
@@ -79,12 +84,21 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
   }
 
   bool _isCompleted(Block block) {
-    // The shared enum still uses `done` as its completed terminal state.
     return block.status == BlockStatus.done;
   }
 
   bool _isActionable(Block block) {
     return !_isCompleted(block) && block.status != BlockStatus.skipped;
+  }
+
+  bool _isRetroactiveBlock(Block block) {
+    final title = block.title.toLowerCase();
+    final description = (block.description ?? '').toLowerCase();
+    return title.contains('retroactive') || description.contains('retroactive');
+  }
+
+  List<Block> _sessionBlocks(List<Block> allBlocks) {
+    return allBlocks.where((block) => !_isRetroactiveBlock(block)).toList();
   }
 
   int _completedCount(List<Block> blocks) {
@@ -95,14 +109,13 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
     return blocks.isNotEmpty && _completedCount(blocks) == blocks.length;
   }
 
-  Block? _primaryBlock(List<Block> blocks) {
+  Block? _primaryBlock(List<Block> blocks, {String? currentBlockId}) {
     final actionableBlocks = _sortedBlocks(blocks).where(_isActionable).toList();
     if (actionableBlocks.isEmpty) return null;
 
-    final currentId = widget.session.currentBlockId;
-    if (currentId != null) {
+    if (currentBlockId != null) {
       for (final block in actionableBlocks) {
-        if (block.id == currentId) return block;
+        if (block.id == currentBlockId) return block;
       }
     }
 
@@ -166,12 +179,12 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
     final startLabel = _formatTimeDisplay(block.plannedStartTime);
 
     if (start == null) {
-      return '$startLabel – ${_formatTimeDisplay(block.plannedEndTime)}';
+      return '$startLabel - ${_formatTimeDisplay(block.plannedEndTime)}';
     }
 
     final resolvedEnd =
         end ?? start.add(Duration(minutes: block.plannedDurationMinutes));
-    return '${DateFormat('h:mm a').format(start)} – ${DateFormat('h:mm a').format(resolvedEnd)}';
+    return '${DateFormat('h:mm a').format(start)} - ${DateFormat('h:mm a').format(resolvedEnd)}';
   }
 
   double _progress(List<Block> blocks) {
@@ -179,61 +192,119 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
     return _completedCount(blocks) / blocks.length;
   }
 
-  bool _isNowBlock(Block block) {
-    return block.status == BlockStatus.inProgress ||
-        widget.session.currentBlockId == block.id;
+  bool _isNowBlock(Block block, {String? currentBlockId}) {
+    return block.status == BlockStatus.inProgress || currentBlockId == block.id;
   }
 
-  void _completeCurrent(AppProvider app, Block block) {
-    app.completeDayPlanBlock(
-      widget.dateKey,
-      block.id,
-      startedAt: widget.session.startedAt,
-      completedAt: DateTime.now(),
-      autoAdvanceFlow: true,
-    );
-    app.rescheduleFromNow(widget.dateKey);
-    setState(() => _elapsedSeconds = 0);
+  String _blockEmoji(Block block) {
+    switch (block.type) {
+      case BlockType.video:
+        return '\u{1F3AC}';
+      case BlockType.revisionFa:
+      case BlockType.fmgeRevision:
+        return '\u{1F504}';
+      case BlockType.anki:
+        return '\u{1F9E0}';
+      case BlockType.qbank:
+        return '\u{270D}';
+      case BlockType.studySession:
+      case BlockType.mixed:
+        return '\u{1F4DA}';
+      case BlockType.breakBlock:
+        return '\u{2615}';
+      case BlockType.other:
+        return '\u{1F4CC}';
+    }
   }
 
-  void _skipCurrent(AppProvider app, Block block) {
+  Future<void> _completeCurrent(
+    AppProvider app,
+    Block block,
+    List<Block> sessionBlocks,
+  ) async {
     final plan = app.getDayPlan(widget.dateKey);
     if (plan == null) return;
+
+    final nextBlock = _nextBlock(sessionBlocks, after: block);
     final blocks = List<Block>.from(plan.blocks ?? []);
     final idx = blocks.indexWhere((b) => b.id == block.id);
     if (idx < 0) return;
+
+    final now = DateTime.now();
+    final actualStart = DateTime.tryParse(block.actualStartTime ?? '') ??
+        widget.session.startedAt;
+    final actualDurationMinutes = now.difference(actualStart).inMinutes;
+
+    blocks[idx] = blocks[idx].copyWith(
+      actualStartTime: block.actualStartTime ?? actualStart.toIso8601String(),
+      actualEndTime: now.toIso8601String(),
+      actualDurationMinutes: actualDurationMinutes < 0 ? 0 : actualDurationMinutes,
+      status: BlockStatus.done,
+    );
+
+    await app.upsertDayPlan(plan.copyWith(blocks: blocks));
+    await app.rescheduleFromNow(widget.dateKey);
+    if (nextBlock != null) {
+      app.setCurrentBlock(widget.dateKey, nextBlock.id);
+    }
+  }
+
+  Future<void> _skipCurrent(
+    AppProvider app,
+    Block block,
+    List<Block> sessionBlocks,
+  ) async {
+    final plan = app.getDayPlan(widget.dateKey);
+    if (plan == null) return;
+
+    final nextBlock = _nextBlock(sessionBlocks, after: block);
+    final blocks = List<Block>.from(plan.blocks ?? []);
+    final idx = blocks.indexWhere((b) => b.id == block.id);
+    if (idx < 0) return;
+
     blocks[idx] = blocks[idx].copyWith(status: BlockStatus.skipped);
-    app.upsertDayPlan(plan.copyWith(blocks: blocks));
-    app.rescheduleFromNow(widget.dateKey);
-    setState(() => _elapsedSeconds = 0);
+    await app.upsertDayPlan(plan.copyWith(blocks: blocks));
+    await app.rescheduleFromNow(widget.dateKey);
+    if (nextBlock != null) {
+      app.setCurrentBlock(widget.dateKey, nextBlock.id);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
+    final activeSession = app.getActiveDaySession(widget.dateKey) ?? widget.session;
     final plan = app.getDayPlan(widget.dateKey);
-    final blocks = plan?.blocks ?? const <Block>[];
-    final primaryBlock = _primaryBlock(blocks);
-    final next = _nextBlock(blocks, after: primaryBlock);
-    final progress = _progress(blocks);
-    final completedCount = _completedCount(blocks);
-    final allBlocksCompleted = _allBlocksCompleted(blocks);
+    final allBlocks = plan?.blocks ?? const <Block>[];
+    final sessionBlocks = _sessionBlocks(allBlocks);
+    final primaryBlock = _primaryBlock(
+      sessionBlocks,
+      currentBlockId: activeSession.currentBlockId,
+    );
+    final next = _nextBlock(sessionBlocks, after: primaryBlock);
+    final progress = _progress(sessionBlocks);
+    final completedCount = _completedCount(sessionBlocks);
+    final allBlocksCompleted = _allBlocksCompleted(sessionBlocks);
+    final theme = Theme.of(context);
+    final primaryTextColor =
+        theme.textTheme.bodyLarge?.color ?? theme.colorScheme.onSurface;
+    final secondaryTextColor = primaryTextColor.withValues(alpha: 0.7);
 
     return Scaffold(
-      backgroundColor: _backgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: _primaryTextColor),
+          icon: Icon(Icons.arrow_back_rounded, color: primaryTextColor),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Day Session',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
-            color: _primaryTextColor,
+            color: primaryTextColor,
           ),
         ),
         actions: [
@@ -260,7 +331,7 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
               child: LinearProgressIndicator(
                 value: progress,
                 minHeight: 6,
-                backgroundColor: Colors.white.withValues(alpha: 0.12),
+                backgroundColor: primaryTextColor.withValues(alpha: 0.12),
                 valueColor: const AlwaysStoppedAnimation(_accentColor),
               ),
             ),
@@ -270,17 +341,17 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
               children: [
                 Text(
                   '${(progress * 100).round()}% Complete',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: _secondaryTextColor,
+                    color: secondaryTextColor,
                   ),
                 ),
                 Text(
-                  '$completedCount/${blocks.length} blocks',
-                  style: const TextStyle(
+                  '$completedCount/${sessionBlocks.length} blocks',
+                  style: TextStyle(
                     fontSize: 12,
-                    color: _secondaryTextColor,
+                    color: secondaryTextColor,
                   ),
                 ),
               ],
@@ -288,7 +359,12 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
             const SizedBox(height: 24),
             if (primaryBlock != null) ...[
               Text(
-                _isNowBlock(primaryBlock) ? 'NOW' : 'NEXT UP',
+                _isNowBlock(
+                  primaryBlock,
+                  currentBlockId: activeSession.currentBlockId,
+                )
+                    ? 'NOW'
+                    : 'NEXT UP',
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
@@ -301,7 +377,7 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: _cardColor,
+                  color: theme.cardColor,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: _accentColor.withValues(alpha: 0.28),
@@ -310,20 +386,20 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
                 child: Column(
                   children: [
                     Text(
-                      primaryBlock.title,
-                      style: const TextStyle(
-                        fontSize: 20,
+                      '${_blockEmoji(primaryBlock)} ${primaryBlock.title}',
+                      style: TextStyle(
+                        fontSize: 24,
                         fontWeight: FontWeight.w800,
-                        color: _primaryTextColor,
+                        color: primaryTextColor,
                       ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 6),
                     Text(
                       _formatBlockTimeRange(primaryBlock),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: _secondaryTextColor,
+                        color: secondaryTextColor,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -341,13 +417,15 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () => _skipCurrent(app, primaryBlock),
+                            onPressed: () async {
+                              await _skipCurrent(app, primaryBlock, sessionBlocks);
+                            },
                             icon: const Icon(Icons.skip_next_rounded, size: 18),
                             label: const Text('Skip'),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: _primaryTextColor,
+                              foregroundColor: primaryTextColor,
                               side: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.14),
+                                color: primaryTextColor.withValues(alpha: 0.14),
                               ),
                               padding:
                                   const EdgeInsets.symmetric(vertical: 12),
@@ -361,7 +439,9 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
                         Expanded(
                           flex: 2,
                           child: FilledButton.icon(
-                            onPressed: () => _completeCurrent(app, primaryBlock),
+                            onPressed: () async {
+                              await _completeCurrent(app, primaryBlock, sessionBlocks);
+                            },
                             icon: const Icon(Icons.check_rounded, size: 20),
                             label: const Text(
                               'Done Early',
@@ -378,6 +458,36 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
                             ),
                           ),
                         ),
+                        if (_elapsedSeconds >=
+                            primaryBlock.plannedDurationMinutes * 60) ...[
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: FilledButton.icon(
+                              onPressed: () async {
+                                await _completeCurrent(
+                                  app,
+                                  primaryBlock,
+                                  sessionBlocks,
+                                );
+                              },
+                              icon: const Icon(Icons.task_alt_rounded, size: 20),
+                              label: const Text(
+                                'Done',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: _accentColor,
+                                foregroundColor: Colors.black,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ],
@@ -396,11 +506,11 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
               Text(
                 allBlocksCompleted
                     ? 'All blocks completed!'
-                    : "You're all done for today! 🎉",
-                style: const TextStyle(
+                    : "You're all done for today!",
+                style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
-                  color: _primaryTextColor,
+                  color: primaryTextColor,
                 ),
               ),
               const SizedBox(height: 4),
@@ -408,9 +518,9 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
                 allBlocksCompleted
                     ? 'Great work today'
                     : 'No incomplete blocks remain.',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  color: _secondaryTextColor,
+                  color: secondaryTextColor,
                 ),
               ),
             ],
@@ -422,7 +532,7 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
                 style: const TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
-                  color: _secondaryTextColor,
+                  color: _accentColor,
                   letterSpacing: 1,
                 ),
               ),
@@ -433,10 +543,10 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: _cardColor,
+                  color: theme.cardColor,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.06),
+                    color: primaryTextColor.withValues(alpha: 0.06),
                   ),
                 ),
                 child: Row(
@@ -461,18 +571,18 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
                         children: [
                           Text(
                             next.title,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
-                              color: _primaryTextColor,
+                              color: primaryTextColor,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             _formatBlockTimeRange(next),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: _secondaryTextColor,
+                              color: secondaryTextColor,
                             ),
                           ),
                         ],
@@ -486,18 +596,18 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: _cardColor,
+                  color: theme.cardColor,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.06),
+                    color: primaryTextColor.withValues(alpha: 0.06),
                   ),
                 ),
-                child: const Text(
-                  "You're all done for today! 🎉",
+                child: Text(
+                  "You're all done for today!",
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: _primaryTextColor,
+                    color: primaryTextColor,
                   ),
                 ),
               ),

@@ -11,6 +11,7 @@ import 'package:intl/intl.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
+import 'package:focusflow_mobile/screens/tracker/video_lectures_tab.dart';
 import 'package:focusflow_mobile/services/notification_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:provider/provider.dart';
@@ -105,9 +106,18 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
     return '$prefix — $unwatchedCount unwatched videos';
   }
 
-  void _openLibrarySubject(BuildContext context, String subject) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Opening $subject videos...')),
+  void _openLibrarySubject(
+    BuildContext context, {
+    required String title,
+    required String subjectQuery,
+  }) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _LibrarySubjectVideoScreen(
+          title: title,
+          subjectQuery: subjectQuery,
+        ),
+      ),
     );
   }
 
@@ -1069,7 +1079,11 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                         subject: 'ENT',
                         prefix: 'Ear, Nose & Throat',
                       ),
-                      onTap: () => _openLibrarySubject(context, 'ENT'),
+                      onTap: () => _openLibrarySubject(
+                        context,
+                        title: 'ENT',
+                        subjectQuery: 'ENT',
+                      ),
                     ),
                     const SizedBox(height: 10),
                     _OptionCard(
@@ -1081,7 +1095,11 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                         subject: 'Preventive & Social Medicine',
                         prefix: 'Preventive & Social Medicine',
                       ),
-                      onTap: () => _openLibrarySubject(context, 'PSM'),
+                      onTap: () => _openLibrarySubject(
+                        context,
+                        title: 'PSM',
+                        subjectQuery: 'Preventive & Social Medicine',
+                      ),
                     ),
                     const SizedBox(height: 10),
                     _OptionCard(
@@ -1093,8 +1111,11 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                         subject: 'Ophthalmology',
                         prefix: 'Ophtha',
                       ),
-                      onTap: () =>
-                          _openLibrarySubject(context, 'Ophthalmology'),
+                      onTap: () => _openLibrarySubject(
+                        context,
+                        title: 'Ophthalmology',
+                        subjectQuery: 'Ophthalmology',
+                      ),
                     ),
                     const SizedBox(height: 20),
                     if (_queue.isNotEmpty) ...[
@@ -2384,6 +2405,34 @@ class _OptionCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _LibrarySubjectVideoScreen extends StatelessWidget {
+  final String title;
+  final String subjectQuery;
+
+  const _LibrarySubjectVideoScreen({
+    required this.title,
+    required this.subjectQuery,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppProvider>();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+      ),
+      body: VideoLecturesTab(
+        app: app,
+        selectionMode: false,
+        selectedItems: const <String>{},
+        onToggleSelect: (_) {},
+        searchQuery: subjectQuery,
       ),
     );
   }

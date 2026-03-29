@@ -572,141 +572,145 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
       color: scaffoldBackgroundColor,
       child: FractionallySizedBox(
         heightFactor: 0.96,
-        child: AnimatedPadding(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
+        child: Padding(
           padding: EdgeInsets.only(bottom: bottomInset),
           child: ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
             child: Material(
               color: _bodyColor,
-              child: Column(
-                children: [
-                  ColoredBox(
-                    color: _headerColor,
-                    child: Container(
+              child: SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                padding: EdgeInsets.only(bottom: bottomPadding),
+                child: Column(
+                  children: [
+                    ColoredBox(
                       color: _headerColor,
-                      padding: EdgeInsets.fromLTRB(
-                        18,
-                        18,
-                        18,
-                        MediaQuery.of(context).padding.top + 18,
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              _CircleIconButton(
-                                icon: Icons.close_rounded,
-                                onTap: () => Navigator.of(context).pop(),
-                              ),
-                              const Spacer(),
-                              _StatusRing(status: widget.block.status),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Stack(
-                            clipBehavior: Clip.none,
-                            alignment: Alignment.center,
-                            children: [
-                              InkWell(
-                                onTap: _pickEmoji,
-                                borderRadius: BorderRadius.circular(999),
-                                child: Container(
-                                  width: 82,
-                                  height: 82,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF49494D),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: Colors.white, width: 3),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Text(_selectedEmoji,
-                                      style: const TextStyle(fontSize: 34)),
+                      child: Container(
+                        color: _headerColor,
+                        padding: EdgeInsets.fromLTRB(
+                          18,
+                          18,
+                          18,
+                          MediaQuery.of(context).padding.top + 18,
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                _CircleIconButton(
+                                  icon: Icons.close_rounded,
+                                  onTap: () => Navigator.of(context).pop(),
                                 ),
-                              ),
-                              Positioned(
-                                bottom: -10,
-                                child: Material(
-                                  color: _accentColor,
-                                  shape: const CircleBorder(),
-                                  child: InkWell(
-                                    onTap: _pickHeaderColor,
-                                    customBorder: const CircleBorder(),
-                                    child: const SizedBox(
-                                      width: 34,
-                                      height: 34,
-                                      child: Icon(Icons.palette_outlined,
-                                          color: Colors.white, size: 18),
+                                const Spacer(),
+                                _StatusRing(status: widget.block.status),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Stack(
+                              clipBehavior: Clip.none,
+                              alignment: Alignment.center,
+                              children: [
+                                InkWell(
+                                  onTap: _pickEmoji,
+                                  borderRadius: BorderRadius.circular(999),
+                                  child: Container(
+                                    width: 82,
+                                    height: 82,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF49494D),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: Colors.white, width: 3),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(_selectedEmoji,
+                                        style: const TextStyle(fontSize: 34)),
+                                  ),
+                                ),
+                                Positioned(
+                                  bottom: -10,
+                                  child: Material(
+                                    color: _accentColor,
+                                    shape: const CircleBorder(),
+                                    child: InkWell(
+                                      onTap: _pickHeaderColor,
+                                      customBorder: const CircleBorder(),
+                                      child: const SizedBox(
+                                        width: 34,
+                                        height: 34,
+                                        child: Icon(Icons.palette_outlined,
+                                            color: Colors.white, size: 18),
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
-                          Text(
-                            '$timeLabel ($durationLabel)',
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                              ],
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          ColoredBox(
-                            color: _headerColor,
-                            child: TextField(
-                              controller: _titleController,
-                              scrollPadding: const EdgeInsets.only(bottom: 24),
-                              onChanged: (value) {
-                                final suggestion =
-                                    TaskSuggestionsService.suggest(value);
-                                setState(() {
-                                  if (!_userChangedEmoji) {
-                                    _selectedEmoji = suggestion.emoji;
-                                  }
-                                  if (!_userChangedColor) {
-                                    _colorHex = suggestion.colorHex;
-                                    _headerColor =
-                                        _colorFromHex(suggestion.colorHex);
-                                  }
-                                  _selectedType = suggestion.category;
-                                });
-                              },
+                            const SizedBox(height: 24),
+                            Text(
+                              '$timeLabel ($durationLabel)',
                               style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
+                                color: Colors.white70,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
                               ),
-                              cursorColor: Colors.white,
-                              decoration: const InputDecoration(
-                                hintText: 'Task title',
-                                hintStyle: TextStyle(
-                                  color: Colors.white54,
+                            ),
+                            const SizedBox(height: 4),
+                            ColoredBox(
+                              color: _headerColor,
+                              child: TextField(
+                                controller: _titleController,
+                                scrollPadding:
+                                    const EdgeInsets.only(bottom: 24),
+                                onChanged: (value) {
+                                  final suggestion =
+                                      TaskSuggestionsService.suggest(value);
+                                  setState(() {
+                                    if (!_userChangedEmoji) {
+                                      _selectedEmoji = suggestion.emoji;
+                                    }
+                                    if (!_userChangedColor) {
+                                      _colorHex = suggestion.colorHex;
+                                      _headerColor =
+                                          _colorFromHex(suggestion.colorHex);
+                                    }
+                                    _selectedType = suggestion.category;
+                                  });
+                                },
+                                style: const TextStyle(
+                                  color: Colors.white,
                                   fontSize: 22,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w800,
                                 ),
-                                border: UnderlineInputBorder(
-                                  borderSide: BorderSide(color: Colors.white54),
-                                ),
-                                enabledBorder: UnderlineInputBorder(
-                                  borderSide: BorderSide(color: Colors.white54),
-                                ),
-                                focusedBorder: UnderlineInputBorder(
-                                  borderSide: BorderSide(color: Colors.white54),
+                                cursorColor: Colors.white,
+                                decoration: const InputDecoration(
+                                  hintText: 'Task title',
+                                  hintStyle: TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  border: UnderlineInputBorder(
+                                    borderSide:
+                                        BorderSide(color: Colors.white54),
+                                  ),
+                                  enabledBorder: UnderlineInputBorder(
+                                    borderSide:
+                                        BorderSide(color: Colors.white54),
+                                  ),
+                                  focusedBorder: UnderlineInputBorder(
+                                    borderSide:
+                                        BorderSide(color: Colors.white54),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -914,8 +918,8 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                         ],
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
