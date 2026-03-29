@@ -45,14 +45,12 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
   static const int _routinesTabIndex = 1;
 
   late DateTime _selectedDate;
+  late DateTime _lastCalendarDate;
   String? _completedBlockId;
   late TabController _tabCtrl;
   bool _didProcessExpiredRoutineQueue = false;
   TodayPlanLaunchRequest? _processingNotificationLaunch;
 
-  // Live clock
-  late final ValueNotifier<DateTime> _clockNotifier =
-      ValueNotifier<DateTime>(DateTime.now());
   late final StreamSubscription<DateTime> _clockTimer;
 
   static const _prayers = [
@@ -68,6 +66,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     setState(fn);
   }
 
+  // ignore: unused_element
   List<Block> _buildPrayerBlocks() {
     final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
     return _prayers.map((p) {
@@ -93,6 +92,30 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
         isVirtual: true,
       );
     }).toList();
+  }
+
+  DateTime _calendarDate(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
+
+  bool _isAutoPrayerRoutineBlock(Block block) =>
+      block.id.startsWith('routine-prayer_');
+
+  void _handleClockTick(DateTime now) {
+    final currentCalendarDate = _calendarDate(now);
+    if (AppDateUtils.isSameDay(currentCalendarDate, _lastCalendarDate)) {
+      return;
+    }
+
+    final wasShowingCurrentDay =
+        AppDateUtils.isSameDay(_selectedDate, _lastCalendarDate);
+    _lastCalendarDate = currentCalendarDate;
+
+    if (wasShowingCurrentDay) {
+      _setStateIfMounted(() => _selectedDate = currentCalendarDate);
+      unawaited(_refreshSelectedDateBlocks());
+    }
+
+    _schedulePrayerNotifications();
   }
 
   void _schedulePrayerNotifications() {
@@ -264,14 +287,14 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
   @override
   void initState() {
     super.initState();
-    _selectedDate = AppDateUtils.getAdjustedDate();
+    _lastCalendarDate = _calendarDate(DateTime.now());
+    _selectedDate = _lastCalendarDate;
     _tabCtrl = TabController(length: 3, vsync: this);
     NotificationService.instance.todayPlanLaunchNotifier
         .addListener(_onTodayPlanLaunchChanged);
-    // Tick clock every minute
     _clockTimer =
         Stream.periodic(const Duration(seconds: 30), (_) => DateTime.now())
-            .listen((dt) => _clockNotifier.value = dt);
+            .listen(_handleClockTick);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _schedulePrayerNotifications();
       _showExpiredRoutineDialogs();
@@ -289,14 +312,13 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     NotificationService.instance.todayPlanLaunchNotifier
         .removeListener(_onTodayPlanLaunchChanged);
     _clockTimer.cancel();
-    _clockNotifier.dispose();
     _tabCtrl.dispose();
     super.dispose();
   }
 
   String get _dateKey => AppDateUtils.formatDate(_selectedDate);
   bool get _isToday =>
-      AppDateUtils.isSameDay(_selectedDate, AppDateUtils.getAdjustedDate());
+      AppDateUtils.isSameDay(_selectedDate, _calendarDate(DateTime.now()));
 
   Future<void> _refreshSelectedDateBlocks() async {
     final app = context.read<AppProvider>();
@@ -581,16 +603,14 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     final app = context.watch<AppProvider>();
     final plan = app.getDayPlan(DateFormat('yyyy-MM-dd').format(_selectedDate));
     final realBlocks = List<Block>.from(plan?.blocks ?? []);
-    final totalBlocks = realBlocks.length;
+    final visibleBlocks = realBlocks
+        .where((block) => !_isAutoPrayerRoutineBlock(block))
+        .toList(growable: false);
+    final totalBlocks = visibleBlocks.length;
     final completedBlocks =
-        realBlocks.where((block) => block.status == BlockStatus.done).length;
+        visibleBlocks.where((block) => block.status == BlockStatus.done).length;
 
-    final List<Block> displayBlocks;
-    if (_isToday) {
-      displayBlocks = [...realBlocks, ..._buildPrayerBlocks()];
-    } else {
-      displayBlocks = List<Block>.from(realBlocks);
-    }
+    final displayBlocks = List<Block>.from(visibleBlocks);
     displayBlocks
         .sort((a, b) => a.plannedStartTime.compareTo(b.plannedStartTime));
 
@@ -998,21 +1018,21 @@ class _CompactHeader extends StatelessWidget {
         : DateFormat('EEE, d MMM').format(date);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
       child: LiquidGlassCard(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
               decoration: BoxDecoration(
                 color: theme.cardColor.withValues(alpha: 0.32),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(18),
                 border: Border.all(
                   color: accent.withValues(alpha: 0.08),
                 ),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
               child: Row(
                 children: [
                   _DateArrowButton(
@@ -1025,15 +1045,15 @@ class _CompactHeader extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
+                          horizontal: 10,
+                          vertical: 8,
                         ),
                         child: Text(
                           dateLabel,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: onSurface,
-                            fontSize: 17,
+                            fontSize: 16,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -1047,26 +1067,26 @@ class _CompactHeader extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             Text(
               '$completedBlocks / $totalBlocks done',
               style: TextStyle(
                 color: onSurface,
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             ClipRRect(
               borderRadius: BorderRadius.circular(999),
               child: LinearProgressIndicator(
                 value: progress.clamp(0.0, 1.0),
-                minHeight: 6,
+                minHeight: 5,
                 backgroundColor: onSurface.withValues(alpha: 0.08),
                 valueColor: AlwaysStoppedAnimation<Color>(accent),
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
@@ -1086,7 +1106,7 @@ class _CompactHeader extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
@@ -1106,29 +1126,33 @@ class _CompactHeader extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 12),
             Row(
               children: [
                 for (final weekDate in weekDates)
                   Expanded(
-                    child: _WeekDayColumn(
-                      date: weekDate,
-                      isSelected: AppDateUtils.isSameDay(weekDate, date),
-                      hasBlocks: (app
-                                  .getDayPlan(
-                                    DateFormat('yyyy-MM-dd').format(weekDate),
-                                  )
-                                  ?.blocks ??
-                              const <Block>[])
-                          .isNotEmpty,
-                      hasNightRoutine: (app
-                                  .getDayPlan(
-                                    DateFormat('yyyy-MM-dd').format(weekDate),
-                                  )
-                                  ?.blocks ??
-                              const <Block>[])
-                          .any(_isNightRoutine),
-                      onTap: () => onSelectDate(weekDate),
+                    child: Builder(
+                      builder: (context) {
+                        final weekBlocks = (app
+                                    .getDayPlan(
+                                      DateFormat('yyyy-MM-dd').format(weekDate),
+                                    )
+                                    ?.blocks ??
+                                const <Block>[])
+                            .where(
+                              (block) =>
+                                  !block.id.startsWith('routine-prayer_'),
+                            )
+                            .toList(growable: false);
+
+                        return _WeekDayColumn(
+                          date: weekDate,
+                          isSelected: AppDateUtils.isSameDay(weekDate, date),
+                          hasBlocks: weekBlocks.isNotEmpty,
+                          hasNightRoutine: weekBlocks.any(_isNightRoutine),
+                          onTap: () => onSelectDate(weekDate),
+                        );
+                      },
                     ),
                   ),
               ],
@@ -1163,9 +1187,9 @@ class _WeekDayColumn extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(16),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
+        padding: const EdgeInsets.symmetric(vertical: 1),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1173,14 +1197,14 @@ class _WeekDayColumn extends StatelessWidget {
               DateFormat('EEE').format(date),
               style: TextStyle(
                 color: onSurface.withValues(alpha: 0.6),
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Container(
-              width: 34,
-              height: 34,
+              width: 30,
+              height: 30,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
@@ -1194,20 +1218,20 @@ class _WeekDayColumn extends StatelessWidget {
                 DateFormat('d').format(date),
                 style: TextStyle(
                   color: isSelected ? theme.colorScheme.onPrimary : onSurface,
-                  fontSize: 16,
+                  fontSize: 15,
                   fontWeight: FontWeight.w700,
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             SizedBox(
-              height: 8,
+              height: 6,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (hasBlocks) _WeekIndicatorDot(color: accent),
-                  if (hasBlocks && hasNightRoutine) const SizedBox(width: 4),
+                  if (hasBlocks && hasNightRoutine) const SizedBox(width: 3),
                   if (hasNightRoutine)
                     _WeekIndicatorDot(
                         color: theme.colorScheme.onSurfaceVariant),
@@ -1229,15 +1253,15 @@ class _WeekIndicatorDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 8,
-      height: 8,
+      width: 6,
+      height: 6,
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
             color: color.withValues(alpha: 0.3),
-            blurRadius: 8,
+            blurRadius: 6,
           ),
         ],
       ),
@@ -1306,12 +1330,13 @@ class _DateArrowButton extends StatelessWidget {
       style: IconButton.styleFrom(
         backgroundColor: accent.withValues(alpha: 0.12),
         foregroundColor: accent,
-        minimumSize: const Size(42, 42),
+        minimumSize: const Size(36, 36),
+        padding: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
         ),
       ),
-      icon: Icon(icon, size: 22),
+      icon: Icon(icon, size: 20),
     );
   }
 }
@@ -1334,24 +1359,24 @@ class _QuickActionCard extends StatelessWidget {
 
     return LiquidGlassCard(
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      borderRadius: BorderRadius.circular(22),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      borderRadius: BorderRadius.circular(18),
       child: SizedBox(
-        height: 68,
+        height: 58,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               emoji,
-              style: const TextStyle(fontSize: 22),
+              style: const TextStyle(fontSize: 20),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             Text(
               label,
               style: TextStyle(
                 color: onSurface,
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
             ),

@@ -1,3 +1,5 @@
+// ignore_for_file: unused_element_parameter
+
 // =============================================================
 // TimelineView — scrollable timeline with:
 //   • 12-hour AM/PM time labels
@@ -38,7 +40,8 @@ String _to12h(String hhmm) {
 }
 
 String _minutesToHHMM(int minutes) {
-  final safeMinutes = minutes >= 24 * 60 ? (24 * 60) - 1 : minutes.clamp(0, 23 * 60 + 59);
+  final safeMinutes =
+      minutes >= 24 * 60 ? (24 * 60) - 1 : minutes.clamp(0, 23 * 60 + 59);
   final h = safeMinutes ~/ 60;
   final m = safeMinutes % 60;
   return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
@@ -131,6 +134,9 @@ const double _kTimelineContentGap = 10;
 const double _kTimelineStatusSize = 20;
 const Color _kTimelineAccent = Color(0xFFE8837A);
 const Color _kTimelineGapAccent = _kTimelineAccent;
+const double _kNowOverlayHeight = 24;
+const double _kNowLineThickness = 1.5;
+const double _kNowDotSize = 10;
 const double _kGapRowMinHeight = 80;
 const double _kGapRowHorizontalPadding = 8;
 const double _kGapRowVerticalPadding = 8;
@@ -328,6 +334,7 @@ class _TimelineViewState extends State<TimelineView> {
 
   DateTime? get _selectedDate => DateTime.tryParse(widget.dateKey);
 
+  // ignore: unused_element
   bool get _isViewingFuture {
     final selectedDate = _selectedDate;
     if (selectedDate == null) return false;
@@ -363,59 +370,9 @@ class _TimelineViewState extends State<TimelineView> {
   }
 
   _TimelineBounds _resolveTimelineBounds() {
-    if (_isViewingFuture && widget.blocks.isNotEmpty) {
-      return const _TimelineBounds(
-        startMinutes: 0,
-        endMinutes: 24 * 60,
-      );
-    }
-
-    final plan = context.read<AppProvider>().getDayPlan(widget.dateKey);
-    final blockStarts = widget.blocks
-        .map((block) => _toMinutes(block.plannedStartTime))
-        .toList(growable: false);
-    final blockEnds = widget.blocks
-        .map((block) => _toMinutes(block.plannedEndTime))
-        .toList(growable: false);
-
-    final planStart = (plan?.startTimePlanned?.isNotEmpty ?? false)
-        ? _toMinutes(plan!.startTimePlanned!)
-        : null;
-    final planEnd = (plan?.estimatedEndTime?.isNotEmpty ?? false)
-        ? _toMinutes(plan!.estimatedEndTime!)
-        : null;
-
-    var startMinutes = planStart ??
-        (blockStarts.isNotEmpty
-            ? blockStarts.reduce((a, b) => a < b ? a : b)
-            : _currentMinutesOfDay);
-    var endMinutes = planEnd ??
-        (blockEnds.isNotEmpty
-            ? blockEnds.reduce((a, b) => a > b ? a : b)
-            : _currentMinutesOfDay + 60);
-
-    if (blockStarts.isNotEmpty) {
-      startMinutes = math.min(
-        startMinutes,
-        blockStarts.reduce((a, b) => a < b ? a : b),
-      );
-    }
-    if (blockEnds.isNotEmpty) {
-      endMinutes = math.max(
-        endMinutes,
-        blockEnds.reduce((a, b) => a > b ? a : b),
-      );
-    }
-
-    startMinutes = startMinutes.clamp(0, (24 * 60) - 1);
-    endMinutes = endMinutes.clamp(0, 24 * 60);
-    if (endMinutes <= startMinutes) {
-      endMinutes = math.min(24 * 60, startMinutes + 60);
-    }
-
-    return _TimelineBounds(
-      startMinutes: startMinutes,
-      endMinutes: endMinutes,
+    return const _TimelineBounds(
+      startMinutes: 0,
+      endMinutes: 24 * 60,
     );
   }
 
@@ -1029,20 +986,6 @@ class _TimelineViewState extends State<TimelineView> {
     final items = _buildTimelineItems(bounds);
     final bottomPadding = MediaQuery.of(context).padding.bottom + 96;
     final nowLabel = _formatCurrentTimeLabel();
-    final showCompactFutureDay = _isViewingFuture && widget.blocks.isEmpty;
-
-    if (showCompactFutureDay) {
-      return ListView(
-        padding: EdgeInsets.fromLTRB(0, 12, 0, bottomPadding),
-        children: [
-          _CompactFutureEmptyTimeline(
-            onAddTask: widget.onAddTask == null
-                ? null
-                : () => widget.onAddTask!(startMinutes: 0),
-          ),
-        ],
-      );
-    }
 
     if (items.isEmpty) {
       return Center(
@@ -1142,9 +1085,10 @@ class _TimelineViewState extends State<TimelineView> {
             leading: const SizedBox(width: 22),
             onTap: () => _onBlockTap(block),
             onLongPress: () => _onBlockLongPress(block),
-            onStatusTap: _isLockedBlock(block) || block.status == BlockStatus.done
-                ? null
-                : () => _markBlockDone(block),
+            onStatusTap:
+                _isLockedBlock(block) || block.status == BlockStatus.done
+                    ? null
+                    : () => _markBlockDone(block),
             pastFraction: _pastFractionForBlock(
               startMinutes: _toMinutes(block.plannedStartTime),
               endMinutes: _toMinutes(block.plannedEndTime),
@@ -1207,6 +1151,7 @@ class _TimelineBounds {
   });
 }
 
+// ignore: unused_element
 class _CompactFutureEmptyTimeline extends StatelessWidget {
   final VoidCallback? onAddTask;
 
@@ -1362,8 +1307,8 @@ class _CompactFutureEmptyTimeline extends StatelessWidget {
                               side: BorderSide(
                                 color: onSurface.withValues(alpha: 0.1),
                               ),
-                              backgroundColor:
-                                  theme.colorScheme.surface.withValues(alpha: 0.6),
+                              backgroundColor: theme.colorScheme.surface
+                                  .withValues(alpha: 0.6),
                             ),
                         ],
                       ),
@@ -1950,8 +1895,7 @@ class _BlockCard extends StatelessWidget {
     final isDone = block.status == BlockStatus.done;
     final isSplit = block.splitTotalParts != null && block.splitTotalParts! > 1;
     final neutralPillColor = theme.colorScheme.surface.withValues(alpha: 0.78);
-    final pillBorderColor =
-        onSurface.withValues(alpha: isDone ? 0.1 : 0.08);
+    final pillBorderColor = onSurface.withValues(alpha: isDone ? 0.1 : 0.08);
     final completedPillColor = accent.withValues(alpha: 0.16);
     final statusRingColor = isDone
         ? accent.withValues(alpha: 0.3)
@@ -1984,8 +1928,8 @@ class _BlockCard extends StatelessWidget {
         : _timelinePillHeight(plannedDuration);
     final double? nowIndicatorTop = nowLineOffset == null
         ? null
-        : (nowLineOffset! - 9)
-            .clamp(0.0, math.max(0.0, cardHeight - 20))
+        : (nowLineOffset! - (_kNowOverlayHeight / 2))
+            .clamp(0.0, math.max(0.0, cardHeight - _kNowOverlayHeight))
             .toDouble();
     final plannedMetaLabel =
         'Planned: ${_to12h(block.plannedStartTime)} - ${_to12h(block.plannedEndTime)}';
@@ -2191,48 +2135,65 @@ class _NowLineOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return IgnorePointer(
       child: SizedBox(
-        height: 20,
+        height: _kNowOverlayHeight,
         child: Stack(
           children: [
             Positioned(
               left: 0,
               right: 0,
-              top: 9,
+              top: (_kNowOverlayHeight / 2) - (_kNowLineThickness / 2),
               child: Container(
-                height: 2,
+                height: _kNowLineThickness,
                 color: _kTimelineAccent,
               ),
             ),
-            const Positioned(
+            Positioned(
               left: 0,
-              top: 6,
+              top: (_kNowOverlayHeight - _kNowDotSize) / 2,
               child: SizedBox(
-                width: 8,
-                height: 8,
+                width: _kNowDotSize,
+                height: _kNowDotSize,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: _kTimelineAccent,
                     shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: _kTimelineAccent.withValues(alpha: 0.3),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
             Positioned(
-              left: 14,
-              top: 0,
+              left: 16,
+              top: 1,
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: backgroundColor,
                   borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: _kTimelineAccent.withValues(alpha: 0.14),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   child: Text(
                     label,
                     style: const TextStyle(
                       color: _kTimelineAccent,
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -2522,8 +2483,8 @@ class _GapSlot extends StatelessWidget {
     );
     final double? nowIndicatorTop = nowLineOffset == null
         ? null
-        : (nowLineOffset! - 9)
-            .clamp(0.0, math.max(0.0, gapHeight - 20))
+        : (nowLineOffset! - (_kNowOverlayHeight / 2))
+            .clamp(0.0, math.max(0.0, gapHeight - _kNowOverlayHeight))
             .toDouble();
 
     return Padding(
@@ -2578,7 +2539,9 @@ class _GapSlot extends StatelessWidget {
                                     fontSize: 10,
                                     fontWeight: FontWeight.w500,
                                     color: timeLabelColor,
-                                    fontFeatures: [FontFeature.tabularFigures()],
+                                    fontFeatures: [
+                                      FontFeature.tabularFigures()
+                                    ],
                                   ),
                                 ),
                               );
@@ -2630,13 +2593,15 @@ class _GapSlot extends StatelessWidget {
                                 if (hasPastSection) ...[
                                   _GapHintRow(
                                     icon: Icons.edit_note_rounded,
-                                    iconColor: onSurface.withValues(alpha: 0.42),
+                                    iconColor:
+                                        onSurface.withValues(alpha: 0.42),
                                     child: Text(
                                       'What did you do here?',
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w600,
-                                        color: onSurface.withValues(alpha: 0.55),
+                                        color:
+                                            onSurface.withValues(alpha: 0.55),
                                       ),
                                     ),
                                   ),
@@ -2649,15 +2614,18 @@ class _GapSlot extends StatelessWidget {
                                       icon: Icon(
                                         Icons.add_rounded,
                                         size: 16,
-                                        color: onSurface.withValues(alpha: 0.56),
+                                        color:
+                                            onSurface.withValues(alpha: 0.56),
                                       ),
                                       label: 'Add Log',
                                       labelStyle: TextStyle(
-                                        color: onSurface.withValues(alpha: 0.72),
+                                        color:
+                                            onSurface.withValues(alpha: 0.72),
                                         fontWeight: FontWeight.w700,
                                       ),
                                       side: BorderSide(
-                                        color: onSurface.withValues(alpha: 0.14),
+                                        color:
+                                            onSurface.withValues(alpha: 0.14),
                                       ),
                                       backgroundColor: theme.colorScheme.surface
                                           .withValues(alpha: 0.54),
@@ -2683,14 +2651,15 @@ class _GapSlot extends StatelessWidget {
                                 if (hasFutureSection) ...[
                                   _GapHintRow(
                                     icon: Icons.access_time_outlined,
-                                    iconColor:
-                                        _kTimelineAccent.withValues(alpha: 0.88),
+                                    iconColor: _kTimelineAccent.withValues(
+                                        alpha: 0.88),
                                     child: RichText(
                                       text: TextSpan(
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w500,
-                                          color: onSurface.withValues(alpha: 0.72),
+                                          color:
+                                              onSurface.withValues(alpha: 0.72),
                                           height: 1.35,
                                         ),
                                         children: [
