@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
@@ -8,7 +9,6 @@ import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/screens/session/session_screen.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/services/notification_service.dart';
-import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart';
 import 'package:intl/intl.dart';
@@ -25,7 +25,6 @@ import 'track_now_screen.dart';
 import 'package:focusflow_mobile/screens/today_plan/timeline_view.dart';
 
 const Color _kTodayPlanAccent = Color(0xFFE8837A);
-const Color _kTodayPlanNightDot = Color(0xFF6CA6FF);
 
 class TodayPlanScreen extends StatefulWidget {
   const TodayPlanScreen({super.key});
@@ -563,6 +562,8 @@ class _TodayTimelineTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return NestedScrollView(
       headerSliverBuilder: (context, innerBoxIsScrolled) {
         return [
@@ -584,10 +585,19 @@ class _TodayTimelineTab extends StatelessWidget {
           ),
         ];
       },
-      body: TimelineView(
-        dateKey: dateKey,
-        blocks: blocks,
-        onAddTask: onAddTask,
+      body: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            color: theme.cardColor.withValues(alpha: 0.85),
+            child: TimelineView(
+              dateKey: dateKey,
+              blocks: blocks,
+              onAddTask: onAddTask,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -619,7 +629,7 @@ class _MoreTabViewState extends State<_MoreTabView>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
     return Column(
       children: [
         // Sub-tab bar
@@ -627,14 +637,10 @@ class _MoreTabViewState extends State<_MoreTabView>
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Container(
             decoration: BoxDecoration(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.06)
-                  : Colors.white.withValues(alpha: 0.72),
+              color: theme.cardColor.withValues(alpha: 0.85),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isDark
-                    ? DashboardColors.glassBorderDark
-                    : DashboardColors.glassBorderLight,
+                color: theme.dividerColor,
                 width: 0.5,
               ),
             ),
@@ -647,7 +653,7 @@ class _MoreTabViewState extends State<_MoreTabView>
               unselectedLabelStyle:
                   const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               indicator: BoxDecoration(
-                color: DashboardColors.primary.withValues(alpha: 0.12),
+                color: _kTodayPlanAccent.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
               tabs: const [
@@ -705,14 +711,6 @@ class _CelebrationOverlayState extends State<_CelebrationOverlay>
               vx: (_rng.nextDouble() - 0.5) * 0.6,
               vy: -0.5 - _rng.nextDouble() * 0.5,
               size: 4 + _rng.nextDouble() * 6,
-              color: [
-                const Color(0xFF6366F1),
-                const Color(0xFF10B981),
-                const Color(0xFFF59E0B),
-                const Color(0xFFEF4444),
-                const Color(0xFF8B5CF6),
-                const Color(0xFF3B82F6),
-              ][_rng.nextInt(6)],
             ));
   }
 
@@ -724,6 +722,17 @@ class _CelebrationOverlayState extends State<_CelebrationOverlay>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final particleColors = <Color>[
+      _kTodayPlanAccent,
+      cs.primary,
+      cs.secondary,
+      cs.onSurfaceVariant,
+      theme.disabledColor,
+      cs.primary.withValues(alpha: 0.7),
+    ];
+
     return AnimatedBuilder(
       animation: _ctrl,
       builder: (context, _) {
@@ -742,26 +751,25 @@ class _CelebrationOverlayState extends State<_CelebrationOverlay>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 24, vertical: 14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981),
+                        color: cs.primary,
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color:
-                                const Color(0xFF10B981).withValues(alpha: 0.3),
+                            color: cs.primary.withValues(alpha: 0.3),
                             blurRadius: 20,
                             spreadRadius: 4,
                           )
                         ],
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(Icons.check_circle_rounded,
-                              color: Colors.white, size: 24),
-                          SizedBox(width: 8),
+                              color: cs.onPrimary, size: 24),
+                          const SizedBox(width: 8),
                           Text('Block Complete! 🎉',
                               style: TextStyle(
-                                  color: Colors.white,
+                                  color: cs.onPrimary,
                                   fontWeight: FontWeight.w700,
                                   fontSize: 16)),
                         ],
@@ -774,6 +782,10 @@ class _CelebrationOverlayState extends State<_CelebrationOverlay>
                 final px = p.x + p.vx * t;
                 final py = p.y + p.vy * t + 0.5 * t * t;
                 final opacity = (1.0 - t).clamp(0.0, 1.0);
+                final particleColor = particleColors[
+                    ((p.size.round() + (p.x * 10).round()) %
+                            particleColors.length)
+                        .abs()];
                 return Positioned(
                   left: px * MediaQuery.of(context).size.width,
                   top: py * MediaQuery.of(context).size.height + 200,
@@ -782,8 +794,10 @@ class _CelebrationOverlayState extends State<_CelebrationOverlay>
                     child: Container(
                       width: p.size,
                       height: p.size,
-                      decoration:
-                          BoxDecoration(color: p.color, shape: BoxShape.circle),
+                      decoration: BoxDecoration(
+                        color: particleColor,
+                        shape: BoxShape.circle,
+                      ),
                     ),
                   ),
                 );
@@ -798,14 +812,12 @@ class _CelebrationOverlayState extends State<_CelebrationOverlay>
 
 class _Particle {
   final double x, y, vx, vy, size;
-  final Color color;
   const _Particle(
       {required this.x,
       required this.y,
       required this.vx,
       required this.vy,
-      required this.size,
-      required this.color});
+      required this.size});
 }
 
 // ── Compact Header ─────────────────────────────────────────────
@@ -1024,7 +1036,8 @@ class _WeekDayColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
 
     return InkWell(
       onTap: onTap,
@@ -1059,7 +1072,7 @@ class _WeekDayColumn extends StatelessWidget {
               child: Text(
                 DateFormat('d').format(date),
                 style: TextStyle(
-                  color: isSelected ? Colors.white : onSurface,
+                  color: isSelected ? theme.colorScheme.onPrimary : onSurface,
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                 ),
@@ -1076,7 +1089,7 @@ class _WeekDayColumn extends StatelessWidget {
                     const _WeekIndicatorDot(color: _kTodayPlanAccent),
                   if (hasBlocks && hasNightRoutine) const SizedBox(width: 4),
                   if (hasNightRoutine)
-                    const _WeekIndicatorDot(color: _kTodayPlanNightDot),
+                    _WeekIndicatorDot(color: theme.colorScheme.onSurfaceVariant),
                 ],
               ),
             ),

@@ -167,8 +167,39 @@ double _fontScale(String fontSize) {
 class AppTheme {
   AppTheme._();
 
-  static const Color _lightScaffoldBackground = Color(0xFFF2F2F7);
   static const Color _lightInputFillColor = Color(0xFFE8E8ED);
+  static const Map<String, String> _themeAliases = {
+    'blue': 'mint',
+    'cyan': 'ocean',
+    'emerald': 'forest',
+    'lime': 'milky',
+    'orange': 'crimson',
+    'pink': 'sunset',
+  };
+
+  static _ThemeDef _resolveTheme(String themeId) {
+    final resolvedId = _themeAliases[themeId] ?? themeId;
+    return _themes.firstWhere(
+      (t) => t.id == resolvedId,
+      orElse: () => _themes.first,
+    );
+  }
+
+  static ThemeData lightTheme(
+    String themeId,
+    String accentKey,
+    String fontSize,
+  ) {
+    return _buildTheme(themeId, false, accentKey, fontSize);
+  }
+
+  static ThemeData darkTheme(
+    String themeId,
+    String accentKey,
+    String fontSize,
+  ) {
+    return _buildTheme(themeId, true, accentKey, fontSize);
+  }
 
   /// Build a full ThemeData for the given settings.
   /// [themeId]   — one of the 12 theme IDs
@@ -181,14 +212,20 @@ class AppTheme {
     String accentKey,
     String fontSize,
   ) {
-    final def = _themes.firstWhere(
-      (t) => t.id == themeId,
-      orElse: () => _themes.first,
-    );
+    return _buildTheme(themeId, isDark, accentKey, fontSize);
+  }
+
+  static ThemeData _buildTheme(
+    String themeId,
+    bool isDark,
+    String accentKey,
+    String fontSize,
+  ) {
+    final def = _resolveTheme(themeId);
 
     final accent = AccentColors.get(accentKey);
     final scale = _fontScale(fontSize);
-    final bg = isDark ? def.darkBg : _lightScaffoldBackground;
+    final bg = isDark ? def.darkBg : def.lightBg;
     final surface = isDark ? def.darkSurface : def.lightSurface;
     final brightness = isDark ? Brightness.dark : Brightness.light;
 
@@ -298,23 +335,37 @@ class AppTheme {
         )
         .apply(fontFamily: 'SF Pro Display'); // Ensures it cascades correctly.
 
+    final colorScheme = isDark
+        ? ColorScheme.dark(
+            primary: accent,
+            secondary: accent.withValues(alpha: 0.7),
+            surface: surface,
+            surfaceContainerHighest: surface.withValues(alpha: 0.92),
+            onSurface: primaryText,
+            onSurfaceVariant: secondaryText,
+            error: const Color(0xFFF87171),
+          )
+        : ColorScheme.light(
+            primary: accent,
+            secondary: accent.withValues(alpha: 0.7),
+            surface: surface,
+            surfaceContainerHighest: surface.withValues(alpha: 0.92),
+            onSurface: primaryText,
+            onSurfaceVariant: secondaryText,
+            error: const Color(0xFFF87171),
+          );
+
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
       scaffoldBackgroundColor: bg,
+      canvasColor: bg,
+      cardColor: surface,
+      dividerColor: border,
+      disabledColor: secondaryText.withValues(alpha: 0.55),
       // Ensure ad-hoc TextStyle() calls also use SF Pro Display
       fontFamily: 'SF Pro Display',
-      colorScheme: ColorScheme(
-        brightness: brightness,
-        primary: accent,
-        onPrimary: Colors.white,
-        secondary: accent.withValues(alpha: 0.7),
-        onSecondary: Colors.white,
-        surface: surface,
-        onSurface: primaryText,
-        error: const Color(0xFFF87171),
-        onError: Colors.white,
-      ),
+      colorScheme: colorScheme,
       textTheme: textTheme,
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
@@ -457,12 +508,13 @@ class AppTheme {
   }
 
   /// List of all available theme IDs.
-  static List<String> get themeIds => _themes.map((t) => t.id).toList();
+  static List<String> get themeIds => {
+        ..._themes.map((t) => t.id),
+        ..._themeAliases.keys,
+      }.toList();
 
   /// Get the display name for a theme.
-  static String themeName(String themeId) => _themes
-      .firstWhere((t) => t.id == themeId, orElse: () => _themes.first)
-      .name;
+  static String themeName(String themeId) => _resolveTheme(themeId).name;
 
   /// List of all accent color keys.
   static List<String> get accentKeys => AccentColors.palette.keys.toList();

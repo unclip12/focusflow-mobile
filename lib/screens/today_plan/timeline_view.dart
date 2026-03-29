@@ -129,7 +129,6 @@ const double _kTimelinePillWidth = 56;
 const double _kTimelineContentGap = 14;
 const double _kTimelineStatusSize = 20;
 const Color _kTimelineAccent = Color(0xFFE8837A);
-const Color _kTimelineComplete = Color(0xFF10B981);
 const Color _kTimelineGapAccent = _kTimelineAccent;
 const double _kGapRowMinHeight = 80;
 const double _kGapRowHorizontalPadding = 16;
@@ -239,6 +238,7 @@ class _TimelineViewState extends State<TimelineView> {
   }
 
   // -- Category Colors -----------------------------------------
+  // ignore: unused_element
   static Color _categoryColor(Block block) {
     if (block.isEvent || block.id.startsWith('prayer_')) {
       return const Color(0xFFEF4444); // red — event
@@ -679,7 +679,7 @@ class _TimelineViewState extends State<TimelineView> {
 
   void _showLockedDetailSheet(Block block) {
     final cs = Theme.of(context).colorScheme;
-    final color = _categoryColor(block);
+    final color = _baseBlockColor(block);
     final duration =
         _toMinutes(block.plannedEndTime) - _toMinutes(block.plannedStartTime);
     final note = block.id.startsWith('prayer_')
@@ -1547,6 +1547,8 @@ class _BlockCard extends StatelessWidget {
     required Color plannedColor,
     required Color actualColor,
     required Color labelColor,
+    required Color actualLabelColor,
+    required Color checkIconColor,
     required String plannedLabel,
     required String actualLabel,
     required double plannedHeight,
@@ -1581,11 +1583,11 @@ class _BlockCard extends StatelessWidget {
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    color: _kTimelineAccent,
-                    fontFeatures: [FontFeature.tabularFigures()],
+                    color: actualLabelColor,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ),
@@ -1620,11 +1622,11 @@ class _BlockCard extends StatelessWidget {
                         color: actualColor,
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Center(
+                      child: Center(
                         child: Icon(
                           Icons.check_rounded,
                           size: 14,
-                          color: Colors.white,
+                          color: checkIconColor,
                         ),
                       ),
                     ),
@@ -1638,8 +1640,11 @@ class _BlockCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusIndicator(
-      {required bool isDone, required Color pillColor}) {
+  Widget _buildStatusIndicator({
+    required bool isDone,
+    required Color pillColor,
+    required Color doneColor,
+  }) {
     final indicator = Padding(
       padding: const EdgeInsets.only(top: 6),
       child: Container(
@@ -1647,7 +1652,7 @@ class _BlockCard extends StatelessWidget {
         height: _kTimelineStatusSize,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: isDone ? _kTimelineComplete : Colors.transparent,
+          color: isDone ? doneColor : Colors.transparent,
           border: isDone ? null : Border.all(color: pillColor, width: 2),
         ),
       ),
@@ -1666,6 +1671,9 @@ class _BlockCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
+    final onSurfaceVariant = theme.colorScheme.onSurfaceVariant;
+    final timeLabelColor =
+        theme.textTheme.bodySmall?.color ?? theme.colorScheme.onSurfaceVariant;
     final accent = _baseBlockColor(block);
     final startMin = _toMinutes(block.plannedStartTime);
     final endMin = _toMinutes(block.plannedEndTime);
@@ -1673,7 +1681,8 @@ class _BlockCard extends StatelessWidget {
         endMin > startMin ? endMin - startMin : block.plannedDurationMinutes;
     final isDone = block.status == BlockStatus.done;
     final isSplit = block.splitTotalParts != null && block.splitTotalParts! > 1;
-    final pillColor = isDone ? onSurface.withValues(alpha: 0.16) : accent;
+    final completedPillColor = theme.disabledColor;
+    final pillColor = isDone ? completedPillColor : accent;
     final startLabel = _to12hShort(block.plannedStartTime);
     final rangeLabel =
         '${_to12h(block.plannedStartTime)} - ${_to12h(block.plannedEndTime)}';
@@ -1744,7 +1753,7 @@ class _BlockCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: onSurface.withValues(alpha: 0.58),
+                          color: timeLabelColor,
                           fontFeatures: [FontFeature.tabularFigures()],
                         ),
                       ),
@@ -1754,10 +1763,11 @@ class _BlockCard extends StatelessWidget {
                   showDualTrack
                       ? _buildDualTrackPills(
                           cardHeight: cardHeight,
-                          plannedColor:
-                              const Color(0xFF8E8E93).withValues(alpha: 0.4),
-                          actualColor: accent,
+                          plannedColor: theme.dividerColor,
+                          actualColor: completedPillColor,
                           labelColor: onSurface.withValues(alpha: 0.52),
+                          actualLabelColor: onSurfaceVariant,
+                          checkIconColor: onSurface,
                           plannedLabel: _to12hShort(block.plannedEndTime),
                           actualLabel: _to12hShort(actualEndTime),
                           plannedHeight: plannedTrackHeight,
@@ -1766,7 +1776,8 @@ class _BlockCard extends StatelessWidget {
                       : _buildSinglePill(
                           height: cardHeight,
                           color: pillColor,
-                          iconColor: isDone ? onSurface : Colors.white,
+                          iconColor:
+                              isDone ? onSurface : theme.colorScheme.onPrimary,
                         ),
                   const SizedBox(width: _kTimelineContentGap),
                   Expanded(
@@ -1831,7 +1842,7 @@ class _BlockCard extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w500,
-                                color: onSurface.withValues(alpha: 0.6),
+                                color: timeLabelColor,
                                 fontFeatures: const [
                                   FontFeature.tabularFigures()
                                 ],
@@ -1853,7 +1864,11 @@ class _BlockCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  _buildStatusIndicator(isDone: isDone, pillColor: pillColor),
+                  _buildStatusIndicator(
+                    isDone: isDone,
+                    pillColor: pillColor,
+                    doneColor: completedPillColor,
+                  ),
                 ],
               ),
               if (pastFraction > 0)
@@ -2205,6 +2220,8 @@ class _GapSlot extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
+    final timeLabelColor =
+        theme.textTheme.bodySmall?.color ?? theme.colorScheme.onSurfaceVariant;
     final gapMinutes = endMinutes - startMinutes;
     final hasPastSection = showPastPrompt;
     final hasFutureSection = onAddTask != null;
@@ -2263,7 +2280,7 @@ class _GapSlot extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
-                                  color: onSurface.withValues(alpha: 0.58),
+                                  color: timeLabelColor,
                                   fontFeatures: [FontFeature.tabularFigures()],
                                 ),
                               ),
@@ -2282,7 +2299,7 @@ class _GapSlot extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w500,
-                                    color: onSurface.withValues(alpha: 0.45),
+                                    color: timeLabelColor,
                                     fontFeatures: [FontFeature.tabularFigures()],
                                   ),
                                 ),
@@ -2306,7 +2323,7 @@ class _GapSlot extends StatelessWidget {
                               gapHeight - (_kGapRowVerticalPadding * 2),
                             ),
                             painter: _DashedLinePainter(
-                              color: onSurface.withValues(alpha: 0.14),
+                              color: theme.dividerColor,
                             ),
                           ),
                         ),
@@ -2354,8 +2371,7 @@ class _GapSlot extends StatelessWidget {
                                   side: BorderSide(
                                     color: onSurface.withValues(alpha: 0.22),
                                   ),
-                                  backgroundColor:
-                                      theme.scaffoldBackgroundColor,
+                                  backgroundColor: theme.cardColor,
                                 ),
                               ],
                               if (hasFutureSection) ...[
@@ -2423,7 +2439,7 @@ class _GapSlot extends StatelessWidget {
                                 side: const BorderSide(
                                   color: _kTimelineGapAccent,
                                 ),
-                                backgroundColor: theme.scaffoldBackgroundColor,
+                                backgroundColor: theme.cardColor,
                               ),
                               const SizedBox(height: _kGapSectionBottomSpacing),
                             ],

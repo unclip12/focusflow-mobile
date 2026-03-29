@@ -13,16 +13,22 @@ class FocusFlowApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
+    final themeMode = settings.isDarkMode ? ThemeMode.dark : ThemeMode.light;
 
     return MaterialApp.router(
       title: 'FocusFlow',
       restorationScopeId: 'app',
-      theme: AppTheme.getTheme(
+      theme: AppTheme.lightTheme(
         settings.currentTheme,
-        settings.isDarkMode,
         settings.primaryColor,
         settings.fontSize,
       ),
+      darkTheme: AppTheme.darkTheme(
+        settings.currentTheme,
+        settings.primaryColor,
+        settings.fontSize,
+      ),
+      themeMode: themeMode,
       routerConfig: appRouter,
       debugShowCheckedModeBanner: false,
     );
