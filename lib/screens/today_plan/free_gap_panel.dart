@@ -317,7 +317,7 @@ class FreeGapPanel extends StatelessWidget {
       title: '${routine.icon} ${routine.name}',
       plannedDurationMinutes: durationMin,
       status: BlockStatus.notStarted,
-      actualNotes: 'source:routine',
+      actualNotes: app.routineBlockSource(routine.id),
     );
     final allBlocks = [...existingBlocks, block];
     final updatedPlan = existingPlan?.copyWith(blocks: allBlocks) ??

@@ -21,6 +21,7 @@ import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart';
 import 'block_editor_sheet.dart';
 import 'free_gap_panel.dart';
+import 'routine_runner_screen.dart';
 import 'study_session_screen.dart';
 
 // -- Helpers --------------------------------------------------
@@ -788,13 +789,17 @@ class _TimelineViewState extends State<TimelineView> {
     _showEditSheet(block);
   }
 
-  void _onBlockTap(Block block) {
+  Future<void> _onBlockTap(Block block) async {
     if (_isLockedBlock(block)) {
       _showLockedDetailSheet(block);
       return;
     }
+    if (_isRoutineBlock(block)) {
+      await _openRoutineBlock(block);
+      return;
+    }
     if (_opensStudySession(block)) {
-      Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => StudySessionScreen(block: block),
@@ -803,6 +808,83 @@ class _TimelineViewState extends State<TimelineView> {
       return;
     }
     _showEditSheet(block);
+  }
+
+  bool _isRoutineBlock(Block block) {
+    return context.read<AppProvider>().isRoutineBlock(block);
+  }
+
+  int _earlyRoutineStartMinutes(Block block) {
+    if (!_isViewingToday) return 0;
+    final plannedStartMinutes = _minutesFromTimeValue(block.plannedStartTime);
+    if (plannedStartMinutes == null) return 0;
+    final diff = plannedStartMinutes - _currentMinutesOfDay;
+    return diff > 0 ? diff : 0;
+  }
+
+  Future<bool> _confirmEarlyRoutineStart(int earlyMinutes) async {
+    final shouldStart = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Start Routine Early?'),
+        content: Text(
+          'You are $earlyMinutes minutes early. Do you want to start the routine now?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Start now'),
+          ),
+        ],
+      ),
+    );
+
+    return shouldStart ?? false;
+  }
+
+  Future<void> _openRoutineBlock(Block block) async {
+    final app = context.read<AppProvider>();
+    final routine = app.getRoutineForBlock(block);
+    if (routine == null) {
+      _showEditSheet(block);
+      return;
+    }
+
+    final latestLog = app.getLatestCompletedRoutineLog(routine.id, widget.dateKey);
+    if (latestLog != null) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => RoutineLogSummaryScreen(
+            routine: routine,
+            log: latestLog,
+            sourceBlockId: block.id,
+            showRerun: true,
+            onDone: () => Navigator.pop(context),
+          ),
+        ),
+      );
+      return;
+    }
+
+    final earlyMinutes = _earlyRoutineStartMinutes(block);
+    if (earlyMinutes > 0) {
+      final shouldStart = await _confirmEarlyRoutineStart(earlyMinutes);
+      if (!shouldStart || !mounted) return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RoutineRunnerScreen(
+          routine: routine,
+          dateKey: widget.dateKey,
+          sourceBlockId: block.id,
+        ),
+      ),
+    );
   }
 
   Future<void> _markBlockDone(Block block) async {

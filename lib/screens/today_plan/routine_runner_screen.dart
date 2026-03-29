@@ -1,26 +1,22 @@
-// =============================================================
-// RoutineRunnerScreen — Full-screen sequential task execution
-// Timer + step display + Done/Skip/Cancel controls
-// Records all timings to RoutineLog
-// =============================================================
-
 import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
-import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/routine.dart';
+import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
+import 'package:provider/provider.dart';
 
 class RoutineRunnerScreen extends StatefulWidget {
   final Routine routine;
   final String dateKey;
+  final String? sourceBlockId;
   final VoidCallback? onComplete;
 
   const RoutineRunnerScreen({
     super.key,
     required this.routine,
     required this.dateKey,
+    this.sourceBlockId,
     this.onComplete,
   });
 
@@ -29,38 +25,37 @@ class RoutineRunnerScreen extends StatefulWidget {
 }
 
 class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
-  int _currentStep = 0;
-  bool _finished = false;
-  Timer? _timer;
-  int _totalElapsed = 0; // seconds
-  int _stepElapsed = 0;
-  DateTime? _stepStartTime;
-  final _uuid = const Uuid();
-  final List<RoutineLogEntry> _entries = [];
-  late DateTime _startTime;
-
-  static const _motivations = [
-    'You got this! 💪',
-    'Keep going, champ! 🏆',
-    'One step at a time 🚀',
-    'Almost there! 🎯',
-    'Stay focused! 🔥',
-    'Great progress! ⭐',
-    'You\'re crushing it! 🌟',
+  static const _motivations = <String>[
+    'You got this.',
+    'Keep going.',
+    'One step at a time.',
+    'Almost there.',
+    'Stay focused.',
+    'Great progress.',
+    'Keep the momentum.',
   ];
+
+  int _currentStep = 0;
+  int _totalElapsed = 0;
+  int _stepElapsed = 0;
+  bool _isSaving = false;
+  Timer? _timer;
+  DateTime? _stepStartTime;
+  late DateTime _startTime;
+  RoutineLog? _completedLog;
+  final List<RoutineLogEntry> _entries = <RoutineLogEntry>[];
 
   @override
   void initState() {
     super.initState();
     _startTime = DateTime.now();
-    _stepStartTime = DateTime.now();
+    _stepStartTime = _startTime;
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!_finished && mounted) {
-        setState(() {
-          _totalElapsed++;
-          _stepElapsed++;
-        });
-      }
+      if (!mounted || _completedLog != null || _isSaving) return;
+      setState(() {
+        _totalElapsed++;
+        _stepElapsed++;
+      });
     });
   }
 
@@ -71,64 +66,71 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
   }
 
   void _markDone() {
+    if (_isSaving) return;
     HapticsService.medium();
-    _entries.add(RoutineLogEntry(
-      stepId: widget.routine.steps[_currentStep].id,
-      stepTitle: widget.routine.steps[_currentStep].title,
-      startTime: _stepStartTime!.toIso8601String(),
-      endTime: DateTime.now().toIso8601String(),
-      durationSeconds: _stepElapsed,
-      skipped: false,
-    ));
-    _nextStep();
+    _recordCurrentStep(skipped: false);
+    _advance();
   }
 
   void _skipStep() {
+    if (_isSaving) return;
     HapticsService.light();
-    _entries.add(RoutineLogEntry(
-      stepId: widget.routine.steps[_currentStep].id,
-      stepTitle: widget.routine.steps[_currentStep].title,
-      startTime: _stepStartTime!.toIso8601String(),
-      endTime: DateTime.now().toIso8601String(),
-      durationSeconds: _stepElapsed,
-      skipped: true,
-    ));
-    _nextStep();
+    _recordCurrentStep(skipped: true);
+    _advance();
   }
 
-  void _nextStep() {
+  void _recordCurrentStep({required bool skipped}) {
+    final step = widget.routine.steps[_currentStep];
+    _entries.add(
+      RoutineLogEntry(
+        stepId: step.id,
+        stepTitle: step.title,
+        startTime: (_stepStartTime ?? DateTime.now()).toIso8601String(),
+        endTime: DateTime.now().toIso8601String(),
+        durationSeconds: _stepElapsed,
+        skipped: skipped,
+      ),
+    );
+  }
+
+  void _advance() {
     if (_currentStep < widget.routine.steps.length - 1) {
       setState(() {
         _currentStep++;
         _stepElapsed = 0;
         _stepStartTime = DateTime.now();
       });
-    } else {
-      _completeRoutine();
+      return;
     }
+
+    unawaited(_completeRoutine());
   }
 
-  void _completeRoutine() {
+  Future<void> _completeRoutine() async {
+    if (_isSaving) return;
     HapticsService.heavy();
-    setState(() => _finished = true);
     _timer?.cancel();
+    setState(() => _isSaving = true);
 
-    final log = RoutineLog(
-      id: _uuid.v4(),
-      routineId: widget.routine.id,
-      routineName: widget.routine.name,
-      date: widget.dateKey,
-      startTime: _startTime.toIso8601String(),
-      endTime: DateTime.now().toIso8601String(),
+    final log = await context.read<AppProvider>().completeRoutineRun(
+      routine: widget.routine,
+      dateKey: widget.dateKey,
+      startedAt: _startTime,
+      completedAt: DateTime.now(),
       totalDurationSeconds: _totalElapsed,
-      entries: _entries,
-      completed: true,
+      entries: List<RoutineLogEntry>.from(_entries),
+      sourceBlockId: widget.sourceBlockId,
     );
-    context.read<AppProvider>().upsertRoutineLog(log);
+
+    if (!mounted) return;
+    setState(() {
+      _completedLog = log;
+      _isSaving = false;
+    });
   }
 
   void _cancelRoutine() {
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Cancel Routine?'),
@@ -143,29 +145,30 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
               Navigator.pop(ctx);
               Navigator.pop(context);
             },
-            child: const Text('Cancel', style: TextStyle(color: Colors.red)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
     );
   }
 
-  String _fmtTime(int seconds) {
-    final m = seconds ~/ 60;
-    final s = seconds % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  String _fmtTimer(int seconds) {
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final steps = widget.routine.steps;
-
-    if (_finished) {
-      return _SummaryScreen(
+    final completedLog = _completedLog;
+    if (completedLog != null) {
+      return RoutineLogSummaryScreen(
         routine: widget.routine,
-        entries: _entries,
-        totalSeconds: _totalElapsed,
+        log: completedLog,
+        sourceBlockId: widget.sourceBlockId,
         onDone: () {
           Navigator.pop(context);
           widget.onComplete?.call();
@@ -173,6 +176,8 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
       );
     }
 
+    final cs = Theme.of(context).colorScheme;
+    final steps = widget.routine.steps;
     final step = steps[_currentStep];
     final progress = (_currentStep + 1) / steps.length;
     final motivation = _motivations[_currentStep % _motivations.length];
@@ -182,13 +187,12 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // ── Header ────────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Row(
                 children: [
                   Text(widget.routine.icon, style: const TextStyle(fontSize: 24)),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       widget.routine.name,
@@ -200,14 +204,12 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
                     ),
                   ),
                   IconButton(
-                    onPressed: _cancelRoutine,
+                    onPressed: _isSaving ? null : _cancelRoutine,
                     icon: Icon(Icons.close_rounded, color: cs.error),
                   ),
                 ],
               ),
             ),
-
-            // ── Progress bar ──────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
@@ -239,37 +241,34 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
                     child: LinearProgressIndicator(
                       value: progress,
                       minHeight: 6,
-                      backgroundColor: cs.primary.withValues(alpha: 0.1),
-                      valueColor: AlwaysStoppedAnimation(cs.primary),
+                      backgroundColor: cs.primary.withValues(alpha: 0.12),
+                      valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
                     ),
                   ),
                 ],
               ),
             ),
-
-            // ── Main task display ─────────────────────────────
             Expanded(
               child: Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(32),
+                  padding: const EdgeInsets.all(28),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        width: 80,
-                        height: 80,
+                        width: 88,
+                        height: 88,
                         decoration: BoxDecoration(
                           color: Color(widget.routine.color).withValues(alpha: 0.15),
                           shape: BoxShape.circle,
                         ),
-                        child: Center(
-                          child: Text(
-                            '${_currentStep + 1}',
-                            style: TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w700,
-                              color: Color(widget.routine.color),
-                            ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${_currentStep + 1}',
+                          style: TextStyle(
+                            fontSize: 34,
+                            fontWeight: FontWeight.w800,
+                            color: Color(widget.routine.color),
                           ),
                         ),
                       ),
@@ -278,18 +277,18 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
                         step.title,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
                           color: cs.onSurface,
                         ),
                       ),
                       if (step.estimatedMinutes != null) ...[
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 10),
                         Text(
                           '~${step.estimatedMinutes} min estimated',
                           style: TextStyle(
                             fontSize: 14,
-                            color: cs.onSurface.withValues(alpha: 0.5),
+                            color: cs.onSurface.withValues(alpha: 0.55),
                           ),
                         ),
                       ],
@@ -298,8 +297,8 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
                         motivation,
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: cs.primary.withValues(alpha: 0.7),
+                          fontWeight: FontWeight.w600,
+                          color: cs.primary.withValues(alpha: 0.8),
                         ),
                       ),
                     ],
@@ -307,105 +306,76 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
                 ),
               ),
             ),
-
-            // ── Timer + Controls ──────────────────────────────
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
               decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Column(
                 children: [
-                  // Timers
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Column(
-                        children: [
-                          Text(
-                            'This step',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: cs.onSurface.withValues(alpha: 0.5),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _fmtTime(_stepElapsed),
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                              color: cs.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 24),
-                        width: 1,
-                        height: 40,
-                        color: cs.onSurface.withValues(alpha: 0.1),
-                      ),
-                      Column(
-                        children: [
-                          Text(
-                            'Total',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: cs.onSurface.withValues(alpha: 0.5),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _fmtTime(_totalElapsed),
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                              color: cs.onSurface.withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  // Buttons
                   Row(
                     children: [
                       Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _skipStep,
-                          icon: const Icon(Icons.skip_next_rounded, size: 20),
-                          label: const Text('Skip'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
+                        child: _TimerCard(
+                          label: 'This step',
+                          value: _fmtTimer(_stepElapsed),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        flex: 2,
-                        child: FilledButton.icon(
-                          onPressed: _markDone,
-                          icon: const Icon(Icons.check_rounded, size: 22),
-                          label: Text(
-                            _currentStep == steps.length - 1 ? 'Finish' : 'Done',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                          ),
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
+                        child: _TimerCard(
+                          label: 'Total',
+                          value: _fmtTimer(_totalElapsed),
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 18),
+                  if (_isSaving)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: CircularProgressIndicator(),
+                    )
+                  else
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _skipStep,
+                            icon: const Icon(Icons.skip_next_rounded, size: 18),
+                            label: const Text('Skip'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: _markDone,
+                            icon: Icon(
+                              _currentStep == steps.length - 1
+                                  ? Icons.task_alt_rounded
+                                  : Icons.check_rounded,
+                              size: 18,
+                            ),
+                            label: Text(
+                              _currentStep == steps.length - 1 ? 'Finish' : 'Done',
+                            ),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),
@@ -416,30 +386,46 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
   }
 }
 
-// ── Summary Screen ──────────────────────────────────────────────
-class _SummaryScreen extends StatelessWidget {
-  final Routine routine;
-  final List<RoutineLogEntry> entries;
-  final int totalSeconds;
+class RoutineLogSummaryScreen extends StatelessWidget {
+  final RoutineLog log;
+  final Routine? routine;
+  final String? sourceBlockId;
+  final bool showRerun;
   final VoidCallback onDone;
 
-  const _SummaryScreen({
-    required this.routine,
-    required this.entries,
-    required this.totalSeconds,
+  const RoutineLogSummaryScreen({
+    super.key,
+    required this.log,
+    this.routine,
+    this.sourceBlockId,
+    this.showRerun = false,
     required this.onDone,
   });
 
   String _fmt(int seconds) {
-    final m = seconds ~/ 60;
-    final s = seconds % 60;
-    if (m > 0) return '${m}m ${s}s';
-    return '${s}s';
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    if (minutes > 0) return '${minutes}m ${remainingSeconds}s';
+    return '${remainingSeconds}s';
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    Routine? resolvedRoutine = routine;
+    if (resolvedRoutine == null) {
+      final app = context.read<AppProvider>();
+      for (final candidate in app.routines) {
+        if (candidate.id == log.routineId) {
+          resolvedRoutine = candidate;
+          break;
+        }
+      }
+    }
+
+    final totalSeconds = log.totalDurationSeconds ?? 0;
+    final title = resolvedRoutine?.name ?? log.routineName;
+    final icon = resolvedRoutine?.icon ?? 'R';
 
     return Scaffold(
       backgroundColor: cs.surface,
@@ -447,10 +433,14 @@ class _SummaryScreen extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 40),
-            Icon(Icons.check_circle_rounded, size: 64, color: const Color(0xFF10B981)),
+            Icon(
+              Icons.check_circle_rounded,
+              size: 64,
+              color: const Color(0xFF10B981),
+            ),
             const SizedBox(height: 16),
             Text(
-              '${routine.name} Complete! 🎉',
+              '$icon $title Complete!',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
@@ -470,14 +460,14 @@ class _SummaryScreen extends StatelessWidget {
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: entries.length,
-                itemBuilder: (context, i) {
-                  final e = entries[i];
+                itemCount: log.entries.length,
+                itemBuilder: (context, index) {
+                  final entry = log.entries[index];
                   return Container(
                     margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: e.skipped
+                      color: entry.skipped
                           ? cs.errorContainer.withValues(alpha: 0.3)
                           : cs.primaryContainer.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(12),
@@ -488,37 +478,40 @@ class _SummaryScreen extends StatelessWidget {
                           width: 28,
                           height: 28,
                           decoration: BoxDecoration(
-                            color: e.skipped
+                            color: entry.skipped
                                 ? cs.error.withValues(alpha: 0.15)
                                 : const Color(0xFF10B981).withValues(alpha: 0.15),
                             shape: BoxShape.circle,
                           ),
-                          child: Center(
-                            child: Icon(
-                              e.skipped ? Icons.skip_next_rounded : Icons.check_rounded,
-                              size: 16,
-                              color: e.skipped ? cs.error : const Color(0xFF10B981),
-                            ),
+                          alignment: Alignment.center,
+                          child: Icon(
+                            entry.skipped
+                                ? Icons.skip_next_rounded
+                                : Icons.check_rounded,
+                            size: 16,
+                            color: entry.skipped ? cs.error : const Color(0xFF10B981),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            e.stepTitle,
+                            entry.stepTitle,
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: cs.onSurface,
-                              decoration: e.skipped ? TextDecoration.lineThrough : null,
+                              decoration: entry.skipped
+                                  ? TextDecoration.lineThrough
+                                  : null,
                             ),
                           ),
                         ),
                         Text(
-                          _fmt(e.durationSeconds ?? 0),
+                          _fmt(entry.durationSeconds ?? 0),
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            color: e.skipped ? cs.error : cs.primary,
+                            color: entry.skipped ? cs.error : cs.primary,
                           ),
                         ),
                       ],
@@ -529,22 +522,96 @@ class _SummaryScreen extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.all(20),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: onDone,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+              child: Row(
+                children: [
+                  if (showRerun && resolvedRoutine != null) ...[
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => RoutineRunnerScreen(
+                                routine: resolvedRoutine!,
+                                dateKey: log.date,
+                                sourceBlockId: sourceBlockId,
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.replay_rounded, size: 18),
+                        label: const Text('Rerun'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: onDone,
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: Text(showRerun ? 'Close' : 'Continue'),
                     ),
                   ),
-                  child: const Text('Continue', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                ),
+                ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _TimerCard extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _TimerCard({
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface.withValues(alpha: 0.55),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: cs.onSurface,
+            ),
+          ),
+        ],
       ),
     );
   }

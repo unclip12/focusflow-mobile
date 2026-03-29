@@ -382,8 +382,14 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     if (session == null) {
       app.startDaySession(_dateKey);
       await app.rescheduleFromNow(_dateKey);
-      session = app.getActiveDaySession(_dateKey);
     }
+
+    final firstBlockId = app.getFirstActionableBlockId(_dateKey);
+    if (firstBlockId != null) {
+      app.setCurrentBlock(_dateKey, firstBlockId);
+    }
+
+    session = app.getActiveDaySession(_dateKey);
 
     if (!mounted || session == null) return;
 

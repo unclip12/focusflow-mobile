@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/models/day_session.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
+import 'package:focusflow_mobile/screens/today_plan/routine_runner_screen.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 
 class DaySessionScreen extends StatefulWidget {
@@ -270,6 +271,30 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
     }
   }
 
+  Future<void> _startRoutineBlock(
+    AppProvider app,
+    Block block,
+  ) async {
+    final routine = app.getRoutineForBlock(block);
+    if (routine == null) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RoutineRunnerScreen(
+          routine: routine,
+          dateKey: widget.dateKey,
+          sourceBlockId: block.id,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    final nextBlockId = app.getFirstActionableBlockId(widget.dateKey);
+    if (nextBlockId != null) {
+      app.setCurrentBlock(widget.dateKey, nextBlockId);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
@@ -285,6 +310,9 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
     final progress = _progress(sessionBlocks);
     final completedCount = _completedCount(sessionBlocks);
     final allBlocksCompleted = _allBlocksCompleted(sessionBlocks);
+    final primaryRoutine =
+        primaryBlock == null ? null : app.getRoutineForBlock(primaryBlock);
+    final primaryIsRoutine = primaryRoutine != null;
     final theme = Theme.of(context);
     final primaryTextColor =
         theme.textTheme.bodyLarge?.color ?? theme.colorScheme.onSurface;
@@ -413,67 +441,39 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () async {
-                              await _skipCurrent(app, primaryBlock, sessionBlocks);
-                            },
-                            icon: const Icon(Icons.skip_next_rounded, size: 18),
-                            label: const Text('Skip'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: primaryTextColor,
-                              side: BorderSide(
-                                color: primaryTextColor.withValues(alpha: 0.14),
-                              ),
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          flex: 2,
-                          child: FilledButton.icon(
-                            onPressed: () async {
-                              await _completeCurrent(app, primaryBlock, sessionBlocks);
-                            },
-                            icon: const Icon(Icons.check_rounded, size: 20),
-                            label: const Text(
-                              'Done Early',
-                              style: TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: _accentColor,
-                              foregroundColor: Colors.black,
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                    if (primaryIsRoutine)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                await _skipCurrent(app, primaryBlock, sessionBlocks);
+                              },
+                              icon: const Icon(Icons.skip_next_rounded, size: 18),
+                              label: const Text('Skip'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: primaryTextColor,
+                                side: BorderSide(
+                                  color: primaryTextColor.withValues(alpha: 0.14),
+                                ),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        if (_elapsedSeconds >=
-                            primaryBlock.plannedDurationMinutes * 60) ...[
                           const SizedBox(width: 10),
                           Expanded(
                             flex: 2,
                             child: FilledButton.icon(
                               onPressed: () async {
-                                await _completeCurrent(
-                                  app,
-                                  primaryBlock,
-                                  sessionBlocks,
-                                );
+                                await _startRoutineBlock(app, primaryBlock);
                               },
-                              icon: const Icon(Icons.task_alt_rounded, size: 20),
+                              icon: const Icon(Icons.play_arrow_rounded, size: 20),
                               label: const Text(
-                                'Done',
+                                'Start Routine',
                                 style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                               style: FilledButton.styleFrom(
@@ -488,8 +488,85 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
                             ),
                           ),
                         ],
-                      ],
-                    ),
+                      )
+                    else
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                await _skipCurrent(app, primaryBlock, sessionBlocks);
+                              },
+                              icon: const Icon(Icons.skip_next_rounded, size: 18),
+                              label: const Text('Skip'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: primaryTextColor,
+                                side: BorderSide(
+                                  color: primaryTextColor.withValues(alpha: 0.14),
+                                ),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: FilledButton.icon(
+                              onPressed: () async {
+                                await _completeCurrent(app, primaryBlock, sessionBlocks);
+                              },
+                              icon: const Icon(Icons.check_rounded, size: 20),
+                              label: const Text(
+                                'Done Early',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: _accentColor,
+                                foregroundColor: Colors.black,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (_elapsedSeconds >=
+                              primaryBlock.plannedDurationMinutes * 60) ...[
+                            const SizedBox(width: 10),
+                            Expanded(
+                              flex: 2,
+                              child: FilledButton.icon(
+                                onPressed: () async {
+                                  await _completeCurrent(
+                                    app,
+                                    primaryBlock,
+                                    sessionBlocks,
+                                  );
+                                },
+                                icon: const Icon(Icons.task_alt_rounded, size: 20),
+                                label: const Text(
+                                  'Done',
+                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: _accentColor,
+                                  foregroundColor: Colors.black,
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                   ],
                 ),
               ),

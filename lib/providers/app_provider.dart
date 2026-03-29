@@ -869,6 +869,24 @@ class AppProvider extends ChangeNotifier {
     return _formatMinutesSinceMidnight(startMinutes + durationMinutes);
   }
 
+  String routineBlockSource(String routineId) => 'source:routine:$routineId';
+
+  String? routineIdFromBlock(Block block) {
+    if (block.id.startsWith('routine-')) {
+      return block.id.substring('routine-'.length);
+    }
+
+    final note = block.actualNotes?.trim();
+    if (note == null || note.isEmpty) return null;
+    if (note == 'source:routine') return null;
+    if (!note.startsWith('source:routine:')) return null;
+
+    final routineId = note.substring('source:routine:'.length).trim();
+    return routineId.isEmpty ? null : routineId;
+  }
+
+  bool isRoutineBlock(Block block) => routineIdFromBlock(block) != null;
+
   bool _isRoutineInjectedBlock(Block block) => block.id.startsWith('routine-');
 
   bool _isRecurringGeneratedBlock(Block block) =>
@@ -1074,7 +1092,7 @@ class AppProvider extends ChangeNotifier {
         type: BlockType.other,
         title: title,
         plannedDurationMinutes: plannedDurationMinutes,
-        actualNotes: 'source:routine',
+        actualNotes: routineBlockSource(routine.id),
       );
     }
 
@@ -1088,7 +1106,7 @@ class AppProvider extends ChangeNotifier {
       title: title,
       plannedDurationMinutes: plannedDurationMinutes,
       status: BlockStatus.notStarted,
-      actualNotes: 'source:routine',
+      actualNotes: routineBlockSource(routine.id),
     );
   }
 
@@ -1247,6 +1265,112 @@ class AppProvider extends ChangeNotifier {
 
   List<RoutineLog> getRoutineLogsForDate(String date) =>
       routineLogs.where((l) => l.date == date).toList();
+
+  Routine? getRoutineForBlock(Block block) {
+    final routineId = routineIdFromBlock(block);
+    if (routineId == null) return null;
+
+    try {
+      return routines.firstWhere((routine) => routine.id == routineId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  RoutineLog? getLatestCompletedRoutineLog(String routineId, String dateKey) {
+    final matches = routineLogs
+        .where((log) => log.routineId == routineId && log.date == dateKey)
+        .where((log) => log.completed)
+        .toList()
+      ..sort((a, b) {
+        final aTime = DateTime.tryParse(a.endTime ?? a.startTime) ??
+            DateTime.tryParse(a.startTime) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final bTime = DateTime.tryParse(b.endTime ?? b.startTime) ??
+            DateTime.tryParse(b.startTime) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return bTime.compareTo(aTime);
+      });
+
+    return matches.isEmpty ? null : matches.first;
+  }
+
+  String? _findRoutineBlockIdForDate(
+    String dateKey,
+    String routineId, {
+    bool onlyUnfinished = false,
+  }) {
+    final plan = getDayPlan(dateKey);
+    final blocks = plan?.blocks ?? const <Block>[];
+    for (final block in blocks) {
+      if (routineIdFromBlock(block) != routineId) continue;
+      if (onlyUnfinished &&
+          (block.status == BlockStatus.done ||
+              block.status == BlockStatus.skipped)) {
+        continue;
+      }
+      return block.id;
+    }
+    return null;
+  }
+
+  Future<RoutineLog> completeRoutineRun({
+    required Routine routine,
+    required String dateKey,
+    required DateTime startedAt,
+    required DateTime completedAt,
+    required int totalDurationSeconds,
+    required List<RoutineLogEntry> entries,
+    String? sourceBlockId,
+  }) async {
+    final log = RoutineLog(
+      id: _uuid.v4(),
+      routineId: routine.id,
+      routineName: routine.name,
+      date: dateKey,
+      startTime: startedAt.toIso8601String(),
+      endTime: completedAt.toIso8601String(),
+      totalDurationSeconds: totalDurationSeconds,
+      entries: entries,
+      completed: true,
+    );
+
+    String? targetBlockId = sourceBlockId;
+    if (targetBlockId == null || targetBlockId.isEmpty) {
+      targetBlockId = _findRoutineBlockIdForDate(
+        dateKey,
+        routine.id,
+        onlyUnfinished: true,
+      );
+    }
+
+    final plan = getDayPlan(dateKey);
+    final blocks = plan?.blocks;
+    if (targetBlockId != null &&
+        targetBlockId.isNotEmpty &&
+        plan != null &&
+        blocks != null) {
+      final idx = blocks.indexWhere((block) => block.id == targetBlockId);
+      if (idx >= 0) {
+        final updatedBlocks = List<Block>.from(blocks);
+        final block = updatedBlocks[idx];
+        updatedBlocks[idx] = block.copyWith(
+          actualStartTime: startedAt.toIso8601String(),
+          actualEndTime: completedAt.toIso8601String(),
+          actualDurationMinutes: (totalDurationSeconds / 60).ceil(),
+          status: BlockStatus.done,
+          completionStatus: 'COMPLETED',
+        );
+        await _saveDayPlan(plan.copyWith(blocks: updatedBlocks), notify: false);
+        await syncFlowActivitiesFromDayPlan(dateKey, notify: false);
+      }
+    }
+
+    await _db.upsertRoutineLog(log.toJson());
+    routineLogs.add(log);
+    notifyListeners();
+    return log;
+  }
 
   // ═══════════════════════════════════════════════════════════════
   // BUYING ITEMS (V6)
@@ -4208,6 +4332,27 @@ class AppProvider extends ChangeNotifier {
   final Map<String, DaySession> _daySessions = {};
 
   DaySession? getActiveDaySession(String dateKey) => _daySessions[dateKey];
+
+  String? getFirstActionableBlockId(String dateKey) {
+    final plan = getDayPlan(dateKey);
+    final blocks = List<Block>.from(plan?.blocks ?? const <Block>[]);
+    if (blocks.isEmpty) return null;
+
+    final actionableBlocks = blocks.where((block) {
+      return block.status != BlockStatus.done &&
+          block.status != BlockStatus.skipped &&
+          !(block.title.toLowerCase().contains('retroactive') ||
+              (block.description ?? '').toLowerCase().contains('retroactive'));
+    }).toList()
+      ..sort((a, b) {
+        final startCompare =
+            _toMinutes(a.plannedStartTime).compareTo(_toMinutes(b.plannedStartTime));
+        if (startCompare != 0) return startCompare;
+        return a.index.compareTo(b.index);
+      });
+
+    return actionableBlocks.isEmpty ? null : actionableBlocks.first.id;
+  }
 
   void startDaySession(String dateKey) {
     _daySessions[dateKey] = DaySession(

@@ -331,6 +331,7 @@ class _RoutineCard extends StatelessWidget {
     final endDateTime =
         startDateTime.add(Duration(minutes: plannedDurationMinutes));
     final timeFormat = DateFormat('HH:mm');
+    final app = context.read<AppProvider>();
 
     final block = Block(
       id: Uuid().v4(),
@@ -343,9 +344,9 @@ class _RoutineCard extends StatelessWidget {
       title: routine.name,
       isEvent: false,
       status: BlockStatus.notStarted,
+      actualNotes: app.routineBlockSource(routine.id),
     );
 
-    final app = context.read<AppProvider>();
     final existingPlan = app.getDayPlan(todayDateKey);
     final existingBlocks = List<Block>.from(existingPlan?.blocks ?? const []);
     final allBlocks = [
