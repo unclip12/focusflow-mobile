@@ -18,8 +18,8 @@ import 'free_gap_panel.dart';
 import 'study_session_screen.dart';
 
 // -- Helpers --------------------------------------------------
-typedef TimelineAddTaskCallback =
-    Future<void> Function({int? startMinutes, bool isEvent});
+typedef TimelineAddTaskCallback = Future<void> Function(
+    {int? startMinutes, bool isEvent});
 
 String _to12h(String hhmm) {
   final parts = hhmm.split(':');
@@ -54,6 +54,16 @@ String _formatGapDurationCompact(int minutes) {
   return '${m}m';
 }
 
+double _scaledTimelineHeight(int minutes) {
+  final safeMinutes = minutes < 0 ? 0 : minutes;
+  return safeMinutes * 1.2;
+}
+
+double _timelinePillHeight(int minutes) {
+  final scaledHeight = _scaledTimelineHeight(minutes);
+  return scaledHeight < 56.0 ? 56.0 : scaledHeight;
+}
+
 const double _kTimelineHandleWidth = 22;
 const double _kTimelineHandleGap = 6;
 const double _kTimelineLeadingWidth =
@@ -63,11 +73,7 @@ const double _kTimelineTimeToPillGap = 10;
 const double _kTimelinePillWidth = 56;
 const double _kTimelineContentGap = 14;
 const double _kTimelineStatusSize = 20;
-const Color _kTimelineCardBackground = Color(0xFF1C1C1E);
 const Color _kTimelineAccent = Color(0xFFE8837A);
-const Color _kTimelineMuted = Color(0xFF8E8E93);
-const Color _kTimelineDivider = Color(0xFF3A3A3C);
-const Color _kTimelineCompletedPill = Color(0xFF3A3A3C);
 const Color _kTimelineComplete = Color(0xFF10B981);
 const Color _kTimelineGapAccent = _kTimelineAccent;
 
@@ -203,9 +209,9 @@ class _TimelineViewState extends State<TimelineView> {
 
     for (var i = 0; i < endExclusive && i < items.length; i++) {
       final item = items[i];
-      if (!item.isGap && !_isLockedBlock(item.block!)) {
-        count++;
-      }
+      if (item.isGap || item.isWarning || item.block == null) continue;
+      if (_isLockedBlock(item.block!)) continue;
+      count++;
     }
 
     return count;
@@ -227,6 +233,10 @@ class _TimelineViewState extends State<TimelineView> {
         if (curStart > prevEnd && (curStart - prevEnd) >= 5) {
           items.add(_TimelineItem.gap(
               gapStartMinutes: prevEnd, gapEndMinutes: curStart));
+        } else if (curStart < prevEnd) {
+          items.add(
+            const _TimelineItem.warning('Tasks are overlapping'),
+          );
         }
       }
       items.add(_TimelineItem.block(block));
@@ -495,7 +505,12 @@ class _TimelineViewState extends State<TimelineView> {
     if (oldIndex < 0 || oldIndex >= items.length) return;
 
     final movedItem = items[oldIndex];
-    if (movedItem.isGap || _isLockedBlock(movedItem.block!)) return;
+    if (movedItem.isGap ||
+        movedItem.isWarning ||
+        movedItem.block == null ||
+        _isLockedBlock(movedItem.block!)) {
+      return;
+    }
 
     final app = context.read<AppProvider>();
     final plan = app.getDayPlan(widget.dateKey);
@@ -503,7 +518,13 @@ class _TimelineViewState extends State<TimelineView> {
     if (plan == null || planBlocks == null) return;
 
     final movableBlocks = items
-        .where((item) => !item.isGap && !_isLockedBlock(item.block!))
+        .where(
+          (item) =>
+              !item.isGap &&
+              !item.isWarning &&
+              item.block != null &&
+              !_isLockedBlock(item.block!),
+        )
         .map((item) => item.block!)
         .toList();
     if (movableBlocks.length < 2) return;
@@ -567,17 +588,16 @@ class _TimelineViewState extends State<TimelineView> {
   }
 
   @override
-  @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
     final items = _buildTimelineItems();
     final bottomPadding = MediaQuery.of(context).padding.bottom + 96;
 
     return Container(
       clipBehavior: Clip.antiAlias,
-      decoration: const BoxDecoration(
-        color: _kTimelineCardBackground,
+      decoration: BoxDecoration(
+        color: theme.cardColor,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
@@ -589,7 +609,7 @@ class _TimelineViewState extends State<TimelineView> {
                 width: 42,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: _kTimelineDivider,
+                  color: onSurface.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -604,15 +624,15 @@ class _TimelineViewState extends State<TimelineView> {
                         Icon(
                           Icons.timeline_rounded,
                           size: 48,
-                          color: Colors.white.withValues(alpha: 0.24),
+                          color: onSurface.withValues(alpha: 0.24),
                         ),
                         const SizedBox(height: 12),
-                        const Text(
+                        Text(
                           'No blocks scheduled',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                            color: onSurface,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -620,7 +640,7 @@ class _TimelineViewState extends State<TimelineView> {
                           'Add tasks or start your day to build the timeline',
                           style: TextStyle(
                             fontSize: 13,
-                            color: cs.onSurface.withValues(alpha: 0.45),
+                            color: onSurface.withValues(alpha: 0.55),
                           ),
                         ),
                       ],
@@ -648,21 +668,25 @@ class _TimelineViewState extends State<TimelineView> {
                                 : () => widget.onAddTask!(
                                       startMinutes: item.gapStartMinutes,
                                     ),
-                            isDark: isDark,
+                          ),
+                        );
+                      }
+                      if (item.isWarning) {
+                        return KeyedSubtree(
+                          key: ValueKey('warning_${item.warningText}_$index'),
+                          child: _OverlapWarningRow(
+                            message:
+                                item.warningText ?? 'Tasks are overlapping',
                           ),
                         );
                       }
                       final block = item.block!;
-                      final isLocked = _isLockedBlock(block);
 
                       return KeyedSubtree(
                         key: ValueKey(block.id),
                         child: _BlockCard(
                           block: block,
-                          isDark: isDark,
-                          leading: isLocked
-                              ? const SizedBox(width: 22)
-                              : const SizedBox(width: 22),
+                          leading: const SizedBox(width: 22),
                           onTap: () => _onBlockTap(block),
                           onLongPress: () => _onBlockLongPress(block),
                         ),
@@ -682,11 +706,15 @@ class _TimelineItem {
   final int? gapStartMinutes;
   final int? gapEndMinutes;
   final bool isGap;
+  final bool isWarning;
+  final String? warningText;
 
   const _TimelineItem._(
       {this.block,
       this.gapStartMinutes,
       this.gapEndMinutes,
+      this.warningText,
+      this.isWarning = false,
       required this.isGap});
   factory _TimelineItem.block(Block b) =>
       _TimelineItem._(block: b, isGap: false);
@@ -696,20 +724,24 @@ class _TimelineItem {
           gapStartMinutes: gapStartMinutes,
           gapEndMinutes: gapEndMinutes,
           isGap: true);
+  const _TimelineItem.warning(String message)
+      : this._(
+          isGap: false,
+          isWarning: true,
+          warningText: message,
+        );
 }
 
 // -- Block Card ----------------------------------------------------
 /*
 class _BlockCard extends StatelessWidget {
   final Block block;
-  final bool isDark;
   final Widget? leading;
   final VoidCallback? onLongPress;
   final VoidCallback? onTap;
 
   const _BlockCard({
     required this.block,
-    required this.isDark,
     this.leading,
     this.onTap,
     this.onLongPress,
@@ -954,14 +986,12 @@ class _BlockCard extends StatelessWidget {
 
 class _BlockCard extends StatelessWidget {
   final Block block;
-  final bool isDark;
   final Widget? leading;
   final VoidCallback? onLongPress;
   final VoidCallback? onTap;
 
   const _BlockCard({
     required this.block,
-    required this.isDark,
     this.leading,
     this.onTap,
     this.onLongPress,
@@ -1011,15 +1041,17 @@ class _BlockCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
     final accent = _baseBlockColor(block);
     final startMin = _toMinutes(block.plannedStartTime);
     final endMin = _toMinutes(block.plannedEndTime);
     final duration =
         endMin > startMin ? endMin - startMin : block.plannedDurationMinutes;
-    final cardHeight = (duration * 2.0).clamp(64.0, double.infinity).toDouble();
+    final cardHeight = _timelinePillHeight(duration);
     final isDone = block.status == BlockStatus.done;
     final isSplit = block.splitTotalParts != null && block.splitTotalParts! > 1;
-    final pillColor = isDone ? _kTimelineCompletedPill : accent;
+    final pillColor = isDone ? onSurface.withValues(alpha: 0.16) : accent;
     final startLabel = _to12hShort(block.plannedStartTime);
     final rangeLabel =
         '${_to12h(block.plannedStartTime)} - ${_to12h(block.plannedEndTime)}';
@@ -1052,10 +1084,10 @@ class _BlockCard extends StatelessWidget {
                   child: Text(
                     startLabel,
                     textAlign: TextAlign.right,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: _kTimelineMuted,
+                      color: onSurface.withValues(alpha: 0.58),
                       fontFeatures: [FontFeature.tabularFigures()],
                     ),
                   ),
@@ -1075,7 +1107,7 @@ class _BlockCard extends StatelessWidget {
                     child: Icon(
                       _iconForBlock(),
                       size: 24,
-                      color: Colors.white,
+                      color: isDone ? onSurface : Colors.white,
                     ),
                   ),
                 ),
@@ -1094,8 +1126,8 @@ class _BlockCard extends StatelessWidget {
                           height: 1.12,
                           fontWeight: FontWeight.w700,
                           color: isDone
-                              ? Colors.white.withValues(alpha: 0.72)
-                              : Colors.white,
+                              ? onSurface.withValues(alpha: 0.68)
+                              : onSurface,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -1103,10 +1135,10 @@ class _BlockCard extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         rangeLabel,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
-                          color: _kTimelineMuted,
+                          color: onSurface.withValues(alpha: 0.6),
                           fontFeatures: [FontFeature.tabularFigures()],
                         ),
                       ),
@@ -1114,10 +1146,10 @@ class _BlockCard extends StatelessWidget {
                         const SizedBox(height: 8),
                         Text(
                           'Part ${block.splitPartIndex} of ${block.splitTotalParts}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: _kTimelineMuted,
+                            color: onSurface.withValues(alpha: 0.6),
                           ),
                         ),
                       ],
@@ -1142,6 +1174,53 @@ class _BlockCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _OverlapWarningRow extends StatelessWidget {
+  final String message;
+
+  const _OverlapWarningRow({
+    required this.message,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: _kTimelineLeadingWidth +
+                _kTimelineTimeWidth +
+                _kTimelineTimeToPillGap +
+                _kTimelinePillWidth +
+                _kTimelineContentGap,
+          ),
+          Expanded(
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  size: 14,
+                  color: _kTimelineAccent,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  message,
+                  style: const TextStyle(
+                    color: _kTimelineAccent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: _kTimelineStatusSize + 10),
+        ],
       ),
     );
   }
@@ -1329,21 +1408,21 @@ class _GapSlot extends StatelessWidget {
   final int endMinutes;
   final VoidCallback onTap;
   final VoidCallback? onAddTask;
-  final bool isDark;
 
   const _GapSlot({
     required this.startMinutes,
     required this.endMinutes,
     required this.onTap,
-    required this.isDark,
     this.onAddTask,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
     final gapMinutes = endMinutes - startMinutes;
-    final gapHeight =
-        (gapMinutes * 2.0).clamp(78.0, double.infinity).toDouble();
+    final scaledGapHeight = _scaledTimelineHeight(gapMinutes);
+    final gapHeight = scaledGapHeight < 56.0 ? 56.0 : scaledGapHeight;
 
     final hourTicks = <int>[];
     final firstHourInGap = (startMinutes ~/ 60) * 60 + 60;
@@ -1376,10 +1455,10 @@ class _GapSlot extends StatelessWidget {
                       child: Text(
                         startLabel,
                         textAlign: TextAlign.right,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: _kTimelineMuted,
+                          color: onSurface.withValues(alpha: 0.58),
                           fontFeatures: [FontFeature.tabularFigures()],
                         ),
                       ),
@@ -1393,10 +1472,10 @@ class _GapSlot extends StatelessWidget {
                         child: Text(
                           _to12hShort(_minutesToHHMM(tick)),
                           textAlign: TextAlign.right,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w500,
-                            color: _kTimelineMuted,
+                            color: onSurface.withValues(alpha: 0.45),
                             fontFeatures: [FontFeature.tabularFigures()],
                           ),
                         ),
@@ -1412,7 +1491,9 @@ class _GapSlot extends StatelessWidget {
                 child: Center(
                   child: CustomPaint(
                     size: Size(2, gapHeight),
-                    painter: const _DashedLinePainter(color: _kTimelineDivider),
+                    painter: _DashedLinePainter(
+                      color: onSurface.withValues(alpha: 0.14),
+                    ),
                   ),
                 ),
               ),
@@ -1429,16 +1510,16 @@ class _GapSlot extends StatelessWidget {
                           const Icon(
                             Icons.access_time_outlined,
                             size: 15,
-                            color: _kTimelineMuted,
+                            color: _kTimelineAccent,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: RichText(
                               text: TextSpan(
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
-                                  color: _kTimelineMuted,
+                                  color: onSurface.withValues(alpha: 0.6),
                                   height: 1.35,
                                 ),
                                 children: [
@@ -1480,7 +1561,7 @@ class _GapSlot extends StatelessWidget {
                           ),
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           visualDensity: VisualDensity.compact,
-                          backgroundColor: _kTimelineCardBackground,
+                          backgroundColor: theme.scaffoldBackgroundColor,
                           side: const BorderSide(color: _kTimelineGapAccent),
                           shape: const StadiumBorder(),
                         ),
