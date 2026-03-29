@@ -1,10 +1,10 @@
-// =============================================================
+﻿// =============================================================
 // TimelineView — scrollable timeline with:
 //   • 12-hour AM/PM time labels
 //   • Proportional block heights (1 min = 2 px)
 //   • Hourly ticks in free gaps
-//   • TAP any block → edit sheet (or detail sheet for locked blocks)
-//   • LONG-PRESS non-locked block → drag to reorder → start times cascade
+//   • TAP any block ? edit sheet (or detail sheet for locked blocks)
+//   • LONG-PRESS non-locked block ? drag to reorder ? start times cascade
 // =============================================================
 
 import 'package:flutter/material.dart';
@@ -16,7 +16,7 @@ import 'package:focusflow_mobile/utils/constants.dart';
 import 'block_editor_sheet.dart';
 import 'free_gap_panel.dart';
 
-// ── Helpers ──────────────────────────────────────────────────
+// -- Helpers --------------------------------------------------
 String _to12h(String hhmm) {
   final parts = hhmm.split(':');
   if (parts.length != 2) return hhmm;
@@ -59,27 +59,23 @@ const double _kTimelineTimeToPillGap = 10;
 const double _kTimelinePillWidth = 56;
 const double _kTimelineContentGap = 14;
 const double _kTimelineStatusSize = 20;
-const Color _kTimelinePillColor = Color(0xFF414248);
-const Color _kTimelineGapAccent = Color(0xFFFF8E88);
+const Color _kTimelineCardBackground = Color(0xFF1C1C1E);
+const Color _kTimelineAccent = Color(0xFFE8837A);
+const Color _kTimelineMuted = Color(0xFF8E8E93);
+const Color _kTimelineDivider = Color(0xFF3A3A3C);
+const Color _kTimelineCompletedPill = Color(0xFF3A3A3C);
+const Color _kTimelineComplete = Color(0xFF10B981);
+const Color _kTimelineGapAccent = _kTimelineAccent;
 
-// ── Category helpers ────────────────────────────────────────────
-Color _categoryColor(Block block) {
-  if (block.isEvent || block.id.startsWith('prayer_')) return const Color(0xFFEF4444);
-  switch (block.type) {
-    case BlockType.studySession:
-    case BlockType.revisionFa:
-    case BlockType.fmgeRevision:
-      return const Color(0xFF3B82F6);
-    case BlockType.video: return const Color(0xFFF59E0B);
-    case BlockType.qbank: return const Color(0xFF10B981);
-    case BlockType.anki: return const Color(0xFF8B5CF6);
-    case BlockType.breakBlock: return const Color(0xFF94A3B8);
-    case BlockType.other:
-      if (block.title.contains('🕌') || block.id.startsWith('prayer_')) return const Color(0xFF0D9488);
-      return const Color(0xFF8B5CF6);
-    default: return const Color(0xFF8B5CF6);
-  }
+Color _colorFromHex(String? value, {Color fallback = _kTimelineAccent}) {
+  if (value == null || value.trim().isEmpty) return fallback;
+  final cleaned = value.trim().replaceFirst('#', '');
+  final normalized = cleaned.length == 6 ? 'FF$cleaned' : cleaned;
+  final parsed = int.tryParse(normalized, radix: 16);
+  return parsed == null ? fallback : Color(parsed);
 }
+
+Color _baseBlockColor(Block block) => _colorFromHex(block.colorHex);
 
 String _categoryLabel(Block block) {
   if (block.id.startsWith('prayer_')) return 'Prayer';
@@ -94,12 +90,12 @@ String _categoryLabel(Block block) {
     case BlockType.anki: return 'Anki';
     case BlockType.breakBlock: return 'Break';
     default:
-      if (block.title.contains('🕌')) return 'Prayer';
+      if (block.title.contains('??')) return 'Prayer';
       return 'General';
   }
 }
 
-// ── Widget ────────────────────────────────────────────────────
+// -- Widget ----------------------------------------------------
 class TimelineView extends StatefulWidget {
   final List<Block> blocks;
   final String dateKey;
@@ -120,7 +116,7 @@ class _TimelineViewState extends State<TimelineView> {
   bool _isLockedBlock(Block block) =>
       block.isEvent || block.id.startsWith('prayer_');
 
-  // ── Category Colors ─────────────────────────────────────────
+  // -- Category Colors -----------------------------------------
   static Color _categoryColor(Block block) {
     if (block.isEvent || block.id.startsWith('prayer_')) {
       return const Color(0xFFEF4444); // red — event
@@ -135,7 +131,7 @@ class _TimelineViewState extends State<TimelineView> {
       case BlockType.breakBlock:
         return const Color(0xFF94A3B8); // grey — break
       case BlockType.other:
-        if (block.title.contains('🕌') || block.id.startsWith('prayer_')) {
+        if (block.title.contains('??') || block.id.startsWith('prayer_')) {
           return const Color(0xFF0D9488); // teal — prayer
         }
         return const Color(0xFF8B5CF6); // purple — general
@@ -220,7 +216,7 @@ class _TimelineViewState extends State<TimelineView> {
     return items;
   }
 
-  // ── Gap tap ──────────────────────────────────────────────
+  // -- Gap tap ----------------------------------------------
   void _onGapTap(_TimelineItem gap) {
     final startH = gap.gapStartMinutes! ~/ 60;
     final startM = gap.gapStartMinutes! % 60;
@@ -540,80 +536,112 @@ class _TimelineViewState extends State<TimelineView> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final items = _buildTimelineItems();
+    final bottomPadding = MediaQuery.of(context).padding.bottom + 96;
 
-    if (items.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.timeline_rounded, size: 48, color: cs.primary.withValues(alpha: 0.25)),
-            const SizedBox(height: 12),
-            Text('No blocks scheduled',
-                style: TextStyle(fontSize: 15, color: cs.onSurface.withValues(alpha: 0.5))),
-            const SizedBox(height: 4),
-            Text('Add tasks or start your day to build the timeline',
-                style: TextStyle(fontSize: 13, color: cs.onSurface.withValues(alpha: 0.35))),
-          ],
-        ),
-      );
-    }
-
-    return ReorderableListView.builder(
-      buildDefaultDragHandles: false,
-      padding: EdgeInsets.fromLTRB(
-        0,
-        8,
-        0,
-        MediaQuery.of(context).padding.bottom + 72 + 24,
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: const BoxDecoration(
+        color: _kTimelineCardBackground,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      itemCount: items.length,
-      onReorder: (oldIndex, newIndex) => _onReorder(oldIndex, newIndex, items),
-      itemBuilder: (context, index) {
-        final item = items[index];
-        if (item.isGap) {
-          return KeyedSubtree(
-            key: ValueKey('gap_${item.gapStartMinutes}_${item.gapEndMinutes}'),
-            child: _GapSlot(
-              startMinutes: item.gapStartMinutes!,
-              endMinutes: item.gapEndMinutes!,
-              onTap: () => _onGapTap(item),
-              onAddTask: widget.onAddTask,
-              isDark: isDark,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 6),
+            child: Center(
+              child: Container(
+                width: 42,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: _kTimelineDivider,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
             ),
-          );
-        }
-        final block = item.block!;
-        final isLocked = _isLockedBlock(block);
-
-        return KeyedSubtree(
-          key: ValueKey(block.id),
-          child: _BlockCard(
-            block: block,
-            isDark: isDark,
-            leading: isLocked
-                ? const SizedBox(width: 22)
-                : ReorderableDragStartListener(
-                    index: index,
-                    child: Icon(
-                      Icons.drag_handle_rounded,
-                      size: 18,
-                      color: cs.onSurface.withValues(alpha: 0.35),
-                    ),
-                  ),
-            onTap: () => _onBlockTap(block),
-            onLongPress: () => _onBlockLongPress(block),
           ),
-        );
-      },
+          Expanded(
+            child: items.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.timeline_rounded,
+                          size: 48,
+                          color: Colors.white.withValues(alpha: 0.24),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'No blocks scheduled',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Add tasks or start your day to build the timeline',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: cs.onSurface.withValues(alpha: 0.45),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ReorderableListView.builder(
+                    buildDefaultDragHandles: false,
+                    padding: EdgeInsets.fromLTRB(0, 8, 0, bottomPadding),
+                    itemCount: items.length,
+                    onReorder: (oldIndex, newIndex) =>
+                        _onReorder(oldIndex, newIndex, items),
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      if (item.isGap) {
+                        return KeyedSubtree(
+                          key: ValueKey(
+                            'gap_${item.gapStartMinutes}_${item.gapEndMinutes}',
+                          ),
+                          child: _GapSlot(
+                            startMinutes: item.gapStartMinutes!,
+                            endMinutes: item.gapEndMinutes!,
+                            onTap: () => _onGapTap(item),
+                            onAddTask: widget.onAddTask,
+                            isDark: isDark,
+                          ),
+                        );
+                      }
+                      final block = item.block!;
+                      final isLocked = _isLockedBlock(block);
+
+                      return KeyedSubtree(
+                        key: ValueKey(block.id),
+                        child: _BlockCard(
+                          block: block,
+                          isDark: isDark,
+                          leading: isLocked
+                              ? const SizedBox(width: 22)
+                              : const SizedBox(width: 22),
+                          onTap: () => _onBlockTap(block),
+                          onLongPress: () => _onBlockLongPress(block),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-// ── Timeline Item ──────────────────────────────────────────────────
+// -- Timeline Item --------------------------------------------------
 class _TimelineItem {
   final Block? block;
   final int? gapStartMinutes;
@@ -626,7 +654,7 @@ class _TimelineItem {
       _TimelineItem._(gapStartMinutes: gapStartMinutes, gapEndMinutes: gapEndMinutes, isGap: true);
 }
 
-// ── Block Card ────────────────────────────────────────────────────
+// -- Block Card ----------------------------------------------------
 /*
 class _BlockCard extends StatelessWidget {
   final Block block;
@@ -739,7 +767,7 @@ class _BlockCard extends StatelessWidget {
             ),
             const SizedBox(width: _kTimelineHandleGap),
           ],
-          // ── Time Column ──
+          // -- Time Column --
           SizedBox(
             width: _kTimelineTimeWidth,
             child: Padding(
@@ -877,7 +905,7 @@ class _BlockCard extends StatelessWidget {
   }
 }
 
-// ── Gap Slot ──────────────────────────────────────────────────────
+// -- Gap Slot ------------------------------------------------------
 */
 
 class _BlockCard extends StatelessWidget {
@@ -899,20 +927,6 @@ class _BlockCard extends StatelessWidget {
     final parts = hhmm.split(':');
     if (parts.length != 2) return 0;
     return (int.tryParse(parts[0]) ?? 0) * 60 + (int.tryParse(parts[1]) ?? 0);
-  }
-
-  Color _statusRingColor(ColorScheme cs, Color accent) {
-    switch (block.status) {
-      case BlockStatus.done:
-        return const Color(0xFF10B981);
-      case BlockStatus.skipped:
-        return cs.onSurface.withValues(alpha: 0.28);
-      case BlockStatus.paused:
-        return const Color(0xFFF59E0B);
-      case BlockStatus.inProgress:
-      case BlockStatus.notStarted:
-        return accent;
-    }
   }
 
   IconData _iconForBlock() {
@@ -953,8 +967,7 @@ class _BlockCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final accent = _categoryColor(block);
+    final accent = _baseBlockColor(block);
     final startMin = _toMinutes(block.plannedStartTime);
     final endMin = _toMinutes(block.plannedEndTime);
     final duration =
@@ -963,7 +976,7 @@ class _BlockCard extends StatelessWidget {
         (duration * 2.0).clamp(64.0, double.infinity).toDouble();
     final isDone = block.status == BlockStatus.done;
     final isSplit = block.splitTotalParts != null && block.splitTotalParts! > 1;
-    final ringColor = _statusRingColor(cs, accent);
+    final pillColor = isDone ? _kTimelineCompletedPill : accent;
     final startLabel = _to12hShort(block.plannedStartTime);
     final rangeLabel =
         '${_to12h(block.plannedStartTime)} - ${_to12h(block.plannedEndTime)}';
@@ -996,11 +1009,11 @@ class _BlockCard extends StatelessWidget {
                   child: Text(
                     startLabel,
                     textAlign: TextAlign.right,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: cs.onSurface.withValues(alpha: 0.45),
-                      fontFeatures: const [FontFeature.tabularFigures()],
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _kTimelineMuted,
+                      fontFeatures: [FontFeature.tabularFigures()],
                     ),
                   ),
                 ),
@@ -1010,11 +1023,8 @@ class _BlockCard extends StatelessWidget {
                 width: _kTimelinePillWidth,
                 height: cardHeight,
                 decoration: BoxDecoration(
-                  color: _kTimelinePillColor,
+                  color: pillColor,
                   borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: isDark ? 0.08 : 0.18),
-                  ),
                 ),
                 child: Center(
                   child: Tooltip(
@@ -1022,7 +1032,7 @@ class _BlockCard extends StatelessWidget {
                     child: Icon(
                       _iconForBlock(),
                       size: 24,
-                      color: accent,
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -1037,13 +1047,12 @@ class _BlockCard extends StatelessWidget {
                       Text(
                         block.title,
                         style: TextStyle(
-                          fontSize: 22,
-                          height: 1.05,
+                          fontSize: 17,
+                          height: 1.12,
                           fontWeight: FontWeight.w700,
                           color: isDone
-                              ? cs.onSurface.withValues(alpha: 0.5)
-                              : cs.onSurface,
-                          decoration: isDone ? TextDecoration.lineThrough : null,
+                              ? Colors.white.withValues(alpha: 0.72)
+                              : Colors.white,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -1051,21 +1060,21 @@ class _BlockCard extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         rangeLabel,
-                        style: TextStyle(
-                          fontSize: 12,
+                        style: const TextStyle(
+                          fontSize: 13,
                           fontWeight: FontWeight.w500,
-                          color: cs.onSurface.withValues(alpha: 0.42),
-                          fontFeatures: const [FontFeature.tabularFigures()],
+                          color: _kTimelineMuted,
+                          fontFeatures: [FontFeature.tabularFigures()],
                         ),
                       ),
                       if (isSplit) ...[
                         const SizedBox(height: 8),
                         Text(
                           'Part ${block.splitPartIndex} of ${block.splitTotalParts}',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: cs.onSurface.withValues(alpha: 0.32),
+                            color: _kTimelineMuted,
                           ),
                         ),
                       ],
@@ -1081,20 +1090,11 @@ class _BlockCard extends StatelessWidget {
                   height: _kTimelineStatusSize,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: ringColor, width: 2),
+                    color: isDone ? _kTimelineComplete : Colors.transparent,
+                    border: isDone
+                        ? null
+                        : Border.all(color: pillColor, width: 2),
                   ),
-                  child: block.status == BlockStatus.done
-                      ? Center(
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF10B981),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        )
-                      : null,
                 ),
               ),
             ],
@@ -1104,7 +1104,6 @@ class _BlockCard extends StatelessWidget {
     );
   }
 }
-
 class _LockedDetailRow extends StatelessWidget {
   final IconData icon;
   final String text;
@@ -1279,7 +1278,7 @@ class _GapSlot extends StatelessWidget {
   }
 }
 
-// ── Dashed Line Painter ───────────────────────────────────────────────
+// -- Dashed Line Painter -----------------------------------------------
 */
 
 class _GapSlot extends StatelessWidget {
@@ -1299,7 +1298,6 @@ class _GapSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final gapMinutes = endMinutes - startMinutes;
     final gapHeight =
         (gapMinutes * 2.0).clamp(78.0, double.infinity).toDouble();
@@ -1335,11 +1333,11 @@ class _GapSlot extends StatelessWidget {
                       child: Text(
                         startLabel,
                         textAlign: TextAlign.right,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: cs.onSurface.withValues(alpha: 0.36),
-                          fontFeatures: const [FontFeature.tabularFigures()],
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _kTimelineMuted,
+                          fontFeatures: [FontFeature.tabularFigures()],
                         ),
                       ),
                     ),
@@ -1352,11 +1350,11 @@ class _GapSlot extends StatelessWidget {
                         child: Text(
                           _to12hShort(_minutesToHHMM(tick)),
                           textAlign: TextAlign.right,
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                            color: cs.onSurface.withValues(alpha: 0.24),
-                            fontFeatures: const [FontFeature.tabularFigures()],
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: _kTimelineMuted,
+                            fontFeatures: [FontFeature.tabularFigures()],
                           ),
                         ),
                       );
@@ -1371,11 +1369,7 @@ class _GapSlot extends StatelessWidget {
                 child: Center(
                   child: CustomPaint(
                     size: Size(2, gapHeight),
-                    painter: _DashedLinePainter(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.12)
-                          : Colors.black.withValues(alpha: 0.14),
-                    ),
+                    painter: const _DashedLinePainter(color: _kTimelineDivider),
                   ),
                 ),
               ),
@@ -1389,19 +1383,19 @@ class _GapSlot extends StatelessWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.access_time_outlined,
                             size: 15,
-                            color: cs.onSurface.withValues(alpha: 0.38),
+                            color: _kTimelineMuted,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: RichText(
                               text: TextSpan(
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
-                                  color: cs.onSurface.withValues(alpha: 0.42),
+                                  color: _kTimelineMuted,
                                   height: 1.35,
                                 ),
                                 children: [
@@ -1413,9 +1407,7 @@ class _GapSlot extends StatelessWidget {
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
-                                  const TextSpan(
-                                    text: ' wisely. Create away!',
-                                  ),
+                                  const TextSpan(text: ' wisely. Create away!'),
                                 ],
                               ),
                             ),
@@ -1445,14 +1437,8 @@ class _GapSlot extends StatelessWidget {
                           ),
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           visualDensity: VisualDensity.compact,
-                          backgroundColor: isDark
-                              ? const Color(0xFF2D2E33)
-                              : Colors.white.withValues(alpha: 0.94),
-                          side: BorderSide(
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.08)
-                                : Colors.black.withValues(alpha: 0.08),
-                          ),
+                          backgroundColor: _kTimelineCardBackground,
+                          side: const BorderSide(color: _kTimelineGapAccent),
                           shape: const StadiumBorder(),
                         ),
                       ),
@@ -1475,7 +1461,10 @@ class _DashedLinePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color..strokeWidth = 1.5;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
     const dashHeight = 4.0;
     const gapHeight = 4.0;
     double y = 0;
@@ -1488,3 +1477,4 @@ class _DashedLinePainter extends CustomPainter {
   @override
   bool shouldRepaint(_DashedLinePainter old) => old.color != color;
 }
+

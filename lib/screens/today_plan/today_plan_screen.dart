@@ -11,7 +11,6 @@ import 'package:focusflow_mobile/services/notification_service.dart';
 import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart';
-import 'package:focusflow_mobile/widgets/aurora_background.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -21,10 +20,17 @@ import 'day_session_screen.dart';
 import 'routine_editor_sheet.dart';
 import 'routines_tab.dart';
 import 'study_flow_screen.dart';
-import 'timeline_view.dart';
 import 'todo_tab.dart';
 import 'track_now_screen.dart';
 import 'wakeup_snooze_overlay.dart';
+import 'package:focusflow_mobile/screens/today_plan/timeline_view.dart';
+
+const Color _kTodayPlanBackground = Color(0xFF0D0D0D);
+const Color _kTodayPlanSurface = Color(0xFF1C1C1E);
+const Color _kTodayPlanAccent = Color(0xFFE8837A);
+const Color _kTodayPlanMuted = Color(0xFF8E8E93);
+const Color _kTodayPlanDivider = Color(0xFF3A3A3C);
+const Color _kTodayPlanNightDot = Color(0xFF6CA6FF);
 
 class TodayPlanScreen extends StatefulWidget {
   const TodayPlanScreen({super.key});
@@ -362,21 +368,16 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     displayBlocks
         .sort((a, b) => a.plannedStartTime.compareTo(b.plannedStartTime));
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
       extendBody: true,
-      backgroundColor: DashboardColors.background(isDark),
+      backgroundColor: _kTodayPlanBackground,
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          Positioned.fill(child: AuroraBackground(isDark: isDark)),
-          SafeArea(
-            bottom: false,
-            child: Stack(
+      body: SafeArea(
+        bottom: false,
+        child: Stack(
+          children: [
+            Column(
               children: [
-                Column(
-                  children: [
                     // ── Compact Header ─────────────────────────
                     // ── Tab Bar ────────────────────────────────
                     _ThreeTabBar(controller: _tabCtrl),
@@ -397,11 +398,14 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                             onStudySession: _openStudyFlow,
                             onTrackNow: _openTrackNow,
                             onAddTask: _openAddTaskSheet,
+                            onSelectDate: (selected) =>
+                                _setStateIfMounted(
+                                  () => _selectedDate = selected,
+                                ),
                             dateKey: _dateKey,
                             blocks: displayBlocks,
                           ),
                           RoutinesTab(dateKey: _dateKey),
-                          // More tab: inline sub-tabs (Todo + Buying)
                           _MoreTabView(dateKey: _dateKey),
                         ],
                       ),
@@ -413,10 +417,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                     onComplete: () =>
                         _setStateIfMounted(() => _completedBlockId = null),
                   ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -435,6 +437,7 @@ class _TodayTimelineTab extends StatelessWidget {
   final VoidCallback onStudySession;
   final VoidCallback onTrackNow;
   final VoidCallback onAddTask;
+  final ValueChanged<DateTime> onSelectDate;
   final String dateKey;
   final List<Block> blocks;
 
@@ -450,6 +453,7 @@ class _TodayTimelineTab extends StatelessWidget {
     required this.onStudySession,
     required this.onTrackNow,
     required this.onAddTask,
+    required this.onSelectDate,
     required this.dateKey,
     required this.blocks,
   });
@@ -468,10 +472,7 @@ class _TodayTimelineTab extends StatelessWidget {
               onPrev: onPrev,
               onNext: onNext,
               onDateTap: onDateTap,
-              onStartDay: onStartDay,
-              onStudySession: onStudySession,
-              onTrackNow: onTrackNow,
-              onAddTask: onAddTask,
+              onSelectDate: onSelectDate,
             ),
           ),
         ];
@@ -709,10 +710,7 @@ class _CompactHeader extends StatelessWidget {
   final VoidCallback onPrev;
   final VoidCallback onNext;
   final VoidCallback onDateTap;
-  final VoidCallback onStartDay;
-  final VoidCallback onStudySession;
-  final VoidCallback onTrackNow;
-  final VoidCallback onAddTask;
+  final ValueChanged<DateTime> onSelectDate;
 
   const _CompactHeader({
     required this.date,
@@ -722,154 +720,173 @@ class _CompactHeader extends StatelessWidget {
     required this.onPrev,
     required this.onNext,
     required this.onDateTap,
-    required this.onStartDay,
-    required this.onStudySession,
-    required this.onTrackNow,
-    required this.onAddTask,
+    required this.onSelectDate,
   });
 
-  String _buildHeaderLabel() {
-    final today = AppDateUtils.getAdjustedDate();
-    final dayOffset = AppDateUtils.daysBetween(today, date);
-    final shortDate = DateFormat('d MMM').format(date);
+  List<DateTime> _buildWeekDates() {
+    final startOfWeek = date.subtract(Duration(days: date.weekday % 7));
+    return List<DateTime>.generate(
+      7,
+      (index) => DateTime(
+        startOfWeek.year,
+        startOfWeek.month,
+        startOfWeek.day + index,
+      ),
+    );
+  }
 
-    if (isToday) return 'Today, $shortDate';
-    if (dayOffset == 1) return 'Tomorrow, $shortDate';
-    return DateFormat('EEEE, d MMM').format(date);
+  bool _isNightRoutine(Block block) {
+    final title = block.title.toLowerCase();
+    return title.contains('night') ||
+        title.contains('sleep') ||
+        title.contains('wind down') ||
+        title.contains('bed');
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final cs = theme.colorScheme;
-    final blockProgress =
-        totalBlocks == 0 ? 0.0 : completedBlocks / totalBlocks;
+    final app = context.watch<AppProvider>();
+    final weekDates = _buildWeekDates();
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.white.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isDark
-                ? DashboardColors.glassBorderDark
-                : DashboardColors.glassBorderLight,
-            width: 0.5,
-          ),
-        ),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                _HeaderArrowButton(
-                    icon: Icons.arrow_back_rounded, onTap: onPrev),
-                Expanded(
-                  child: InkWell(
-                    onTap: onDateTap,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Column(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: onDateTap,
+            borderRadius: BorderRadius.circular(18),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.8,
+                          height: 1,
+                        ),
                         children: [
-                          Text(
-                            _buildHeaderLabel(),
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                              color: cs.onSurface,
-                            ),
+                          TextSpan(
+                            text: DateFormat('d MMMM ').format(date),
+                            style: const TextStyle(color: Colors.white),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            DateFormat('d MMMM yyyy').format(date),
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: cs.onSurface.withValues(alpha: 0.55)),
+                          TextSpan(
+                            text: DateFormat('yyyy').format(date),
+                            style: const TextStyle(color: _kTodayPlanAccent),
                           ),
                         ],
                       ),
                     ),
                   ),
-                ),
-                _HeaderArrowButton(
-                    icon: Icons.arrow_forward_rounded, onTap: onNext),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.05)
-                    : Colors.black.withValues(alpha: 0.03),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.checklist_rounded,
-                    size: 16,
-                    color: DashboardColors.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '$completedBlocks / $totalBlocks done',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: cs.onSurface,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(999),
-                      child: LinearProgressIndicator(
-                        value: blockProgress,
-                        minHeight: 3,
-                        backgroundColor: isDark
-                            ? Colors.white.withValues(alpha: 0.12)
-                            : Colors.black.withValues(alpha: 0.08),
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          DashboardColors.primary,
-                        ),
-                      ),
-                    ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 30,
+                    color: _kTodayPlanAccent,
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              for (final weekDate in weekDates)
                 Expanded(
-                    child: _HeaderActionButton(
-                        emoji: '🌅', label: 'Start Day', onTap: onStartDay)),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: _HeaderActionButton(
-                        emoji: '📚',
-                        label: 'Study Session',
-                        onTap: onStudySession)),
-              ],
+                  child: _WeekDayColumn(
+                    date: weekDate,
+                    isSelected: AppDateUtils.isSameDay(weekDate, date),
+                    hasBlocks: (app.getDayPlan(
+                                  DateFormat('yyyy-MM-dd').format(weekDate),
+                                )?.blocks ??
+                                const <Block>[])
+                            .isNotEmpty,
+                    hasNightRoutine: (app.getDayPlan(
+                                  DateFormat('yyyy-MM-dd').format(weekDate),
+                                )?.blocks ??
+                                const <Block>[])
+                            .any(_isNightRoutine),
+                    onTap: () => onSelectDate(weekDate),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeekDayColumn extends StatelessWidget {
+  final DateTime date;
+  final bool isSelected;
+  final bool hasBlocks;
+  final bool hasNightRoutine;
+  final VoidCallback onTap;
+
+  const _WeekDayColumn({
+    required this.date,
+    required this.isSelected,
+    required this.hasBlocks,
+    required this.hasNightRoutine,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              DateFormat('EEE').format(date),
+              style: const TextStyle(
+                color: _kTodayPlanMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                    child: _HeaderActionButton(
-                        emoji: '📊', label: 'Track Now', onTap: onTrackNow)),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: _HeaderActionButton(
-                        emoji: '➕', label: 'Add Task', onTap: onAddTask)),
-              ],
+            const SizedBox(height: 8),
+            Container(
+              width: 34,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isSelected ? Colors.white : Colors.transparent,
+                border: Border.all(
+                  color: isSelected ? Colors.white : Colors.transparent,
+                ),
+              ),
+              child: Text(
+                DateFormat('d').format(date),
+                style: TextStyle(
+                  color: isSelected ? _kTodayPlanBackground : Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 8,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hasBlocks) const _WeekIndicatorDot(color: _kTodayPlanAccent),
+                  if (hasBlocks && hasNightRoutine) const SizedBox(width: 4),
+                  if (hasNightRoutine)
+                    const _WeekIndicatorDot(color: _kTodayPlanNightDot),
+                ],
+              ),
             ),
           ],
         ),
@@ -878,68 +895,25 @@ class _CompactHeader extends StatelessWidget {
   }
 }
 
-class _HeaderArrowButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  const _HeaderArrowButton({required this.icon, required this.onTap});
+class _WeekIndicatorDot extends StatelessWidget {
+  final Color color;
+
+  const _WeekIndicatorDot({required this.color});
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Material(
-      color: isDark
-          ? Colors.white.withValues(alpha: 0.08)
-          : Colors.black.withValues(alpha: 0.04),
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Icon(icon, size: 18),
-        ),
-      ),
-    );
-  }
-}
-
-class _HeaderActionButton extends StatelessWidget {
-  final String emoji;
-  final String label;
-  final VoidCallback onTap;
-  const _HeaderActionButton(
-      {required this.emoji, required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cs = Theme.of(context).colorScheme;
-    return Material(
-      color: isDark
-          ? Colors.white.withValues(alpha: 0.05)
-          : Colors.black.withValues(alpha: 0.03),
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(emoji, style: const TextStyle(fontSize: 16)),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(label,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: cs.onSurface)),
-              ),
-            ],
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.3),
+            blurRadius: 8,
           ),
-        ),
+        ],
       ),
     );
   }
@@ -951,33 +925,33 @@ class _ThreeTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Container(
         decoration: BoxDecoration(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.white.withValues(alpha: 0.72),
+          color: _kTodayPlanSurface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isDark
-                ? DashboardColors.glassBorderDark
-                : DashboardColors.glassBorderLight,
-            width: 0.5,
+            color: _kTodayPlanDivider,
+            width: 1,
           ),
         ),
         child: TabBar(
           controller: controller,
           dividerColor: Colors.transparent,
           indicatorSize: TabBarIndicatorSize.tab,
+          labelColor: Colors.white,
+          unselectedLabelColor: _kTodayPlanMuted,
           labelStyle:
               const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
           unselectedLabelStyle:
               const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           indicator: BoxDecoration(
-            color: DashboardColors.primary.withValues(alpha: 0.12),
+            color: _kTodayPlanAccent.withValues(alpha: 0.16),
             borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _kTodayPlanAccent.withValues(alpha: 0.28),
+            ),
           ),
           tabs: const [
             Tab(text: 'Timeline'),
@@ -989,3 +963,5 @@ class _ThreeTabBar extends StatelessWidget {
     );
   }
 }
+
+
