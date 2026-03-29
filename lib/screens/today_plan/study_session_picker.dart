@@ -88,6 +88,29 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
     return StudyTask.totalItemCount(_plannedQueueFromBlock(block));
   }
 
+  String _videoLibrarySubtitle({
+    required AppProvider app,
+    required String subject,
+    required String prefix,
+  }) {
+    final subjectVideos = app.videoLectures
+        .where((video) => video.subject.toLowerCase() == subject.toLowerCase())
+        .toList();
+    if (subjectVideos.isEmpty) {
+      return '$prefix — Videos available';
+    }
+
+    final unwatchedCount =
+        subjectVideos.where((video) => !video.isComplete).length;
+    return '$prefix — $unwatchedCount unwatched videos';
+  }
+
+  void _openLibrarySubject(BuildContext context, String subject) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Opening $subject videos...')),
+    );
+  }
+
   List<StudyTask> _queueWithPlanningDefaults(Iterable<StudyTask> tasks) {
     return tasks
         .map(
@@ -453,215 +476,212 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                 MediaQuery.of(sheetContext).padding.bottom + 20,
               ),
               child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                      Text(
-                        'Plan for Later',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: cs.onSurface,
-                        ),
+                  Text(
+                    'Plan for Later',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Estimated duration: ${_formatDurationLabel(estimatedMinutes)}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Planned Queue',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Drag to reorder - top item starts first',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.onSurface.withValues(alpha: 0.55),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 320),
+                    child: ReorderableListView.builder(
+                      padding: EdgeInsets.only(
+                        bottom: MediaQuery.of(sheetContext).padding.bottom + 20,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Estimated duration: ${_formatDurationLabel(estimatedMinutes)}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: cs.onSurface.withValues(alpha: 0.6),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Planned Queue',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: cs.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Drag to reorder - top item starts first',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: cs.onSurface.withValues(alpha: 0.55),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 320),
-                        child: ReorderableListView.builder(
-                          padding: EdgeInsets.only(
-                            bottom:
-                                MediaQuery.of(sheetContext).padding.bottom + 20,
-                          ),
-                          shrinkWrap: true,
-                          buildDefaultDragHandles: false,
-                          itemCount: plannedQueue.length,
-                          onReorder: (oldIndex, newIndex) {
-                            setSheetState(() {
-                              if (newIndex > oldIndex) {
-                                newIndex -= 1;
-                              }
-                              final task = plannedQueue.removeAt(oldIndex);
-                              plannedQueue.insert(newIndex, task);
-                            });
-                          },
-                          itemBuilder: (_, index) {
-                            final task = plannedQueue[index];
-                            return Container(
-                              key: ValueKey(task.id),
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: cs.surfaceContainerHighest
-                                    .withValues(alpha: 0.45),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  ReorderableDragStartListener(
-                                    index: index,
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(top: 4),
-                                      child: Icon(
-                                        Icons.drag_handle,
-                                        size: 20,
-                                        color: cs.onSurface
-                                            .withValues(alpha: 0.45),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  _iconForType(task.type),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          task.label,
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            color: cs.onSurface,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          task.detail,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: cs.onSurface
-                                                .withValues(alpha: 0.55),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          _plannedTaskWindowLabel(
-                                            sessionStart,
-                                            plannedQueue,
-                                            index,
-                                          ),
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: cs.onSurface
-                                                .withValues(alpha: 0.6),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ActionChip(
-                                    label: Text(
-                                      '${task.estimatedDurationMinutes} min',
-                                    ),
-                                    onPressed: () async {
-                                      final minutes =
-                                          await _pickTaskDurationMinutes(
-                                        task.estimatedDurationMinutes,
-                                      );
-                                      if (minutes == null) {
-                                        return;
-                                      }
-                                      if (!mounted || !sheetContext.mounted) {
-                                        return;
-                                      }
-                                      setSheetState(() {
-                                        plannedQueue[index] = task.copyWith(
-                                          plannedDurationMinutes: minutes,
-                                        );
-                                      });
-                                    },
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Scheduled Start',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: cs.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      OutlinedButton.icon(
-                        onPressed: () async {
-                          final picked = await showTimePicker(
-                            context: sheetContext,
-                            initialTime: selectedTime,
-                          );
-                          if (picked != null) {
-                            setSheetState(() {
-                              selectedTime = picked;
-                            });
+                      shrinkWrap: true,
+                      buildDefaultDragHandles: false,
+                      itemCount: plannedQueue.length,
+                      onReorder: (oldIndex, newIndex) {
+                        setSheetState(() {
+                          if (newIndex > oldIndex) {
+                            newIndex -= 1;
                           }
-                        },
-                        icon: const Icon(Icons.schedule_rounded, size: 18),
-                        label: Text(selectedTime.format(sheetContext)),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 14,
-                          ),
-                          shape: RoundedRectangleBorder(
+                          final task = plannedQueue.removeAt(oldIndex);
+                          plannedQueue.insert(newIndex, task);
+                        });
+                      },
+                      itemBuilder: (_, index) {
+                        final task = plannedQueue[index];
+                        return Container(
+                          key: ValueKey(task.id),
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: cs.surfaceContainerHighest
+                                .withValues(alpha: 0.45),
                             borderRadius: BorderRadius.circular(12),
                           ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ReorderableDragStartListener(
+                                index: index,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Icon(
+                                    Icons.drag_handle,
+                                    size: 20,
+                                    color: cs.onSurface.withValues(alpha: 0.45),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              _iconForType(task.type),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      task.label,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: cs.onSurface,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      task.detail,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: cs.onSurface
+                                            .withValues(alpha: 0.55),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      _plannedTaskWindowLabel(
+                                        sessionStart,
+                                        plannedQueue,
+                                        index,
+                                      ),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color:
+                                            cs.onSurface.withValues(alpha: 0.6),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              ActionChip(
+                                label: Text(
+                                  '${task.estimatedDurationMinutes} min',
+                                ),
+                                onPressed: () async {
+                                  final minutes =
+                                      await _pickTaskDurationMinutes(
+                                    task.estimatedDurationMinutes,
+                                  );
+                                  if (minutes == null) {
+                                    return;
+                                  }
+                                  if (!mounted || !sheetContext.mounted) {
+                                    return;
+                                  }
+                                  setSheetState(() {
+                                    plannedQueue[index] = task.copyWith(
+                                      plannedDurationMinutes: minutes,
+                                    );
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Scheduled Start',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final picked = await showTimePicker(
+                        context: sheetContext,
+                        initialTime: selectedTime,
+                      );
+                      if (picked != null) {
+                        setSheetState(() {
+                          selectedTime = picked;
+                        });
+                      }
+                    },
+                    icon: const Icon(Icons.schedule_rounded, size: 18),
+                    label: Text(selectedTime.format(sheetContext)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => _savePlannedSession(
+                        sheetContext,
+                        plannedQueue,
+                        selectedTime,
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF8B5CF6),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          onPressed: () => _savePlannedSession(
-                            sheetContext,
-                            plannedQueue,
-                            selectedTime,
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF8B5CF6),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          child: const Text(
-                            'Save to Day Plan',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                        ),
+                      child: const Text(
+                        'Save to Day Plan',
+                        style: TextStyle(fontWeight: FontWeight.w700),
                       ),
-                    ],
+                    ),
+                  ),
+                ],
               ),
             );
           },
@@ -1025,6 +1045,57 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                           '${app.pathomaChapters.where((c) => !c.watched).length} unwatched chapters',
                       onTap: () => _showPathomaPicker(context, app),
                     ),
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '🎥 Videos from Library',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                      ),
+                    ),
+                    _OptionCard(
+                      icon: Icons.headphones_rounded,
+                      color: const Color(0xFFF59E0B),
+                      title: 'ENT',
+                      subtitle: _videoLibrarySubtitle(
+                        app: app,
+                        subject: 'ENT',
+                        prefix: 'Ear, Nose & Throat',
+                      ),
+                      onTap: () => _openLibrarySubject(context, 'ENT'),
+                    ),
+                    const SizedBox(height: 10),
+                    _OptionCard(
+                      icon: Icons.public_rounded,
+                      color: const Color(0xFF10B981),
+                      title: 'PSM',
+                      subtitle: _videoLibrarySubtitle(
+                        app: app,
+                        subject: 'Preventive & Social Medicine',
+                        prefix: 'Preventive & Social Medicine',
+                      ),
+                      onTap: () => _openLibrarySubject(context, 'PSM'),
+                    ),
+                    const SizedBox(height: 10),
+                    _OptionCard(
+                      icon: Icons.visibility_rounded,
+                      color: const Color(0xFF3B82F6),
+                      title: 'Ophthalmology',
+                      subtitle: _videoLibrarySubtitle(
+                        app: app,
+                        subject: 'Ophthalmology',
+                        prefix: 'Ophtha',
+                      ),
+                      onTap: () =>
+                          _openLibrarySubject(context, 'Ophthalmology'),
+                    ),
                     const SizedBox(height: 20),
                     if (_queue.isNotEmpty) ...[
                       Padding(
@@ -1238,102 +1309,101 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                     16,
                     MediaQuery.of(ctx).padding.bottom + 72 + 20,
                   ),
-                    itemCount: pages.length,
-                    itemBuilder: (ctx, i) {
-                      final page = pages[i];
-                      final isRead = page.status != 'unread';
-                      final isSelected =
-                          selectedPageNumbers.contains(page.pageNum);
-                      return CheckboxListTile(
-                        value: isSelected,
-                        onChanged: (value) {
-                          setSheetState(() {
-                            if (value == true) {
-                              selectedPageNumbers.add(page.pageNum);
-                            } else {
-                              selectedPageNumbers.remove(page.pageNum);
-                            }
-                          });
-                        },
-                        secondary: Icon(
-                          isRead
-                              ? Icons.check_circle_rounded
-                              : Icons.menu_book_rounded,
-                          color:
-                              isRead ? Colors.green : const Color(0xFF8B5CF6),
+                  itemCount: pages.length,
+                  itemBuilder: (ctx, i) {
+                    final page = pages[i];
+                    final isRead = page.status != 'unread';
+                    final isSelected =
+                        selectedPageNumbers.contains(page.pageNum);
+                    return CheckboxListTile(
+                      value: isSelected,
+                      onChanged: (value) {
+                        setSheetState(() {
+                          if (value == true) {
+                            selectedPageNumbers.add(page.pageNum);
+                          } else {
+                            selectedPageNumbers.remove(page.pageNum);
+                          }
+                        });
+                      },
+                      secondary: Icon(
+                        isRead
+                            ? Icons.check_circle_rounded
+                            : Icons.menu_book_rounded,
+                        color: isRead ? Colors.green : const Color(0xFF8B5CF6),
+                      ),
+                      title: Text(
+                        'Page ${page.pageNum}',
+                        style: TextStyle(
+                          color: isRead
+                              ? cs.onSurface.withValues(alpha: 0.65)
+                              : cs.onSurface,
+                          fontWeight: FontWeight.w600,
                         ),
-                        title: Text(
-                          'Page ${page.pageNum}',
-                          style: TextStyle(
-                            color: isRead
-                                ? cs.onSurface.withValues(alpha: 0.65)
-                                : cs.onSurface,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      ),
+                      subtitle: Text(
+                        '${page.subject} - ${page.title}',
+                        style: TextStyle(
+                          color: cs.onSurface.withValues(alpha: 0.5),
                         ),
-                        subtitle: Text(
-                          '${page.subject} - ${page.title}',
-                          style: TextStyle(
-                            color: cs.onSurface.withValues(alpha: 0.5),
-                          ),
-                        ),
-                        controlAffinity: ListTileControlAffinity.leading,
-                        dense: true,
-                      );
-                    },
-                  ),
+                      ),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      dense: true,
+                    );
+                  },
                 ),
-                Padding(
-                  padding: EdgeInsets.only(
-                    left: 16,
-                    top: 16,
-                    right: 16,
-                    bottom: MediaQuery.of(ctx).padding.bottom + 16,
-                  ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: selectedPageNumbers.isEmpty
-                          ? null
-                          : () {
-                              final selectedPages = selectedPageNumbers.toList()
-                                ..sort();
-                              setState(() {
-                                _queue.add(StudyTask(
-                                  id: _buildTaskId(
-                                    type: 'FA',
-                                    pageNumbers: selectedPages,
-                                  ),
+              ),
+              Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  top: 16,
+                  right: 16,
+                  bottom: MediaQuery.of(ctx).padding.bottom + 16,
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: selectedPageNumbers.isEmpty
+                        ? null
+                        : () {
+                            final selectedPages = selectedPageNumbers.toList()
+                              ..sort();
+                            setState(() {
+                              _queue.add(StudyTask(
+                                id: _buildTaskId(
                                   type: 'FA',
-                                  label: 'FA Pages',
-                                  detail: _faTaskDetail(selectedPages),
                                   pageNumbers: selectedPages,
-                                ));
-                              });
-                              Navigator.pop(ctx);
-                            },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF8B5CF6),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                                ),
+                                type: 'FA',
+                                label: 'FA Pages',
+                                detail: _faTaskDetail(selectedPages),
+                                pageNumbers: selectedPages,
+                              ));
+                            });
+                            Navigator.pop(ctx);
+                          },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF8B5CF6),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Text(
-                        selectedPageNumbers.isEmpty
-                            ? 'Select pages to add'
-                            : 'Add ${selectedPageNumbers.length} pages to queue',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
+                    ),
+                    child: Text(
+                      selectedPageNumbers.isEmpty
+                          ? 'Select pages to add'
+                          : 'Add ${selectedPageNumbers.length} pages to queue',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
                 ),
-              ],
-            );
-          });
-        },
-      );
-    }
+              ),
+            ],
+          );
+        });
+      },
+    );
+  }
 
   void _showUWorldPicker(BuildContext context, AppProvider app) {
     final systems = <String, List<UWorldTopic>>{};
@@ -1451,99 +1521,99 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                     16,
                     MediaQuery.of(ctx).padding.bottom + 20,
                   ),
-                    itemCount: topics.length,
-                    itemBuilder: (ctx, i) {
-                      final topic = topics[i];
-                      final remaining =
-                          topic.totalQuestions - topic.doneQuestions;
-                      final isSelectable = topic.id != null && remaining > 0;
-                      final isSelected = topic.id != null &&
-                          selectedTopicIds.contains(topic.id);
-                      return CheckboxListTile(
-                        value: isSelected,
-                        onChanged: !isSelectable
-                            ? null
-                            : (value) {
-                                setSheetState(() {
-                                  if (value == true) {
-                                    selectedTopicIds.add(topic.id!);
-                                  } else {
-                                    selectedTopicIds.remove(topic.id);
-                                  }
-                                });
-                              },
-                        title: Text(
-                          topic.subtopic,
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                        subtitle: Text(
-                          '${topic.system} - ${topic.doneQuestions} / ${topic.totalQuestions} done',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: remaining == 0
-                                ? Colors.green
-                                : cs.onSurface.withValues(alpha: 0.5),
-                          ),
-                        ),
-                        controlAffinity: ListTileControlAffinity.leading,
-                        dense: true,
-                      );
-                    },
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: selectedQuestionTotal <= 0
+                  itemCount: topics.length,
+                  itemBuilder: (ctx, i) {
+                    final topic = topics[i];
+                    final remaining =
+                        topic.totalQuestions - topic.doneQuestions;
+                    final isSelectable = topic.id != null && remaining > 0;
+                    final isSelected =
+                        topic.id != null && selectedTopicIds.contains(topic.id);
+                    return CheckboxListTile(
+                      value: isSelected,
+                      onChanged: !isSelectable
                           ? null
-                          : () {
-                              setState(() {
-                                _queue.add(StudyTask(
-                                  id: _buildTaskId(
-                                    type: 'UWORLD',
-                                    topicIds: selectedTopics
-                                        .map((topic) => topic.id!)
-                                        .toList(),
-                                  ),
+                          : (value) {
+                              setSheetState(() {
+                                if (value == true) {
+                                  selectedTopicIds.add(topic.id!);
+                                } else {
+                                  selectedTopicIds.remove(topic.id);
+                                }
+                              });
+                            },
+                      title: Text(
+                        topic.subtopic,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      subtitle: Text(
+                        '${topic.system} - ${topic.doneQuestions} / ${topic.totalQuestions} done',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: remaining == 0
+                              ? Colors.green
+                              : cs.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      dense: true,
+                    );
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: selectedQuestionTotal <= 0
+                        ? null
+                        : () {
+                            setState(() {
+                              _queue.add(StudyTask(
+                                id: _buildTaskId(
                                   type: 'UWORLD',
-                                  label: selectedSystem == null
-                                      ? 'UWorld Questions'
-                                      : 'UWorld - $selectedSystem',
-                                  detail: _uWorldTaskDetail(
-                                    selectedTopics,
-                                    selectedQuestionTotal,
-                                  ),
                                   topicIds: selectedTopics
                                       .map((topic) => topic.id!)
                                       .toList(),
-                                  questionCount: selectedQuestionTotal,
-                                ));
-                              });
-                              Navigator.pop(ctx);
-                            },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFFF59E0B),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                                ),
+                                type: 'UWORLD',
+                                label: selectedSystem == null
+                                    ? 'UWorld Questions'
+                                    : 'UWorld - $selectedSystem',
+                                detail: _uWorldTaskDetail(
+                                  selectedTopics,
+                                  selectedQuestionTotal,
+                                ),
+                                topicIds: selectedTopics
+                                    .map((topic) => topic.id!)
+                                    .toList(),
+                                questionCount: selectedQuestionTotal,
+                              ));
+                            });
+                            Navigator.pop(ctx);
+                          },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFF59E0B),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Text(
-                        selectedQuestionTotal <= 0
-                            ? 'Select questions to add'
-                            : 'Add $selectedQuestionTotal UWorld questions to queue',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
+                    ),
+                    child: Text(
+                      selectedQuestionTotal <= 0
+                          ? 'Select questions to add'
+                          : 'Add $selectedQuestionTotal UWorld questions to queue',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
                 ),
-              ],
-            );
-          });
-        },
+              ),
+            ],
+          );
+        });
+      },
     );
   }
 
@@ -1625,106 +1695,106 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                       16,
                       MediaQuery.of(ctx).padding.bottom + 20,
                     ),
-                      itemCount: categoryVideos.length,
-                      itemBuilder: (ctx, i) {
-                        final video = categoryVideos[i];
-                        final isSelected = selectedVideos.contains(video.id);
-                        return CheckboxListTile(
-                          value: video.watched ? true : isSelected,
-                          onChanged: video.watched
-                              ? null
-                              : (value) {
-                                  setSheetState(() {
-                                    if (value == true) {
-                                      selectedVideos.add(video.id!);
-                                    } else {
-                                      selectedVideos.remove(video.id);
-                                    }
-                                  });
-                                },
-                          title: Text(
-                            video.title,
-                            style: TextStyle(
-                              fontSize: 14,
-                              decoration: video.watched
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                              color: video.watched
-                                  ? cs.onSurface.withValues(alpha: 0.4)
-                                  : cs.onSurface,
-                            ),
+                    itemCount: categoryVideos.length,
+                    itemBuilder: (ctx, i) {
+                      final video = categoryVideos[i];
+                      final isSelected = selectedVideos.contains(video.id);
+                      return CheckboxListTile(
+                        value: video.watched ? true : isSelected,
+                        onChanged: video.watched
+                            ? null
+                            : (value) {
+                                setSheetState(() {
+                                  if (value == true) {
+                                    selectedVideos.add(video.id!);
+                                  } else {
+                                    selectedVideos.remove(video.id);
+                                  }
+                                });
+                              },
+                        title: Text(
+                          video.title,
+                          style: TextStyle(
+                            fontSize: 14,
+                            decoration: video.watched
+                                ? TextDecoration.lineThrough
+                                : null,
+                            color: video.watched
+                                ? cs.onSurface.withValues(alpha: 0.4)
+                                : cs.onSurface,
                           ),
-                          subtitle: Text(
-                            video.subcategory,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: cs.onSurface.withValues(alpha: 0.4),
-                            ),
-                          ),
-                          dense: true,
-                          controlAffinity: ListTileControlAffinity.leading,
-                        );
-                      },
-                    ),
-                  )
-                else
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        'Select a category above',
-                        style: TextStyle(
-                          color: cs.onSurface.withValues(alpha: 0.35),
                         ),
-                      ),
-                    ),
+                        subtitle: Text(
+                          video.subcategory,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurface.withValues(alpha: 0.4),
+                          ),
+                        ),
+                        dense: true,
+                        controlAffinity: ListTileControlAffinity.leading,
+                      );
+                    },
                   ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: selectedVideos.isEmpty
-                          ? null
-                          : () {
-                              setState(() {
-                                _queue.add(StudyTask(
-                                  id: _buildTaskId(
-                                    type: type == 'micro'
-                                        ? 'SKETCHY_MICRO'
-                                        : 'SKETCHY_PHARM',
-                                    topicIds: selectedVideos.toList(),
-                                  ),
-                                  type: type == 'micro'
-                                      ? 'SKETCHY_MICRO'
-                                      : 'SKETCHY_PHARM',
-                                  label: '$label - $selectedCategory',
-                                  detail: '${selectedVideos.length} videos',
-                                  topicIds: selectedVideos.toList(),
-                                ));
-                              });
-                              Navigator.pop(ctx);
-                            },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: color,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        selectedVideos.isEmpty
-                            ? 'Select videos'
-                            : 'Add ${selectedVideos.length} videos to queue',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+                )
+              else
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      'Select a category above',
+                      style: TextStyle(
+                        color: cs.onSurface.withValues(alpha: 0.35),
                       ),
                     ),
                   ),
                 ),
-              ],
-            );
-          });
-        },
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: selectedVideos.isEmpty
+                        ? null
+                        : () {
+                            setState(() {
+                              _queue.add(StudyTask(
+                                id: _buildTaskId(
+                                  type: type == 'micro'
+                                      ? 'SKETCHY_MICRO'
+                                      : 'SKETCHY_PHARM',
+                                  topicIds: selectedVideos.toList(),
+                                ),
+                                type: type == 'micro'
+                                    ? 'SKETCHY_MICRO'
+                                    : 'SKETCHY_PHARM',
+                                label: '$label - $selectedCategory',
+                                detail: '${selectedVideos.length} videos',
+                                topicIds: selectedVideos.toList(),
+                              ));
+                            });
+                            Navigator.pop(ctx);
+                          },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: color,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      selectedVideos.isEmpty
+                          ? 'Select videos'
+                          : 'Add ${selectedVideos.length} videos to queue',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        });
+      },
     );
   }
 
@@ -1786,100 +1856,100 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
                       16,
                       MediaQuery.of(ctx).padding.bottom + 20,
                     ),
-                      itemCount: chapters.length,
-                      itemBuilder: (ctx, i) {
-                        final chapter = chapters[i];
-                        final isSelected = chapter.id != null &&
-                            selectedChapterIds.contains(chapter.id);
-                        return CheckboxListTile(
-                          value: chapter.watched ? true : isSelected,
-                          onChanged: chapter.watched || chapter.id == null
-                              ? null
-                              : (value) {
-                                  setSheetState(() {
-                                    if (value == true) {
-                                      selectedChapterIds.add(chapter.id!);
-                                    } else {
-                                      selectedChapterIds.remove(chapter.id);
-                                    }
-                                  });
-                                },
-                          title: Text(
-                            'Chapter ${chapter.chapter}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              decoration: chapter.watched
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                              color: chapter.watched
-                                  ? cs.onSurface.withValues(alpha: 0.45)
-                                  : cs.onSurface,
-                            ),
-                          ),
-                          subtitle: Text(
-                            chapter.title,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: cs.onSurface.withValues(alpha: 0.5),
-                            ),
-                          ),
-                          dense: true,
-                          controlAffinity: ListTileControlAffinity.leading,
-                        );
-                      },
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: selectedChapters.isEmpty
+                    itemCount: chapters.length,
+                    itemBuilder: (ctx, i) {
+                      final chapter = chapters[i];
+                      final isSelected = chapter.id != null &&
+                          selectedChapterIds.contains(chapter.id);
+                      return CheckboxListTile(
+                        value: chapter.watched ? true : isSelected,
+                        onChanged: chapter.watched || chapter.id == null
                             ? null
-                            : () {
-                                setState(() {
-                                  _queue.add(
-                                    StudyTask(
-                                      id: _buildTaskId(
-                                        type: 'PATHOMA',
-                                        topicIds: selectedChapters
-                                            .map((chapter) => chapter.id!)
-                                            .toList(),
-                                      ),
+                            : (value) {
+                                setSheetState(() {
+                                  if (value == true) {
+                                    selectedChapterIds.add(chapter.id!);
+                                  } else {
+                                    selectedChapterIds.remove(chapter.id);
+                                  }
+                                });
+                              },
+                        title: Text(
+                          'Chapter ${chapter.chapter}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            decoration: chapter.watched
+                                ? TextDecoration.lineThrough
+                                : null,
+                            color: chapter.watched
+                                ? cs.onSurface.withValues(alpha: 0.45)
+                                : cs.onSurface,
+                          ),
+                        ),
+                        subtitle: Text(
+                          chapter.title,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurface.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        dense: true,
+                        controlAffinity: ListTileControlAffinity.leading,
+                      );
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: selectedChapters.isEmpty
+                          ? null
+                          : () {
+                              setState(() {
+                                _queue.add(
+                                  StudyTask(
+                                    id: _buildTaskId(
                                       type: 'PATHOMA',
-                                      label: 'Pathoma',
-                                      detail:
-                                          _pathomaTaskDetail(selectedChapters),
                                       topicIds: selectedChapters
                                           .map((chapter) => chapter.id!)
                                           .toList(),
                                     ),
-                                  );
-                                });
-                                Navigator.pop(ctx);
-                              },
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFEF4444),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                                    type: 'PATHOMA',
+                                    label: 'Pathoma',
+                                    detail:
+                                        _pathomaTaskDetail(selectedChapters),
+                                    topicIds: selectedChapters
+                                        .map((chapter) => chapter.id!)
+                                        .toList(),
+                                  ),
+                                );
+                              });
+                              Navigator.pop(ctx);
+                            },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFEF4444),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Text(
-                          selectedChapters.isEmpty
-                              ? 'Select chapters'
-                              : 'Add ${selectedChapters.length} chapters to queue',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
+                      ),
+                      child: Text(
+                        selectedChapters.isEmpty
+                            ? 'Select chapters'
+                            : 'Add ${selectedChapters.length} chapters to queue',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
                   ),
-                ],
-              );
-            },
-          );
-        },
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
