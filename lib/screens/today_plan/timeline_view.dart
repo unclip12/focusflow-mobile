@@ -18,6 +18,7 @@ import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
+import 'package:focusflow_mobile/utils/date_utils.dart';
 import 'block_editor_sheet.dart';
 import 'free_gap_panel.dart';
 import 'study_session_screen.dart';
@@ -127,10 +128,10 @@ const double _kTimelineHandleWidth = 14;
 const double _kTimelineHandleGap = 4;
 const double _kTimelineLeadingWidth =
     _kTimelineHandleWidth + _kTimelineHandleGap;
-const double _kTimelineTimeWidth = 40;
-const double _kTimelineTimeToPillGap = 6;
+const double _kTimelineTimeWidth = 36;
+const double _kTimelineTimeToPillGap = 4;
 const double _kTimelinePillWidth = 46;
-const double _kTimelineContentGap = 10;
+const double _kTimelineContentGap = 8;
 const double _kTimelineStatusSize = 20;
 const Color _kTimelineAccent = Color(0xFFE8837A);
 const Color _kTimelineGapAccent = _kTimelineAccent;
@@ -196,17 +197,92 @@ String _categoryLabel(Block block) {
   }
 }
 
+enum _TimelineBlockRelation { sameDay, carryOut, carryIn }
+
+class _TimelineBlockSlice {
+  final Block block;
+  final int visibleStartMinutes;
+  final int visibleEndMinutes;
+  final _TimelineBlockRelation relation;
+  final DateTime displayDate;
+
+  const _TimelineBlockSlice({
+    required this.block,
+    required this.visibleStartMinutes,
+    required this.visibleEndMinutes,
+    required this.relation,
+    required this.displayDate,
+  });
+
+  int get visibleDurationMinutes =>
+      math.max(0, visibleEndMinutes - visibleStartMinutes);
+
+  String get startLabel => _to12hShort(_minutesToHHMM(visibleStartMinutes));
+
+  String get rangeLabel {
+    final fullStart = _to12h(block.plannedStartTime);
+    final fullEnd = _to12h(_fullEndTime);
+    switch (relation) {
+      case _TimelineBlockRelation.sameDay:
+        return '$fullStart - $fullEnd';
+      case _TimelineBlockRelation.carryOut:
+        return '$fullStart - $fullEnd (next day)';
+      case _TimelineBlockRelation.carryIn:
+        return '$fullStart - $fullEnd (previous day)';
+    }
+  }
+
+  String? get adjacentActionLabel {
+    switch (relation) {
+      case _TimelineBlockRelation.sameDay:
+        return null;
+      case _TimelineBlockRelation.carryOut:
+        return 'Next day';
+      case _TimelineBlockRelation.carryIn:
+        return 'Previous day';
+    }
+  }
+
+  DateTime? get adjacentDate {
+    switch (relation) {
+      case _TimelineBlockRelation.sameDay:
+        return null;
+      case _TimelineBlockRelation.carryOut:
+        return displayDate.add(const Duration(days: 1));
+      case _TimelineBlockRelation.carryIn:
+        return displayDate.subtract(const Duration(days: 1));
+    }
+  }
+
+  String get _fullEndTime {
+    final startMinutes = _minutesFromTimeValue(block.plannedStartTime) ?? 0;
+    final totalMinutes = startMinutes + _resolvedBlockDurationMinutes(block);
+    return _minutesToHHMM(totalMinutes % (24 * 60));
+  }
+}
+
+int _resolvedBlockDurationMinutes(Block block) {
+  if (block.plannedDurationMinutes > 0) return block.plannedDurationMinutes;
+
+  final startMinutes = _minutesFromTimeValue(block.plannedStartTime) ?? 0;
+  final endMinutes = _minutesFromTimeValue(block.plannedEndTime) ?? 0;
+  final rawDuration = endMinutes - startMinutes;
+  return rawDuration > 0 ? rawDuration : 0;
+}
+
 // -- Widget ----------------------------------------------------
 class TimelineView extends StatefulWidget {
   final List<Block> blocks;
   final String dateKey;
   final TimelineAddTaskCallback? onAddTask;
+  final ValueChanged<DateTime>? onOpenDate;
 
   const TimelineView({
     super.key,
     required this.blocks,
     required this.dateKey,
     this.onAddTask,
+    this.onOpenDate,
   });
 
   @override
@@ -299,11 +375,7 @@ class _TimelineViewState extends State<TimelineView> {
   }
 
   int _blockDurationMinutes(Block block) {
-    if (block.plannedDurationMinutes > 0) return block.plannedDurationMinutes;
-
-    final duration =
-        _toMinutes(block.plannedEndTime) - _toMinutes(block.plannedStartTime);
-    return duration > 0 ? duration : 0;
+    return _resolvedBlockDurationMinutes(block);
   }
 
   String _lockedCategoryLabel(Block block) =>
@@ -317,6 +389,7 @@ class _TimelineViewState extends State<TimelineView> {
     for (var i = 0; i < endExclusive && i < items.length; i++) {
       final item = items[i];
       if (item.isGap || item.isWarning || item.block == null) continue;
+      if (item.slice?.relation == _TimelineBlockRelation.carryIn) continue;
       if (_isLockedBlock(item.block!)) continue;
       count++;
     }
@@ -332,7 +405,12 @@ class _TimelineViewState extends State<TimelineView> {
         selectedDate.day == _currentTime.day;
   }
 
-  DateTime? get _selectedDate => DateTime.tryParse(widget.dateKey);
+  DateTime? get _selectedDate => AppDateUtils.parseDate(widget.dateKey);
+
+  DateTime? get _previousDate =>
+      _selectedDate?.subtract(const Duration(days: 1));
+
+  String _dateKeyForDate(DateTime date) => AppDateUtils.formatDate(date);
 
   // ignore: unused_element
   bool get _isViewingFuture {
@@ -353,6 +431,101 @@ class _TimelineViewState extends State<TimelineView> {
   }
 
   int get _currentMinutesOfDay => _currentTime.hour * 60 + _currentTime.minute;
+
+  _TimelineBlockSlice? _buildCurrentDaySlice(
+    Block block,
+    DateTime displayDate,
+  ) {
+    final startMinutes = _toMinutes(block.plannedStartTime).clamp(0, 1439);
+    final durationMinutes = _blockDurationMinutes(block);
+    final visibleEndMinutes = math.min(24 * 60, startMinutes + durationMinutes);
+    if (visibleEndMinutes <= startMinutes) return null;
+
+    final relation = startMinutes + durationMinutes > 24 * 60
+        ? _TimelineBlockRelation.carryOut
+        : _TimelineBlockRelation.sameDay;
+
+    return _TimelineBlockSlice(
+      block: block,
+      visibleStartMinutes: startMinutes,
+      visibleEndMinutes: visibleEndMinutes,
+      relation: relation,
+      displayDate: displayDate,
+    );
+  }
+
+  _TimelineBlockSlice? _buildCarryInSlice(
+    Block block,
+    DateTime displayDate,
+  ) {
+    final startMinutes = _toMinutes(block.plannedStartTime);
+    final durationMinutes = _blockDurationMinutes(block);
+    final overflowMinutes = (startMinutes + durationMinutes) - (24 * 60);
+    final visibleEndMinutes = overflowMinutes.clamp(0, 24 * 60);
+    if (visibleEndMinutes <= 0) return null;
+
+    return _TimelineBlockSlice(
+      block: block,
+      visibleStartMinutes: 0,
+      visibleEndMinutes: visibleEndMinutes,
+      relation: _TimelineBlockRelation.carryIn,
+      displayDate: displayDate,
+    );
+  }
+
+  List<_TimelineBlockSlice> _displaySlicesForSelectedDate() {
+    final selectedDate = _selectedDate;
+    if (selectedDate == null) {
+      return widget.blocks
+          .map((block) => _buildCurrentDaySlice(block, DateTime.now()))
+          .whereType<_TimelineBlockSlice>()
+          .toList();
+    }
+
+    final app = context.read<AppProvider>();
+    final slices = <_TimelineBlockSlice>[];
+
+    for (final block in widget.blocks) {
+      final slice = _buildCurrentDaySlice(block, selectedDate);
+      if (slice != null) {
+        slices.add(slice);
+      }
+    }
+
+    final previousDate = _previousDate;
+    if (previousDate != null) {
+      final previousDateKey = _dateKeyForDate(previousDate);
+      final previousBlocks =
+          List<Block>.from(app.getDayPlan(previousDateKey)?.blocks ?? const []);
+      for (final block in previousBlocks) {
+        final slice = _buildCarryInSlice(block, selectedDate);
+        if (slice != null) {
+          slices.add(slice);
+        }
+      }
+    }
+
+    slices.sort((left, right) {
+      final startCompare =
+          left.visibleStartMinutes.compareTo(right.visibleStartMinutes);
+      if (startCompare != 0) return startCompare;
+
+      final endCompare =
+          left.visibleEndMinutes.compareTo(right.visibleEndMinutes);
+      if (endCompare != 0) return endCompare;
+
+      if (left.relation != right.relation) {
+        if (left.relation == _TimelineBlockRelation.carryIn) return -1;
+        if (right.relation == _TimelineBlockRelation.carryIn) return 1;
+      }
+
+      final indexCompare = left.block.index.compareTo(right.block.index);
+      if (indexCompare != 0) return indexCompare;
+      return left.block.id.compareTo(right.block.id);
+    });
+
+    return slices;
+  }
 
   int _roundUpToNextFiveMinutes(int minutes) => ((minutes + 4) ~/ 5) * 5;
 
@@ -558,16 +731,12 @@ class _TimelineViewState extends State<TimelineView> {
 
   // Build list of timeline items (blocks + gaps)
   List<_TimelineItem> _buildTimelineItems(_TimelineBounds bounds) {
-    final sortedBlocks = List<Block>.from(widget.blocks)
-      ..sort(
-        (a, b) => _toMinutes(a.plannedStartTime)
-            .compareTo(_toMinutes(b.plannedStartTime)),
-      );
+    final sortedSlices = _displaySlicesForSelectedDate();
     final items = <_TimelineItem>[];
     var cursor = bounds.startMinutes;
-    for (final block in sortedBlocks) {
-      final blockStart = _toMinutes(block.plannedStartTime);
-      final blockEnd = _toMinutes(block.plannedEndTime);
+    for (final slice in sortedSlices) {
+      final blockStart = slice.visibleStartMinutes;
+      final blockEnd = slice.visibleEndMinutes;
       if (blockStart > cursor && (blockStart - cursor) >= 5) {
         items.add(
           _TimelineItem.gap(
@@ -580,7 +749,7 @@ class _TimelineViewState extends State<TimelineView> {
           const _TimelineItem.warning('Tasks are overlapping'),
         );
       }
-      items.add(_TimelineItem.block(block));
+      items.add(_TimelineItem.block(slice));
       cursor = math.max(cursor, blockEnd);
     }
     if (bounds.endMinutes > cursor && (bounds.endMinutes - cursor) >= 5) {
@@ -640,7 +809,8 @@ class _TimelineViewState extends State<TimelineView> {
     if (_isLockedBlock(block) || block.status == BlockStatus.done) return;
 
     final app = context.read<AppProvider>();
-    final plan = app.getDayPlan(widget.dateKey);
+    final sourceDateKey = block.date.isNotEmpty ? block.date : widget.dateKey;
+    final plan = app.getDayPlan(sourceDateKey);
     final planBlocks = plan?.blocks;
     if (plan == null || planBlocks == null) return;
 
@@ -670,8 +840,7 @@ class _TimelineViewState extends State<TimelineView> {
   void _showLockedDetailSheet(Block block) {
     final cs = Theme.of(context).colorScheme;
     final color = _baseBlockColor(block);
-    final duration =
-        _toMinutes(block.plannedEndTime) - _toMinutes(block.plannedStartTime);
+    final duration = _blockDurationMinutes(block);
     final note = block.id.startsWith('prayer_')
         ? 'Prayer time - auto-inserted'
         : 'Fixed Event - scheduler won\'t move this';
@@ -823,7 +992,8 @@ class _TimelineViewState extends State<TimelineView> {
 
   Future<void> _saveBlockEdit(Block block, BlockEditorUpdate update) async {
     final app = context.read<AppProvider>();
-    final sourcePlan = app.getDayPlan(widget.dateKey);
+    final sourceDateKey = block.date.isNotEmpty ? block.date : widget.dateKey;
+    final sourcePlan = app.getDayPlan(sourceDateKey);
     if (sourcePlan == null) return;
     final sourceBlocks = List<Block>.from(sourcePlan.blocks ?? []);
     final sourceIndex = sourceBlocks.indexWhere((b) => b.id == block.id);
@@ -847,14 +1017,14 @@ class _TimelineViewState extends State<TimelineView> {
       type: update.type,
     );
 
-    if (update.dateKey == widget.dateKey) {
+    if (update.dateKey == sourceDateKey) {
       sourceBlocks[sourceIndex] = updatedBlock;
       await app.upsertDayPlan(
         sourcePlan.copyWith(blocks: _reindexBlocks(sourceBlocks)),
       );
-      await app.ensureRecurringBlocksForDate(widget.dateKey);
+      await app.ensureRecurringBlocksForDate(sourceDateKey);
       await app.rescheduleFrom(
-        widget.dateKey,
+        sourceDateKey,
         _anchorForStartTime(update.plannedStartTime),
       );
       return;
@@ -863,7 +1033,7 @@ class _TimelineViewState extends State<TimelineView> {
     sourceBlocks.removeAt(sourceIndex);
     final updatedSourceBlocks = _reindexBlocks(sourceBlocks);
     await app.upsertDayPlan(sourcePlan.copyWith(blocks: updatedSourceBlocks));
-    await app.syncFlowActivitiesFromDayPlan(widget.dateKey);
+    await app.syncFlowActivitiesFromDayPlan(sourceDateKey);
 
     final targetPlan = app.getDayPlan(update.dateKey);
     final targetBlocks =
@@ -875,8 +1045,8 @@ class _TimelineViewState extends State<TimelineView> {
       targetPlan?.copyWith(blocks: updatedTargetBlocks) ??
           _emptyPlanForDate(update.dateKey, updatedTargetBlocks),
     );
-    await app.ensureRecurringBlocksForDate(widget.dateKey);
-    if (update.dateKey != widget.dateKey) {
+    await app.ensureRecurringBlocksForDate(sourceDateKey);
+    if (update.dateKey != sourceDateKey) {
       await app.ensureRecurringBlocksForDate(update.dateKey);
     }
     await app.rescheduleFrom(
@@ -888,7 +1058,10 @@ class _TimelineViewState extends State<TimelineView> {
   void _deleteBlock(Block block) {
     context
         .read<AppProvider>()
-        .removeBlockFromDayPlan(block.id, widget.dateKey);
+        .removeBlockFromDayPlan(
+          block.id,
+          block.date.isNotEmpty ? block.date : widget.dateKey,
+        );
   }
 
   void _onReorder(int oldIndex, int newIndex, List<_TimelineItem> items) {
@@ -898,6 +1071,7 @@ class _TimelineViewState extends State<TimelineView> {
     if (movedItem.isGap ||
         movedItem.isWarning ||
         movedItem.block == null ||
+        movedItem.slice?.relation == _TimelineBlockRelation.carryIn ||
         _isLockedBlock(movedItem.block!)) {
       return;
     }
@@ -913,6 +1087,7 @@ class _TimelineViewState extends State<TimelineView> {
               !item.isGap &&
               !item.isWarning &&
               item.block != null &&
+              item.slice?.relation != _TimelineBlockRelation.carryIn &&
               !_isLockedBlock(item.block!),
         )
         .map((item) => item.block!)
@@ -1077,27 +1252,33 @@ class _TimelineViewState extends State<TimelineView> {
           );
         }
         final block = item.block!;
+        final slice = item.slice!;
 
         return KeyedSubtree(
-          key: ValueKey(block.id),
+          key: ValueKey('block_${block.id}_${slice.relation.name}'),
           child: _BlockCard(
-            block: block,
+            slice: slice,
             leading: const SizedBox(width: 22),
             onTap: () => _onBlockTap(block),
             onLongPress: () => _onBlockLongPress(block),
             onStatusTap:
-                _isLockedBlock(block) || block.status == BlockStatus.done
+                _isLockedBlock(block) ||
+                        block.status == BlockStatus.done ||
+                        slice.relation == _TimelineBlockRelation.carryIn
                     ? null
                     : () => _markBlockDone(block),
+            onAdjacentDateTap: slice.adjacentDate == null || widget.onOpenDate == null
+                ? null
+                : () => widget.onOpenDate!(slice.adjacentDate!),
             pastFraction: _pastFractionForBlock(
-              startMinutes: _toMinutes(block.plannedStartTime),
-              endMinutes: _toMinutes(block.plannedEndTime),
+              startMinutes: slice.visibleStartMinutes,
+              endMinutes: slice.visibleEndMinutes,
             ),
             nowLineOffset: _lineOffsetForRange(
-              startMinutes: _toMinutes(block.plannedStartTime),
-              endMinutes: _toMinutes(block.plannedEndTime),
+              startMinutes: slice.visibleStartMinutes,
+              endMinutes: slice.visibleEndMinutes,
               height: _timelinePillHeight(
-                _blockDurationMinutes(block),
+                slice.visibleDurationMinutes,
               ),
             ),
             nowLabel: nowLabel,
@@ -1112,6 +1293,7 @@ class _TimelineViewState extends State<TimelineView> {
 // -- Timeline Item --------------------------------------------------
 class _TimelineItem {
   final Block? block;
+  final _TimelineBlockSlice? slice;
   final int? gapStartMinutes;
   final int? gapEndMinutes;
   final bool isGap;
@@ -1120,13 +1302,14 @@ class _TimelineItem {
 
   const _TimelineItem._(
       {this.block,
+      this.slice,
       this.gapStartMinutes,
       this.gapEndMinutes,
       this.warningText,
       this.isWarning = false,
       required this.isGap});
-  factory _TimelineItem.block(Block b) =>
-      _TimelineItem._(block: b, isGap: false);
+  factory _TimelineItem.block(_TimelineBlockSlice slice) =>
+      _TimelineItem._(block: slice.block, slice: slice, isGap: false);
   factory _TimelineItem.gap(
           {required int gapStartMinutes, required int gapEndMinutes}) =>
       _TimelineItem._(
@@ -1614,33 +1797,31 @@ class _BlockCard extends StatelessWidget {
 */
 
 class _BlockCard extends StatelessWidget {
-  final Block block;
+  final _TimelineBlockSlice slice;
   final Widget? leading;
   final VoidCallback? onLongPress;
   final VoidCallback? onTap;
   final VoidCallback? onStatusTap;
+  final VoidCallback? onAdjacentDateTap;
   final double pastFraction;
   final double? nowLineOffset;
   final String nowLabel;
   final Color nowLineBackgroundColor;
 
   const _BlockCard({
-    required this.block,
+    required this.slice,
     this.leading,
     this.onTap,
     this.onLongPress,
     this.onStatusTap,
+    this.onAdjacentDateTap,
     this.pastFraction = 0,
     this.nowLineOffset,
     required this.nowLabel,
     required this.nowLineBackgroundColor,
   });
 
-  static int _toMinutes(String hhmm) {
-    final parts = hhmm.split(':');
-    if (parts.length != 2) return 0;
-    return (int.tryParse(parts[0]) ?? 0) * 60 + (int.tryParse(parts[1]) ?? 0);
-  }
+  Block get block => slice.block;
 
   IconData _iconForBlock() {
     final lowerTitle = block.title.toLowerCase();
@@ -1888,10 +2069,7 @@ class _BlockCard extends StatelessWidget {
     final timeLabelColor =
         theme.textTheme.bodySmall?.color ?? theme.colorScheme.onSurfaceVariant;
     final accent = _baseBlockColor(block);
-    final startMin = _toMinutes(block.plannedStartTime);
-    final endMin = _toMinutes(block.plannedEndTime);
-    final plannedDuration =
-        endMin > startMin ? endMin - startMin : block.plannedDurationMinutes;
+    final plannedDuration = slice.visibleDurationMinutes;
     final isDone = block.status == BlockStatus.done;
     final isSplit = block.splitTotalParts != null && block.splitTotalParts! > 1;
     final neutralPillColor = theme.colorScheme.surface.withValues(alpha: 0.78);
@@ -1900,9 +2078,8 @@ class _BlockCard extends StatelessWidget {
     final statusRingColor = isDone
         ? accent.withValues(alpha: 0.3)
         : onSurface.withValues(alpha: 0.2);
-    final startLabel = _to12hShort(block.plannedStartTime);
-    final rangeLabel =
-        '${_to12h(block.plannedStartTime)} - ${_to12h(block.plannedEndTime)}';
+    final startLabel = slice.startLabel;
+    final rangeLabel = slice.rangeLabel;
     final actualStartTime =
         _normalizeTimeValue(block.actualStartTime) ?? block.plannedStartTime;
     final actualEndTime = _normalizeTimeValue(block.actualEndTime);
@@ -1910,7 +2087,9 @@ class _BlockCard extends StatelessWidget {
         (actualStartTime != block.plannedStartTime ||
             actualEndTime != block.plannedEndTime);
     final showDualTrack = isDone && hasDifferentActualRange;
-    final actualDuration = actualEndTime == null
+    final isCompactCard = plannedDuration <= 90 && !showDualTrack;
+    final actualDuration = actualEndTime == null ||
+            slice.relation != _TimelineBlockRelation.sameDay
         ? plannedDuration
         : _durationFromTimeRange(
             actualStartTime,
@@ -1923,16 +2102,16 @@ class _BlockCard extends StatelessWidget {
         math.max(18.0, _scaledTimelineHeight(actualDuration));
     final dualTrackHeight =
         math.max(plannedTrackHeight, actualTrackHeight) + 22;
+    final baseCardMinHeight = showDualTrack ? 0.0 : 84.0;
     final cardHeight = showDualTrack
         ? math.max(_timelinePillHeight(plannedDuration), dualTrackHeight)
-        : _timelinePillHeight(plannedDuration);
+        : math.max(_timelinePillHeight(plannedDuration), baseCardMinHeight);
     final double? nowIndicatorTop = nowLineOffset == null
         ? null
         : (nowLineOffset! - (_kNowOverlayHeight / 2))
             .clamp(0.0, math.max(0.0, cardHeight - _kNowOverlayHeight))
             .toDouble();
-    final plannedMetaLabel =
-        'Planned: ${_to12h(block.plannedStartTime)} - ${_to12h(block.plannedEndTime)}';
+    final plannedMetaLabel = 'Planned: $rangeLabel';
     final actualMetaLabel = actualEndTime == null
         ? null
         : 'Actual: ${_to12h(actualStartTime)} - ${_to12h(actualEndTime)}';
@@ -1986,7 +2165,8 @@ class _BlockCard extends StatelessWidget {
                           labelColor: onSurface.withValues(alpha: 0.52),
                           actualLabelColor: onSurfaceVariant,
                           checkIconColor: onSurface,
-                          plannedLabel: _to12hShort(block.plannedEndTime),
+                          plannedLabel:
+                              _to12hShort(_minutesToHHMM(slice.visibleEndMinutes % (24 * 60))),
                           actualLabel: _to12hShort(actualEndTime),
                           plannedHeight: plannedTrackHeight,
                           actualHeight: actualTrackHeight,
@@ -2002,24 +2182,24 @@ class _BlockCard extends StatelessWidget {
                   const SizedBox(width: _kTimelineContentGap),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.only(top: 4),
+                      padding: EdgeInsets.only(top: isCompactCard ? 0 : 4),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             block.title,
                             style: TextStyle(
-                              fontSize: 17,
-                              height: 1.12,
+                              fontSize: isCompactCard ? 14 : 16,
+                              height: isCompactCard ? 1.0 : 1.12,
                               fontWeight: FontWeight.w700,
                               color: isDone
                                   ? onSurface.withValues(alpha: 0.68)
                                   : onSurface,
                             ),
-                            maxLines: 2,
+                            maxLines: isCompactCard ? 1 : 2,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 6),
+                          SizedBox(height: isCompactCard ? 1 : 4),
                           if (showDualTrack) ...[
                             Text(
                               plannedMetaLabel,
@@ -2057,16 +2237,52 @@ class _BlockCard extends StatelessWidget {
                               ],
                             ),
                           ] else
-                            Text(
-                              rangeLabel,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: timeLabelColor,
-                                fontFeatures: const [
-                                  FontFeature.tabularFigures()
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    rangeLabel,
+                                    style: TextStyle(
+                                      fontSize: isCompactCard ? 11 : 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: timeLabelColor,
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures()
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                if (slice.adjacentActionLabel != null &&
+                                    onAdjacentDateTap != null) ...[
+                                  const SizedBox(width: 8),
+                                  InkWell(
+                                    onTap: onAdjacentDateTap,
+                                    borderRadius: BorderRadius.circular(999),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: accent.withValues(alpha: 0.12),
+                                        borderRadius:
+                                            BorderRadius.circular(999),
+                                        border: Border.all(
+                                          color: accent.withValues(alpha: 0.18),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        slice.adjacentActionLabel!,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: accent,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 ],
-                              ),
+                              ],
                             ),
                           if (isSplit) ...[
                             const SizedBox(height: 8),
@@ -2076,6 +2292,36 @@ class _BlockCard extends StatelessWidget {
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
                                 color: onSurface.withValues(alpha: 0.6),
+                              ),
+                            ),
+                          ],
+                          if (showDualTrack &&
+                              slice.adjacentActionLabel != null &&
+                              onAdjacentDateTap != null) ...[
+                            const SizedBox(height: 8),
+                            InkWell(
+                              onTap: onAdjacentDateTap,
+                              borderRadius: BorderRadius.circular(999),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: accent.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(
+                                    color: accent.withValues(alpha: 0.18),
+                                  ),
+                                ),
+                                child: Text(
+                                  slice.adjacentActionLabel!,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: accent,
+                                  ),
+                                ),
                               ),
                             ),
                           ],

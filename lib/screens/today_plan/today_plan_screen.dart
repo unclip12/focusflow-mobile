@@ -355,6 +355,13 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     }
   }
 
+  Future<void> _openTimelineDate(DateTime date) async {
+    _setStateIfMounted(
+      () => _selectedDate = DateTime(date.year, date.month, date.day),
+    );
+    await _refreshSelectedDateBlocks();
+  }
+
   void _openTrackNow() {
     final app = context.read<AppProvider>();
     final activeTrackNow = app.getActiveTrackNow(_dateKey);
@@ -643,8 +650,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                       onTrackNow: _openTrackNow,
                       onAddTask: _openAddTaskSheet,
                       onSelectDate: (selected) {
-                        _setStateIfMounted(() => _selectedDate = selected);
-                        unawaited(_refreshSelectedDateBlocks());
+                        unawaited(_openTimelineDate(selected));
                       },
                       dateKey: _dateKey,
                       blocks: displayBlocks,
@@ -730,6 +736,7 @@ class _TodayTimelineTab extends StatelessWidget {
           dateKey: dateKey,
           blocks: blocks,
           onAddTask: onAddTask,
+          onOpenDate: onSelectDate,
         ),
       ),
     );
