@@ -14,8 +14,8 @@ import 'package:focusflow_mobile/utils/date_utils.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import 'add_task_sheet.dart';
 import 'buying_tab.dart';
+import 'block_editor_sheet.dart';
 import 'day_session_screen.dart';
 import 'routine_editor_sheet.dart';
 import 'routines_tab.dart';
@@ -242,16 +242,126 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     );
   }
 
-  void _openAddTaskSheet() {
-    showModalBottomSheet<void>(
+  int _defaultStartMinutes() {
+    final now = DateTime.now();
+    final roundedMinutes = ((now.minute + 14) ~/ 15) * 15;
+    final rolledHour = now.hour + (roundedMinutes ~/ 60);
+    final normalizedHour = rolledHour.clamp(0, 23);
+    final normalizedMinute = roundedMinutes % 60;
+    return normalizedHour * 60 + normalizedMinute;
+  }
+
+  String _formatMinutesOfDay(int totalMinutes) {
+    final normalized = totalMinutes.clamp(0, 23 * 60 + 59);
+    final hours = normalized ~/ 60;
+    final minutes = normalized % 60;
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
+  }
+
+  int _sumMinutesByType(List<Block> blocks, bool Function(Block block) test) {
+    return blocks
+        .where(test)
+        .fold<int>(0, (sum, block) => sum + block.plannedDurationMinutes);
+  }
+
+  Block _buildDraftBlock({int? startMinutes, bool isEvent = false}) {
+    final initialStart = startMinutes ?? _defaultStartMinutes();
+    const defaultDurationMinutes = 60;
+    return Block(
+      id: 'draft_${DateTime.now().microsecondsSinceEpoch}',
+      index: 0,
+      date: _dateKey,
+      plannedStartTime: _formatMinutesOfDay(initialStart),
+      plannedEndTime: _formatMinutesOfDay(initialStart + defaultDurationMinutes),
+      type: BlockType.other,
+      title: isEvent ? 'New Event' : 'New Task',
+      plannedDurationMinutes: defaultDurationMinutes,
+      isEvent: isEvent,
+      status: BlockStatus.notStarted,
+    );
+  }
+
+  Future<void> _saveNewBlock(BlockEditorUpdate update, String blockId) async {
+    final app = context.read<AppProvider>();
+    final existingPlan = app.getDayPlan(update.dateKey);
+    final existingBlocks = List<Block>.from(existingPlan?.blocks ?? const []);
+    final newBlock = Block(
+      id: blockId,
+      index: existingBlocks.length,
+      date: update.dateKey,
+      plannedStartTime: update.plannedStartTime,
+      plannedEndTime: update.plannedEndTime,
+      type: update.type,
+      title: update.title,
+      description: update.description,
+      plannedDurationMinutes: update.plannedDurationMinutes,
+      isEvent: update.isEvent,
+      status: BlockStatus.notStarted,
+    );
+    final allBlocks = [...existingBlocks, newBlock];
+    final updatedPlan = existingPlan?.copyWith(
+          blocks: allBlocks,
+          totalStudyMinutesPlanned: _sumMinutesByType(
+            allBlocks,
+            (block) => block.type != BlockType.breakBlock,
+          ),
+          totalBreakMinutes: _sumMinutesByType(
+            allBlocks,
+            (block) => block.type == BlockType.breakBlock,
+          ),
+        ) ??
+        DayPlan(
+          date: update.dateKey,
+          faPages: const [],
+          faPagesCount: 0,
+          videos: const [],
+          notesFromUser: '',
+          notesFromAI: '',
+          attachments: const [],
+          breaks: const [],
+          blocks: allBlocks,
+          totalStudyMinutesPlanned: _sumMinutesByType(
+            allBlocks,
+            (block) => block.type != BlockType.breakBlock,
+          ),
+          totalBreakMinutes: _sumMinutesByType(
+            allBlocks,
+            (block) => block.type == BlockType.breakBlock,
+          ),
+        );
+
+    await app.upsertDayPlan(updatedPlan);
+    await app.syncFlowActivitiesFromDayPlan(update.dateKey);
+  }
+
+  Future<void> _showNewBlockEditor({
+    int? startMinutes,
+    bool isEvent = false,
+  }) async {
+    final draftBlock = _buildDraftBlock(
+      startMinutes: startMinutes,
+      isEvent: isEvent,
+    );
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => AddTaskSheet(
-        dateKey: _dateKey,
-        prefillCategory: null,
+      builder: (_) => BlockEditorSheet(
+        block: draftBlock,
+        onSave: (update) => _saveNewBlock(update, draftBlock.id),
+        onDelete: () => Navigator.of(context).pop(),
       ),
+    );
+  }
+
+  Future<void> _openAddTaskSheet({
+    int? startMinutes,
+    bool isEvent = false,
+  }) {
+    return _showNewBlockEditor(
+      startMinutes: startMinutes,
+      isEvent: isEvent,
     );
   }
 
@@ -436,7 +546,7 @@ class _TodayTimelineTab extends StatelessWidget {
   final VoidCallback onStartDay;
   final VoidCallback onStudySession;
   final VoidCallback onTrackNow;
-  final VoidCallback onAddTask;
+  final TimelineAddTaskCallback onAddTask;
   final ValueChanged<DateTime> onSelectDate;
   final String dateKey;
   final List<Block> blocks;

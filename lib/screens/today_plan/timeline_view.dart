@@ -18,6 +18,9 @@ import 'free_gap_panel.dart';
 import 'study_session_screen.dart';
 
 // -- Helpers --------------------------------------------------
+typedef TimelineAddTaskCallback =
+    Future<void> Function({int? startMinutes, bool isEvent});
+
 String _to12h(String hhmm) {
   final parts = hhmm.split(':');
   if (parts.length != 2) return hhmm;
@@ -104,7 +107,7 @@ String _categoryLabel(Block block) {
 class TimelineView extends StatefulWidget {
   final List<Block> blocks;
   final String dateKey;
-  final VoidCallback? onAddTask;
+  final TimelineAddTaskCallback? onAddTask;
 
   const TimelineView({
     super.key,
@@ -640,7 +643,11 @@ class _TimelineViewState extends State<TimelineView> {
                             startMinutes: item.gapStartMinutes!,
                             endMinutes: item.gapEndMinutes!,
                             onTap: () => _onGapTap(item),
-                            onAddTask: widget.onAddTask,
+                            onAddTask: widget.onAddTask == null
+                                ? null
+                                : () => widget.onAddTask!(
+                                      startMinutes: item.gapStartMinutes,
+                                    ),
                             isDark: isDark,
                           ),
                         );
