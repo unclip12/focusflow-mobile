@@ -190,6 +190,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _schedulePrayerNotifications();
       _showExpiredRoutineDialogs();
+      unawaited(_refreshSelectedDateBlocks());
     });
   }
 
@@ -205,11 +206,27 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
   bool get _isToday =>
       AppDateUtils.isSameDay(_selectedDate, AppDateUtils.getAdjustedDate());
 
-  void _prevDay() => _setStateIfMounted(
-      () => _selectedDate = _selectedDate.subtract(const Duration(days: 1)));
+  Future<void> _refreshSelectedDateBlocks() async {
+    final app = context.read<AppProvider>();
+    if (_dateKey == app.todayDateKey) {
+      await app.injectRoutinesIntoDayPlan(_dateKey);
+    }
+    await app.ensureRecurringBlocksForDate(_dateKey);
+  }
 
-  void _nextDay() => _setStateIfMounted(
-      () => _selectedDate = _selectedDate.add(const Duration(days: 1)));
+  void _prevDay() {
+    _setStateIfMounted(
+      () => _selectedDate = _selectedDate.subtract(const Duration(days: 1)),
+    );
+    unawaited(_refreshSelectedDateBlocks());
+  }
+
+  void _nextDay() {
+    _setStateIfMounted(
+      () => _selectedDate = _selectedDate.add(const Duration(days: 1)),
+    );
+    unawaited(_refreshSelectedDateBlocks());
+  }
 
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
@@ -218,7 +235,10 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
       firstDate: DateTime(2024),
       lastDate: DateTime(2027),
     );
-    if (picked != null) _setStateIfMounted(() => _selectedDate = picked);
+    if (picked != null) {
+      _setStateIfMounted(() => _selectedDate = picked);
+      await _refreshSelectedDateBlocks();
+    }
   }
 
   void _openTrackNow() {
@@ -325,6 +345,10 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
       title: update.title,
       description: update.description,
       plannedDurationMinutes: update.plannedDurationMinutes,
+      alertOffsetMinutes: update.alertOffsetMinutes,
+      alertType: update.alertType,
+      recurrenceType: update.recurrenceType,
+      recurrenceDays: update.recurrenceDays,
       isEvent: update.isEvent,
       status: BlockStatus.notStarted,
     );
@@ -362,6 +386,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
 
     await app.upsertDayPlan(updatedPlan);
     await app.syncFlowActivitiesFromDayPlan(update.dateKey);
+    await app.ensureRecurringBlocksForDate(update.dateKey);
   }
 
   Future<void> _showNewBlockEditor({

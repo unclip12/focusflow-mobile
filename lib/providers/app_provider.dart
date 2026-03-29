@@ -871,6 +871,185 @@ class AppProvider extends ChangeNotifier {
 
   bool _isRoutineInjectedBlock(Block block) => block.id.startsWith('routine-');
 
+  bool _isRecurringGeneratedBlock(Block block) =>
+      block.id.startsWith('repeat_');
+
+  DateTime? _parseBlockDate(String ymd) {
+    if (ymd.isEmpty) return null;
+    final parsed = DateTime.tryParse(ymd);
+    if (parsed == null) return null;
+    return _routineDateOnly(parsed);
+  }
+
+  int _weekdayIndex(DateTime date) => date.weekday - 1;
+
+  String _recurringOccurrenceId(String templateId, String date) =>
+      'repeat_${templateId}_$date';
+
+  bool _shouldGenerateRecurringBlockForDate(
+    Block block,
+    DateTime templateDate,
+    DateTime targetDate,
+  ) {
+    if (!targetDate.isAfter(templateDate)) {
+      return false;
+    }
+
+    switch (block.recurrenceType) {
+      case 'daily':
+        return true;
+      case 'weekly':
+        final targetWeekday = _weekdayIndex(targetDate);
+        final recurrenceDays = block.recurrenceDays.isEmpty
+            ? <int>[_weekdayIndex(templateDate)]
+            : block.recurrenceDays;
+        return recurrenceDays.contains(targetWeekday);
+      case 'monthly':
+        return templateDate.day == targetDate.day;
+      case 'yearly':
+        return templateDate.month == targetDate.month &&
+            templateDate.day == targetDate.day;
+      default:
+        return false;
+    }
+  }
+
+  List<BlockTask>? _resetRecurringTasks(
+    List<BlockTask>? tasks,
+    String date,
+  ) {
+    if (tasks == null) return null;
+    return tasks
+        .map(
+          (task) => BlockTask(
+            id: '${task.id}@$date',
+            type: task.type,
+            detail: task.detail,
+            completed: false,
+            meta: task.meta,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Block _buildRecurringBlockOccurrence(
+    Block template, {
+    required String date,
+    required int index,
+    Block? existing,
+  }) {
+    if (existing != null) {
+      return existing.copyWith(index: index, date: date);
+    }
+
+    return Block(
+      id: _recurringOccurrenceId(template.id, date),
+      index: index,
+      date: date,
+      plannedStartTime: template.plannedStartTime,
+      plannedEndTime: template.plannedEndTime,
+      type: template.type,
+      title: template.title,
+      description: template.description,
+      tasks: _resetRecurringTasks(template.tasks, date),
+      colorHex: template.colorHex,
+      alertOffsetMinutes: template.alertOffsetMinutes,
+      alertType: template.alertType,
+      recurrenceType: template.recurrenceType,
+      recurrenceDays: List<int>.from(template.recurrenceDays),
+      subtaskTitles: List<String>.from(template.subtaskTitles),
+      subtaskCompleted: List<bool>.filled(
+        template.subtaskCompleted.length,
+        false,
+      ),
+      relatedVideoId: template.relatedVideoId,
+      relatedFaPages: template.relatedFaPages == null
+          ? null
+          : List<int>.from(template.relatedFaPages!),
+      relatedAnkiInfo: template.relatedAnkiInfo == null
+          ? null
+          : Map<String, dynamic>.from(template.relatedAnkiInfo!),
+      relatedQbankInfo: template.relatedQbankInfo == null
+          ? null
+          : Map<String, dynamic>.from(template.relatedQbankInfo!),
+      plannedDurationMinutes: template.plannedDurationMinutes,
+      isEvent: template.isEvent,
+      splitGroupId: template.splitGroupId,
+      splitPartIndex: template.splitPartIndex,
+      splitTotalParts: template.splitTotalParts,
+      remainingDurationMinutes: template.plannedDurationMinutes,
+      status: BlockStatus.notStarted,
+      isVirtual: template.isVirtual,
+    );
+  }
+
+  Future<void> ensureRecurringBlocksForDate(String date) async {
+    final targetDate = _parseBlockDate(date);
+    if (targetDate == null) return;
+
+    final existingPlan = getDayPlan(date);
+    final existingBlocks = List<Block>.from(existingPlan?.blocks ?? const []);
+    final repeatBlocksById = <String, Block>{
+      for (final block in existingBlocks)
+        if (_isRecurringGeneratedBlock(block)) block.id: block,
+    };
+    final staticBlocks = existingBlocks
+        .where((block) => !_isRecurringGeneratedBlock(block))
+        .toList(growable: false);
+    final generatedBlocks = <Block>[];
+
+    for (final plan in dayPlans) {
+      for (final block in plan.blocks ?? const <Block>[]) {
+        if (_isRecurringGeneratedBlock(block) || block.recurrenceType == 'none') {
+          continue;
+        }
+        final templateDate = _parseBlockDate(block.date);
+        if (templateDate == null ||
+            !_shouldGenerateRecurringBlockForDate(
+              block,
+              templateDate,
+              targetDate,
+            )) {
+          continue;
+        }
+
+        final occurrenceId = _recurringOccurrenceId(block.id, date);
+        generatedBlocks.add(
+          _buildRecurringBlockOccurrence(
+            block,
+            date: date,
+            index: generatedBlocks.length,
+            existing: repeatBlocksById[occurrenceId],
+          ),
+        );
+      }
+    }
+
+    final reconciledBlocks = [...staticBlocks, ...generatedBlocks]..sort((a, b) {
+        final startCompare =
+            _toMinutes(a.plannedStartTime).compareTo(_toMinutes(b.plannedStartTime));
+        if (startCompare != 0) {
+          return startCompare;
+        }
+        return a.id.compareTo(b.id);
+      });
+    final normalizedExistingBlocks = _reindexBlocks(existingBlocks);
+    final normalizedReconciledBlocks = _reindexBlocks(reconciledBlocks);
+    if (_sameBlockLists(normalizedExistingBlocks, normalizedReconciledBlocks)) {
+      return;
+    }
+    if (existingPlan == null && normalizedReconciledBlocks.isEmpty) {
+      return;
+    }
+
+    final updatedPlan =
+        existingPlan?.copyWith(blocks: normalizedReconciledBlocks) ??
+            _buildMinimalDayPlan(date, normalizedReconciledBlocks);
+    await _saveDayPlan(updatedPlan, notify: false);
+    await syncFlowActivitiesFromDayPlan(date, notify: false);
+    notifyListeners();
+  }
+
   Block _buildRoutineInjectedBlock(
     Routine routine, {
     required String date,

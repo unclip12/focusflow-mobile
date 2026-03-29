@@ -15,6 +15,10 @@ class BlockEditorUpdate {
   final String plannedStartTime;
   final String plannedEndTime;
   final int plannedDurationMinutes;
+  final int? alertOffsetMinutes;
+  final String? alertType;
+  final String recurrenceType;
+  final List<int> recurrenceDays;
   final bool isEvent;
   final BlockType type;
 
@@ -25,6 +29,10 @@ class BlockEditorUpdate {
     required this.plannedStartTime,
     required this.plannedEndTime,
     required this.plannedDurationMinutes,
+    required this.alertOffsetMinutes,
+    required this.alertType,
+    required this.recurrenceType,
+    required this.recurrenceDays,
     required this.isEvent,
     required this.type,
   });
@@ -122,10 +130,10 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
     _selectedEmoji =
         _leadingEmoji(widget.block.title) ?? _defaultEmoji(widget.block);
     _colorHex = _hexFromColor(_headerColor);
-    _alertOffsetMinutes = -1;
-    _alertType = 'nudge';
-    _recurrenceType = 'none';
-    _recurrenceDays = <int>[];
+    _alertOffsetMinutes = widget.block.alertOffsetMinutes ?? -1;
+    _alertType = widget.block.alertType ?? 'nudge';
+    _recurrenceType = widget.block.recurrenceType;
+    _recurrenceDays = List<int>.from(widget.block.recurrenceDays)..sort();
     _titleController =
         TextEditingController(text: _stripLeadingEmoji(widget.block.title));
     _notesController =
@@ -548,6 +556,12 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
           plannedStartTime: _toHhmm(_selectedStartTime),
           plannedEndTime: _toHhmm(end),
           plannedDurationMinutes: _durationMinutes,
+          alertOffsetMinutes: _alertOffsetMinutes == -1
+              ? null
+              : _alertOffsetMinutes,
+          alertType: _alertOffsetMinutes == -1 ? null : _alertType,
+          recurrenceType: _recurrenceType,
+          recurrenceDays: List<int>.from(_recurrenceDays)..sort(),
           isEvent: _isEvent,
           type: _selectedType,
         ),

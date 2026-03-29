@@ -323,10 +323,12 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
   }
 
   Future<int?> _pickTaskDurationMinutes(int initialMinutes) {
-    return showDialog<int>(
+    return showModalBottomSheet<int>(
       context: context,
-      builder: (dialogContext) {
-        return _TaskDurationDialog(initialMinutes: initialMinutes);
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return _TaskDurationPickerSheet(initialMinutes: initialMinutes);
       },
     );
   }
@@ -2092,86 +2094,295 @@ class _PlannedSessionCard extends StatelessWidget {
   }
 }
 
-class _TaskDurationDialog extends StatefulWidget {
+class _TaskDurationPickerSheet extends StatefulWidget {
   final int initialMinutes;
 
-  const _TaskDurationDialog({
+  const _TaskDurationPickerSheet({
     required this.initialMinutes,
   });
 
   @override
-  State<_TaskDurationDialog> createState() => _TaskDurationDialogState();
+  State<_TaskDurationPickerSheet> createState() =>
+      _TaskDurationPickerSheetState();
 }
 
-class _TaskDurationDialogState extends State<_TaskDurationDialog> {
-  late final TextEditingController _controller;
-  String? _errorText;
+class _TaskDurationPickerSheetState extends State<_TaskDurationPickerSheet> {
+  static const _bodyColor = Color(0xFF1C1C1E);
+  static const _cardColor = Color(0xFF252528);
+  static const _accentColor = Color(0xFF8B5CF6);
+  static const _wheelItemExtent = 40.0;
+  static const _wheelHeight = _wheelItemExtent * 5;
+  static const _maxHours = 99;
+
+  late final FixedExtentScrollController _hoursController;
+  late final FixedExtentScrollController _minutesController;
+  late int _hours;
+  late int _minutes;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.initialMinutes.toString());
+    final safeMinutes = widget.initialMinutes < 1 ? 1 : widget.initialMinutes;
+    _hours = safeMinutes ~/ 60;
+    _minutes = safeMinutes % 60;
+    _hoursController = FixedExtentScrollController(
+      initialItem: _hours.clamp(0, _maxHours),
+    );
+    _minutesController = FixedExtentScrollController(initialItem: _minutes);
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _hoursController.dispose();
+    _minutesController.dispose();
     super.dispose();
   }
 
-  void _save() {
-    final minutes = int.tryParse(_controller.text.trim());
-    if (minutes == null || minutes < 5 || minutes > 120) {
-      setState(() {
-        _errorText = 'Enter a value from 5 to 120.';
-      });
-      return;
-    }
+  int get _totalMinutes {
+    final total = (_hours * 60) + _minutes;
+    return total < 1 ? 1 : total;
+  }
 
-    Navigator.of(context).pop(minutes);
+  String _durationLabel(int totalMinutes) {
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes % 60;
+    if (hours == 0) return '$minutes min';
+    if (minutes == 0) return '$hours hr';
+    return '$hours hr $minutes min';
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Task duration'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('5 - 120 min'),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _controller,
-            keyboardType: TextInputType.number,
-            autofocus: true,
-            decoration: InputDecoration(
-              labelText: 'Minutes',
-              suffixText: 'min',
-              errorText: _errorText,
+    final bottomPadding = MediaQuery.of(context).padding.bottom + 20;
+
+    return Material(
+      color: Colors.transparent,
+      child: FractionallySizedBox(
+        heightFactor: 0.6,
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          child: Material(
+            color: _bodyColor,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(20, 12, 20, bottomPadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Task duration',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _durationLabel(_totalMinutes),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: _cardColor,
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Container(
+                              height: _wheelItemExtent + 8,
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.06),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.08),
+                                ),
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _DurationWheelColumn(
+                                    controller: _hoursController,
+                                    itemCount: _maxHours + 1,
+                                    selectedItem: _hours.clamp(0, _maxHours),
+                                    onSelectedItemChanged: (value) {
+                                      setState(() {
+                                        _hours = value;
+                                      });
+                                    },
+                                    labelBuilder: (value, isSelected) => Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          value.toString().padLeft(2, '0'),
+                                          style: _wheelTextStyle(isSelected),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'hr',
+                                          style: _wheelUnitStyle(isSelected),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _DurationWheelColumn(
+                                    controller: _minutesController,
+                                    itemCount: 60,
+                                    selectedItem: _minutes,
+                                    onSelectedItemChanged: (value) {
+                                      setState(() {
+                                        _minutes = value;
+                                      });
+                                    },
+                                    labelBuilder: (value, isSelected) => Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          value.toString().padLeft(2, '0'),
+                                          style: _wheelTextStyle(isSelected),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'min',
+                                          style: _wheelUnitStyle(isSelected),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white70,
+                              side: BorderSide(
+                                color: Colors.white.withValues(alpha: 0.16),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () =>
+                                Navigator.of(context).pop(_totalMinutes),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: _accentColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                            ),
+                            child: const Text('Save'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
-            onChanged: (_) {
-              if (_errorText == null) {
-                return;
-              }
-              setState(() {
-                _errorText = null;
-              });
-            },
-            onSubmitted: (_) => _save(),
           ),
-        ],
+        ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+    );
+  }
+
+  TextStyle _wheelTextStyle(bool isSelected) {
+    return TextStyle(
+      color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.34),
+      fontSize: isSelected ? 24 : 19,
+      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+    );
+  }
+
+  TextStyle _wheelUnitStyle(bool isSelected) {
+    return TextStyle(
+      color: isSelected
+          ? Colors.white.withValues(alpha: 0.78)
+          : Colors.white.withValues(alpha: 0.26),
+      fontSize: isSelected ? 14 : 12,
+      fontWeight: FontWeight.w700,
+    );
+  }
+}
+
+class _DurationWheelColumn extends StatelessWidget {
+  final FixedExtentScrollController controller;
+  final int itemCount;
+  final int selectedItem;
+  final ValueChanged<int> onSelectedItemChanged;
+  final Widget Function(int value, bool isSelected) labelBuilder;
+
+  const _DurationWheelColumn({
+    required this.controller,
+    required this.itemCount,
+    required this.selectedItem,
+    required this.onSelectedItemChanged,
+    required this.labelBuilder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: _TaskDurationPickerSheetState._wheelHeight,
+      child: ListWheelScrollView.useDelegate(
+        controller: controller,
+        itemExtent: _TaskDurationPickerSheetState._wheelItemExtent,
+        physics: const FixedExtentScrollPhysics(),
+        diameterRatio: 1.45,
+        perspective: 0.004,
+        onSelectedItemChanged: onSelectedItemChanged,
+        childDelegate: ListWheelChildBuilderDelegate(
+          childCount: itemCount,
+          builder: (context, index) {
+            return Center(
+              child: labelBuilder(index, index == selectedItem),
+            );
+          },
         ),
-        FilledButton(
-          onPressed: _save,
-          child: const Text('Save'),
-        ),
-      ],
+      ),
     );
   }
 }

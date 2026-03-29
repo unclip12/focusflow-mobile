@@ -461,6 +461,10 @@ class _TimelineViewState extends State<TimelineView> {
       title: update.title,
       description: update.description,
       plannedDurationMinutes: update.plannedDurationMinutes,
+      alertOffsetMinutes: update.alertOffsetMinutes,
+      alertType: update.alertType,
+      recurrenceType: update.recurrenceType,
+      recurrenceDays: update.recurrenceDays,
       isEvent: update.isEvent,
       status: BlockStatus.notStarted,
     );
@@ -507,6 +511,7 @@ class _TimelineViewState extends State<TimelineView> {
 
     await app.upsertDayPlan(updatedPlan);
     await app.syncFlowActivitiesFromDayPlan(update.dateKey);
+    await app.ensureRecurringBlocksForDate(update.dateKey);
   }
 
   Future<void> _showNewBlockEditor(Block draftBlock) async {
@@ -846,6 +851,10 @@ class _TimelineViewState extends State<TimelineView> {
       plannedStartTime: update.plannedStartTime,
       plannedEndTime: update.plannedEndTime,
       plannedDurationMinutes: update.plannedDurationMinutes,
+      alertOffsetMinutes: update.alertOffsetMinutes,
+      alertType: update.alertType,
+      recurrenceType: update.recurrenceType,
+      recurrenceDays: update.recurrenceDays,
       remainingDurationMinutes: update.plannedDurationMinutes > 0
           ? update.plannedDurationMinutes
           : block.remainingDurationMinutes,
@@ -858,6 +867,7 @@ class _TimelineViewState extends State<TimelineView> {
       await app.upsertDayPlan(
         sourcePlan.copyWith(blocks: _reindexBlocks(sourceBlocks)),
       );
+      await app.ensureRecurringBlocksForDate(widget.dateKey);
       await app.rescheduleFrom(
         widget.dateKey,
         _anchorForStartTime(update.plannedStartTime),
@@ -880,6 +890,10 @@ class _TimelineViewState extends State<TimelineView> {
       targetPlan?.copyWith(blocks: updatedTargetBlocks) ??
           _emptyPlanForDate(update.dateKey, updatedTargetBlocks),
     );
+    await app.ensureRecurringBlocksForDate(widget.dateKey);
+    if (update.dateKey != widget.dateKey) {
+      await app.ensureRecurringBlocksForDate(update.dateKey);
+    }
     await app.rescheduleFrom(
       update.dateKey,
       _anchorForStartTime(update.plannedStartTime),
