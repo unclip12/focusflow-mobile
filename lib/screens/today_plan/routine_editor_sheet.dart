@@ -1006,6 +1006,7 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final scaffoldBackgroundColor = Theme.of(context).scaffoldBackgroundColor;
     final isEdit = widget.existing != null;
 
     return DraggableScrollableSheet(
@@ -1013,155 +1014,167 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
       maxChildSize: 0.95,
       minChildSize: 0.5,
       expand: false,
-      builder: (context, scroll) => ListView(
-        controller: scroll,
-        padding: EdgeInsets.fromLTRB(
-          20,
-          0,
-          20,
-          MediaQuery.of(context).viewInsets.bottom +
-              MediaQuery.of(context).padding.bottom +
+      builder: (context, scroll) => AnimatedPadding(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          color: scaffoldBackgroundColor,
+          child: SingleChildScrollView(
+            controller: scroll,
+            padding: EdgeInsets.fromLTRB(
               20,
-        ),
-        children: [
-          const SizedBox(height: 12),
-          Center(
-            child: Container(
-              width: 32,
-              height: 4,
-              decoration: BoxDecoration(
-                color: cs.onSurface.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(4),
-              ),
+              0,
+              20,
+              MediaQuery.of(context).padding.bottom + 20,
             ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            isEdit ? 'Edit Routine' : 'Create Routine',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: cs.onSurface,
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _nameCtrl,
-            decoration: InputDecoration(
-              labelText: 'Routine name',
-              hintText: 'e.g., Morning Routine',
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 40,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: _icons.map((icon) {
-                final selected = _icon == icon;
-                return GestureDetector(
-                  onTap: () => setState(() => _icon = icon),
-                  child: Container(
-                    width: 40,
-                    margin: const EdgeInsets.only(right: 6),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? cs.primary.withValues(alpha: 0.15)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: selected
-                            ? cs.primary
-                            : cs.onSurface.withValues(alpha: 0.1),
-                      ),
-                    ),
-                    child: Center(
-                      child: Text(icon, style: const TextStyle(fontSize: 20)),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 32,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: _colors.map((colorValue) {
-                final selected = _color == colorValue;
-                return GestureDetector(
-                  onTap: () => setState(() => _color = colorValue),
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Center(
                   child: Container(
                     width: 32,
-                    margin: const EdgeInsets.only(right: 6),
+                    height: 4,
                     decoration: BoxDecoration(
-                      color: Color(colorValue),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: selected ? Colors.white : Colors.transparent,
-                        width: 2,
-                      ),
-                      boxShadow: selected
-                          ? [
-                              BoxShadow(
-                                color: Color(colorValue).withValues(alpha: 0.5),
-                                blurRadius: 8,
-                              ),
-                            ]
-                          : null,
+                      color: cs.onSurface.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(4),
                     ),
-                    child: selected
-                        ? const Center(
-                            child: Icon(
-                              Icons.check_rounded,
-                              size: 16,
-                              color: Colors.white,
-                            ),
-                          )
-                        : null,
                   ),
-                );
-              }).toList(),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  isEdit ? 'Edit Routine' : 'Create Routine',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _nameCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Routine name',
+                    hintText: 'e.g., Morning Routine',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 40,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: _icons.map((icon) {
+                      final selected = _icon == icon;
+                      return GestureDetector(
+                        onTap: () => setState(() => _icon = icon),
+                        child: Container(
+                          width: 40,
+                          margin: const EdgeInsets.only(right: 6),
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? cs.primary.withValues(alpha: 0.15)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: selected
+                                  ? cs.primary
+                                  : cs.onSurface.withValues(alpha: 0.1),
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(icon,
+                                style: const TextStyle(fontSize: 20)),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 32,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: _colors.map((colorValue) {
+                      final selected = _color == colorValue;
+                      return GestureDetector(
+                        onTap: () => setState(() => _color = colorValue),
+                        child: Container(
+                          width: 32,
+                          margin: const EdgeInsets.only(right: 6),
+                          decoration: BoxDecoration(
+                            color: Color(colorValue),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color:
+                                  selected ? Colors.white : Colors.transparent,
+                              width: 2,
+                            ),
+                            boxShadow: selected
+                                ? [
+                                    BoxShadow(
+                                      color: Color(colorValue)
+                                          .withValues(alpha: 0.5),
+                                      blurRadius: 8,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: selected
+                              ? const Center(
+                                  child: Icon(
+                                    Icons.check_rounded,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : null,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildReminderCard(cs),
+                const SizedBox(height: 12),
+                _buildReminderRepeatCard(cs),
+                if (_reminderTime != null) const SizedBox(height: 16),
+                _buildStepsSection(cs),
+                const SizedBox(height: 16),
+                _buildSubtasksSection(cs),
+                const SizedBox(height: 16),
+                _buildRoutineRecurrenceSection(cs),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _save,
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      backgroundColor: Color(_color),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: Text(
+                      isEdit ? 'Save Changes' : 'Create Routine',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          _buildReminderCard(cs),
-          const SizedBox(height: 12),
-          _buildReminderRepeatCard(cs),
-          if (_reminderTime != null) const SizedBox(height: 16),
-          _buildStepsSection(cs),
-          const SizedBox(height: 16),
-          _buildSubtasksSection(cs),
-          const SizedBox(height: 16),
-          _buildRoutineRecurrenceSection(cs),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _save,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                backgroundColor: Color(_color),
-                foregroundColor: Colors.white,
-              ),
-              child: Text(
-                isEdit ? 'Save Changes' : 'Create Routine',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
+        ),
       ),
     );
   }

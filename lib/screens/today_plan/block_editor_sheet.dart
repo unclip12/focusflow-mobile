@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:focusflow_mobile/models/day_plan.dart';
+import 'package:focusflow_mobile/services/task_suggestions_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 
 import 'alert_repeat_sheet.dart';
@@ -46,22 +47,49 @@ class BlockEditorSheet extends StatefulWidget {
 }
 
 class _BlockEditorSheetState extends State<BlockEditorSheet> {
-  static const _bodyColor = Color(0xFF171717);
+  static const _bodyColor = Color(0xFF1C1C1E);
   static const _cardColor = Color(0xFF252528);
   static const _accentColor = Color(0xFFFF8E88);
   static const _defaultHeaderColor = Color(0xFFD77A78);
   static const _emojiOptions = <String>[
-    '📚', '📝', '🎯', '✅', '🧠', '📖', '💼', '🍽️', '🚶', '🧹', '🛒', '⚡',
+    '📚',
+    '📝',
+    '🎯',
+    '✅',
+    '🧠',
+    '📖',
+    '💼',
+    '🍽️',
+    '🚶',
+    '🧹',
+    '🛒',
+    '⚡',
   ];
   static const _headerChoices = <Color>[
     _defaultHeaderColor,
+    Color(0xFF4A90D9),
+    Color(0xFF5856D6),
+    Color(0xFF30D158),
+    Color(0xFFFF9F0A),
+    Color(0xFFBF5AF2),
+    Color(0xFFFF6B6B),
+    Color(0xFF1C1C1E),
+    Color(0xFFE8837A),
     Color(0xFF7A89D7),
     Color(0xFF6FB89E),
     Color(0xFFDAA768),
     Color(0xFF8E78D4),
     Color(0xFF6D7A86),
   ];
-  static const _weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  static const _weekdayLabels = [
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+    'Sun'
+  ];
 
   late final TextEditingController _titleController;
   late final TextEditingController _notesController;
@@ -71,30 +99,37 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
   late bool _isEvent;
   late BlockType _selectedType;
   late String _selectedEmoji;
+  late String _colorHex;
   late int _alertOffsetMinutes;
   late String _alertType;
   late String _recurrenceType;
   late List<int> _recurrenceDays;
 
   bool _isSaving = false;
+  bool _userChangedEmoji = false;
+  bool _userChangedColor = false;
   Color _headerColor = _defaultHeaderColor;
 
   @override
   void initState() {
     super.initState();
     _selectedDate = DateTime.tryParse(widget.block.date) ?? DateTime.now();
-    _selectedStartTime =
-        _parseTime(widget.block.plannedStartTime) ?? const TimeOfDay(hour: 8, minute: 0);
+    _selectedStartTime = _parseTime(widget.block.plannedStartTime) ??
+        const TimeOfDay(hour: 8, minute: 0);
     _durationMinutes = _resolvedDuration(widget.block);
     _isEvent = widget.block.isEvent;
     _selectedType = widget.block.type;
-    _selectedEmoji = _leadingEmoji(widget.block.title) ?? _defaultEmoji(widget.block);
+    _selectedEmoji =
+        _leadingEmoji(widget.block.title) ?? _defaultEmoji(widget.block);
+    _colorHex = _hexFromColor(_headerColor);
     _alertOffsetMinutes = -1;
     _alertType = 'nudge';
     _recurrenceType = 'none';
     _recurrenceDays = <int>[];
-    _titleController = TextEditingController(text: _stripLeadingEmoji(widget.block.title));
-    _notesController = TextEditingController(text: widget.block.description ?? '');
+    _titleController =
+        TextEditingController(text: _stripLeadingEmoji(widget.block.title));
+    _notesController =
+        TextEditingController(text: widget.block.description ?? '');
   }
 
   @override
@@ -212,6 +247,23 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
     return '$_selectedEmoji ${plain.isEmpty ? fallback : plain}'.trim();
   }
 
+  Color _colorFromHex(String colorHex) {
+    final sanitized = colorHex.replaceAll('#', '').trim();
+    if (sanitized.length != 6) {
+      return _defaultHeaderColor;
+    }
+    final value = int.tryParse('FF$sanitized', radix: 16);
+    if (value == null) {
+      return _defaultHeaderColor;
+    }
+    return Color(value);
+  }
+
+  String _hexFromColor(Color color) {
+    final value = color.toARGB32() & 0x00FFFFFF;
+    return '#${value.toRadixString(16).padLeft(6, '0').toUpperCase()}';
+  }
+
   String _statusLabel(BlockStatus status) {
     switch (status) {
       case BlockStatus.notStarted:
@@ -255,7 +307,8 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: _cardColor,
-        title: const Text('Choose emoji', style: TextStyle(color: Colors.white)),
+        title:
+            const Text('Choose emoji', style: TextStyle(color: Colors.white)),
         content: Wrap(
           spacing: 10,
           runSpacing: 10,
@@ -279,7 +332,12 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
         ),
       ),
     );
-    if (value != null && mounted) setState(() => _selectedEmoji = value);
+    if (value != null && mounted) {
+      setState(() {
+        _userChangedEmoji = true;
+        _selectedEmoji = value;
+      });
+    }
   }
 
   Future<void> _pickHeaderColor() async {
@@ -303,12 +361,16 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
           children: [
             const Text(
               'Sheet accent',
-              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
             Text(
               'This affects the editor only. Blocks do not have a persisted color field.',
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.6), height: 1.4),
+              style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6), height: 1.4),
             ),
             const SizedBox(height: 18),
             Wrap(
@@ -327,7 +389,7 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: Colors.white.withValues(alpha: 0.75),
-                          width: _headerColor == color ? 3 : 1,
+                          width: _colorHex == _hexFromColor(color) ? 3 : 1,
                         ),
                       ),
                     ),
@@ -338,7 +400,13 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
         ),
       ),
     );
-    if (value != null && mounted) setState(() => _headerColor = value);
+    if (value != null && mounted) {
+      setState(() {
+        _userChangedColor = true;
+        _headerColor = value;
+        _colorHex = _hexFromColor(value);
+      });
+    }
   }
 
   Future<void> _pickDate() async {
@@ -390,10 +458,12 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
     );
     if (result == null || !mounted) return;
     setState(() {
-      _alertOffsetMinutes = result['alertOffsetMinutes'] as int? ?? _alertOffsetMinutes;
+      _alertOffsetMinutes =
+          result['alertOffsetMinutes'] as int? ?? _alertOffsetMinutes;
       _alertType = result['alertType'] as String? ?? _alertType;
       _recurrenceType = result['recurrenceType'] as String? ?? _recurrenceType;
-      _recurrenceDays = List<int>.from(result['recurrenceDays'] as List<dynamic>? ?? _recurrenceDays)
+      _recurrenceDays = List<int>.from(
+          result['recurrenceDays'] as List<dynamic>? ?? _recurrenceDays)
         ..sort();
     });
   }
@@ -453,7 +523,8 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
   }
 
   String _repeatRowSummary() {
-    if (_recurrenceType != 'weekly') return _recurrenceTypeLabel(_recurrenceType);
+    if (_recurrenceType != 'weekly')
+      return _recurrenceTypeLabel(_recurrenceType);
     final labels = _recurrenceDays
         .where((day) => day >= 0 && day < _weekdayLabels.length)
         .map((day) => _weekdayLabels[day])
@@ -471,7 +542,9 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
         BlockEditorUpdate(
           dateKey: _dateKey(_selectedDate),
           title: _composeTitle(),
-          description: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+          description: _notesController.text.trim().isEmpty
+              ? null
+              : _notesController.text.trim(),
           plannedStartTime: _toHhmm(_selectedStartTime),
           plannedEndTime: _toHhmm(end),
           plannedDurationMinutes: _durationMinutes,
@@ -491,297 +564,340 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
     final durationLabel = _formatDuration(_durationMinutes);
     final dateLabel = DateFormat('EEE, MMM d, yyyy').format(_selectedDate);
     final relativeLabel = _relativeDateLabel(_selectedDate);
-    final bottomPadding = MediaQuery.of(context).viewInsets.bottom +
-        MediaQuery.of(context).padding.bottom +
-        20;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final bottomPadding = MediaQuery.of(context).padding.bottom + 20;
 
     return FractionallySizedBox(
       heightFactor: 0.96,
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
-        child: Material(
-          color: _bodyColor,
-          child: Column(
-            children: [
-              Container(
-                color: _headerColor,
-                padding: EdgeInsets.fromLTRB(
-                  18,
-                  18,
-                  18,
-                  MediaQuery.of(context).padding.top + 18,
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        _CircleIconButton(
-                          icon: Icons.close_rounded,
-                          onTap: () => Navigator.of(context).pop(),
-                        ),
-                        const Spacer(),
-                        _StatusRing(status: widget.block.status),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Stack(
-                      clipBehavior: Clip.none,
-                      alignment: Alignment.center,
-                      children: [
-                        InkWell(
-                          onTap: _pickEmoji,
-                          borderRadius: BorderRadius.circular(999),
-                          child: Container(
-                            width: 82,
-                            height: 82,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF49494D),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 3),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(_selectedEmoji, style: const TextStyle(fontSize: 34)),
+      child: AnimatedPadding(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
+          child: Material(
+            color: _bodyColor,
+            child: Column(
+              children: [
+                Container(
+                  color: _headerColor,
+                  padding: EdgeInsets.fromLTRB(
+                    18,
+                    18,
+                    18,
+                    MediaQuery.of(context).padding.top + 18,
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          _CircleIconButton(
+                            icon: Icons.close_rounded,
+                            onTap: () => Navigator.of(context).pop(),
                           ),
-                        ),
-                        Positioned(
-                          bottom: -10,
-                          child: Material(
-                            color: _accentColor,
-                            shape: const CircleBorder(),
-                            child: InkWell(
-                              onTap: _pickHeaderColor,
-                              customBorder: const CircleBorder(),
-                              child: const SizedBox(
-                                width: 34,
-                                height: 34,
-                                child: Icon(Icons.palette_outlined, color: Colors.white, size: 18),
+                          const Spacer(),
+                          _StatusRing(status: widget.block.status),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Stack(
+                        clipBehavior: Clip.none,
+                        alignment: Alignment.center,
+                        children: [
+                          InkWell(
+                            onTap: _pickEmoji,
+                            borderRadius: BorderRadius.circular(999),
+                            child: Container(
+                              width: 82,
+                              height: 82,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF49494D),
+                                shape: BoxShape.circle,
+                                border:
+                                    Border.all(color: Colors.white, width: 3),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(_selectedEmoji,
+                                  style: const TextStyle(fontSize: 34)),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: -10,
+                            child: Material(
+                              color: _accentColor,
+                              shape: const CircleBorder(),
+                              child: InkWell(
+                                onTap: _pickHeaderColor,
+                                customBorder: const CircleBorder(),
+                                child: const SizedBox(
+                                  width: 34,
+                                  height: 34,
+                                  child: Icon(Icons.palette_outlined,
+                                      color: Colors.white, size: 18),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      '$timeLabel ($durationLabel)',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    TextField(
-                      controller: _titleController,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 30,
-                        fontWeight: FontWeight.w800,
-                      ),
-                      cursorColor: Colors.white,
-                      decoration: const InputDecoration(
-                        hintText: 'Task title',
-                        hintStyle: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 30,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        enabledBorder:
-                            UnderlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                        focusedBorder:
-                            UnderlineInputBorder(borderSide: BorderSide(color: Colors.white)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _Card(
-                        children: [
-                          _ActionRow(
-                            icon: Icons.calendar_today_rounded,
-                            iconColor: _accentColor,
-                            title: dateLabel,
-                            trailing: relativeLabel,
-                            onTap: _pickDate,
-                          ),
-                          _ActionRow(
-                            icon: Icons.access_time_filled_rounded,
-                            iconColor: _accentColor,
-                            title: timeLabel,
-                            trailing: durationLabel,
-                            onTap: _pickTime,
-                          ),
-                          _ActionRow(
-                            icon: Icons.notifications_rounded,
-                            iconColor: const Color(0xFFB78A88),
-                            title: 'Alert',
-                            trailing: _alertRowSummary(),
-                            onTap: _openAlertRepeatSheet,
-                          ),
-                          _ActionRow(
-                            icon: Icons.repeat_rounded,
-                            iconColor: const Color(0xFFB78A88),
-                            title: 'Repeat',
-                            trailing: _repeatRowSummary(),
-                            onTap: _openAlertRepeatSheet,
-                          ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      _Card(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-                            child: Row(
-                              children: [
-                                Icon(Icons.event_rounded,
-                                    color: Colors.white.withValues(alpha: 0.75)),
-                                const SizedBox(width: 12),
-                                const Expanded(
-                                  child: Text(
-                                    'Fixed Event',
+                      const SizedBox(height: 24),
+                      Text(
+                        '$timeLabel ($durationLabel)',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      TextField(
+                        controller: _titleController,
+                        scrollPadding: const EdgeInsets.only(bottom: 24),
+                        onChanged: (value) {
+                          final suggestion =
+                              TaskSuggestionsService.suggest(value);
+                          setState(() {
+                            if (!_userChangedEmoji) {
+                              _selectedEmoji = suggestion.emoji;
+                            }
+                            if (!_userChangedColor) {
+                              _colorHex = suggestion.colorHex;
+                              _headerColor = _colorFromHex(suggestion.colorHex);
+                            }
+                            _selectedType = suggestion.category;
+                          });
+                        },
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 30,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        cursorColor: Colors.white,
+                        decoration: const InputDecoration(
+                          hintText: 'Task title',
+                          hintStyle: TextStyle(
+                            color: Colors.white54,
+                            fontSize: 30,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          enabledBorder: UnderlineInputBorder(
+                              borderSide: BorderSide(color: Colors.white54)),
+                          focusedBorder: UnderlineInputBorder(
+                              borderSide: BorderSide(color: Colors.white)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _Card(
+                          children: [
+                            _ActionRow(
+                              icon: Icons.calendar_today_rounded,
+                              iconColor: _accentColor,
+                              title: dateLabel,
+                              trailing: relativeLabel,
+                              onTap: _pickDate,
+                            ),
+                            _ActionRow(
+                              icon: Icons.access_time_filled_rounded,
+                              iconColor: _accentColor,
+                              title: timeLabel,
+                              trailing: durationLabel,
+                              onTap: _pickTime,
+                            ),
+                            _ActionRow(
+                              icon: Icons.notifications_rounded,
+                              iconColor: const Color(0xFFB78A88),
+                              title: 'Alert',
+                              trailing: _alertRowSummary(),
+                              onTap: _openAlertRepeatSheet,
+                            ),
+                            _ActionRow(
+                              icon: Icons.repeat_rounded,
+                              iconColor: const Color(0xFFB78A88),
+                              title: 'Repeat',
+                              trailing: _repeatRowSummary(),
+                              onTap: _openAlertRepeatSheet,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _Card(
+                          children: [
+                            Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.event_rounded,
+                                      color:
+                                          Colors.white.withValues(alpha: 0.75)),
+                                  const SizedBox(width: 12),
+                                  const Expanded(
+                                    child: Text(
+                                      'Fixed Event',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                  Switch(
+                                    value: _isEvent,
+                                    onChanged: (value) =>
+                                        setState(() => _isEvent = value),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              child: Divider(
+                                  height: 1,
+                                  color: Colors.white.withValues(alpha: 0.08)),
+                            ),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.category_outlined,
+                                      color:
+                                          Colors.white.withValues(alpha: 0.75)),
+                                  const SizedBox(width: 12),
+                                  const Text(
+                                    'Block Type',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontSize: 16,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
-                                ),
-                                Switch(
-                                  value: _isEvent,
-                                  onChanged: (value) => setState(() => _isEvent = value),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Divider(height: 1, color: Colors.white.withValues(alpha: 0.08)),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                            child: Row(
-                              children: [
-                                Icon(Icons.category_outlined,
-                                    color: Colors.white.withValues(alpha: 0.75)),
-                                const SizedBox(width: 12),
-                                const Text(
-                                  'Block Type',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.05),
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                      color: Colors.white.withValues(alpha: 0.08),
-                                    ),
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<BlockType>(
-                                      value: _selectedType,
-                                      dropdownColor: _cardColor,
-                                      iconEnabledColor: Colors.white70,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700,
+                                  const Spacer(),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.05),
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.08),
                                       ),
-                                      onChanged: (value) {
-                                        if (value != null) setState(() => _selectedType = value);
-                                      },
-                                      items: BlockType.values
-                                          .map((type) => DropdownMenuItem<BlockType>(
-                                                value: type,
-                                                child: Text(_typeLabel(type)),
-                                              ))
-                                          .toList(growable: false),
+                                    ),
+                                    child: DropdownButtonHideUnderline(
+                                      child: DropdownButton<BlockType>(
+                                        value: _selectedType,
+                                        dropdownColor: _cardColor,
+                                        iconEnabledColor: Colors.white70,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        onChanged: (value) {
+                                          if (value != null)
+                                            setState(
+                                                () => _selectedType = value);
+                                        },
+                                        items: BlockType.values
+                                            .map((type) =>
+                                                DropdownMenuItem<BlockType>(
+                                                  value: type,
+                                                  child: Text(_typeLabel(type)),
+                                                ))
+                                            .toList(growable: false),
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Divider(height: 1, color: Colors.white.withValues(alpha: 0.08)),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                            child: Row(
-                              children: [
-                                Icon(Icons.radio_button_unchecked_rounded,
-                                    color: Colors.white.withValues(alpha: 0.75)),
-                                const SizedBox(width: 12),
-                                const Text(
-                                  'Status',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Text(
-                                  _statusLabel(widget.block.status),
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.7),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              child: Divider(
+                                  height: 1,
+                                  color: Colors.white.withValues(alpha: 0.08)),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-                      TextButton(
-                        onPressed: widget.onDelete,
-                        child: const Text(
-                          'Delete Block',
-                          style: TextStyle(
-                            color: _accentColor,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
+                            Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.radio_button_unchecked_rounded,
+                                      color:
+                                          Colors.white.withValues(alpha: 0.75)),
+                                  const SizedBox(width: 12),
+                                  const Text(
+                                    'Status',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    _statusLabel(widget.block.status),
+                                    style: TextStyle(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.7),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        TextButton(
+                          onPressed: widget.onDelete,
+                          child: const Text(
+                            'Delete Block',
+                            style: TextStyle(
+                              color: _accentColor,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: _accentColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 18),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(999),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: _accentColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
-                            textStyle: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                            ),
+                            onPressed: _isSaving ? null : _save,
+                            child:
+                                Text(_isSaving ? 'Saving...' : 'Save Changes'),
                           ),
-                          onPressed: _isSaving ? null : _save,
-                          child: Text(_isSaving ? 'Saving...' : 'Save Changes'),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -836,7 +952,8 @@ class _StatusRing extends StatelessWidget {
           ? Container(
               width: 12,
               height: 12,
-              decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+              decoration: const BoxDecoration(
+                  shape: BoxShape.circle, color: Colors.white),
             )
           : null,
     );
@@ -913,7 +1030,8 @@ class _ActionRow extends StatelessWidget {
                   ),
                 ),
               ),
-            Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.45)),
+            Icon(Icons.chevron_right_rounded,
+                color: Colors.white.withValues(alpha: 0.45)),
           ],
         ),
       ),

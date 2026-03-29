@@ -510,11 +510,9 @@ class AppProvider extends ChangeNotifier {
 
     final updatedBlocks = List<Block>.from(blocks);
     updatedBlocks[blockIdx] = block.copyWith(
-      status: BlockStatus.done,
       actualStartTime: block.actualStartTime ?? start.toIso8601String(),
       actualEndTime: end.toIso8601String(),
       actualDurationMinutes: (resolvedDurationSeconds / 60).ceil(),
-      completionStatus: 'COMPLETED',
     );
     final updatedPlan = plan.copyWith(blocks: updatedBlocks);
     await _saveDayPlan(updatedPlan, notify: !autoAdvanceFlow);
@@ -1767,13 +1765,11 @@ class AppProvider extends ChangeNotifier {
 
     final block = blocks[idx];
     blocks[idx] = block.copyWith(
-      status: BlockStatus.done,
       actualStartTime: block.actualStartTime ?? startIso,
       actualEndTime: completedAt.toIso8601String(),
       actualDurationMinutes: durationSeconds != null
           ? (durationSeconds / 60).ceil()
           : block.actualDurationMinutes,
-      completionStatus: 'COMPLETED',
     );
     await upsertDayPlan(plan.copyWith(blocks: blocks));
   }
@@ -2104,7 +2100,8 @@ class AppProvider extends ChangeNotifier {
 
   /// Smart confidence-based revision: 'hard', 'good', or 'easy'.
   /// Updates scheduling, logs, and retention score via SrsService.
-  Future<void> markRevisionItemWithConfidence(String revId, String quality) async {
+  Future<void> markRevisionItemWithConfidence(
+      String revId, String quality) async {
     final idx = revisionItems.indexWhere((r) => r.id == revId);
     if (idx < 0) return;
     final item = revisionItems[idx];
@@ -2149,7 +2146,8 @@ class AppProvider extends ChangeNotifier {
   }
 
   /// Smart confidence-based revision for KB entries.
-  Future<void> markKBEntryWithConfidence(String kbPageNumber, String quality) async {
+  Future<void> markKBEntryWithConfidence(
+      String kbPageNumber, String quality) async {
     final kbIdx = knowledgeBase.indexWhere((e) => e.pageNumber == kbPageNumber);
     if (kbIdx < 0) return;
     final kb = knowledgeBase[kbIdx];
@@ -2367,8 +2365,14 @@ class AppProvider extends ChangeNotifier {
     await _logActivity(
       itemId: 'fa:$pageNum',
       itemType: 'fa',
-      action: status == 'unread' ? 'reset' : status == 'read' ? 'read' : 'anki_done',
-      title: updated.title.isNotEmpty ? 'FA p.$pageNum — ${updated.title}' : 'FA Page $pageNum',
+      action: status == 'unread'
+          ? 'reset'
+          : status == 'read'
+              ? 'read'
+              : 'anki_done',
+      title: updated.title.isNotEmpty
+          ? 'FA p.$pageNum — ${updated.title}'
+          : 'FA Page $pageNum',
     );
   }
 
@@ -2995,7 +2999,9 @@ class AppProvider extends ChangeNotifier {
       itemId: 'sketchy-micro:$id',
       itemType: 'sketchy',
       action: watched ? 'watched' : 'unwatched',
-      title: logVideo != null ? 'Sketchy Micro — ${logVideo.title}' : 'Sketchy Micro #$id',
+      title: logVideo != null
+          ? 'Sketchy Micro — ${logVideo.title}'
+          : 'Sketchy Micro #$id',
     );
   }
 
@@ -3073,7 +3079,9 @@ class AppProvider extends ChangeNotifier {
       itemId: 'sketchy-pharm:$id',
       itemType: 'sketchy',
       action: watched ? 'watched' : 'unwatched',
-      title: logVideo != null ? 'Sketchy Pharm — ${logVideo.title}' : 'Sketchy Pharm #$id',
+      title: logVideo != null
+          ? 'Sketchy Pharm — ${logVideo.title}'
+          : 'Sketchy Pharm #$id',
     );
   }
 
@@ -3197,7 +3205,9 @@ class AppProvider extends ChangeNotifier {
       itemId: 'pathoma:$id',
       itemType: 'pathoma',
       action: watched ? 'watched' : 'unwatched',
-      title: logChapter != null ? 'Pathoma Ch${logChapter.chapter} — ${logChapter.title}' : 'Pathoma #$id',
+      title: logChapter != null
+          ? 'Pathoma Ch${logChapter.chapter} — ${logChapter.title}'
+          : 'Pathoma #$id',
     );
   }
 
@@ -3335,7 +3345,8 @@ class AppProvider extends ChangeNotifier {
       final lecture = videoLectures[idx];
       videoLectures[idx] = lecture.copyWith(
         watched: watched,
-        watchedMinutes: watched ? lecture.durationMinutes : lecture.watchedMinutes,
+        watchedMinutes:
+            watched ? lecture.durationMinutes : lecture.watchedMinutes,
       );
       if (watched) {
         // Also update watched_minutes in DB to match full duration
@@ -3377,7 +3388,9 @@ class AppProvider extends ChangeNotifier {
       itemId: 'video-lecture:$id',
       itemType: 'video_lecture',
       action: watched ? 'watched' : 'unwatched',
-      title: logLecture != null ? '${logLecture.subject} — ${logLecture.title}' : 'Video Lecture #$id',
+      title: logLecture != null
+          ? '${logLecture.subject} — ${logLecture.title}'
+          : 'Video Lecture #$id',
     );
   }
 
@@ -3522,7 +3535,8 @@ class AppProvider extends ChangeNotifier {
     // Get topic info before update for logging
     final topicIdx = uworldTopics.indexWhere((t) => t.id == id);
     final prevDone = topicIdx >= 0 ? uworldTopics[topicIdx].doneQuestions : 0;
-    final prevCorrect = topicIdx >= 0 ? uworldTopics[topicIdx].correctQuestions : 0;
+    final prevCorrect =
+        topicIdx >= 0 ? uworldTopics[topicIdx].correctQuestions : 0;
 
     await _db.updateUWorldProgress(id, done, correct);
     await loadUWorldTopics();
@@ -3532,13 +3546,18 @@ class AppProvider extends ChangeNotifier {
     final deltaDone = done - prevDone;
     final deltaCorrect = correct - prevCorrect;
     if (deltaDone > 0) {
-      final topic = topicIdx >= 0 ? uworldTopics.firstWhere((t) => t.id == id, orElse: () => uworldTopics[0]) : null;
+      final topic = topicIdx >= 0
+          ? uworldTopics.firstWhere((t) => t.id == id,
+              orElse: () => uworldTopics[0])
+          : null;
       await _logActivity(
         itemId: 'uworld:$id',
         itemType: 'uworld',
         action: 'question_done',
-        title: topic != null ? 'UWorld — ${topic.subtopic}' : 'UWorld Topic #$id',
-        details: '{"done":$deltaDone,"correct":$deltaCorrect,"totalDone":$done,"totalCorrect":$correct}',
+        title:
+            topic != null ? 'UWorld — ${topic.subtopic}' : 'UWorld Topic #$id',
+        details:
+            '{"done":$deltaDone,"correct":$deltaCorrect,"totalDone":$done,"totalCorrect":$correct}',
       );
     }
   }
@@ -3926,14 +3945,14 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> updateSketchyMetadata(SketchyVideo updatedItem) async {
-    final microIndex = sketchyMicroVideos
-        .indexWhere((v) => v.id == updatedItem.id);
+    final microIndex =
+        sketchyMicroVideos.indexWhere((v) => v.id == updatedItem.id);
     if (microIndex != -1) {
       sketchyMicroVideos[microIndex] = updatedItem;
       await _db.updateSketchyMicroVideo(updatedItem.toMap());
     } else {
-      final pharmIndex = sketchyPharmVideos
-          .indexWhere((v) => v.id == updatedItem.id);
+      final pharmIndex =
+          sketchyPharmVideos.indexWhere((v) => v.id == updatedItem.id);
       if (pharmIndex != -1) {
         sketchyPharmVideos[pharmIndex] = updatedItem;
         await _db.updateSketchyPharmVideo(updatedItem.toMap());
@@ -3943,8 +3962,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> updatePathomaMetadata(PathomaChapter updatedItem) async {
-    final i =
-        pathomaChapters.indexWhere((c) => c.id == updatedItem.id);
+    final i = pathomaChapters.indexWhere((c) => c.id == updatedItem.id);
     if (i == -1) return;
     pathomaChapters[i] = updatedItem;
     await _db.updatePathomaChapter(updatedItem.toMap());
@@ -4074,18 +4092,17 @@ class AppProvider extends ChangeNotifier {
             !anchoredBlockIds.contains(block.id))
         .toList();
 
-    final reschedulableBlocks = blocks
-        .where((block) => anchoredBlockIds.contains(block.id))
-        .toList()
-      ..sort((a, b) {
-        final startCompare = _toMinutes(a.plannedStartTime).compareTo(
-          _toMinutes(b.plannedStartTime),
-        );
-        if (startCompare != 0) return startCompare;
-        final indexCompare = a.index.compareTo(b.index);
-        if (indexCompare != 0) return indexCompare;
-        return a.id.compareTo(b.id);
-      });
+    final reschedulableBlocks =
+        blocks.where((block) => anchoredBlockIds.contains(block.id)).toList()
+          ..sort((a, b) {
+            final startCompare = _toMinutes(a.plannedStartTime).compareTo(
+              _toMinutes(b.plannedStartTime),
+            );
+            if (startCompare != 0) return startCompare;
+            final indexCompare = a.index.compareTo(b.index);
+            if (indexCompare != 0) return indexCompare;
+            return a.id.compareTo(b.id);
+          });
 
     final updatedById = <String, Block>{};
     final placedMovableBlocks = <Block>[];
@@ -4118,18 +4135,17 @@ class AppProvider extends ChangeNotifier {
       placedMovableBlocks.add(rescheduledBlock);
     }
 
-    final updatedBlocks = blocks
-        .map((block) => updatedById[block.id] ?? block)
-        .toList()
-      ..sort((a, b) {
-        final startCompare = _toMinutes(a.plannedStartTime).compareTo(
-          _toMinutes(b.plannedStartTime),
-        );
-        if (startCompare != 0) return startCompare;
-        final indexCompare = a.index.compareTo(b.index);
-        if (indexCompare != 0) return indexCompare;
-        return a.id.compareTo(b.id);
-      });
+    final updatedBlocks =
+        blocks.map((block) => updatedById[block.id] ?? block).toList()
+          ..sort((a, b) {
+            final startCompare = _toMinutes(a.plannedStartTime).compareTo(
+              _toMinutes(b.plannedStartTime),
+            );
+            if (startCompare != 0) return startCompare;
+            final indexCompare = a.index.compareTo(b.index);
+            if (indexCompare != 0) return indexCompare;
+            return a.id.compareTo(b.id);
+          });
 
     final reindexedBlocks = <Block>[];
     for (int i = 0; i < updatedBlocks.length; i++) {
