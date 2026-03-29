@@ -1,4 +1,4 @@
-﻿// =============================================================
+// =============================================================
 // TimelineView — scrollable timeline with:
 //   • 12-hour AM/PM time labels
 //   • Proportional block heights (1 min = 2 px)
@@ -15,6 +15,7 @@ import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'block_editor_sheet.dart';
 import 'free_gap_panel.dart';
+import 'study_session_screen.dart';
 
 // -- Helpers --------------------------------------------------
 String _to12h(String hhmm) {
@@ -85,10 +86,14 @@ String _categoryLabel(Block block) {
     case BlockType.revisionFa:
     case BlockType.fmgeRevision:
       return 'Study';
-    case BlockType.video: return 'Video';
-    case BlockType.qbank: return 'Qbank';
-    case BlockType.anki: return 'Anki';
-    case BlockType.breakBlock: return 'Break';
+    case BlockType.video:
+      return 'Video';
+    case BlockType.qbank:
+      return 'Qbank';
+    case BlockType.anki:
+      return 'Anki';
+    case BlockType.breakBlock:
+      return 'Break';
     default:
       if (block.title.contains('??')) return 'Prayer';
       return 'General';
@@ -115,6 +120,15 @@ class TimelineView extends StatefulWidget {
 class _TimelineViewState extends State<TimelineView> {
   bool _isLockedBlock(Block block) =>
       block.isEvent || block.id.startsWith('prayer_');
+
+  bool _opensStudySession(Block block) {
+    final title = block.title.toLowerCase();
+    return title.contains('study') ||
+        title.contains('revision') ||
+        title.contains('anki') ||
+        title.contains('qbank') ||
+        title.contains('lecture');
+  }
 
   // -- Category Colors -----------------------------------------
   static Color _categoryColor(Block block) {
@@ -208,7 +222,8 @@ class _TimelineViewState extends State<TimelineView> {
         final prevEnd = _toMinutes(sortedBlocks[i - 1].plannedEndTime);
         final curStart = _toMinutes(block.plannedStartTime);
         if (curStart > prevEnd && (curStart - prevEnd) >= 5) {
-          items.add(_TimelineItem.gap(gapStartMinutes: prevEnd, gapEndMinutes: curStart));
+          items.add(_TimelineItem.gap(
+              gapStartMinutes: prevEnd, gapEndMinutes: curStart));
         }
       }
       items.add(_TimelineItem.block(block));
@@ -244,6 +259,15 @@ class _TimelineViewState extends State<TimelineView> {
   void _onBlockTap(Block block) {
     if (_isLockedBlock(block)) {
       _showLockedDetailSheet(block);
+      return;
+    }
+    if (_opensStudySession(block)) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => StudySessionScreen(block: block),
+        ),
+      );
       return;
     }
     _showEditSheet(block);
@@ -443,8 +467,10 @@ class _TimelineViewState extends State<TimelineView> {
     await app.syncFlowActivitiesFromDayPlan(widget.dateKey);
 
     final targetPlan = app.getDayPlan(update.dateKey);
-    final targetBlocks = List<Block>.from(targetPlan?.blocks ?? const <Block>[]);
-    targetBlocks.add(updatedBlock.copyWith(index: targetBlocks.length, date: update.dateKey));
+    final targetBlocks =
+        List<Block>.from(targetPlan?.blocks ?? const <Block>[]);
+    targetBlocks.add(updatedBlock.copyWith(
+        index: targetBlocks.length, date: update.dateKey));
     final updatedTargetBlocks = _reindexBlocks(targetBlocks);
     await app.upsertDayPlan(
       targetPlan?.copyWith(blocks: updatedTargetBlocks) ??
@@ -457,7 +483,9 @@ class _TimelineViewState extends State<TimelineView> {
   }
 
   void _deleteBlock(Block block) {
-    context.read<AppProvider>().removeBlockFromDayPlan(block.id, widget.dateKey);
+    context
+        .read<AppProvider>()
+        .removeBlockFromDayPlan(block.id, widget.dateKey);
   }
 
   void _onReorder(int oldIndex, int newIndex, List<_TimelineItem> items) {
@@ -519,11 +547,11 @@ class _TimelineViewState extends State<TimelineView> {
     }
 
     final updatedBlocks = planBlocks
-      .map((block) => updatedMovableById[block.id] ?? block)
-      .toList()
+        .map((block) => updatedMovableById[block.id] ?? block)
+        .toList()
       ..sort(
-        (a, b) =>
-            _toMinutes(a.plannedStartTime).compareTo(_toMinutes(b.plannedStartTime)),
+        (a, b) => _toMinutes(a.plannedStartTime)
+            .compareTo(_toMinutes(b.plannedStartTime)),
       );
 
     final reindexedBlocks = <Block>[
@@ -648,10 +676,19 @@ class _TimelineItem {
   final int? gapEndMinutes;
   final bool isGap;
 
-  const _TimelineItem._({this.block, this.gapStartMinutes, this.gapEndMinutes, required this.isGap});
-  factory _TimelineItem.block(Block b) => _TimelineItem._(block: b, isGap: false);
-  factory _TimelineItem.gap({required int gapStartMinutes, required int gapEndMinutes}) =>
-      _TimelineItem._(gapStartMinutes: gapStartMinutes, gapEndMinutes: gapEndMinutes, isGap: true);
+  const _TimelineItem._(
+      {this.block,
+      this.gapStartMinutes,
+      this.gapEndMinutes,
+      required this.isGap});
+  factory _TimelineItem.block(Block b) =>
+      _TimelineItem._(block: b, isGap: false);
+  factory _TimelineItem.gap(
+          {required int gapStartMinutes, required int gapEndMinutes}) =>
+      _TimelineItem._(
+          gapStartMinutes: gapStartMinutes,
+          gapEndMinutes: gapEndMinutes,
+          isGap: true);
 }
 
 // -- Block Card ----------------------------------------------------
@@ -972,8 +1009,7 @@ class _BlockCard extends StatelessWidget {
     final endMin = _toMinutes(block.plannedEndTime);
     final duration =
         endMin > startMin ? endMin - startMin : block.plannedDurationMinutes;
-    final cardHeight =
-        (duration * 2.0).clamp(64.0, double.infinity).toDouble();
+    final cardHeight = (duration * 2.0).clamp(64.0, double.infinity).toDouble();
     final isDone = block.status == BlockStatus.done;
     final isSplit = block.splitTotalParts != null && block.splitTotalParts! > 1;
     final pillColor = isDone ? _kTimelineCompletedPill : accent;
@@ -1091,9 +1127,8 @@ class _BlockCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: isDone ? _kTimelineComplete : Colors.transparent,
-                    border: isDone
-                        ? null
-                        : Border.all(color: pillColor, width: 2),
+                    border:
+                        isDone ? null : Border.all(color: pillColor, width: 2),
                   ),
                 ),
               ),
@@ -1104,6 +1139,7 @@ class _BlockCard extends StatelessWidget {
     );
   }
 }
+
 class _LockedDetailRow extends StatelessWidget {
   final IconData icon;
   final String text;
@@ -1477,4 +1513,3 @@ class _DashedLinePainter extends CustomPainter {
   @override
   bool shouldRepaint(_DashedLinePainter old) => old.color != color;
 }
-
