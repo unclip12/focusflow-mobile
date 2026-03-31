@@ -211,6 +211,96 @@ class Routine {
       );
 }
 
+class ActiveRoutineRun {
+  final String routineId;
+  final String dateKey;
+  final String? sourceBlockId;
+  final DateTime startedAt;
+  final DateTime currentStepStartedAt;
+  final int currentStepIndex;
+  final List<RoutineLogEntry> entries;
+  final String status; // 'active' | 'cancelled' | 'completed'
+
+  const ActiveRoutineRun({
+    required this.routineId,
+    required this.dateKey,
+    this.sourceBlockId,
+    required this.startedAt,
+    required this.currentStepStartedAt,
+    required this.currentStepIndex,
+    this.entries = const [],
+    this.status = 'active',
+  });
+
+  factory ActiveRoutineRun.fromJson(Map<String, dynamic> j) {
+    final now = DateTime.now();
+    return ActiveRoutineRun(
+      routineId: j['routineId'] ?? '',
+      dateKey: j['dateKey'] ?? '',
+      sourceBlockId: j['sourceBlockId'],
+      startedAt: DateTime.tryParse(j['startedAt'] ?? '') ?? now,
+      currentStepStartedAt:
+          DateTime.tryParse(j['currentStepStartedAt'] ?? '') ?? now,
+      currentStepIndex: j['currentStepIndex'] ?? 0,
+      entries: (j['entries'] as List?)
+              ?.map((e) => RoutineLogEntry.fromJson(e))
+              .toList() ??
+          const [],
+      status: j['status'] ?? 'active',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'routineId': routineId,
+        'dateKey': dateKey,
+        if (sourceBlockId != null) 'sourceBlockId': sourceBlockId,
+        'startedAt': startedAt.toIso8601String(),
+        'currentStepStartedAt': currentStepStartedAt.toIso8601String(),
+        'currentStepIndex': currentStepIndex,
+        'entries': entries.map((entry) => entry.toJson()).toList(),
+        'status': status,
+      };
+
+  bool get isActive => status == 'active';
+  bool get isCancelled => status == 'cancelled';
+  bool get isCompleted => status == 'completed';
+
+  int totalElapsedSecondsAt([DateTime? now]) {
+    final effectiveNow = now ?? DateTime.now();
+    final elapsed = effectiveNow.difference(startedAt).inSeconds;
+    return elapsed < 0 ? 0 : elapsed;
+  }
+
+  int currentStepElapsedSecondsAt([DateTime? now]) {
+    final effectiveNow = now ?? DateTime.now();
+    final elapsed = effectiveNow.difference(currentStepStartedAt).inSeconds;
+    return elapsed < 0 ? 0 : elapsed;
+  }
+
+  ActiveRoutineRun copyWith({
+    String? routineId,
+    String? dateKey,
+    Object? sourceBlockId = _routineFieldUnset,
+    DateTime? startedAt,
+    DateTime? currentStepStartedAt,
+    int? currentStepIndex,
+    List<RoutineLogEntry>? entries,
+    String? status,
+  }) =>
+      ActiveRoutineRun(
+        routineId: routineId ?? this.routineId,
+        dateKey: dateKey ?? this.dateKey,
+        sourceBlockId: identical(sourceBlockId, _routineFieldUnset)
+            ? this.sourceBlockId
+            : sourceBlockId as String?,
+        startedAt: startedAt ?? this.startedAt,
+        currentStepStartedAt: currentStepStartedAt ?? this.currentStepStartedAt,
+        currentStepIndex: currentStepIndex ?? this.currentStepIndex,
+        entries: entries ?? this.entries,
+        status: status ?? this.status,
+      );
+}
+
 // Routine log records actual execution timings.
 
 class RoutineLogEntry {

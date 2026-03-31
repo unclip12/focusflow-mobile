@@ -851,6 +851,16 @@ class _TimelineViewState extends State<TimelineView> {
       return;
     }
 
+    if (app.getActiveRoutineRun() != null) {
+      await RoutineRunnerScreen.open(
+        context,
+        routine: routine,
+        dateKey: sourceDateKey,
+        sourceBlockId: block.id,
+      );
+      return;
+    }
+
     final latestLog =
         app.getLatestCompletedRoutineLog(routine.id, sourceDateKey);
     if (latestLog != null) {
@@ -874,14 +884,11 @@ class _TimelineViewState extends State<TimelineView> {
       if (!shouldStart || !mounted) return;
     }
 
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => RoutineRunnerScreen(
-          routine: routine,
-          dateKey: sourceDateKey,
-          sourceBlockId: block.id,
-        ),
-      ),
+    await RoutineRunnerScreen.open(
+      context,
+      routine: routine,
+      dateKey: sourceDateKey,
+      sourceBlockId: block.id,
     );
   }
 

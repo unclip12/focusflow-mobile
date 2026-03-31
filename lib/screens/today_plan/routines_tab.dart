@@ -22,6 +22,7 @@ class RoutinesTab extends StatelessWidget {
     final app = context.watch<AppProvider>();
     final routines = app.routines;
     final todayLogs = app.getRoutineLogsForDate(dateKey);
+    final activeRun = app.getActiveRoutineRun();
 
     final prayerRoutines =
         routines.where((r) => r.id.startsWith('prayer_')).toList();
@@ -115,6 +116,8 @@ class RoutinesTab extends StatelessWidget {
                         return _RoutineCard(
                           routine: routine,
                           wasRunToday: wasRun,
+                          isActive: activeRun?.routineId == routine.id &&
+                              activeRun?.dateKey == dateKey,
                           onTap: () => _showEditor(context, routine),
                           onStart: () => _startRoutine(context, routine),
                           onDelete: () => _deleteRoutine(context, routine),
@@ -135,6 +138,8 @@ class RoutinesTab extends StatelessWidget {
                         return _RoutineCard(
                           routine: routine,
                           wasRunToday: wasRun,
+                          isActive: activeRun?.routineId == routine.id &&
+                              activeRun?.dateKey == dateKey,
                           onTap: () => _showEditor(context, routine),
                           onStart: () => _startRoutine(context, routine),
                           onDelete: () => _deleteRoutine(context, routine),
@@ -149,10 +154,10 @@ class RoutinesTab extends StatelessWidget {
   }
 
   void _startRoutine(BuildContext context, Routine routine) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => RoutineRunnerScreen(routine: routine, dateKey: dateKey),
-      ),
+    RoutineRunnerScreen.open(
+      context,
+      routine: routine,
+      dateKey: dateKey,
     );
   }
 
@@ -246,6 +251,7 @@ class _SectionHeader extends StatelessWidget {
 class _RoutineCard extends StatelessWidget {
   final Routine routine;
   final bool wasRunToday;
+  final bool isActive;
   final VoidCallback onTap;
   final VoidCallback onStart;
   final VoidCallback onDelete;
@@ -253,6 +259,7 @@ class _RoutineCard extends StatelessWidget {
   const _RoutineCard({
     required this.routine,
     required this.wasRunToday,
+    required this.isActive,
     required this.onTap,
     required this.onStart,
     required this.onDelete,
@@ -476,7 +483,27 @@ class _RoutineCard extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            if (wasRunToday) ...[
+                            if (isActive) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: routineColor.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'Active',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: routineColor,
+                                  ),
+                                ),
+                              ),
+                            ] else if (wasRunToday) ...[
                               const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(
@@ -623,13 +650,15 @@ class _RoutineCard extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.play_arrow_rounded,
+                            isActive
+                                ? Icons.play_circle_fill_rounded
+                                : Icons.play_arrow_rounded,
                             size: 16,
                             color: routineColor,
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            'Start',
+                            isActive ? 'Resume' : 'Start',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
@@ -647,7 +676,10 @@ class _RoutineCard extends StatelessWidget {
                         value: 'edit',
                         child: Text('Edit / Settings'),
                       ),
-                      const PopupMenuItem(value: 'start', child: Text('Start')),
+                      PopupMenuItem(
+                        value: 'start',
+                        child: Text(isActive ? 'Resume' : 'Start'),
+                      ),
                       const PopupMenuItem(
                         value: 'delete',
                         child: Text('Delete'),

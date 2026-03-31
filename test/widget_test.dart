@@ -1,9 +1,14 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:focusflow_mobile/models/day_plan.dart';
+import 'package:focusflow_mobile/models/routine.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
+import 'package:focusflow_mobile/screens/today_plan/routine_runner_screen.dart';
 import 'package:focusflow_mobile/screens/today_plan/timeline_view.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart';
@@ -617,6 +622,150 @@ void main() {
     expect(find.text('Planned: 12:00 PM - 1:00 PM'), findsOneWidget);
     expect(find.text('Actual: 11:30 AM - 12:50 PM'), findsOneWidget);
   });
+
+  testWidgets('routine run progress is persisted to shared preferences',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final app = AppProvider();
+    final routine = _buildRoutineFixture();
+    final startedAt = DateTime.now().subtract(const Duration(seconds: 70));
+
+    await app.startOrResumeRoutineRun(
+      routine: routine,
+      dateKey: '2026-03-31',
+      now: startedAt,
+    );
+    await app.advanceActiveRoutineStep(
+      routine: routine,
+      skipped: false,
+      now: startedAt.add(const Duration(seconds: 30)),
+    );
+
+    final activeRun = app.getActiveRoutineRunForRoutine(routine.id, '2026-03-31');
+    expect(activeRun, isNotNull);
+    expect(activeRun!.currentStepIndex, 1);
+    expect(activeRun.entries.length, 1);
+    expect(activeRun.entries.first.durationSeconds, 30);
+
+    final prefs = await SharedPreferences.getInstance();
+    final rawRun = prefs.getString('active_routine_run');
+    expect(rawRun, isNotNull);
+    final decoded = ActiveRoutineRun.fromJson(
+      Map<String, dynamic>.from(jsonDecode(rawRun!) as Map),
+    );
+    expect(decoded.currentStepIndex, 1);
+    expect(decoded.entries.length, 1);
+  });
+
+  testWidgets('routine runner reopens without resetting elapsed time',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final app = AppProvider();
+    final routine = _buildRoutineFixture();
+    final startedAt = DateTime.now().subtract(const Duration(seconds: 70));
+
+    await app.startOrResumeRoutineRun(
+      routine: routine,
+      dateKey: '2026-03-31',
+      now: startedAt,
+    );
+
+    await tester.pumpWidget(
+      _RoutineRunnerHarness(
+        app: app,
+        routine: routine,
+        dateKey: '2026-03-31',
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Brush Teeth'), findsOneWidget);
+    expect(find.text('01:10'), findsWidgets);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+
+    await tester.pumpWidget(
+      _RoutineRunnerHarness(
+        app: app,
+        routine: routine,
+        dateKey: '2026-03-31',
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Brush Teeth'), findsOneWidget);
+    expect(find.text('01:10'), findsWidgets);
+  });
+
+  testWidgets('routine runner resumes the current step instead of restarting',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final app = AppProvider();
+    final routine = _buildRoutineFixture();
+    final startedAt = DateTime.now().subtract(const Duration(seconds: 70));
+    final secondStepStartedAt =
+        DateTime.now().subtract(const Duration(seconds: 40));
+
+    await app.startOrResumeRoutineRun(
+      routine: routine,
+      dateKey: '2026-03-31',
+      now: startedAt,
+    );
+    await app.advanceActiveRoutineStep(
+      routine: routine,
+      skipped: false,
+      now: secondStepStartedAt,
+    );
+
+    await tester.pumpWidget(
+      _RoutineRunnerHarness(
+        app: app,
+        routine: routine,
+        dateKey: '2026-03-31',
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Washroom'), findsOneWidget);
+    expect(find.text('Step 2 of 2'), findsOneWidget);
+    expect(find.text('00:40'), findsWidgets);
+  });
+
+  testWidgets('cancelling a routine clears active state and restart begins fresh',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final app = AppProvider();
+    final routine = _buildRoutineFixture();
+    final startedAt = DateTime.now().subtract(const Duration(seconds: 70));
+
+    await app.startOrResumeRoutineRun(
+      routine: routine,
+      dateKey: '2026-03-31',
+      now: startedAt,
+    );
+    await app.cancelActiveRoutineRun();
+
+    expect(app.getActiveRoutineRun(), isNull);
+
+    await app.startOrResumeRoutineRun(
+      routine: routine,
+      dateKey: '2026-03-31',
+      now: DateTime.now(),
+    );
+
+    await tester.pumpWidget(
+      _RoutineRunnerHarness(
+        app: app,
+        routine: routine,
+        dateKey: '2026-03-31',
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Brush Teeth'), findsOneWidget);
+    expect(find.text('00:00'), findsWidgets);
+  });
 }
 
 AppProvider _buildAppProviderWithPlans() {
@@ -714,6 +863,30 @@ Block _block({
   );
 }
 
+Routine _buildRoutineFixture() {
+  return Routine(
+    id: 'morning_routine',
+    name: 'Morning Routine',
+    icon: 'R',
+    color: 0xFF2563EB,
+    steps: const [
+      RoutineStep(
+        id: 'step_1',
+        title: 'Brush Teeth',
+        estimatedMinutes: 2,
+        sortOrder: 0,
+      ),
+      RoutineStep(
+        id: 'step_2',
+        title: 'Washroom',
+        estimatedMinutes: 5,
+        sortOrder: 1,
+      ),
+    ],
+    createdAt: '2026-03-31T00:00:00.000',
+  );
+}
+
 class _TimelineHarness extends StatefulWidget {
   final AppProvider app;
   final DateTime initialDate;
@@ -765,6 +938,31 @@ class _TimelineHarnessState extends State<_TimelineHarness> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RoutineRunnerHarness extends StatelessWidget {
+  final AppProvider app;
+  final Routine routine;
+  final String dateKey;
+
+  const _RoutineRunnerHarness({
+    required this.app,
+    required this.routine,
+    required this.dateKey,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider<AppProvider>.value(
+      value: app,
+      child: MaterialApp(
+        home: RoutineRunnerScreen(
+          routine: routine,
+          dateKey: dateKey,
         ),
       ),
     );

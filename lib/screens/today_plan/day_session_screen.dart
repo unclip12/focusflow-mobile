@@ -278,17 +278,17 @@ class _DaySessionScreenState extends State<DaySessionScreen> {
     final routine = app.getRoutineForBlock(block);
     if (routine == null) return;
 
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => RoutineRunnerScreen(
-          routine: routine,
-          dateKey: widget.dateKey,
-          sourceBlockId: block.id,
-        ),
-      ),
+    await RoutineRunnerScreen.open(
+      context,
+      routine: routine,
+      dateKey: widget.dateKey,
+      sourceBlockId: block.id,
     );
 
     if (!mounted) return;
+    if (app.getActiveRoutineRun() != null) {
+      return;
+    }
     final nextBlockId = app.getFirstActionableBlockId(widget.dateKey);
     if (nextBlockId != null) {
       app.setCurrentBlock(widget.dateKey, nextBlockId);

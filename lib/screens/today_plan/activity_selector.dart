@@ -264,16 +264,13 @@ class DefaultChainRunner {
                 ? app.routines.first
                 : _placeholderRoutine(activity),
           );
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => RoutineRunnerScreen(
-                routine: routine,
-                dateKey: dateKey,
-                onComplete: () {
-                  start(context, chain, dateKey, startIndex: startIndex + 1);
-                },
-              ),
-            ),
+          RoutineRunnerScreen.open(
+            context,
+            routine: routine,
+            dateKey: dateKey,
+            onComplete: () {
+              start(context, chain, dateKey, startIndex: startIndex + 1);
+            },
           );
         } else {
           start(context, chain, dateKey, startIndex: startIndex + 1);
@@ -388,13 +385,10 @@ class _RoutinePickerSheet extends StatelessWidget {
                         Icon(Icons.play_arrow_rounded, color: cs.primary),
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => RoutineRunnerScreen(
-                            routine: r,
-                            dateKey: dateKey,
-                          ),
-                        ),
+                      RoutineRunnerScreen.open(
+                        context,
+                        routine: r,
+                        dateKey: dateKey,
                       );
                     },
                   ),

@@ -21,11 +21,52 @@ class RoutineRunnerScreen extends StatefulWidget {
     this.onComplete,
   });
 
+  static Future<void> open(
+    BuildContext context, {
+    required Routine routine,
+    required String dateKey,
+    String? sourceBlockId,
+    VoidCallback? onComplete,
+    bool forceRestart = false,
+    bool replaceCurrent = false,
+  }) async {
+    final app = context.read<AppProvider>();
+    final existingRun = app.getActiveRoutineRun();
+    final activeRun = await app.startOrResumeRoutineRun(
+      routine: routine,
+      dateKey: dateKey,
+      sourceBlockId: sourceBlockId,
+      forceRestart: forceRestart,
+    );
+    if (!context.mounted) return;
+
+    final resolvedRoutine = app.getRoutineById(activeRun.routineId) ?? routine;
+    final shouldKeepOnComplete = existingRun == null ||
+        forceRestart ||
+        (existingRun.routineId == routine.id && existingRun.dateKey == dateKey);
+    final route = MaterialPageRoute<void>(
+      builder: (_) => RoutineRunnerScreen(
+        routine: resolvedRoutine,
+        dateKey: activeRun.dateKey,
+        sourceBlockId: activeRun.sourceBlockId,
+        onComplete: shouldKeepOnComplete ? onComplete : null,
+      ),
+    );
+
+    final navigator = Navigator.of(context);
+    if (replaceCurrent) {
+      await navigator.pushReplacement(route);
+      return;
+    }
+    await navigator.push(route);
+  }
+
   @override
   State<RoutineRunnerScreen> createState() => _RoutineRunnerScreenState();
 }
 
-class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
+class _RoutineRunnerScreenState extends State<RoutineRunnerScreen>
+    with WidgetsBindingObserver {
   static const _motivations = <String>[
     'You got this.',
     'Keep going.',
@@ -36,91 +77,86 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
     'Keep the momentum.',
   ];
 
-  int _currentStep = 0;
-  int _totalElapsed = 0;
-  int _stepElapsed = 0;
   bool _isSaving = false;
+  bool _isLoading = true;
   Timer? _timer;
-  DateTime? _stepStartTime;
-  late DateTime _startTime;
   RoutineLog? _completedLog;
-  final List<RoutineLogEntry> _entries = <RoutineLogEntry>[];
 
   @override
   void initState() {
     super.initState();
-    _startTime = DateTime.now();
-    _stepStartTime = _startTime;
+    WidgetsBinding.instance.addObserver(this);
+    unawaited(_ensureRoutineRun());
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || _completedLog != null || _isSaving) return;
-      setState(() {
-        _totalElapsed++;
-        _stepElapsed++;
-      });
+      setState(() {});
     });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     super.dispose();
   }
 
-  void _markDone() {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _ensureRoutineRun() async {
+    await context.read<AppProvider>().startOrResumeRoutineRun(
+          routine: widget.routine,
+          dateKey: widget.dateKey,
+          sourceBlockId: widget.sourceBlockId,
+        );
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+  }
+
+  Future<void> _markDone(
+    AppProvider app,
+    ActiveRoutineRun run,
+    Routine routine,
+  ) async {
     if (_isSaving) return;
     HapticsService.medium();
-    _recordCurrentStep(skipped: false);
-    _advance();
-  }
-
-  void _skipStep() {
-    if (_isSaving) return;
-    HapticsService.light();
-    _recordCurrentStep(skipped: true);
-    _advance();
-  }
-
-  void _recordCurrentStep({required bool skipped}) {
-    final step = widget.routine.steps[_currentStep];
-    _entries.add(
-      RoutineLogEntry(
-        stepId: step.id,
-        stepTitle: step.title,
-        startTime: (_stepStartTime ?? DateTime.now()).toIso8601String(),
-        endTime: DateTime.now().toIso8601String(),
-        durationSeconds: _stepElapsed,
-        skipped: skipped,
-      ),
-    );
-  }
-
-  void _advance() {
-    if (_currentStep < widget.routine.steps.length - 1) {
-      setState(() {
-        _currentStep++;
-        _stepElapsed = 0;
-        _stepStartTime = DateTime.now();
-      });
+    if (run.currentStepIndex >= routine.steps.length - 1) {
+      await _completeRoutine(app, routine: routine, skipped: false);
       return;
     }
-
-    unawaited(_completeRoutine());
+    await app.advanceActiveRoutineStep(routine: routine, skipped: false);
   }
 
-  Future<void> _completeRoutine() async {
+  Future<void> _skipStep(
+    AppProvider app,
+    ActiveRoutineRun run,
+    Routine routine,
+  ) async {
+    if (_isSaving) return;
+    HapticsService.light();
+    if (run.currentStepIndex >= routine.steps.length - 1) {
+      await _completeRoutine(app, routine: routine, skipped: true);
+      return;
+    }
+    await app.advanceActiveRoutineStep(routine: routine, skipped: true);
+  }
+
+  Future<void> _completeRoutine(
+    AppProvider app, {
+    required Routine routine,
+    required bool skipped,
+  }) async {
     if (_isSaving) return;
     HapticsService.heavy();
-    _timer?.cancel();
     setState(() => _isSaving = true);
 
-    final log = await context.read<AppProvider>().completeRoutineRun(
-      routine: widget.routine,
-      dateKey: widget.dateKey,
-      startedAt: _startTime,
-      completedAt: DateTime.now(),
-      totalDurationSeconds: _totalElapsed,
-      entries: List<RoutineLogEntry>.from(_entries),
-      sourceBlockId: widget.sourceBlockId,
+    final log = await app.completeActiveRoutineRun(
+      routine: routine,
+      skipped: skipped,
     );
 
     if (!mounted) return;
@@ -142,9 +178,14 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
             child: const Text('Continue'),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.pop(context);
+            onPressed: () async {
+              final app = context.read<AppProvider>();
+              final dialogNavigator = Navigator.of(ctx);
+              final pageNavigator = Navigator.of(context);
+              await app.cancelActiveRoutineRun();
+              if (!mounted) return;
+              dialogNavigator.pop();
+              pageNavigator.pop();
             },
             child: const Text(
               'Cancel',
@@ -167,7 +208,8 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
     final completedLog = _completedLog;
     if (completedLog != null) {
       return RoutineLogSummaryScreen(
-        routine: widget.routine,
+        routine: context.read<AppProvider>().getRoutineById(widget.routine.id) ??
+            widget.routine,
         log: completedLog,
         sourceBlockId: widget.sourceBlockId,
         onDone: () {
@@ -177,11 +219,89 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
       );
     }
 
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final app = context.watch<AppProvider>();
+    final routine = app.getRoutineById(widget.routine.id) ?? widget.routine;
+    final activeRun = app.getActiveRoutineRunForRoutine(
+      routine.id,
+      widget.dateKey,
+    );
+    if (activeRun == null) {
+      return Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.timer_off_rounded, size: 48),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'This routine is no longer active.',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Close'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final cs = Theme.of(context).colorScheme;
-    final steps = widget.routine.steps;
-    final step = steps[_currentStep];
-    final progress = (_currentStep + 1) / steps.length;
-    final motivation = _motivations[_currentStep % _motivations.length];
+    final steps = routine.steps;
+    if (steps.isEmpty) {
+      return Scaffold(
+        backgroundColor: cs.surface,
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(routine.icon, style: const TextStyle(fontSize: 40)),
+                  const SizedBox(height: 12),
+                  Text(
+                    '${routine.name} has no steps.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Close'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final currentStepIndex =
+        activeRun.currentStepIndex.clamp(0, steps.length - 1).toInt();
+    final totalElapsed = activeRun.totalElapsedSecondsAt();
+    final stepElapsed = activeRun.currentStepElapsedSecondsAt();
+    final step = steps[currentStepIndex];
+    final progress = (currentStepIndex + 1) / steps.length;
+    final motivation = _motivations[currentStepIndex % _motivations.length];
 
     return Scaffold(
       backgroundColor: cs.surface,
@@ -192,11 +312,11 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Row(
                 children: [
-                  Text(widget.routine.icon, style: const TextStyle(fontSize: 24)),
+                  Text(routine.icon, style: const TextStyle(fontSize: 24)),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      widget.routine.name,
+                      routine.name,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -219,7 +339,7 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Step ${_currentStep + 1} of ${steps.length}',
+                        'Step ${currentStepIndex + 1} of ${steps.length}',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -265,11 +385,11 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
                         ),
                         alignment: Alignment.center,
                         child: Text(
-                          '${_currentStep + 1}',
+                          '${currentStepIndex + 1}',
                           style: TextStyle(
                             fontSize: 34,
                             fontWeight: FontWeight.w800,
-                            color: Color(widget.routine.color),
+                            color: Color(routine.color),
                           ),
                         ),
                       ),
@@ -320,14 +440,14 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
                       Expanded(
                         child: _TimerCard(
                           label: 'This step',
-                          value: _fmtTimer(_stepElapsed),
+                          value: _fmtTimer(stepElapsed),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: _TimerCard(
                           label: 'Total',
-                          value: _fmtTimer(_totalElapsed),
+                          value: _fmtTimer(totalElapsed),
                         ),
                       ),
                     ],
@@ -343,7 +463,7 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: _skipStep,
+                            onPressed: () => _skipStep(app, activeRun, routine),
                             icon: const Icon(Icons.skip_next_rounded, size: 18),
                             label: const Text('Skip'),
                             style: OutlinedButton.styleFrom(
@@ -357,15 +477,17 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: FilledButton.icon(
-                            onPressed: _markDone,
+                            onPressed: () => _markDone(app, activeRun, routine),
                             icon: Icon(
-                              _currentStep == steps.length - 1
+                              currentStepIndex == steps.length - 1
                                   ? Icons.task_alt_rounded
                                   : Icons.check_rounded,
                               size: 18,
                             ),
                             label: Text(
-                              _currentStep == steps.length - 1 ? 'Finish' : 'Done',
+                              currentStepIndex == steps.length - 1
+                                  ? 'Finish'
+                                  : 'Done',
                             ),
                             style: FilledButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 14),
@@ -644,17 +766,14 @@ class _RoutineLogSummaryScreenState extends State<RoutineLogSummaryScreen> {
                       child: OutlinedButton.icon(
                         onPressed: _isUpdatingActuals
                             ? null
-                            : () {
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(
-                              builder: (_) => RoutineRunnerScreen(
-                                routine: resolvedRoutine,
-                                dateKey: _log.date,
-                                sourceBlockId: widget.sourceBlockId,
-                              ),
-                            ),
-                          );
-                        },
+                            : () => RoutineRunnerScreen.open(
+                                  context,
+                                  routine: resolvedRoutine,
+                                  dateKey: _log.date,
+                                  sourceBlockId: widget.sourceBlockId,
+                                  forceRestart: true,
+                                  replaceCurrent: true,
+                                ),
                         icon: const Icon(Icons.replay_rounded, size: 18),
                         label: const Text('Rerun'),
                         style: OutlinedButton.styleFrom(

@@ -173,6 +173,8 @@ const _kMentorAutoReplies = [
 ];
 
 class AppProvider extends ChangeNotifier {
+  static const _activeRoutineRunPrefsKey = 'active_routine_run';
+
   final _db = DatabaseService.instance;
   final _uuid = const Uuid();
   bool _loaded = false;
@@ -208,6 +210,7 @@ class AppProvider extends ChangeNotifier {
   List<Routine> routines = [];
   final List<Routine> _pendingExpiredRoutinePrompts = [];
   List<RoutineLog> routineLogs = [];
+  ActiveRoutineRun? _activeRoutineRun;
   List<BuyingItem> buyingItems = [];
   List<TodoItem> todoItems = [];
   List<DefaultActivity> defaultActivities = [];
@@ -333,6 +336,7 @@ class AppProvider extends ChangeNotifier {
     final savedNames = prefs.getStringList('general_task_names') ?? [];
     _savedGeneralTaskNames = savedNames;
     faViewMode = prefs.getString('faViewMode') ?? 'cards';
+    _restoreActiveRoutineRun(prefs);
     await _refreshRoutineReminderState();
 
     // ── Seed sample notifications (in-memory only) ────────────────
@@ -421,6 +425,44 @@ class AppProvider extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════════
+  void _restoreActiveRoutineRun(SharedPreferences prefs) {
+    final rawRun = prefs.getString(_activeRoutineRunPrefsKey);
+    if (rawRun == null || rawRun.isEmpty) {
+      _activeRoutineRun = null;
+      return;
+    }
+
+    try {
+      final decoded = jsonDecode(rawRun);
+      if (decoded is Map<String, dynamic>) {
+        final restored = ActiveRoutineRun.fromJson(decoded);
+        _activeRoutineRun = restored.isActive ? restored : null;
+        return;
+      }
+      if (decoded is Map) {
+        final restored = ActiveRoutineRun.fromJson(
+          Map<String, dynamic>.from(decoded),
+        );
+        _activeRoutineRun = restored.isActive ? restored : null;
+        return;
+      }
+    } catch (_) {
+      // Ignore malformed persisted routine state and start clean.
+    }
+
+    _activeRoutineRun = null;
+  }
+
+  Future<void> _persistActiveRoutineRun() async {
+    final prefs = await SharedPreferences.getInstance();
+    final run = _activeRoutineRun;
+    if (run == null || !run.isActive) {
+      await prefs.remove(_activeRoutineRunPrefsKey);
+      return;
+    }
+    await prefs.setString(_activeRoutineRunPrefsKey, jsonEncode(run.toJson()));
+  }
+
   // KNOWLEDGE BASE
   // ═══════════════════════════════════════════════════════════════
 
@@ -2214,15 +2256,166 @@ class AppProvider extends ChangeNotifier {
   List<RoutineLog> getRoutineLogsForDate(String date) =>
       routineLogs.where((l) => l.date == date).toList();
 
-  Routine? getRoutineForBlock(Block block) {
-    final routineId = routineIdFromBlock(block);
-    if (routineId == null) return null;
+  ActiveRoutineRun? getActiveRoutineRun() {
+    final run = _activeRoutineRun;
+    if (run == null || !run.isActive) return null;
+    return run;
+  }
 
+  ActiveRoutineRun? getActiveRoutineRunForRoutine(
+    String routineId,
+    String dateKey,
+  ) {
+    final run = getActiveRoutineRun();
+    if (run == null) return null;
+    if (run.routineId != routineId || run.dateKey != dateKey) return null;
+    return run;
+  }
+
+  Routine? getRoutineById(String routineId) {
     try {
       return routines.firstWhere((routine) => routine.id == routineId);
     } catch (_) {
       return null;
     }
+  }
+
+  Routine? getRoutineForBlock(Block block) {
+    final routineId = routineIdFromBlock(block);
+    if (routineId == null) return null;
+
+    return getRoutineById(routineId);
+  }
+
+  Future<ActiveRoutineRun> startOrResumeRoutineRun({
+    required Routine routine,
+    required String dateKey,
+    String? sourceBlockId,
+    bool forceRestart = false,
+    DateTime? now,
+  }) async {
+    final existing = getActiveRoutineRun();
+    if (!forceRestart && existing != null) {
+      final isSameRoutineRun =
+          existing.routineId == routine.id && existing.dateKey == dateKey;
+      if (isSameRoutineRun) {
+        final needsSourceBlockUpdate =
+            (existing.sourceBlockId == null || existing.sourceBlockId!.isEmpty) &&
+                sourceBlockId != null &&
+                sourceBlockId.isNotEmpty;
+        if (needsSourceBlockUpdate) {
+          _activeRoutineRun = existing.copyWith(sourceBlockId: sourceBlockId);
+          await _persistActiveRoutineRun();
+          notifyListeners();
+        }
+        return getActiveRoutineRun()!;
+      }
+
+      return existing;
+    }
+
+    final startedAt = now ?? DateTime.now();
+    _activeRoutineRun = ActiveRoutineRun(
+      routineId: routine.id,
+      dateKey: dateKey,
+      sourceBlockId: sourceBlockId,
+      startedAt: startedAt,
+      currentStepStartedAt: startedAt,
+      currentStepIndex: 0,
+      entries: const <RoutineLogEntry>[],
+      status: 'active',
+    );
+    await _persistActiveRoutineRun();
+    notifyListeners();
+    return _activeRoutineRun!;
+  }
+
+  Future<ActiveRoutineRun?> advanceActiveRoutineStep({
+    required Routine routine,
+    required bool skipped,
+    DateTime? now,
+  }) async {
+    final run = getActiveRoutineRun();
+    if (run == null || run.routineId != routine.id || routine.steps.isEmpty) {
+      return run;
+    }
+
+    final effectiveNow = now ?? DateTime.now();
+    final safeStepIndex =
+        run.currentStepIndex.clamp(0, routine.steps.length - 1).toInt();
+    if (safeStepIndex >= routine.steps.length - 1) {
+      return run;
+    }
+
+    final step = routine.steps[safeStepIndex];
+    final entry = RoutineLogEntry(
+      stepId: step.id,
+      stepTitle: step.title,
+      startTime: run.currentStepStartedAt.toIso8601String(),
+      endTime: effectiveNow.toIso8601String(),
+      durationSeconds: run.currentStepElapsedSecondsAt(effectiveNow),
+      skipped: skipped,
+    );
+
+    _activeRoutineRun = run.copyWith(
+      currentStepIndex: safeStepIndex + 1,
+      currentStepStartedAt: effectiveNow,
+      entries: [...run.entries, entry],
+    );
+    await _persistActiveRoutineRun();
+    notifyListeners();
+    return _activeRoutineRun;
+  }
+
+  Future<void> cancelActiveRoutineRun() async {
+    final run = getActiveRoutineRun();
+    if (run == null) return;
+    _activeRoutineRun = run.copyWith(status: 'cancelled');
+    await _persistActiveRoutineRun();
+    _activeRoutineRun = null;
+    notifyListeners();
+  }
+
+  Future<RoutineLog?> completeActiveRoutineRun({
+    required Routine routine,
+    required bool skipped,
+    DateTime? now,
+  }) async {
+    final run = getActiveRoutineRun();
+    if (run == null || run.routineId != routine.id || routine.steps.isEmpty) {
+      return null;
+    }
+
+    final effectiveNow = now ?? DateTime.now();
+    final safeStepIndex =
+        run.currentStepIndex.clamp(0, routine.steps.length - 1).toInt();
+    final step = routine.steps[safeStepIndex];
+    final finalEntry = RoutineLogEntry(
+      stepId: step.id,
+      stepTitle: step.title,
+      startTime: run.currentStepStartedAt.toIso8601String(),
+      endTime: effectiveNow.toIso8601String(),
+      durationSeconds: run.currentStepElapsedSecondsAt(effectiveNow),
+      skipped: skipped,
+    );
+
+    _activeRoutineRun = run.copyWith(status: 'completed');
+    await _persistActiveRoutineRun();
+
+    final log = await completeRoutineRun(
+      routine: routine,
+      dateKey: run.dateKey,
+      startedAt: run.startedAt,
+      completedAt: effectiveNow,
+      totalDurationSeconds: run.totalElapsedSecondsAt(effectiveNow),
+      entries: [...run.entries, finalEntry],
+      sourceBlockId: run.sourceBlockId,
+    );
+
+    _activeRoutineRun = null;
+    await _persistActiveRoutineRun();
+    notifyListeners();
+    return log;
   }
 
   RoutineLog? getLatestCompletedRoutineLog(String routineId, String dateKey) {
