@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:focusflow_mobile/models/active_study_session.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/models/routine.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
@@ -21,6 +22,7 @@ import 'block_editor_sheet.dart';
 import 'day_session_screen.dart';
 import 'routine_editor_sheet.dart';
 import 'routines_tab.dart';
+import 'study_flow_screen.dart';
 import 'study_session_picker.dart';
 import 'study_session_screen.dart';
 import 'todo_tab.dart';
@@ -50,6 +52,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
   String? _completedBlockId;
   late TabController _tabCtrl;
   bool _didProcessExpiredRoutineQueue = false;
+  bool _didAutoOpenActiveStudySession = false;
   TodayPlanLaunchRequest? _processingNotificationLaunch;
 
   late final StreamSubscription<DateTime> _clockTimer;
@@ -304,6 +307,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
           NotificationService.instance.todayPlanLaunchNotifier.value;
       if (request != null) {
         unawaited(_handleTodayPlanLaunchRequest(request));
+      } else {
+        unawaited(_tryOpenActiveStudySession());
       }
     });
   }
@@ -361,6 +366,43 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
       () => _selectedDate = DateTime(date.year, date.month, date.day),
     );
     await _refreshSelectedDateBlocks();
+  }
+
+  Future<void> _tryOpenActiveStudySession() async {
+    if (_didAutoOpenActiveStudySession || !mounted) {
+      return;
+    }
+
+    final app = context.read<AppProvider>();
+    final session = app.getActiveStudySession();
+    if (session == null || session.kind != ActiveStudySessionKind.studyFlow) {
+      return;
+    }
+
+    _didAutoOpenActiveStudySession = true;
+    final sessionDate = AppDateUtils.parseDate(session.dateKey);
+    if (sessionDate != null) {
+      _setStateIfMounted(
+        () => _selectedDate =
+            DateTime(sessionDate.year, sessionDate.month, sessionDate.day),
+      );
+    }
+
+    _tabCtrl.animateTo(0);
+    await _refreshSelectedDateBlocks();
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    if (!mounted) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => StudyFlowScreen(
+          dateKey: session.dateKey,
+          blockId: session.blockId,
+          sessionTitle: session.title,
+          autoAdvanceFlow: true,
+        ),
+      ),
+    );
   }
 
   void _openTrackNow() {

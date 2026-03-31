@@ -18,6 +18,7 @@ import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:focusflow_mobile/models/knowledge_base.dart';
+import 'package:focusflow_mobile/models/active_study_session.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/models/study_plan_item.dart';
 import 'package:focusflow_mobile/models/fmge_entry.dart';
@@ -174,6 +175,7 @@ const _kMentorAutoReplies = [
 
 class AppProvider extends ChangeNotifier {
   static const _activeRoutineRunPrefsKey = 'active_routine_run';
+  static const _activeStudySessionPrefsKey = 'active_study_session';
 
   final _db = DatabaseService.instance;
   final _uuid = const Uuid();
@@ -183,6 +185,7 @@ class AppProvider extends ChangeNotifier {
   List<String> get savedGeneralTaskNames =>
       List.unmodifiable(_savedGeneralTaskNames);
   int _mentorReplyIdx = 0;
+  ActiveStudySession? _activeStudySession;
 
   // ── Data stores ───────────────────────────────────────────────
   List<KnowledgeBaseEntry> knowledgeBase = [];
@@ -337,6 +340,8 @@ class AppProvider extends ChangeNotifier {
     _savedGeneralTaskNames = savedNames;
     faViewMode = prefs.getString('faViewMode') ?? 'cards';
     _restoreActiveRoutineRun(prefs);
+    _restoreActiveStudySession(prefs);
+    await _syncActiveStudySessionBackgroundTimer();
     await _refreshRoutineReminderState();
 
     // ── Seed sample notifications (in-memory only) ────────────────
@@ -422,6 +427,7 @@ class AppProvider extends ChangeNotifier {
     _loaded = true;
     notifyListeners();
     await injectRoutinesIntoDayPlan(todayDateKey);
+    await _syncActiveStudySessionBackgroundTimer();
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -461,6 +467,371 @@ class AppProvider extends ChangeNotifier {
       return;
     }
     await prefs.setString(_activeRoutineRunPrefsKey, jsonEncode(run.toJson()));
+  }
+
+  void _restoreActiveStudySession(SharedPreferences prefs) {
+    final rawSession = prefs.getString(_activeStudySessionPrefsKey);
+    if (rawSession == null || rawSession.isEmpty) {
+      _activeStudySession = null;
+      return;
+    }
+
+    try {
+      final decoded = jsonDecode(rawSession);
+      if (decoded is Map<String, dynamic>) {
+        _activeStudySession = ActiveStudySession.fromJson(decoded);
+        return;
+      }
+      if (decoded is Map) {
+        _activeStudySession =
+            ActiveStudySession.fromJson(Map<String, dynamic>.from(decoded));
+        return;
+      }
+    } catch (_) {
+      // Ignore malformed persisted study session state and start clean.
+    }
+
+    _activeStudySession = null;
+  }
+
+  Future<void> _persistActiveStudySession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final session = _activeStudySession;
+    if (session == null) {
+      await prefs.remove(_activeStudySessionPrefsKey);
+      return;
+    }
+    await prefs.setString(
+      _activeStudySessionPrefsKey,
+      jsonEncode(session.toJson()),
+    );
+  }
+
+  ActiveStudySession? getActiveStudySession() => _activeStudySession;
+
+  bool get hasActiveStudySession => _activeStudySession != null;
+
+  int get activeStudySessionElapsedSeconds =>
+      _elapsedSecondsForSession(_activeStudySession);
+
+  int activeStudySessionTaskElapsedSeconds([DateTime? now]) {
+    final session = _activeStudySession;
+    if (session == null) return 0;
+
+    var elapsed = session.currentTaskElapsedSeconds;
+    final runStartedAt = DateTime.tryParse(session.currentTaskRunStartedAt ?? '');
+    if (runStartedAt != null && !session.isPaused) {
+      elapsed += (now ?? DateTime.now()).difference(runStartedAt).inSeconds;
+    }
+    return math.max(0, elapsed);
+  }
+
+  int _elapsedSecondsForSession(ActiveStudySession? session, {DateTime? now}) {
+    if (session == null) return 0;
+
+    final end = now ?? DateTime.now();
+    return session.segments.fold<int>(0, (sum, segment) {
+      final start = DateTime.tryParse(segment.start);
+      if (start == null) return sum;
+      final segmentEnd = DateTime.tryParse(segment.end ?? '') ?? end;
+      if (segmentEnd.isBefore(start)) return sum;
+      return sum + segmentEnd.difference(start).inSeconds;
+    });
+  }
+
+  List<BlockSegment> _closeLastOpenSegment(
+    List<BlockSegment> segments,
+    DateTime endedAt,
+  ) {
+    if (segments.isEmpty) return segments;
+    final updated = List<BlockSegment>.from(segments);
+    final last = updated.last;
+    if (last.end != null && last.end!.isNotEmpty) {
+      return updated;
+    }
+    updated[updated.length - 1] = BlockSegment(
+      start: last.start,
+      end: endedAt.toIso8601String(),
+    );
+    return updated;
+  }
+
+  List<BlockInterruption> _closeLastOpenInterruption(
+    List<BlockInterruption> interruptions,
+    DateTime endedAt,
+  ) {
+    if (interruptions.isEmpty) return interruptions;
+    final updated = List<BlockInterruption>.from(interruptions);
+    final last = updated.last;
+    if (last.end != null && last.end!.isNotEmpty) {
+      return updated;
+    }
+    updated[updated.length - 1] = BlockInterruption(
+      start: last.start,
+      end: endedAt.toIso8601String(),
+      reason: last.reason,
+    );
+    return updated;
+  }
+
+  Future<void> _syncActiveStudySessionToBlock(
+    ActiveStudySession session, {
+    BlockStatus? status,
+    String? completionStatus,
+    String? actualEndTime,
+    int? actualDurationMinutes,
+    String? actualNotes,
+  }) async {
+    final blockId = session.blockId;
+    if (blockId == null || blockId.isEmpty) return;
+
+    final plan = getDayPlan(session.dateKey);
+    final blocks = plan?.blocks;
+    if (plan == null || blocks == null) return;
+
+    final blockIndex = blocks.indexWhere((block) => block.id == blockId);
+    if (blockIndex < 0) return;
+
+    final updatedBlocks = List<Block>.from(blocks);
+    final existing = updatedBlocks[blockIndex];
+    updatedBlocks[blockIndex] = existing.copyWith(
+      actualStartTime: existing.actualStartTime ?? session.startedAt,
+      actualEndTime: actualEndTime ?? existing.actualEndTime,
+      actualDurationMinutes:
+          actualDurationMinutes ?? existing.actualDurationMinutes,
+      status: status ?? existing.status,
+      segments: session.segments,
+      interruptions: session.interruptions,
+      completionStatus: completionStatus ?? existing.completionStatus,
+      actualNotes: actualNotes ?? existing.actualNotes,
+    );
+
+    await _saveDayPlan(
+      _dayPlanWithUpdatedBlocks(plan, session.dateKey, updatedBlocks),
+      notify: false,
+    );
+    await syncFlowActivitiesFromDayPlan(session.dateKey, notify: false);
+    notifyListeners();
+  }
+
+  Future<ActiveStudySession> startActiveStudySession({
+    required String kind,
+    required String dateKey,
+    required String title,
+    String? blockId,
+    DateTime? startedAt,
+    List<Map<String, dynamic>> queuedTasks = const <Map<String, dynamic>>[],
+    int currentTaskIndex = 0,
+    int currentPage = 0,
+    int targetPages = 0,
+    int pagesCompletedInSession = 0,
+    List<int> ankiPendingPages = const <int>[],
+    bool showAnkiPrompt = false,
+  }) async {
+    final existing = _activeStudySession;
+    if (existing != null &&
+        existing.kind == kind &&
+        existing.dateKey == dateKey &&
+        existing.blockId == blockId) {
+      return existing;
+    }
+
+    final started = startedAt ?? DateTime.now();
+    final runStartedAt = kind == ActiveStudySessionKind.studyFlow
+        ? started.toIso8601String()
+        : null;
+    final session = ActiveStudySession(
+      sessionId: _uuid.v4(),
+      kind: kind,
+      dateKey: dateKey,
+      title: title,
+      blockId: blockId,
+      startedAt: started.toIso8601String(),
+      currentTaskIndex: currentTaskIndex,
+      currentTaskRunStartedAt: runStartedAt,
+      currentPage: currentPage,
+      targetPages: targetPages,
+      pagesCompletedInSession: pagesCompletedInSession,
+      ankiPendingPages: ankiPendingPages,
+      showAnkiPrompt: showAnkiPrompt,
+      queuedTasks: queuedTasks,
+      segments: <BlockSegment>[
+        BlockSegment(start: started.toIso8601String()),
+      ],
+    );
+
+    _activeStudySession = session;
+    await _persistActiveStudySession();
+    await _syncActiveStudySessionToBlock(
+      session,
+      status: BlockStatus.inProgress,
+      completionStatus: null,
+    );
+    await _syncActiveStudySessionBackgroundTimer();
+    notifyListeners();
+    return session;
+  }
+
+  Future<void> updateActiveStudySession({
+    int? currentTaskIndex,
+    int? currentTaskElapsedSeconds,
+    String? currentTaskRunStartedAt,
+    int? currentPage,
+    int? targetPages,
+    int? pagesCompletedInSession,
+    List<int>? ankiPendingPages,
+    bool? showAnkiPrompt,
+    String? title,
+  }) async {
+    final session = _activeStudySession;
+    if (session == null) return;
+
+    _activeStudySession = session.copyWith(
+      currentTaskIndex: currentTaskIndex,
+      currentTaskElapsedSeconds: currentTaskElapsedSeconds,
+      currentTaskRunStartedAt: currentTaskRunStartedAt,
+      currentPage: currentPage,
+      targetPages: targetPages,
+      pagesCompletedInSession: pagesCompletedInSession,
+      ankiPendingPages: ankiPendingPages,
+      showAnkiPrompt: showAnkiPrompt,
+      title: title,
+    );
+    await _persistActiveStudySession();
+    await _syncActiveStudySessionBackgroundTimer();
+    notifyListeners();
+  }
+
+  Future<void> pauseActiveStudySession() async {
+    final session = _activeStudySession;
+    if (session == null || session.isPaused) return;
+
+    final pausedAt = DateTime.now();
+    var currentTaskElapsedSeconds = session.currentTaskElapsedSeconds;
+    final runStartedAt = DateTime.tryParse(session.currentTaskRunStartedAt ?? '');
+    if (runStartedAt != null) {
+      currentTaskElapsedSeconds += pausedAt.difference(runStartedAt).inSeconds;
+    }
+
+    final updated = session.copyWith(
+      isPaused: true,
+      currentTaskElapsedSeconds: currentTaskElapsedSeconds,
+      currentTaskRunStartedAt: null,
+      segments: _closeLastOpenSegment(session.segments, pausedAt),
+      interruptions: <BlockInterruption>[
+        ...session.interruptions,
+        BlockInterruption(
+          start: pausedAt.toIso8601String(),
+          reason: 'Paused',
+        ),
+      ],
+    );
+    _activeStudySession = updated;
+    await _persistActiveStudySession();
+    await _syncActiveStudySessionToBlock(updated, status: BlockStatus.paused);
+    await _syncActiveStudySessionBackgroundTimer();
+    notifyListeners();
+  }
+
+  Future<void> resumeActiveStudySession() async {
+    final session = _activeStudySession;
+    if (session == null || !session.isPaused) return;
+
+    final resumedAt = DateTime.now();
+    final shouldTrackTaskRun =
+        session.kind == ActiveStudySessionKind.studyFlow;
+    final updated = session.copyWith(
+      isPaused: false,
+      currentTaskRunStartedAt:
+          shouldTrackTaskRun ? resumedAt.toIso8601String() : null,
+      segments: <BlockSegment>[
+        ...session.segments,
+        BlockSegment(start: resumedAt.toIso8601String()),
+      ],
+      interruptions:
+          _closeLastOpenInterruption(session.interruptions, resumedAt),
+    );
+    _activeStudySession = updated;
+    await _persistActiveStudySession();
+    await _syncActiveStudySessionToBlock(updated, status: BlockStatus.inProgress);
+    await _syncActiveStudySessionBackgroundTimer();
+    notifyListeners();
+  }
+
+  Future<void> clearActiveStudySession({bool notify = true}) async {
+    _activeStudySession = null;
+    await _persistActiveStudySession();
+    await BackgroundTimerService.stop();
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
+  Future<int> completeActiveStudySession({
+    DateTime? completedAt,
+    bool autoAdvanceFlow = false,
+    String? actualNotes,
+  }) async {
+    final session = _activeStudySession;
+    if (session == null) return 0;
+
+    final end = completedAt ?? DateTime.now();
+    final runStartedAt = DateTime.tryParse(session.currentTaskRunStartedAt ?? '');
+    final finalizedSegments = session.isPaused
+        ? session.segments
+        : _closeLastOpenSegment(session.segments, end);
+    final finalizedInterruptions =
+        _closeLastOpenInterruption(session.interruptions, end);
+    final finalizedSession = session.copyWith(
+      segments: finalizedSegments,
+      interruptions: finalizedInterruptions,
+      currentTaskElapsedSeconds: session.currentTaskElapsedSeconds +
+          (runStartedAt != null && !session.isPaused
+              ? end.difference(runStartedAt).inSeconds
+              : 0),
+      currentTaskRunStartedAt: null,
+    );
+    final studiedSeconds =
+        _elapsedSecondsForSession(finalizedSession, now: end);
+
+    final blockId = finalizedSession.blockId;
+    if (blockId != null && blockId.isNotEmpty) {
+      final startedAt =
+          DateTime.tryParse(finalizedSession.startedAt) ?? end;
+      await completeDayPlanBlock(
+        finalizedSession.dateKey,
+        blockId,
+        startedAt: startedAt,
+        completedAt: end,
+        durationSeconds: studiedSeconds,
+        autoAdvanceFlow: autoAdvanceFlow,
+        segments: finalizedSegments,
+        interruptions: finalizedInterruptions,
+        actualNotes: actualNotes,
+        shouldClearActiveStudySession: false,
+      );
+    }
+
+    await clearActiveStudySession();
+    return studiedSeconds;
+  }
+
+  Future<void> _syncActiveStudySessionBackgroundTimer() async {
+    final session = _activeStudySession;
+    if (session == null) {
+      await BackgroundTimerService.stop();
+      return;
+    }
+
+    if (session.isPaused) {
+      await BackgroundTimerService.stop();
+      return;
+    }
+
+    await BackgroundTimerService.start(
+      activityName: session.title,
+      elapsedSeconds: activeStudySessionElapsedSeconds,
+    );
   }
 
   // KNOWLEDGE BASE
@@ -1483,6 +1854,10 @@ class AppProvider extends ChangeNotifier {
     DateTime? completedAt,
     int? durationSeconds,
     bool autoAdvanceFlow = false,
+    List<BlockSegment>? segments,
+    List<BlockInterruption>? interruptions,
+    String? actualNotes,
+    bool shouldClearActiveStudySession = true,
   }) async {
     final plan = getDayPlan(date);
     final blocks = plan?.blocks;
@@ -1503,9 +1878,20 @@ class AppProvider extends ChangeNotifier {
       actualStartTime: block.actualStartTime ?? start.toIso8601String(),
       actualEndTime: end.toIso8601String(),
       actualDurationMinutes: (resolvedDurationSeconds / 60).ceil(),
+      status: BlockStatus.done,
+      segments: segments ?? block.segments,
+      interruptions: interruptions ?? block.interruptions,
+      actualNotes: actualNotes ?? block.actualNotes,
+      completionStatus: 'COMPLETED',
     );
     final updatedPlan = plan.copyWith(blocks: updatedBlocks);
     await _saveDayPlan(updatedPlan, notify: !autoAdvanceFlow);
+
+    if (shouldClearActiveStudySession &&
+        _activeStudySession?.blockId == blockId &&
+        _activeStudySession?.dateKey == date) {
+      await clearActiveStudySession(notify: false);
+    }
 
     final flow = getDailyFlow(date);
     if (flow == null) {

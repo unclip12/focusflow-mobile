@@ -13,12 +13,14 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:focusflow_mobile/models/active_study_session.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart';
+import 'block_detail_modal.dart';
 import 'block_editor_sheet.dart';
 import 'free_gap_panel.dart';
 import 'routine_runner_screen.dart';
@@ -114,6 +116,15 @@ String _formatGapDurationCompact(int minutes) {
   if (h > 0 && m > 0) return '${h}h ${m}m';
   if (h > 0) return '${h}h';
   return '${m}m';
+}
+
+String _formatDurationMetaLabel(int minutes) {
+  if (minutes >= 60) {
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    return m > 0 ? '${h}h ${m}min' : '${h}h';
+  }
+  return '$minutes min';
 }
 
 double _scaledTimelineHeight(int minutes) {
@@ -894,27 +905,40 @@ class _TimelineViewState extends State<TimelineView> {
 
   Future<void> _openStudyBlock(Block block) async {
     final sourceDateKey = block.date.isNotEmpty ? block.date : widget.dateKey;
+    if (block.status == BlockStatus.done) {
+      await _showBlockDetailSheet(block, sourceDateKey: sourceDateKey);
+      return;
+    }
+
+    final app = context.read<AppProvider>();
+    final activeSession = app.getActiveStudySession();
+    if (activeSession != null &&
+        activeSession.kind == ActiveStudySessionKind.studyFlow &&
+        activeSession.dateKey == sourceDateKey &&
+        activeSession.blockId == block.id) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => StudyFlowScreen(
+            dateKey: sourceDateKey,
+            blockId: block.id,
+            sessionTitle: block.title,
+            autoAdvanceFlow: true,
+          ),
+        ),
+      );
+      return;
+    }
+
     final plannedSession = PlannedStudySessionPayload.fromBlock(block);
     if (plannedSession != null && plannedSession.tasks.isNotEmpty) {
-      final app = context.read<AppProvider>();
-      final startedAt = DateTime.now();
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => StudyFlowScreen(
             dateKey: sourceDateKey,
             queuedTasks: plannedSession.tasks,
-            onComplete: () {
-              final completedAt = DateTime.now();
-              unawaited(
-                app.completeDayPlanBlock(
-                  sourceDateKey,
-                  block.id,
-                  startedAt: startedAt,
-                  completedAt: completedAt,
-                  durationSeconds: completedAt.difference(startedAt).inSeconds,
-                ),
-              );
-            },
+            blockId: block.id,
+            sessionTitle: block.title,
+            autoAdvanceFlow: true,
           ),
         ),
       );
@@ -932,6 +956,23 @@ class _TimelineViewState extends State<TimelineView> {
         boundPlannedStartTime: block.plannedStartTime,
         boundPlannedEndTime: block.plannedEndTime,
       ),
+    );
+  }
+
+  Future<void> _showBlockDetailSheet(
+    Block block, {
+    required String sourceDateKey,
+  }) async {
+    final plan = context.read<AppProvider>().getDayPlan(sourceDateKey);
+    if (plan == null) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      builder: (_) => BlockDetailModal(block: block, dayPlan: plan),
     );
   }
 
@@ -2359,10 +2400,13 @@ class _BlockCard extends StatelessWidget {
         : (nowLineOffset! - (_kNowOverlayHeight / 2))
             .clamp(0.0, math.max(0.0, cardHeight - _kNowOverlayHeight))
             .toDouble();
-    final plannedMetaLabel = 'Planned: $rangeLabel';
+    final plannedMetaLabel =
+        'Planned: $rangeLabel • ${_formatDurationMetaLabel(plannedDuration)}';
+    final actualDurationLabelMinutes =
+        block.actualDurationMinutes ?? actualDuration;
     final actualMetaLabel = actualEndTime == null
         ? null
-        : 'Actual: ${_to12h(actualStartTime)} - ${_to12h(actualEndTime)}';
+        : 'Actual: ${_to12h(actualStartTime)} - ${_to12h(actualEndTime)} • ${_formatDurationMetaLabel(actualDurationLabelMinutes)}';
     final executionControls = _buildExecutionControls(context, accent);
 
     return Padding(
@@ -2511,7 +2555,7 @@ class _BlockCard extends StatelessWidget {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    rangeLabel,
+                                    '$rangeLabel • ${_formatDurationMetaLabel(plannedDuration)}',
                                     style: TextStyle(
                                       fontSize: isCompactCard ? 11 : 13,
                                       fontWeight: FontWeight.w600,

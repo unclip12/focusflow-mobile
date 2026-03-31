@@ -83,6 +83,11 @@ class _SplashScreenState extends State<SplashScreen>
         final handledIntent =
             await NotificationService.instance.tryDispatchPendingIntent();
         if (handledIntent || !mounted) return;
+        final app = context.read<AppProvider>();
+        if (app.hasActiveStudySession) {
+          context.go('/todays-plan');
+          return;
+        }
         final prefs = await SharedPreferences.getInstance();
         final lastTab = prefs.getString('lastActiveTab') ?? 'dashboard';
         if (!mounted) return;

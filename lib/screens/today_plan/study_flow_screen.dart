@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:focusflow_mobile/models/active_study_session.dart';
 import 'package:focusflow_mobile/models/fa_page.dart';
 import 'package:focusflow_mobile/models/pathoma_chapter.dart';
 import 'package:focusflow_mobile/models/sketchy_video.dart';
@@ -353,25 +354,33 @@ class StudyFlowScreen extends StatefulWidget {
   final String dateKey;
   final VoidCallback? onComplete;
   final List<StudyTask>? queuedTasks;
+  final String? blockId;
+  final String? sessionTitle;
+  final bool autoAdvanceFlow;
 
   const StudyFlowScreen({
     super.key,
     required this.dateKey,
     this.onComplete,
     this.queuedTasks,
+    this.blockId,
+    this.sessionTitle,
+    this.autoAdvanceFlow = false,
   });
 
   @override
   State<StudyFlowScreen> createState() => _StudyFlowScreenState();
 }
 
-class _StudyFlowScreenState extends State<StudyFlowScreen> {
+class _StudyFlowScreenState extends State<StudyFlowScreen>
+    with WidgetsBindingObserver {
   int _currentPage = 0;
   int _pagesCompletedInSession = 0;
   int _targetPages = 10;
   bool _isStudying = false;
   bool _isRevisionPage = false;
-  bool _timersPaused = false;
+  bool _userPaused = false;
+  bool _revisionGatePaused = false;
   bool _isResolvingQueuedRevision = false;
   bool _showAnkiPrompt = false;
   final List<int> _ankiPendingPages = [];
@@ -409,6 +418,11 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
   bool get _isQueueFaTask => _currentTask?.type == 'FA';
   bool get _isQueueUWorldTask => _currentTask?.type == 'UWORLD';
   bool get _isQueueStructuredTask => _isQueueFaTask || _isQueueUWorldTask;
+  bool get _timersPaused => _userPaused || _revisionGatePaused;
+  String get _persistedTitle =>
+      widget.sessionTitle ??
+      _currentTask?.label ??
+      (_hasQueuedTasks ? 'Study Session' : 'Essay Reading');
 
   void _setStateIfMounted(VoidCallback fn) {
     if (!mounted) return;
@@ -418,34 +432,159 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final app = context.read<AppProvider>();
-    _queue = StudyTask.explodeForExecution(
-      tasks: widget.queuedTasks ?? const <StudyTask>[],
-      uworldTopics: app.uworldTopics,
-      sketchyMicroVideos: app.sketchyMicroVideos,
-      sketchyPharmVideos: app.sketchyPharmVideos,
-      pathomaChapters: app.pathomaChapters,
-      videoLectures: app.videoLectures,
-    );
     final settingsProvider = context.read<SettingsProvider>();
-
     settingsProvider.ensureStudyPlanStartDate();
 
-    if (_hasQueuedTasks) {
-      _targetPages = _queue
-          .where((task) => task.type == 'FA')
-          .fold<int>(0, (sum, task) => sum + task.pageNumbers.length);
-      _prepareQueuedTask();
-    } else {
-      _currentPage = app.getNextContinuePage();
-      _targetPages = settingsProvider.dailyFAGoal;
+    final restored = _restoreActiveSession(app);
+    if (!restored) {
+      _queue = StudyTask.explodeForExecution(
+        tasks: widget.queuedTasks ?? const <StudyTask>[],
+        uworldTopics: app.uworldTopics,
+        sketchyMicroVideos: app.sketchyMicroVideos,
+        sketchyPharmVideos: app.sketchyPharmVideos,
+        pathomaChapters: app.pathomaChapters,
+        videoLectures: app.videoLectures,
+      );
+
+      if (_hasQueuedTasks) {
+        _targetPages = _queue
+            .where((task) => task.type == 'FA')
+            .fold<int>(0, (sum, task) => sum + task.pageNumbers.length);
+        _prepareQueuedTask();
+      } else {
+        _currentPage = app.getNextContinuePage();
+        _targetPages = settingsProvider.dailyFAGoal;
+      }
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshElapsedFromProvider();
+    }
+  }
+
+  bool _restoreActiveSession(AppProvider app) {
+    final session = app.getActiveStudySession();
+    if (session == null ||
+        session.kind != ActiveStudySessionKind.studyFlow ||
+        session.dateKey != widget.dateKey) {
+      return false;
+    }
+    if (widget.blockId != null && session.blockId != widget.blockId) {
+      return false;
+    }
+
+    _queue = StudyTask.fromJsonList(session.queuedTasks);
+    _currentTaskIndex = session.currentTaskIndex;
+    _currentPage = session.currentPage;
+    _targetPages = session.targetPages;
+    _pagesCompletedInSession = session.pagesCompletedInSession;
+    _prepareQueuedTask();
+    _ankiPendingPages
+      ..clear()
+      ..addAll(session.ankiPendingPages);
+    _showAnkiPrompt = session.showAnkiPrompt;
+    _isStudying = true;
+    _userPaused = session.isPaused;
+    _refreshElapsedFromProvider();
+    _ensureTimerRunning();
+    return true;
+  }
+
+  Future<void> _refreshElapsedFromProvider() async {
+    if (!mounted) return;
+    final app = context.read<AppProvider>();
+    _setStateIfMounted(() {
+      _totalElapsed = app.activeStudySessionElapsedSeconds;
+      _pageElapsed = app.activeStudySessionTaskElapsedSeconds();
+    });
+  }
+
+  Future<void> _persistActiveSessionProgress({
+    int? currentTaskIndex,
+    int? currentTaskElapsedSeconds,
+    Object? currentTaskRunStartedAt = _retainCurrentTaskRunStartedAt,
+    int? currentPage,
+    int? targetPages,
+    int? pagesCompletedInSession,
+    List<int>? ankiPendingPages,
+    bool? showAnkiPrompt,
+  }) async {
+    final session = context.read<AppProvider>().getActiveStudySession();
+    await context.read<AppProvider>().updateActiveStudySession(
+          currentTaskIndex: currentTaskIndex ?? _currentTaskIndex,
+          currentTaskElapsedSeconds:
+              currentTaskElapsedSeconds ?? _pageElapsed,
+          currentTaskRunStartedAt:
+              identical(currentTaskRunStartedAt, _retainCurrentTaskRunStartedAt)
+                  ? session?.currentTaskRunStartedAt
+                  : currentTaskRunStartedAt as String?,
+          currentPage: currentPage ?? _currentPage,
+          targetPages: targetPages ?? _targetPages,
+          pagesCompletedInSession:
+              pagesCompletedInSession ?? _pagesCompletedInSession,
+          ankiPendingPages: ankiPendingPages ?? List<int>.from(_ankiPendingPages),
+          showAnkiPrompt: showAnkiPrompt ?? _showAnkiPrompt,
+          title: _persistedTitle,
+        );
+  }
+
+  static const Object _retainCurrentTaskRunStartedAt = Object();
+
+  Future<void> _resetCurrentTaskClock() async {
+    if (!_isStudying) {
+      return;
+    }
+
+    await _persistActiveSessionProgress(
+      currentTaskElapsedSeconds: 0,
+      currentTaskRunStartedAt:
+          _timersPaused ? null : DateTime.now().toIso8601String(),
+    );
+    await _refreshElapsedFromProvider();
+  }
+
+  Future<void> _pauseSession() async {
+    if (!_isStudying || _userPaused) {
+      return;
+    }
+
+    await context.read<AppProvider>().pauseActiveStudySession();
+    _setStateIfMounted(() {
+      _userPaused = true;
+    });
+    await _refreshElapsedFromProvider();
+  }
+
+  Future<void> _resumeSession() async {
+    if (!_isStudying || !_userPaused) {
+      return;
+    }
+
+    await context.read<AppProvider>().resumeActiveStudySession();
+    _setStateIfMounted(() {
+      _userPaused = false;
+    });
+    await _refreshElapsedFromProvider();
+  }
+
+  Future<void> _togglePause() async {
+    if (_userPaused) {
+      await _resumeSession();
+      return;
+    }
+    await _pauseSession();
   }
 
   void _prepareQueuedTask() {
@@ -468,12 +607,31 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
   }
 
   void _startStudying() {
+    unawaited(_startStudyingAsync());
+  }
+
+  Future<void> _startStudyingAsync() async {
     _setStateIfMounted(() {
       _isStudying = true;
+      _userPaused = false;
       _pageElapsed = 0;
     });
 
+    await context.read<AppProvider>().startActiveStudySession(
+          kind: ActiveStudySessionKind.studyFlow,
+          dateKey: widget.dateKey,
+          title: _persistedTitle,
+          blockId: widget.blockId,
+          queuedTasks: StudyTask.toJsonList(_queue),
+          currentTaskIndex: _currentTaskIndex,
+          currentPage: _currentPage,
+          targetPages: _targetPages,
+          pagesCompletedInSession: _pagesCompletedInSession,
+          ankiPendingPages: List<int>.from(_ankiPendingPages),
+          showAnkiPrompt: _showAnkiPrompt,
+        );
     _startCurrentQueuedTaskIfNeeded();
+    await _refreshElapsedFromProvider();
     _ensureTimerRunning();
     _triggerQueuedFaRevisionGateIfNeeded();
   }
@@ -491,10 +649,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       if (!mounted || !_isStudying || _timersPaused) {
         return;
       }
-      _setStateIfMounted(() {
-        _totalElapsed++;
-        _pageElapsed++;
-      });
+      unawaited(_refreshElapsedFromProvider());
     });
   }
 
@@ -527,7 +682,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
     if (!isRevisionTask) {
       if (_timersPaused || _isRevisionPage || _isResolvingQueuedRevision) {
         _setStateIfMounted(() {
-          _timersPaused = false;
+          _revisionGatePaused = false;
           _isRevisionPage = false;
           _isResolvingQueuedRevision = false;
         });
@@ -536,7 +691,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
     }
 
     _setStateIfMounted(() {
-      _timersPaused = true;
+      _revisionGatePaused = true;
       _isRevisionPage = true;
       _isResolvingQueuedRevision = true;
     });
@@ -552,7 +707,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
 
     if (reviseNow) {
       _setStateIfMounted(() {
-        _timersPaused = false;
+        _revisionGatePaused = false;
         _isRevisionPage = true;
         _isResolvingQueuedRevision = false;
       });
@@ -574,7 +729,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
 
     if (!_isQueueFaTask) {
       _setStateIfMounted(() {
-        _timersPaused = false;
+        _revisionGatePaused = false;
       });
       return;
     }
@@ -766,6 +921,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
         _setStateIfMounted(() {
           _showAnkiPrompt = true;
         });
+        await _persistActiveSessionProgress(showAnkiPrompt: true);
         return;
       }
     }
@@ -793,6 +949,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       _pageElapsed = 0;
       _isRevisionPage = false;
     });
+    await _resetCurrentTaskClock();
   }
 
   Future<void> _advanceQueue({
@@ -809,7 +966,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
     }
     final nextTaskIndex = _currentTaskIndex + 1;
     if (nextTaskIndex >= _queue.length) {
-      _endSession();
+      await _completeSession();
       return;
     }
 
@@ -817,6 +974,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       _currentTaskIndex = nextTaskIndex;
       _prepareQueuedTask();
     });
+    await _resetCurrentTaskClock();
     if (triggerRevisionGate) {
       _triggerQueuedFaRevisionGateIfNeeded();
     }
@@ -897,6 +1055,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       _showAnkiPrompt = false;
       _ankiPendingPages.clear();
     });
+    unawaited(_persistActiveSessionProgress(showAnkiPrompt: false));
     unawaited(_moveToNextPage());
   }
 
@@ -905,17 +1064,42 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       _showAnkiPrompt = false;
       _ankiPendingPages.clear();
     });
+    unawaited(_persistActiveSessionProgress(showAnkiPrompt: false));
     unawaited(_moveToNextPage());
   }
 
-  void _endSession() {
+  void _closeSessionUi() {
     _timer?.cancel();
     _timer = null;
     _isStudying = false;
-    _timersPaused = false;
+    _userPaused = false;
+    _revisionGatePaused = false;
     _isRevisionPage = false;
     _isResolvingQueuedRevision = false;
     _setStateIfMounted(() {});
+  }
+
+  Future<void> _endSession() async {
+    final app = context.read<AppProvider>();
+    if (_isStudying) {
+      if (!_userPaused) {
+        await app.pauseActiveStudySession();
+      }
+      await app.clearActiveStudySession();
+    }
+    _closeSessionUi();
+    if (mounted) {
+      Navigator.pop(context);
+    }
+  }
+
+  Future<void> _completeSession() async {
+    if (_isStudying) {
+      await context.read<AppProvider>().completeActiveStudySession(
+            autoAdvanceFlow: widget.autoAdvanceFlow,
+          );
+    }
+    _closeSessionUi();
     widget.onComplete?.call();
     if (mounted) {
       Navigator.pop(context);
@@ -929,9 +1113,14 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
     }
 
     final completedAt = DateTime.now();
-    final startedAt = _taskStartedAt.remove(task.id) ?? completedAt;
+    final app = context.read<AppProvider>();
     final actualDurationSeconds =
-        completedAt.difference(startedAt).inSeconds.clamp(0, 24 * 60 * 60);
+        app.activeStudySessionTaskElapsedSeconds(completedAt).clamp(
+              0,
+              24 * 60 * 60,
+            );
+    final startedAt =
+        completedAt.subtract(Duration(seconds: actualDurationSeconds));
     final durationMinutes =
         (actualDurationSeconds / 60).ceil().clamp(1, 24 * 60);
     final dateLabel = DateFormat('yyyy-MM-dd').format(completedAt.toLocal());
@@ -954,7 +1143,8 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
       topics: _timeLogTopics(task),
     );
 
-    await context.read<AppProvider>().upsertTimeLog(entry);
+    _taskStartedAt.remove(task.id);
+    await app.upsertTimeLog(entry);
   }
 
   TimeLogCategory _timeLogCategoryForTask(StudyTask task) {
@@ -1236,6 +1426,8 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
         totalTasks: _queue.length,
         totalElapsedLabel: _fmtTime(_totalElapsed),
         taskElapsedLabel: _fmtTime(_pageElapsed),
+        isPaused: _userPaused,
+        onTogglePause: _togglePause,
         onComplete: _completeQueuedUWorldTask,
         onEndSession: _endSession,
       );
@@ -1252,6 +1444,8 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
         taskElapsedLabel: _fmtTime(_pageElapsed),
         accentColor: _accentForTaskType(task.type),
         icon: _iconForTaskType(task.type),
+        isPaused: _userPaused,
+        onTogglePause: _togglePause,
         onComplete: _completeQueuedSupplementalTask,
         onEndSession: _endSession,
       );
@@ -1489,26 +1683,55 @@ class _StudyFlowScreenState extends State<StudyFlowScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: _markPageDone,
-                      icon: const Icon(Icons.check_rounded, size: 22),
-                      label: const Text(
-                        'Done with this page',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _togglePause,
+                          icon: Icon(
+                            _userPaused
+                                ? Icons.play_arrow_rounded
+                                : Icons.pause_rounded,
+                            size: 20,
+                          ),
+                          label: Text(
+                            _userPaused ? 'Resume' : 'Pause',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
                         ),
                       ),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: FilledButton.icon(
+                          onPressed: _markPageDone,
+                          icon: const Icon(Icons.check_rounded, size: 22),
+                          label: const Text(
+                            'Done with this page',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            backgroundColor: const Color(0xFF8B5CF6),
+                          ),
                         ),
-                        backgroundColor: const Color(0xFF8B5CF6),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -1631,8 +1854,10 @@ class _QueuedUWorldView extends StatelessWidget {
   final int totalTasks;
   final String totalElapsedLabel;
   final String taskElapsedLabel;
+  final bool isPaused;
+  final Future<void> Function() onTogglePause;
   final Future<void> Function() onComplete;
-  final VoidCallback onEndSession;
+  final Future<void> Function() onEndSession;
 
   const _QueuedUWorldView({
     required this.task,
@@ -1641,6 +1866,8 @@ class _QueuedUWorldView extends StatelessWidget {
     required this.totalTasks,
     required this.totalElapsedLabel,
     required this.taskElapsedLabel,
+    required this.isPaused,
+    required this.onTogglePause,
     required this.onComplete,
     required this.onEndSession,
   });
@@ -1860,27 +2087,56 @@ class _QueuedUWorldView extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: onComplete,
-                      icon: const Icon(Icons.check_rounded, size: 22),
-                      label: const Text(
-                        'Complete UWorld task',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: onTogglePause,
+                          icon: Icon(
+                            isPaused
+                                ? Icons.play_arrow_rounded
+                                : Icons.pause_rounded,
+                            size: 20,
+                          ),
+                          label: Text(
+                            isPaused ? 'Resume' : 'Pause',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
                         ),
                       ),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: FilledButton.icon(
+                          onPressed: onComplete,
+                          icon: const Icon(Icons.check_rounded, size: 22),
+                          label: const Text(
+                            'Complete UWorld task',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            backgroundColor: const Color(0xFFF59E0B),
+                            foregroundColor: Colors.white,
+                          ),
                         ),
-                        backgroundColor: const Color(0xFFF59E0B),
-                        foregroundColor: Colors.white,
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -1911,8 +2167,10 @@ class _QueuedGenericTaskView extends StatelessWidget {
   final String taskElapsedLabel;
   final Color accentColor;
   final IconData icon;
+  final bool isPaused;
+  final Future<void> Function() onTogglePause;
   final Future<void> Function() onComplete;
-  final VoidCallback onEndSession;
+  final Future<void> Function() onEndSession;
 
   const _QueuedGenericTaskView({
     required this.task,
@@ -1923,6 +2181,8 @@ class _QueuedGenericTaskView extends StatelessWidget {
     required this.taskElapsedLabel,
     required this.accentColor,
     required this.icon,
+    required this.isPaused,
+    required this.onTogglePause,
     required this.onComplete,
     required this.onEndSession,
   });
@@ -2132,27 +2392,56 @@ class _QueuedGenericTaskView extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: onComplete,
-                      icon: const Icon(Icons.check_rounded, size: 22),
-                      label: const Text(
-                        'Mark Done',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: onTogglePause,
+                          icon: Icon(
+                            isPaused
+                                ? Icons.play_arrow_rounded
+                                : Icons.pause_rounded,
+                            size: 20,
+                          ),
+                          label: Text(
+                            isPaused ? 'Resume' : 'Pause',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
                         ),
                       ),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: FilledButton.icon(
+                          onPressed: onComplete,
+                          icon: const Icon(Icons.check_rounded, size: 22),
+                          label: const Text(
+                            'Mark Done',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            backgroundColor: accentColor,
+                            foregroundColor: Colors.white,
+                          ),
                         ),
-                        backgroundColor: accentColor,
-                        foregroundColor: Colors.white,
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),

@@ -10,6 +10,7 @@ import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/screens/session/session_screen.dart';
+import 'package:intl/intl.dart';
 
 class BlockDetailModal extends StatelessWidget {
   final Block block;
@@ -33,6 +34,12 @@ class BlockDetailModal extends StatelessWidget {
         block;
     final tasks = latestBlock.tasks ?? [];
     final segments = latestBlock.segments ?? [];
+    final interruptions = latestBlock.interruptions ?? [];
+    final timelineEntries = _buildTimelineEntries(
+      segments: segments,
+      interruptions: interruptions,
+      fallbackBlock: latestBlock,
+    );
 
     return Container(
       decoration: BoxDecoration(
@@ -67,11 +74,23 @@ class BlockDetailModal extends StatelessWidget {
                     ?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
             Text(
-              '${latestBlock.plannedStartTime} â€“ ${latestBlock.plannedEndTime}  â€¢  ${latestBlock.plannedDurationMinutes}m',
+              'Planned: ${_formatTimeLabel(latestBlock.plannedStartTime)} - ${_formatTimeLabel(latestBlock.plannedEndTime)} • ${_formatDurationLabel(latestBlock.plannedDurationMinutes)}',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: cs.onSurface.withValues(alpha: 0.5),
               ),
             ),
+            if (latestBlock.actualStartTime != null ||
+                latestBlock.actualEndTime != null ||
+                latestBlock.actualDurationMinutes != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Actual: ${_formatTimeLabel(latestBlock.actualStartTime)} - ${_formatTimeLabel(latestBlock.actualEndTime)} • ${_formatDurationLabel(latestBlock.actualDurationMinutes ?? latestBlock.plannedDurationMinutes)}',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: cs.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
             if (latestBlock.description != null &&
                 latestBlock.description!.isNotEmpty) ...[
               const SizedBox(height: 8),
@@ -102,12 +121,12 @@ class BlockDetailModal extends StatelessWidget {
             ],
 
             // â”€â”€ Segments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            if (segments.isNotEmpty) ...[
+            if (timelineEntries.isNotEmpty) ...[
               Text('Timeline',
                   style: theme.textTheme.titleMedium
                       ?.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
-              ...segments.map((seg) => _SegmentTile(segment: seg)),
+              ...timelineEntries.map((entry) => _SegmentTile(entry: entry)),
               const SizedBox(height: 16),
             ],
 
@@ -439,35 +458,170 @@ class _TaskTile extends StatelessWidget {
 }
 
 // â”€â”€ Segment tile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-class _SegmentTile extends StatelessWidget {
-  final BlockSegment segment;
+class _BlockTimelineEntry {
+  final String label;
+  final String start;
+  final String? end;
+  final bool isPause;
 
-  const _SegmentTile({required this.segment});
+  const _BlockTimelineEntry({
+    required this.label,
+    required this.start,
+    this.end,
+    this.isPause = false,
+  });
+}
+
+DateTime? _parseTimelineDateTime(String? raw) {
+  if (raw == null) return null;
+  final value = raw.trim();
+  if (value.isEmpty) return null;
+
+  final parsed = DateTime.tryParse(value);
+  if (parsed != null) {
+    return parsed.toLocal();
+  }
+
+  final match = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(value);
+  if (match == null) return null;
+
+  final hour = int.tryParse(match.group(1)!);
+  final minute = int.tryParse(match.group(2)!);
+  if (hour == null || minute == null) return null;
+
+  return DateTime(2000, 1, 1, hour, minute);
+}
+
+String _formatTimeLabel(String? raw) {
+  final parsed = _parseTimelineDateTime(raw);
+  if (parsed == null) {
+    return raw?.trim().isNotEmpty == true ? raw!.trim() : '--';
+  }
+  return DateFormat('h:mm a').format(parsed);
+}
+
+String _formatDurationLabel(int minutes) {
+  if (minutes >= 60) {
+    final hours = minutes ~/ 60;
+    final remainingMinutes = minutes % 60;
+    if (remainingMinutes == 0) {
+      return '${hours}h';
+    }
+    return '${hours}h ${remainingMinutes}m';
+  }
+  return '$minutes min';
+}
+
+int? _durationMinutesBetween(String start, String? end) {
+  final parsedStart = _parseTimelineDateTime(start);
+  final parsedEnd = _parseTimelineDateTime(end);
+  if (parsedStart == null || parsedEnd == null || parsedEnd.isBefore(parsedStart)) {
+    return null;
+  }
+  return parsedEnd.difference(parsedStart).inMinutes;
+}
+
+List<_BlockTimelineEntry> _buildTimelineEntries({
+  required List<BlockSegment> segments,
+  required List<BlockInterruption> interruptions,
+  required Block fallbackBlock,
+}) {
+  final entries = <_BlockTimelineEntry>[
+    ...segments.map(
+      (segment) => _BlockTimelineEntry(
+        label: 'Studied',
+        start: segment.start,
+        end: segment.end,
+      ),
+    ),
+    ...interruptions.map(
+      (interruption) => _BlockTimelineEntry(
+        label: interruption.reason.trim().isNotEmpty
+            ? interruption.reason.trim()
+            : 'Paused',
+        start: interruption.start,
+        end: interruption.end,
+        isPause: true,
+      ),
+    ),
+  ];
+
+  entries.sort((a, b) {
+    final aStart = _parseTimelineDateTime(a.start);
+    final bStart = _parseTimelineDateTime(b.start);
+    if (aStart == null && bStart == null) return 0;
+    if (aStart == null) return 1;
+    if (bStart == null) return -1;
+    return aStart.compareTo(bStart);
+  });
+
+  if (entries.isNotEmpty) {
+    return entries;
+  }
+
+  if (fallbackBlock.actualStartTime == null && fallbackBlock.actualEndTime == null) {
+    return const <_BlockTimelineEntry>[];
+  }
+
+  return <_BlockTimelineEntry>[
+    _BlockTimelineEntry(
+      label: 'Studied',
+      start: fallbackBlock.actualStartTime ?? fallbackBlock.plannedStartTime,
+      end: fallbackBlock.actualEndTime ?? fallbackBlock.plannedEndTime,
+    ),
+  ];
+}
+
+class _SegmentTile extends StatelessWidget {
+  final _BlockTimelineEntry entry;
+
+  const _SegmentTile({required this.entry});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final endStr = segment.end ?? '...';
+    final durationMinutes = _durationMinutesBetween(entry.start, entry.end);
+    final accentColor = entry.isPause ? const Color(0xFFF59E0B) : cs.primary;
+    final durationLabel = durationMinutes == null
+        ? null
+        : _formatDurationLabel(durationMinutes);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 8,
             height: 8,
             decoration: BoxDecoration(
-              color: cs.primary.withValues(alpha: 0.4),
+              color: accentColor.withValues(alpha: 0.75),
               shape: BoxShape.circle,
             ),
           ),
           const SizedBox(width: 10),
-          Text(
-            '${segment.start} â€“ $endStr',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: cs.onSurface.withValues(alpha: 0.6),
-              fontSize: 13,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.label,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: accentColor,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${_formatTimeLabel(entry.start)} - ${_formatTimeLabel(entry.end)}${durationLabel == null ? '' : ' • $durationLabel'}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurface.withValues(alpha: 0.65),
+                    fontSize: 13,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
