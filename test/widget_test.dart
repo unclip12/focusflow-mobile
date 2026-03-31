@@ -5,11 +5,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:focusflow_mobile/models/active_study_session.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
+import 'package:focusflow_mobile/models/fa_subtopic.dart';
 import 'package:focusflow_mobile/models/routine.dart';
 import 'package:focusflow_mobile/models/video_lecture.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
+import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/screens/today_plan/routine_runner_screen.dart';
+import 'package:focusflow_mobile/screens/today_plan/study_flow_screen.dart';
 import 'package:focusflow_mobile/screens/today_plan/timeline_view.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart';
@@ -840,6 +844,114 @@ void main() {
     expect(find.text('Brush Teeth'), findsOneWidget);
     expect(find.text('00:00'), findsWidgets);
   });
+
+  testWidgets(
+      'study flow shows planned summary, studied total, and remaining time',
+      (tester) async {
+    final app = _buildStudyFlowAppProvider();
+
+    await tester.pumpWidget(
+      _StudyFlowHarness(
+        app: app,
+        dateKey: '2026-04-01',
+        blockId: 'study_block',
+        sessionTitle: 'ENT Day-2 Mission 200+',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Session Summary'), findsOneWidget);
+    expect(find.text('01:00:00'), findsOneWidget);
+    expect(find.text('10:00'), findsWidgets);
+    expect(find.text('10:00 AM - 10:10 AM'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('session_footer_remaining')),
+        matching: find.text('50:00'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('study flow pause and resume updates log rows', (tester) async {
+    final app = _buildStudyFlowAppProvider();
+
+    await tester.pumpWidget(
+      _StudyFlowHarness(
+        app: app,
+        dateKey: '2026-04-01',
+        blockId: 'study_block',
+        sessionTitle: 'ENT Day-2 Mission 200+',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pause'), findsOneWidget);
+    expect(app.getActiveStudySession()!.interruptions, isEmpty);
+
+    await tester.tap(find.text('Pause'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Resume'), findsOneWidget);
+    expect(app.getActiveStudySession()!.interruptions.length, 1);
+    expect(app.getActiveStudySession()!.interruptions.single.reason, 'Paused');
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('session_footer_studied')),
+        matching: find.text('10:00'),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Resume'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pause'), findsOneWidget);
+    expect(app.getActiveStudySession()!.segments.length, 2);
+    expect(app.getActiveStudySession()!.interruptions.single.end, isNotNull);
+  });
+
+  testWidgets('study flow subtopics section expands and collapses',
+      (tester) async {
+    final app = _buildStudyFlowAppProvider(
+      subtopics: const [
+        FASubtopic(id: 1, pageNum: 42, name: 'Nasal cavity'),
+        FASubtopic(id: 2, pageNum: 42, name: 'Paranasal sinus'),
+      ],
+    );
+
+    await tester.pumpWidget(
+      _StudyFlowHarness(
+        app: app,
+        dateKey: '2026-04-01',
+        blockId: 'study_block',
+        sessionTitle: 'ENT Day-2 Mission 200+',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('study_flow_subtopics_section')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('study_flow_subtopics_section')),
+        findsOneWidget);
+    expect(find.text('Nasal cavity'), findsNothing);
+
+    await tester.tap(find.text('Subtopics'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nasal cavity'), findsOneWidget);
+    expect(find.text('Paranasal sinus'), findsOneWidget);
+
+    await tester.tap(find.text('Subtopics'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nasal cavity'), findsNothing);
+  });
 }
 
 AppProvider _buildAppProviderWithPlans() {
@@ -961,6 +1073,61 @@ Routine _buildRoutineFixture() {
   );
 }
 
+_TestStudyFlowAppProvider _buildStudyFlowAppProvider({
+  List<FASubtopic> subtopics = const [],
+}) {
+  final dayPlan = _buildDayPlan(
+    date: '2026-04-01',
+    blocks: [
+      Block(
+        id: 'study_block',
+        index: 0,
+        date: '2026-04-01',
+        plannedStartTime: '10:00',
+        plannedEndTime: '11:00',
+        type: BlockType.studySession,
+        title: 'ENT Day-2 Mission 200+',
+        plannedDurationMinutes: 60,
+        actualStartTime: '2026-04-01T10:00:00.000',
+        status: BlockStatus.inProgress,
+        segments: const [
+          BlockSegment(
+            start: '2026-04-01T10:00:00.000',
+            end: '2026-04-01T10:10:00.000',
+          ),
+        ],
+      ),
+    ],
+  );
+
+  final activeSession = ActiveStudySession(
+    sessionId: 'study-session-1',
+    kind: ActiveStudySessionKind.studyFlow,
+    dateKey: '2026-04-01',
+    title: 'ENT Day-2 Mission 200+',
+    blockId: 'study_block',
+    startedAt: '2026-04-01T10:00:00.000',
+    currentPage: 42,
+    targetPages: 1,
+    currentTaskElapsedSeconds: 600,
+    segments: const [
+      BlockSegment(
+        start: '2026-04-01T10:00:00.000',
+        end: '2026-04-01T10:10:00.000',
+      ),
+    ],
+    interruptions: const [],
+  );
+
+  return _TestStudyFlowAppProvider(
+    activeSession: activeSession,
+    dayPlan: dayPlan,
+    subtopics: subtopics,
+    totalElapsedSeconds: 600,
+    taskElapsedSeconds: 600,
+  );
+}
+
 class _TimelineHarness extends StatefulWidget {
   final AppProvider app;
   final DateTime initialDate;
@@ -1040,5 +1207,177 @@ class _RoutineRunnerHarness extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _StudyFlowHarness extends StatelessWidget {
+  final AppProvider app;
+  final String dateKey;
+  final String? blockId;
+  final String? sessionTitle;
+
+  const _StudyFlowHarness({
+    required this.app,
+    required this.dateKey,
+    this.blockId,
+    this.sessionTitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AppProvider>.value(value: app),
+        ChangeNotifierProvider<SettingsProvider>.value(
+          value: _TestSettingsProvider(),
+        ),
+      ],
+      child: MaterialApp(
+        home: StudyFlowScreen(
+          dateKey: dateKey,
+          blockId: blockId,
+          sessionTitle: sessionTitle,
+        ),
+      ),
+    );
+  }
+}
+
+class _TestSettingsProvider extends SettingsProvider {
+  @override
+  int get dailyFAGoal => 10;
+
+  @override
+  Future<void> ensureStudyPlanStartDate() async {}
+}
+
+class _TestStudyFlowAppProvider extends AppProvider {
+  ActiveStudySession? _session;
+  final int totalElapsedSeconds;
+  final int taskElapsedSeconds;
+
+  _TestStudyFlowAppProvider({
+    required ActiveStudySession activeSession,
+    required DayPlan dayPlan,
+    required List<FASubtopic> subtopics,
+    required this.totalElapsedSeconds,
+    required this.taskElapsedSeconds,
+  }) : _session = activeSession {
+    dayPlans = [dayPlan];
+    faSubtopics = List<FASubtopic>.from(subtopics);
+  }
+
+  @override
+  ActiveStudySession? getActiveStudySession() => _session;
+
+  @override
+  int get activeStudySessionElapsedSeconds => totalElapsedSeconds;
+
+  @override
+  int activeStudySessionTaskElapsedSeconds([DateTime? now]) =>
+      taskElapsedSeconds;
+
+  @override
+  Future<void> pauseActiveStudySession() async {
+    final session = _session;
+    if (session == null || session.isPaused) {
+      return;
+    }
+
+    final pausedAt = DateTime.parse('2026-04-01T10:10:00.000');
+    _session = session.copyWith(
+      isPaused: true,
+      currentTaskRunStartedAt: null,
+      segments: _closeSegments(session.segments, pausedAt),
+      interruptions: [
+        ...session.interruptions,
+        BlockInterruption(
+          start: pausedAt.toIso8601String(),
+          reason: 'Paused',
+        ),
+      ],
+    );
+    notifyListeners();
+  }
+
+  @override
+  Future<void> resumeActiveStudySession() async {
+    final session = _session;
+    if (session == null || !session.isPaused) {
+      return;
+    }
+
+    final resumedAt = DateTime.parse('2026-04-01T10:15:00.000');
+    _session = session.copyWith(
+      isPaused: false,
+      currentTaskRunStartedAt: resumedAt.toIso8601String(),
+      segments: [
+        ...session.segments,
+        BlockSegment(start: resumedAt.toIso8601String()),
+      ],
+      interruptions: _closeInterruptions(session.interruptions, resumedAt),
+    );
+    notifyListeners();
+  }
+
+  @override
+  Future<void> markSubtopicRead(int subtopicId) async {
+    final index = faSubtopics.indexWhere((subtopic) => subtopic.id == subtopicId);
+    if (index < 0) {
+      return;
+    }
+    faSubtopics[index] = faSubtopics[index].copyWith(status: 'read');
+    notifyListeners();
+  }
+
+  @override
+  Future<void> markSubtopicsRead(List<int> subtopicIds) async {
+    for (final subtopicId in subtopicIds) {
+      final index =
+          faSubtopics.indexWhere((subtopic) => subtopic.id == subtopicId);
+      if (index >= 0) {
+        faSubtopics[index] = faSubtopics[index].copyWith(status: 'read');
+      }
+    }
+    notifyListeners();
+  }
+
+  List<BlockSegment> _closeSegments(
+    List<BlockSegment> segments,
+    DateTime endedAt,
+  ) {
+    if (segments.isEmpty) {
+      return segments;
+    }
+    final updated = List<BlockSegment>.from(segments);
+    final last = updated.last;
+    if (last.end != null && last.end!.isNotEmpty) {
+      return updated;
+    }
+    updated[updated.length - 1] = BlockSegment(
+      start: last.start,
+      end: endedAt.toIso8601String(),
+    );
+    return updated;
+  }
+
+  List<BlockInterruption> _closeInterruptions(
+    List<BlockInterruption> interruptions,
+    DateTime endedAt,
+  ) {
+    if (interruptions.isEmpty) {
+      return interruptions;
+    }
+    final updated = List<BlockInterruption>.from(interruptions);
+    final last = updated.last;
+    if (last.end != null && last.end!.isNotEmpty) {
+      return updated;
+    }
+    updated[updated.length - 1] = BlockInterruption(
+      start: last.start,
+      end: endedAt.toIso8601String(),
+      reason: last.reason,
+    );
+    return updated;
   }
 }

@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:focusflow_mobile/models/active_study_session.dart';
+import 'package:focusflow_mobile/models/fa_subtopic.dart';
 import 'package:focusflow_mobile/models/fa_page.dart';
+import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/models/pathoma_chapter.dart';
 import 'package:focusflow_mobile/models/sketchy_video.dart';
 import 'package:focusflow_mobile/models/time_log_entry.dart';
@@ -1178,10 +1181,202 @@ class _StudyFlowScreenState extends State<StudyFlowScreen>
     return task.topicIds.map((id) => id.toString()).toList();
   }
 
+  ActiveStudySession? _matchingActiveSession(AppProvider app) {
+    final session = app.getActiveStudySession();
+    if (session == null ||
+        session.kind != ActiveStudySessionKind.studyFlow ||
+        session.dateKey != widget.dateKey) {
+      return null;
+    }
+    if (widget.blockId != null && session.blockId != widget.blockId) {
+      return null;
+    }
+    return session;
+  }
+
+  Block? _sessionBlock(AppProvider app) {
+    final blockId = widget.blockId;
+    if (blockId == null || blockId.isEmpty) {
+      return null;
+    }
+
+    final blocks = app.getDayPlan(widget.dateKey)?.blocks ?? const <Block>[];
+    for (final block in blocks) {
+      if (block.id == blockId) {
+        return block;
+      }
+    }
+    return null;
+  }
+
+  int _sumSegmentSeconds(
+    Iterable<BlockSegment> segments, {
+    required DateTime now,
+  }) {
+    var total = 0;
+    for (final segment in segments) {
+      final start = DateTime.tryParse(segment.start);
+      if (start == null) {
+        continue;
+      }
+      final end = DateTime.tryParse(segment.end ?? '') ?? now;
+      if (end.isBefore(start)) {
+        continue;
+      }
+      total += end.difference(start).inSeconds;
+    }
+    return total;
+  }
+
+  int _sumInterruptionSeconds(
+    Iterable<BlockInterruption> interruptions, {
+    required DateTime now,
+  }) {
+    var total = 0;
+    for (final interruption in interruptions) {
+      final start = DateTime.tryParse(interruption.start);
+      if (start == null) {
+        continue;
+      }
+      final end = DateTime.tryParse(interruption.end ?? '') ?? now;
+      if (end.isBefore(start)) {
+        continue;
+      }
+      total += end.difference(start).inSeconds;
+    }
+    return total;
+  }
+
+  int? _plannedSessionDurationSeconds(AppProvider app) {
+    final block = _sessionBlock(app);
+    if (block != null && block.plannedDurationMinutes > 0) {
+      return block.plannedDurationMinutes * 60;
+    }
+    if (_hasQueuedTasks) {
+      return StudyTask.estimateQueueDurationMinutes(_queue) * 60;
+    }
+    return null;
+  }
+
+  List<_SessionLogEntryData> _buildSessionLogEntries(
+    Iterable<BlockSegment> segments,
+    Iterable<BlockInterruption> interruptions, {
+    required DateTime now,
+  }) {
+    final entries = <_SessionLogEntryData>[];
+
+    for (final segment in segments) {
+      final start = DateTime.tryParse(segment.start);
+      if (start == null) {
+        continue;
+      }
+      final end = DateTime.tryParse(segment.end ?? '') ?? now;
+      if (end.isBefore(start)) {
+        continue;
+      }
+      entries.add(
+        _SessionLogEntryData(
+          label: 'Studied',
+          start: start,
+          end: end,
+          durationSeconds: end.difference(start).inSeconds,
+          isPaused: false,
+        ),
+      );
+    }
+
+    for (final interruption in interruptions) {
+      final start = DateTime.tryParse(interruption.start);
+      if (start == null) {
+        continue;
+      }
+      final end = DateTime.tryParse(interruption.end ?? '') ?? now;
+      if (end.isBefore(start)) {
+        continue;
+      }
+      entries.add(
+        _SessionLogEntryData(
+          label: interruption.reason.trim().isEmpty
+              ? 'Paused'
+              : interruption.reason,
+          start: start,
+          end: end,
+          durationSeconds: end.difference(start).inSeconds,
+          isPaused: true,
+        ),
+      );
+    }
+
+    entries.sort((a, b) => a.start.compareTo(b.start));
+    return entries;
+  }
+
+  _SessionUiData _buildSessionUiData(AppProvider app) {
+    final now = DateTime.now();
+    final session = _matchingActiveSession(app);
+    final block = _sessionBlock(app);
+    final segments =
+        session?.segments ?? block?.segments ?? const <BlockSegment>[];
+    final interruptions = session?.interruptions ??
+        block?.interruptions ??
+        const <BlockInterruption>[];
+    final studiedSeconds = session != null
+        ? app.activeStudySessionElapsedSeconds
+        : _sumSegmentSeconds(segments, now: now);
+    final pausedSeconds = _sumInterruptionSeconds(
+      interruptions,
+      now: now,
+    );
+    final plannedSeconds = _plannedSessionDurationSeconds(app);
+    final remainingSeconds = plannedSeconds == null
+        ? null
+        : math.max(0, plannedSeconds - studiedSeconds);
+
+    return _SessionUiData(
+      plannedDurationLabel:
+          plannedSeconds == null ? null : _fmtTime(plannedSeconds),
+      studiedDurationLabel: _fmtTime(studiedSeconds),
+      pausedDurationLabel: _fmtTime(pausedSeconds),
+      remainingDurationLabel:
+          remainingSeconds == null ? null : _fmtTime(remainingSeconds),
+      logEntries: _buildSessionLogEntries(
+        segments,
+        interruptions,
+        now: now,
+      ),
+    );
+  }
+
   String _fmtTime(int seconds) {
-    final m = seconds ~/ 60;
-    final s = seconds % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    final safeSeconds = math.max(0, seconds);
+    final hours = safeSeconds ~/ 3600;
+    final minutes = (safeSeconds % 3600) ~/ 60;
+    final remainingSeconds = safeSeconds % 60;
+    if (hours > 0) {
+      return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+    }
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
+  String _fmtLogDuration(int seconds) {
+    final safeSeconds = math.max(0, seconds);
+    final hours = safeSeconds ~/ 3600;
+    final minutes = (safeSeconds % 3600) ~/ 60;
+    final remainingSeconds = safeSeconds % 60;
+    if (hours > 0) {
+      return minutes > 0 ? '${hours}h ${minutes}m' : '${hours}h';
+    }
+    if (minutes > 0) {
+      return remainingSeconds > 0
+          ? '${minutes}m ${remainingSeconds}s'
+          : '${minutes}m';
+    }
+    return '${remainingSeconds}s';
+  }
+
+  String _fmtClockRange(DateTime start, DateTime end) {
+    final formatter = DateFormat('h:mm a');
+    return '${formatter.format(start)} - ${formatter.format(end)}';
   }
 
   List<UWorldTopic> _selectedUWorldTopics(AppProvider app) {
@@ -1394,10 +1589,327 @@ class _StudyFlowScreenState extends State<StudyFlowScreen>
     return 'Page $_currentPage';
   }
 
+  Widget _buildFASubtopicsSection(
+    BuildContext context,
+    AppProvider app,
+    List<FASubtopic> subtopics,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          key: const ValueKey('study_flow_subtopics_section'),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          initiallyExpanded: false,
+          title: Text(
+            'Subtopics',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: cs.onSurface,
+            ),
+          ),
+          subtitle: Text(
+            subtopics.isEmpty
+                ? 'No subtopics available for this page'
+                : '${subtopics.length} subtopics for page $_currentPage',
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurface.withValues(alpha: 0.55),
+            ),
+          ),
+          children: [
+            if (subtopics.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      size: 18,
+                      color: cs.onSurface.withValues(alpha: 0.45),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'No subtopics available for this page yet.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: cs.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else ...[
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () {
+                    final unreadIds = subtopics
+                        .where((subtopic) => subtopic.status == 'unread')
+                        .map((subtopic) => subtopic.id)
+                        .whereType<int>()
+                        .toList();
+                    if (unreadIds.isNotEmpty) {
+                      app.markSubtopicsRead(unreadIds);
+                    }
+                  },
+                  icon: const Icon(Icons.select_all_rounded, size: 16),
+                  label: const Text(
+                    'Select All',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
+              ),
+              for (final subtopic in subtopics)
+                CheckboxListTile(
+                  value: subtopic.status != 'unread',
+                  onChanged: (checked) {
+                    if (checked == true && subtopic.id != null) {
+                      app.markSubtopicRead(subtopic.id!);
+                    }
+                  },
+                  title: Text(
+                    subtopic.name,
+                    style: TextStyle(
+                      fontSize: 14,
+                      decoration: subtopic.status != 'unread'
+                          ? TextDecoration.lineThrough
+                          : null,
+                      color: subtopic.status != 'unread'
+                          ? cs.onSurface.withValues(alpha: 0.4)
+                          : cs.onSurface,
+                    ),
+                  ),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  dense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFASessionContent(
+    BuildContext context,
+    AppProvider app,
+    List<FASubtopic> subtopics,
+    _SessionUiData sessionUi,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      children: [
+        _SessionSummaryCard(
+          accentColor: const Color(0xFF8B5CF6),
+          data: sessionUi,
+        ),
+        const SizedBox(height: 16),
+        _SessionLogSection(
+          accentColor: const Color(0xFF8B5CF6),
+          entries: sessionUi.logEntries,
+          formatClockRange: _fmtClockRange,
+          formatDuration: _fmtLogDuration,
+        ),
+        const SizedBox(height: 16),
+        _buildFASubtopicsSection(context, app, subtopics),
+      ],
+    );
+  }
+
+  Widget _buildQueuedUWorldContent(
+    ThemeData theme,
+    List<UWorldTopic> topics,
+    _SessionUiData sessionUi,
+  ) {
+    final cs = theme.colorScheme;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      children: [
+        _SessionSummaryCard(
+          accentColor: const Color(0xFFF59E0B),
+          data: sessionUi,
+        ),
+        const SizedBox(height: 16),
+        _SessionLogSection(
+          accentColor: const Color(0xFFF59E0B),
+          entries: sessionUi.logEntries,
+          formatClockRange: _fmtClockRange,
+          formatDuration: _fmtLogDuration,
+        ),
+        const SizedBox(height: 16),
+        if (topics.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Text(
+                'No UWorld topics were selected.',
+                style: TextStyle(
+                  color: cs.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
+          )
+        else
+          for (final topic in topics)
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.quiz_rounded,
+                      color: Color(0xFFF59E0B),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          topic.subtopic,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${topic.system} - ${topic.totalQuestions - topic.doneQuestions} remaining',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurface.withValues(alpha: 0.55),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+      ],
+    );
+  }
+
+  Widget _buildQueuedGenericContent(
+    ThemeData theme,
+    Color accentColor,
+    IconData icon,
+    List<_QueuedTaskListItem> items,
+    _SessionUiData sessionUi,
+  ) {
+    final cs = theme.colorScheme;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      children: [
+        _SessionSummaryCard(
+          accentColor: accentColor,
+          data: sessionUi,
+        ),
+        const SizedBox(height: 16),
+        _SessionLogSection(
+          accentColor: accentColor,
+          entries: sessionUi.logEntries,
+          formatClockRange: _fmtClockRange,
+          formatDuration: _fmtLogDuration,
+        ),
+        const SizedBox(height: 16),
+        if (items.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Text(
+                'Review the task details, then mark it done when finished.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: cs.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
+          )
+        else
+          for (final item in items)
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, color: accentColor),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.title,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          item.subtitle,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurface.withValues(alpha: 0.55),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     final app = context.watch<AppProvider>();
+    final sessionUi = _buildSessionUiData(app);
 
     if (!_isStudying) {
       return _WelcomeView(
@@ -1421,11 +1933,17 @@ class _StudyFlowScreenState extends State<StudyFlowScreen>
       final topics = _selectedUWorldTopics(app);
       return _QueuedUWorldView(
         task: task,
-        topics: topics,
-        taskIndex: _currentTaskIndex,
-        totalTasks: _queue.length,
-        totalElapsedLabel: _fmtTime(_totalElapsed),
-        taskElapsedLabel: _fmtTime(_pageElapsed),
+        content: _buildQueuedUWorldContent(
+          theme,
+          topics,
+          sessionUi,
+        ),
+        timerMetrics: _SessionTimerMetrics(
+          currentLabel: 'This task',
+          currentElapsedLabel: _fmtTime(_pageElapsed),
+          studiedElapsedLabel: _fmtTime(_totalElapsed),
+          remainingElapsedLabel: sessionUi.remainingDurationLabel,
+        ),
         isPaused: _userPaused,
         onTogglePause: _togglePause,
         onComplete: _completeQueuedUWorldTask,
@@ -1437,11 +1955,19 @@ class _StudyFlowScreenState extends State<StudyFlowScreen>
       final task = _currentTask!;
       return _QueuedGenericTaskView(
         task: task,
-        items: _selectedSupplementalItems(app),
-        taskIndex: _currentTaskIndex,
-        totalTasks: _queue.length,
-        totalElapsedLabel: _fmtTime(_totalElapsed),
-        taskElapsedLabel: _fmtTime(_pageElapsed),
+        content: _buildQueuedGenericContent(
+          theme,
+          _accentForTaskType(task.type),
+          _iconForTaskType(task.type),
+          _selectedSupplementalItems(app),
+          sessionUi,
+        ),
+        timerMetrics: _SessionTimerMetrics(
+          currentLabel: 'This task',
+          currentElapsedLabel: _fmtTime(_pageElapsed),
+          studiedElapsedLabel: _fmtTime(_totalElapsed),
+          remainingElapsedLabel: sessionUi.remainingDurationLabel,
+        ),
         accentColor: _accentForTaskType(task.type),
         icon: _iconForTaskType(task.type),
         isPaused: _userPaused,
@@ -1515,226 +2041,25 @@ class _StudyFlowScreenState extends State<StudyFlowScreen>
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: subtopics.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.auto_stories_rounded,
-                            size: 48,
-                            color: cs.primary.withValues(alpha: 0.3),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Study Page $_currentPage',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: cs.onSurface.withValues(alpha: 0.5),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'No subtopics available for this page',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: cs.onSurface.withValues(alpha: 0.35),
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Row(
-                            children: [
-                              Text(
-                                'Subtopics',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: cs.onSurface,
-                                ),
-                              ),
-                              const Spacer(),
-                              TextButton.icon(
-                                onPressed: () {
-                                  final unreadIds = subtopics
-                                      .where((s) => s.status == 'unread')
-                                      .map((s) => s.id!)
-                                      .toList();
-                                  if (unreadIds.isNotEmpty) {
-                                    app.markSubtopicsRead(unreadIds);
-                                  }
-                                },
-                                icon: const Icon(
-                                  Icons.select_all_rounded,
-                                  size: 16,
-                                ),
-                                label: const Text(
-                                  'Select All',
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemCount: subtopics.length,
-                            itemBuilder: (context, i) {
-                              final sub = subtopics[i];
-                              final isDone = sub.status != 'unread';
-                              return CheckboxListTile(
-                                value: isDone,
-                                onChanged: (val) {
-                                  if (val == true && sub.id != null) {
-                                    app.markSubtopicRead(sub.id!);
-                                  }
-                                },
-                                title: Text(
-                                  sub.name,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    decoration: isDone
-                                        ? TextDecoration.lineThrough
-                                        : null,
-                                    color: isDone
-                                        ? cs.onSurface.withValues(alpha: 0.4)
-                                        : cs.onSurface,
-                                  ),
-                                ),
-                                controlAffinity:
-                                    ListTileControlAffinity.leading,
-                                dense: true,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
+              child: _buildFASessionContent(
+                context,
+                app,
+                subtopics,
+                sessionUi,
+              ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(24)),
+            _SessionTimerFooter(
+              accentColor: const Color(0xFF8B5CF6),
+              metrics: _SessionTimerMetrics(
+                currentLabel: 'This page',
+                currentElapsedLabel: _fmtTime(_pageElapsed),
+                studiedElapsedLabel: _fmtTime(_totalElapsed),
+                remainingElapsedLabel: sessionUi.remainingDurationLabel,
               ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Column(
-                        children: [
-                          Text(
-                            'This page',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: cs.onSurface.withValues(alpha: 0.5),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _fmtTime(_pageElapsed),
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF8B5CF6),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 24),
-                        width: 1,
-                        height: 40,
-                        color: cs.onSurface.withValues(alpha: 0.1),
-                      ),
-                      Column(
-                        children: [
-                          Text(
-                            'Total',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: cs.onSurface.withValues(alpha: 0.5),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _fmtTime(_totalElapsed),
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                              color: cs.onSurface.withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _togglePause,
-                          icon: Icon(
-                            _userPaused
-                                ? Icons.play_arrow_rounded
-                                : Icons.pause_rounded,
-                            size: 20,
-                          ),
-                          label: Text(
-                            _userPaused ? 'Resume' : 'Pause',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        flex: 2,
-                        child: FilledButton.icon(
-                          onPressed: _markPageDone,
-                          icon: const Icon(Icons.check_rounded, size: 22),
-                          label: const Text(
-                            'Done with this page',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            backgroundColor: const Color(0xFF8B5CF6),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+              isPaused: _userPaused,
+              onTogglePause: _togglePause,
+              onComplete: _markPageDone,
+              completeLabel: 'Done with this page',
             ),
           ],
         ),
@@ -1847,13 +2172,477 @@ class _WelcomeView extends StatelessWidget {
   }
 }
 
+class _SessionUiData {
+  final String? plannedDurationLabel;
+  final String studiedDurationLabel;
+  final String pausedDurationLabel;
+  final String? remainingDurationLabel;
+  final List<_SessionLogEntryData> logEntries;
+
+  const _SessionUiData({
+    required this.plannedDurationLabel,
+    required this.studiedDurationLabel,
+    required this.pausedDurationLabel,
+    required this.remainingDurationLabel,
+    required this.logEntries,
+  });
+}
+
+class _SessionLogEntryData {
+  final String label;
+  final DateTime start;
+  final DateTime end;
+  final int durationSeconds;
+  final bool isPaused;
+
+  const _SessionLogEntryData({
+    required this.label,
+    required this.start,
+    required this.end,
+    required this.durationSeconds,
+    required this.isPaused,
+  });
+}
+
+class _SessionTimerMetrics {
+  final String currentLabel;
+  final String currentElapsedLabel;
+  final String studiedElapsedLabel;
+  final String? remainingElapsedLabel;
+
+  const _SessionTimerMetrics({
+    required this.currentLabel,
+    required this.currentElapsedLabel,
+    required this.studiedElapsedLabel,
+    this.remainingElapsedLabel,
+  });
+}
+
+class _SessionSummaryCard extends StatelessWidget {
+  final Color accentColor;
+  final _SessionUiData data;
+
+  const _SessionSummaryCard({
+    required this.accentColor,
+    required this.data,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final metrics = <Widget>[
+      if (data.plannedDurationLabel != null)
+        _SessionSummaryMetric(
+          label: 'Planned',
+          value: data.plannedDurationLabel!,
+          accentColor: accentColor,
+        ),
+      _SessionSummaryMetric(
+        label: 'Studied',
+        value: data.studiedDurationLabel,
+        accentColor: accentColor,
+      ),
+      _SessionSummaryMetric(
+        label: 'Paused',
+        value: data.pausedDurationLabel,
+        accentColor: accentColor,
+      ),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Session Summary',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: cs.onSurface,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Planned, studied, and paused totals update live here.',
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurface.withValues(alpha: 0.55),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: metrics,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SessionSummaryMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color accentColor;
+
+  const _SessionSummaryMetric({
+    required this.label,
+    required this.value,
+    required this.accentColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      constraints: const BoxConstraints(minWidth: 100),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: accentColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface.withValues(alpha: 0.55),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: accentColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SessionLogSection extends StatelessWidget {
+  final Color accentColor;
+  final List<_SessionLogEntryData> entries;
+  final String Function(DateTime start, DateTime end) formatClockRange;
+  final String Function(int seconds) formatDuration;
+
+  const _SessionLogSection({
+    required this.accentColor,
+    required this.entries,
+    required this.formatClockRange,
+    required this.formatDuration,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Session Log',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: cs.onSurface,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Every study run and pause is listed in the order it happened.',
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurface.withValues(alpha: 0.55),
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (entries.isEmpty)
+            Text(
+              'Start the session to begin logging study and pause periods.',
+              style: TextStyle(
+                fontSize: 13,
+                color: cs.onSurface.withValues(alpha: 0.5),
+              ),
+            )
+          else
+            for (var index = 0; index < entries.length; index++) ...[
+              _SessionLogRow(
+                rowKey: ValueKey(
+                  'session_log_${entries[index].isPaused ? 'paused' : 'studied'}_$index',
+                ),
+                accentColor: accentColor,
+                entry: entries[index],
+                formatClockRange: formatClockRange,
+                formatDuration: formatDuration,
+              ),
+              if (index != entries.length - 1) const SizedBox(height: 10),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SessionLogRow extends StatelessWidget {
+  final Key? rowKey;
+  final Color accentColor;
+  final _SessionLogEntryData entry;
+  final String Function(DateTime start, DateTime end) formatClockRange;
+  final String Function(int seconds) formatDuration;
+
+  const _SessionLogRow({
+    this.rowKey,
+    required this.accentColor,
+    required this.entry,
+    required this.formatClockRange,
+    required this.formatDuration,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final rowColor = entry.isPaused ? const Color(0xFF6366F1) : accentColor;
+    return Container(
+      key: rowKey,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cs.surface.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: rowColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              entry.isPaused ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              color: rowColor,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  formatClockRange(entry.start, entry.end),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: cs.onSurface.withValues(alpha: 0.58),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            formatDuration(entry.durationSeconds),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: rowColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SessionTimerFooter extends StatelessWidget {
+  final Color accentColor;
+  final _SessionTimerMetrics metrics;
+  final bool isPaused;
+  final Future<void> Function() onTogglePause;
+  final Future<void> Function() onComplete;
+  final String completeLabel;
+
+  const _SessionTimerFooter({
+    required this.accentColor,
+    required this.metrics,
+    required this.isPaused,
+    required this.onTogglePause,
+    required this.onComplete,
+    required this.completeLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Expanded(
+                child: _SessionFooterMetric(
+                  metricKey: const ValueKey('session_footer_current'),
+                  label: metrics.currentLabel,
+                  value: metrics.currentElapsedLabel,
+                  color: accentColor,
+                ),
+              ),
+              Expanded(
+                child: _SessionFooterMetric(
+                  metricKey: const ValueKey('session_footer_studied'),
+                  label: 'Studied',
+                  value: metrics.studiedElapsedLabel,
+                  color: cs.onSurface.withValues(alpha: 0.65),
+                ),
+              ),
+              if (metrics.remainingElapsedLabel != null)
+                Expanded(
+                  child: _SessionFooterMetric(
+                    metricKey: const ValueKey('session_footer_remaining'),
+                    label: 'Remaining',
+                    value: metrics.remainingElapsedLabel!,
+                    color: const Color(0xFF2563EB),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onTogglePause,
+                  icon: Icon(
+                    isPaused
+                        ? Icons.play_arrow_rounded
+                        : Icons.pause_rounded,
+                    size: 20,
+                  ),
+                  label: Text(
+                    isPaused ? 'Resume' : 'Pause',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: FilledButton.icon(
+                  onPressed: onComplete,
+                  icon: const Icon(Icons.check_rounded, size: 22),
+                  label: Text(
+                    completeLabel,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    backgroundColor: accentColor,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SessionFooterMetric extends StatelessWidget {
+  final Key? metricKey;
+  final String label;
+  final String value;
+  final Color color;
+
+  const _SessionFooterMetric({
+    this.metricKey,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: metricKey,
+      children: [
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 11,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _QueuedUWorldView extends StatelessWidget {
   final StudyTask task;
-  final List<UWorldTopic> topics;
-  final int taskIndex;
-  final int totalTasks;
-  final String totalElapsedLabel;
-  final String taskElapsedLabel;
+  final Widget content;
+  final _SessionTimerMetrics timerMetrics;
   final bool isPaused;
   final Future<void> Function() onTogglePause;
   final Future<void> Function() onComplete;
@@ -1861,11 +2650,8 @@ class _QueuedUWorldView extends StatelessWidget {
 
   const _QueuedUWorldView({
     required this.task,
-    required this.topics,
-    required this.taskIndex,
-    required this.totalTasks,
-    required this.totalElapsedLabel,
-    required this.taskElapsedLabel,
+    required this.content,
+    required this.timerMetrics,
     required this.isPaused,
     required this.onTogglePause,
     required this.onComplete,
@@ -1929,7 +2715,7 @@ class _QueuedUWorldView extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Task ${taskIndex + 1}/$totalTasks - ${task.questionCount} queued questions',
+                      '${task.questionCount} queued question${task.questionCount == 1 ? '' : 's'}',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -1955,191 +2741,14 @@ class _QueuedUWorldView extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            Expanded(
-              child: topics.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No UWorld topics were selected.',
-                        style: TextStyle(
-                          color: cs.onSurface.withValues(alpha: 0.5),
-                        ),
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: topics.length,
-                      itemBuilder: (context, index) {
-                        final topic = topics[index];
-                        final remaining =
-                            topic.totalQuestions - topic.doneQuestions;
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: cs.surfaceContainerHighest
-                                .withValues(alpha: 0.45),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF59E0B)
-                                      .withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(
-                                  Icons.quiz_rounded,
-                                  color: Color(0xFFF59E0B),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      topic.subtopic,
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: cs.onSurface,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${topic.system} - $remaining remaining',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: cs.onSurface
-                                            .withValues(alpha: 0.55),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Column(
-                        children: [
-                          Text(
-                            'This task',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: cs.onSurface.withValues(alpha: 0.5),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            taskElapsedLabel,
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFFF59E0B),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 24),
-                        width: 1,
-                        height: 40,
-                        color: cs.onSurface.withValues(alpha: 0.1),
-                      ),
-                      Column(
-                        children: [
-                          Text(
-                            'Total',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: cs.onSurface.withValues(alpha: 0.5),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            totalElapsedLabel,
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                              color: cs.onSurface.withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: onTogglePause,
-                          icon: Icon(
-                            isPaused
-                                ? Icons.play_arrow_rounded
-                                : Icons.pause_rounded,
-                            size: 20,
-                          ),
-                          label: Text(
-                            isPaused ? 'Resume' : 'Pause',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        flex: 2,
-                        child: FilledButton.icon(
-                          onPressed: onComplete,
-                          icon: const Icon(Icons.check_rounded, size: 22),
-                          label: const Text(
-                            'Complete UWorld task',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            backgroundColor: const Color(0xFFF59E0B),
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+            Expanded(child: content),
+            _SessionTimerFooter(
+              accentColor: const Color(0xFFF59E0B),
+              metrics: timerMetrics,
+              isPaused: isPaused,
+              onTogglePause: onTogglePause,
+              onComplete: onComplete,
+              completeLabel: 'Complete UWorld task',
             ),
           ],
         ),
@@ -2160,11 +2769,8 @@ class _QueuedTaskListItem {
 
 class _QueuedGenericTaskView extends StatelessWidget {
   final StudyTask task;
-  final List<_QueuedTaskListItem> items;
-  final int taskIndex;
-  final int totalTasks;
-  final String totalElapsedLabel;
-  final String taskElapsedLabel;
+  final Widget content;
+  final _SessionTimerMetrics timerMetrics;
   final Color accentColor;
   final IconData icon;
   final bool isPaused;
@@ -2174,11 +2780,8 @@ class _QueuedGenericTaskView extends StatelessWidget {
 
   const _QueuedGenericTaskView({
     required this.task,
-    required this.items,
-    required this.taskIndex,
-    required this.totalTasks,
-    required this.totalElapsedLabel,
-    required this.taskElapsedLabel,
+    required this.content,
+    required this.timerMetrics,
     required this.accentColor,
     required this.icon,
     required this.isPaused,
@@ -2239,7 +2842,7 @@ class _QueuedGenericTaskView extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Task ${taskIndex + 1}/$totalTasks - ${task.itemCount} queued $itemLabel',
+                      '${task.itemCount} queued $itemLabel',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -2265,186 +2868,14 @@ class _QueuedGenericTaskView extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            Expanded(
-              child: items.isEmpty
-                  ? Center(
-                      child: Text(
-                        'Review the task details, then mark it done when finished.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: cs.onSurface.withValues(alpha: 0.5),
-                        ),
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: items.length,
-                      itemBuilder: (context, index) {
-                        final item = items[index];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: cs.surfaceContainerHighest
-                                .withValues(alpha: 0.45),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: accentColor.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Icon(icon, color: accentColor),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item.title,
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: cs.onSurface,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      item.subtitle,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: cs.onSurface
-                                            .withValues(alpha: 0.55),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Column(
-                        children: [
-                          Text(
-                            'This task',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: cs.onSurface.withValues(alpha: 0.5),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            taskElapsedLabel,
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                              color: accentColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 24),
-                        width: 1,
-                        height: 40,
-                        color: cs.onSurface.withValues(alpha: 0.1),
-                      ),
-                      Column(
-                        children: [
-                          Text(
-                            'Total',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: cs.onSurface.withValues(alpha: 0.5),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            totalElapsedLabel,
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                              color: cs.onSurface.withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: onTogglePause,
-                          icon: Icon(
-                            isPaused
-                                ? Icons.play_arrow_rounded
-                                : Icons.pause_rounded,
-                            size: 20,
-                          ),
-                          label: Text(
-                            isPaused ? 'Resume' : 'Pause',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        flex: 2,
-                        child: FilledButton.icon(
-                          onPressed: onComplete,
-                          icon: const Icon(Icons.check_rounded, size: 22),
-                          label: const Text(
-                            'Mark Done',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            backgroundColor: accentColor,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+            Expanded(child: content),
+            _SessionTimerFooter(
+              accentColor: accentColor,
+              metrics: timerMetrics,
+              isPaused: isPaused,
+              onTogglePause: onTogglePause,
+              onComplete: onComplete,
+              completeLabel: 'Mark Done',
             ),
           ],
         ),
