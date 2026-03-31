@@ -377,14 +377,20 @@ class _SubjectGroup extends StatelessWidget {
         extentRatio: slidableActionExtentRatio,
         children: [
           SlidableAction(
-            onPressed: (_) =>
-                app.toggleVideoLectureWatched(lecture.id!, !lecture.watched),
-            backgroundColor: lecture.watched
+            onPressed: (_) async {
+              if (lecture.isComplete) {
+                await app.undoVideoLecture(lecture.id!);
+                return;
+              }
+              await app.toggleVideoLectureWatched(lecture.id!, true);
+            },
+            backgroundColor: lecture.isComplete
                 ? DashboardColors.warning
                 : DashboardColors.success,
             foregroundColor: Colors.white,
-            icon: lecture.watched ? Icons.undo_rounded : Icons.check_rounded,
-            label: lecture.watched ? 'Undo' : 'Done',
+            icon:
+                lecture.isComplete ? Icons.undo_rounded : Icons.check_rounded,
+            label: lecture.isComplete ? 'Undo' : 'Done',
             borderRadius: BorderRadius.circular(8),
           ),
         ],
@@ -523,7 +529,7 @@ class _SubjectGroup extends StatelessWidget {
                 ],
               );
               if (!proceed || !context.mounted) return;
-              app.toggleVideoLectureWatched(lecture.id!, true);
+              await app.toggleVideoLectureWatched(lecture.id!, true);
             } else {
               // Already watched — show revision confidence
               final revId = 'video-lecture-${lecture.id}';
@@ -536,7 +542,7 @@ class _SubjectGroup extends StatelessWidget {
                   source: 'VIDEO_LECTURE',
                 );
               } else {
-                app.toggleVideoLectureWatched(lecture.id!, false);
+                await app.undoVideoLecture(lecture.id!);
               }
             }
           },

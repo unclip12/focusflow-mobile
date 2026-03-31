@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/models/routine.dart';
+import 'package:focusflow_mobile/models/video_lecture.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/screens/today_plan/routine_runner_screen.dart';
 import 'package:focusflow_mobile/screens/today_plan/timeline_view.dart';
@@ -14,6 +15,8 @@ import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   testWidgets('planned insertion recommends the next free start time',
       (tester) async {
     final app = AppProvider();
@@ -233,6 +236,77 @@ void main() {
       excludedBlockIds: const {'morning'},
     );
     expect(validMove.isValid, isTrue);
+  });
+
+  test('video lecture toggle watched derives full completion state', () {
+    const lecture = VideoLecture(
+      id: 1,
+      subject: 'Ophthalmology',
+      title: 'Day-1 Mission 200+',
+      durationMinutes: 120,
+      watchedMinutes: 18,
+      watched: false,
+    );
+
+    final nextState = AppProvider.deriveVideoLectureToggleState(lecture, true);
+
+    expect(nextState.watched, isTrue);
+    expect(nextState.watchedMinutes, lecture.durationMinutes);
+    expect(nextState.shouldHaveRevision, isTrue);
+  });
+
+  test('video lecture toggle unwatched derives zero-progress reset state', () {
+    const lecture = VideoLecture(
+      id: 1,
+      subject: 'Ophthalmology',
+      title: 'Day-1 Mission 200+',
+      durationMinutes: 120,
+      watchedMinutes: 120,
+      watched: true,
+    );
+
+    final nextState = AppProvider.deriveVideoLectureToggleState(lecture, false);
+
+    expect(nextState.watched, isFalse);
+    expect(nextState.watchedMinutes, 0);
+    expect(nextState.shouldHaveRevision, isFalse);
+  });
+
+  test('video lecture progress auto-complete derives watched revision state',
+      () {
+    const lecture = VideoLecture(
+      id: 1,
+      subject: 'Ophthalmology',
+      title: 'Day-1 Mission 200+',
+      durationMinutes: 120,
+      watchedMinutes: 60,
+      watched: false,
+    );
+
+    final nextState = AppProvider.deriveVideoLectureProgressState(lecture, 120);
+
+    expect(nextState.watched, isTrue);
+    expect(nextState.watchedMinutes, lecture.durationMinutes);
+    expect(nextState.shouldHaveRevision, isTrue);
+  });
+
+  test(
+      'video lecture progress drop from complete to zero derives unwatch reset',
+      () {
+    const lecture = VideoLecture(
+      id: 1,
+      subject: 'Ophthalmology',
+      title: 'Day-1 Mission 200+',
+      durationMinutes: 120,
+      watchedMinutes: 120,
+      watched: true,
+    );
+
+    final nextState = AppProvider.deriveVideoLectureProgressState(lecture, 0);
+
+    expect(nextState.watched, isFalse);
+    expect(nextState.watchedMinutes, 0);
+    expect(nextState.shouldHaveRevision, isFalse);
   });
 
   testWidgets('current day overnight block renders only the visible slice',

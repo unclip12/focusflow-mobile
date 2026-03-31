@@ -67,13 +67,17 @@ class _VideoLectureDetailSheetState extends State<VideoLectureDetailSheet>
     setState(() => _sliderValue = val.round());
   }
 
-  void _onSliderEnd(double val) {
+  Future<void> _onSliderEnd(double val) async {
     final app = context.read<AppProvider>();
-    app.updateVideoLectureProgress(widget.lecture.id!, val.round());
+    final rounded = val.round();
+    await app.updateVideoLectureProgress(widget.lecture.id!, rounded);
     if (val.round() >= widget.lecture.durationMinutes) {
       HapticFeedback.mediumImpact();
     }
-    setState(() => _isDragging = false);
+    setState(() {
+      _sliderValue = rounded;
+      _isDragging = false;
+    });
   }
 
   String _formatMinutes(int min) {
@@ -303,14 +307,16 @@ class _VideoLectureDetailSheetState extends State<VideoLectureDetailSheet>
                       ? DashboardColors.warning
                       : DashboardColors.success,
                   isDark: isDark,
-                  onTap: () {
+                  onTap: () async {
                     HapticFeedback.mediumImpact();
-                    app.toggleVideoLectureWatched(
-                        lecture.id!, !lecture.isComplete);
+                    if (lecture.isComplete) {
+                      await app.undoVideoLecture(lecture.id!);
+                    } else {
+                      await app.toggleVideoLectureWatched(lecture.id!, true);
+                    }
                     setState(() {
-                      if (!lecture.isComplete) {
-                        _sliderValue = lecture.durationMinutes;
-                      }
+                      _sliderValue =
+                          lecture.isComplete ? 0 : lecture.durationMinutes;
                     });
                   },
                 ),

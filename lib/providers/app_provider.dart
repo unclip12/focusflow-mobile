@@ -163,6 +163,18 @@ class DateActivity {
 }
 
 // ── Canned mentor replies ─────────────────────────────────────────
+class VideoLectureSyncState {
+  final bool watched;
+  final int watchedMinutes;
+  final bool shouldHaveRevision;
+
+  const VideoLectureSyncState({
+    required this.watched,
+    required this.watchedMinutes,
+    required this.shouldHaveRevision,
+  });
+}
+
 const _kMentorAutoReplies = [
   "Great question! Based on your recent study logs, I'd recommend focusing on Anatomy — you haven't reviewed it in 5 days.",
   "You're doing amazing! Your streak is strong 🔥. Keep the momentum going with a quick revision session today.",
@@ -5243,106 +5255,127 @@ class AppProvider extends ChangeNotifier {
   // VIDEO LECTURES (V11)
   // ═══════════════════════════════════════════════════════════════
 
+  String _videoLectureRevisionId(int id) => 'video-lecture-$id';
+
+  static VideoLectureSyncState deriveVideoLectureToggleState(
+    VideoLecture lecture,
+    bool watched,
+  ) {
+    return VideoLectureSyncState(
+      watched: watched,
+      watchedMinutes: watched ? lecture.durationMinutes : 0,
+      shouldHaveRevision: watched,
+    );
+  }
+
+  static VideoLectureSyncState deriveVideoLectureProgressState(
+    VideoLecture lecture,
+    int watchedMinutes,
+  ) {
+    final clamped = watchedMinutes.clamp(0, lecture.durationMinutes);
+    final isComplete = clamped >= lecture.durationMinutes;
+    return VideoLectureSyncState(
+      watched: isComplete,
+      watchedMinutes: clamped,
+      shouldHaveRevision: isComplete,
+    );
+  }
+
+  Future<void> _ensureVideoLectureRevisionItem(VideoLecture lecture) async {
+    final id = lecture.id;
+    if (id == null) return;
+
+    final revId = _videoLectureRevisionId(id);
+    final exists = revisionItems.any((r) => r.id == revId);
+    if (exists) return;
+
+    final mode = revisionSettings?.mode ?? 'strict';
+    final now = DateTime.now().toIso8601String();
+    final nextDate = SrsService.calculateNextRevisionDateString(
+      lastStudiedAt: now,
+      revisionIndex: 0,
+      mode: mode,
+    );
+    final revItem = RevisionItem(
+      id: revId,
+      type: 'VIDEO',
+      source: 'VIDEO_LECTURE',
+      pageNumber: '',
+      title: lecture.title,
+      parentTitle: lecture.subject,
+      nextRevisionAt:
+          nextDate ?? DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
+      currentRevisionIndex: 0,
+      lastStudiedAt: now,
+      totalSteps: SrsService.totalSteps(mode),
+    );
+    await _db.upsertRevisionItem(revItem.toJson());
+    revisionItems.add(revItem);
+  }
+
+  Future<void> _removeVideoLectureRevisionItem(int id) async {
+    final revId = _videoLectureRevisionId(id);
+    final hasRevision = revisionItems.any((r) => r.id == revId);
+    if (!hasRevision) return;
+
+    await _db.deleteRevisionItem(revId);
+    revisionItems.removeWhere((r) => r.id == revId);
+  }
+
   Future<void> toggleVideoLectureWatched(int id, bool watched) async {
-    await _db.toggleVideoLecture(id, watched);
     final idx = videoLectures.indexWhere((v) => v.id == id);
-    if (idx >= 0) {
-      final lecture = videoLectures[idx];
-      videoLectures[idx] = lecture.copyWith(
-        watched: watched,
-        watchedMinutes:
-            watched ? lecture.durationMinutes : lecture.watchedMinutes,
-      );
-      if (watched) {
-        // Also update watched_minutes in DB to match full duration
-        await _db.updateVideoLectureProgress(id, lecture.durationMinutes);
-        // Create revision item
-        final revId = 'video-lecture-$id';
-        final exists = revisionItems.any((r) => r.id == revId);
-        if (!exists) {
-          final mode = revisionSettings?.mode ?? 'strict';
-          final now = DateTime.now().toIso8601String();
-          final nextDate = SrsService.calculateNextRevisionDateString(
-            lastStudiedAt: now,
-            revisionIndex: 0,
-            mode: mode,
-          );
-          final revItem = RevisionItem(
-            id: revId,
-            type: 'VIDEO',
-            source: 'VIDEO_LECTURE',
-            pageNumber: '',
-            title: lecture.title,
-            parentTitle: lecture.subject,
-            nextRevisionAt: nextDate ??
-                DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
-            currentRevisionIndex: 0,
-            lastStudiedAt: now,
-            totalSteps: SrsService.totalSteps(mode),
-          );
-          await upsertRevisionItem(revItem);
-        }
-      }
+    if (idx < 0) return;
+
+    final lecture = videoLectures[idx];
+    final nextState = deriveVideoLectureToggleState(lecture, watched);
+
+    await _db.updateVideoLectureProgress(id, nextState.watchedMinutes);
+    await _db.toggleVideoLecture(id, nextState.watched);
+
+    final updatedLecture = lecture.copyWith(
+      watched: nextState.watched,
+      watchedMinutes: nextState.watchedMinutes,
+    );
+    videoLectures[idx] = updatedLecture;
+
+    if (nextState.shouldHaveRevision) {
+      await _ensureVideoLectureRevisionItem(updatedLecture);
+    } else {
+      await _removeVideoLectureRevisionItem(id);
     }
+
     notifyListeners();
     unawaited(_triggerBackup());
 
     // Log activity
-    final logLecture = idx >= 0 ? videoLectures[idx] : null;
     await _logActivity(
       itemId: 'video-lecture:$id',
       itemType: 'video_lecture',
       action: watched ? 'watched' : 'unwatched',
-      title: logLecture != null
-          ? '${logLecture.subject} — ${logLecture.title}'
-          : 'Video Lecture #$id',
+      title: '${updatedLecture.subject} — ${updatedLecture.title}',
     );
   }
 
   Future<void> updateVideoLectureProgress(int id, int watchedMinutes) async {
     final idx = videoLectures.indexWhere((v) => v.id == id);
     if (idx < 0) return;
+
     final lecture = videoLectures[idx];
-    final clamped = watchedMinutes.clamp(0, lecture.durationMinutes);
-    final autoComplete = clamped >= lecture.durationMinutes;
+    final nextState = deriveVideoLectureProgressState(lecture, watchedMinutes);
 
-    await _db.updateVideoLectureProgress(id, clamped);
-    if (autoComplete && !lecture.watched) {
-      await _db.toggleVideoLecture(id, true);
-    }
+    await _db.updateVideoLectureProgress(id, nextState.watchedMinutes);
+    await _db.toggleVideoLecture(id, nextState.watched);
 
-    videoLectures[idx] = lecture.copyWith(
-      watchedMinutes: clamped,
-      watched: autoComplete ? true : lecture.watched,
+    final updatedLecture = lecture.copyWith(
+      watchedMinutes: nextState.watchedMinutes,
+      watched: nextState.watched,
     );
+    videoLectures[idx] = updatedLecture;
 
-    // Create revision if auto-completed
-    if (autoComplete && !lecture.watched) {
-      final revId = 'video-lecture-$id';
-      final exists = revisionItems.any((r) => r.id == revId);
-      if (!exists) {
-        final mode = revisionSettings?.mode ?? 'strict';
-        final now = DateTime.now().toIso8601String();
-        final nextDate = SrsService.calculateNextRevisionDateString(
-          lastStudiedAt: now,
-          revisionIndex: 0,
-          mode: mode,
-        );
-        final revItem = RevisionItem(
-          id: revId,
-          type: 'VIDEO',
-          source: 'VIDEO_LECTURE',
-          pageNumber: '',
-          title: lecture.title,
-          parentTitle: lecture.subject,
-          nextRevisionAt: nextDate ??
-              DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
-          currentRevisionIndex: 0,
-          lastStudiedAt: now,
-          totalSteps: SrsService.totalSteps(mode),
-        );
-        await upsertRevisionItem(revItem);
-      }
+    if (nextState.shouldHaveRevision) {
+      await _ensureVideoLectureRevisionItem(updatedLecture);
+    } else {
+      await _removeVideoLectureRevisionItem(id);
     }
 
     notifyListeners();
@@ -5367,10 +5400,7 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> undoVideoLecture(int id) async {
     await toggleVideoLectureWatched(id, false);
-    final revId = 'video-lecture-$id';
-    if (revisionItems.any((r) => r.id == revId)) {
-      await deleteRevisionItem(revId);
-    }
+    await _removeVideoLectureRevisionItem(id);
   }
 
   // ═══════════════════════════════════════════════════════════════
