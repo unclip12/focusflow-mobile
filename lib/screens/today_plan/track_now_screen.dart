@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/daily_flow.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
@@ -32,6 +33,8 @@ const _categories = [
   _Category('Work',     '💼', Color(0xFF0EA5E9)),
   _Category('Other',    '⏱️', Color(0xFF64748B)),
 ];
+
+enum _TrackNowInterruptChoice { pauseAndTrack, linkToCurrent }
 
 // ═══════════════════════════════════════════════════════════════
 // TrackNowScreen
@@ -65,10 +68,21 @@ class _TrackNowScreenState extends State<TrackNowScreen>
   // Selected existing task to link to
   String? _selectedTaskId;
   String? _selectedTaskTitle;
+  String? _pausedPlannedBlockId;
 
   // Timer state
   int _elapsed = 0;
   Timer? _tickTimer;
+
+  String? _categoryColorHex(String? category) {
+    if (category == null) return null;
+    try {
+      final item = _categories.firstWhere((entry) => entry.name == category);
+      return '#${item.color.toARGB32().toRadixString(16).substring(2).toUpperCase()}';
+    } catch (_) {
+      return null;
+    }
+  }
 
   @override
   void initState() {
@@ -129,6 +143,258 @@ class _TrackNowScreenState extends State<TrackNowScreen>
     } catch (_) {
       return null;
     }
+  }
+
+  Future<_TrackNowInterruptChoice?> _showInterruptChoice(String blockTitle) {
+    return showModalBottomSheet<_TrackNowInterruptChoice>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final cs = Theme.of(sheetContext).colorScheme;
+        return Container(
+          decoration: BoxDecoration(
+            color: cs.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$blockTitle is already running',
+                    style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Choose how Track Now should handle the current task.',
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.65),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.pause_circle_outline_rounded),
+                    title: const Text('Pause current task'),
+                    subtitle: const Text('Pause it, then start Track Now'),
+                    onTap: () => Navigator.of(sheetContext).pop(
+                      _TrackNowInterruptChoice.pauseAndTrack,
+                    ),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.link_rounded),
+                    title: const Text('Link to current task'),
+                    subtitle: const Text('Keep the current task running instead'),
+                    onTap: () => Navigator.of(sheetContext).pop(
+                      _TrackNowInterruptChoice.linkToCurrent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<TrackNowConflictChoice?> _showConflictChoice(List<Block> conflicts) {
+    return showModalBottomSheet<TrackNowConflictChoice>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final cs = Theme.of(sheetContext).colorScheme;
+        final conflictTitle = conflicts.first.title;
+        return Container(
+          decoration: BoxDecoration(
+            color: cs.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'This tracked time overlaps $conflictTitle',
+                    style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Choose how the timeline should save this session.',
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.65),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.schedule_send_rounded),
+                    title: const Text('Push planned block'),
+                    subtitle:
+                        const Text('Move the planned task later and keep this tracked block'),
+                    onTap: () => Navigator.of(sheetContext)
+                        .pop(TrackNowConflictChoice.push),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.content_cut_rounded),
+                    title: const Text('Consume planned time'),
+                    subtitle: const Text(
+                      'Use this tracked block inside the planned time window',
+                    ),
+                    onTap: () => Navigator.of(sheetContext)
+                        .pop(TrackNowConflictChoice.consume),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.layers_rounded),
+                    title: const Text('Overlap'),
+                    subtitle:
+                        const Text('Show both the planned block and this tracked block'),
+                    onTap: () => Navigator.of(sheetContext)
+                        .pop(TrackNowConflictChoice.overlap),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<bool> _confirmCascadePush() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Push later tasks too?'),
+        content: const Text(
+          'This push would collide with later planned tasks. Push all later movable tasks forward as well?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Push Later Tasks'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  Future<TrackNowResumeChoice?> _showResumeChoice(String blockTitle) {
+    return showModalBottomSheet<TrackNowResumeChoice>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final cs = Theme.of(sheetContext).colorScheme;
+        return Container(
+          decoration: BoxDecoration(
+            color: cs.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Resume $blockTitle?',
+                    style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'The task was paused when Track Now started.',
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.65),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.play_arrow_rounded),
+                    title: const Text('Resume now'),
+                    onTap: () =>
+                        Navigator.of(sheetContext).pop(TrackNowResumeChoice.now),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.schedule_rounded),
+                    title: const Text('Resume after delay'),
+                    onTap: () => Navigator.of(sheetContext)
+                        .pop(TrackNowResumeChoice.later),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.pause_rounded),
+                    title: const Text('Leave paused'),
+                    onTap: () => Navigator.of(sheetContext)
+                        .pop(TrackNowResumeChoice.keepPaused),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<int?> _askDelayMinutes() async {
+    final controller = TextEditingController(text: '15');
+    final result = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Resume after how many minutes?'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Minutes',
+            hintText: '15',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final minutes = int.tryParse(controller.text.trim());
+              Navigator.of(dialogContext).pop(minutes);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null || result <= 0) return null;
+    return result;
   }
 
   void _startTimer() {
@@ -316,6 +582,29 @@ class _TrackNowScreenState extends State<TrackNowScreen>
 
     HapticsService.medium();
     final app = context.read<AppProvider>();
+    final activeBlock = app.getActivePlannedBlock(widget.dateKey);
+    if (activeBlock != null &&
+        activeBlock.status == BlockStatus.inProgress &&
+        activeBlock.id != _selectedTaskId) {
+      final choice = await _showInterruptChoice(activeBlock.title);
+      if (choice == null) return;
+      if (choice == _TrackNowInterruptChoice.linkToCurrent) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${activeBlock.title} is already running, so its timer will continue.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.of(context).pop();
+        return;
+      }
+      await app.pausePlannedBlock(widget.dateKey, activeBlock.id);
+      _pausedPlannedBlockId = activeBlock.id;
+    }
+
     final activity = await app.startTrackNow(
       widget.dateKey,
       label: name,
@@ -348,11 +637,40 @@ class _TrackNowScreenState extends State<TrackNowScreen>
     HapticsService.heavy();
     final app = context.read<AppProvider>();
     final name = _trackingDisplayName;
+    var resolution = TrackNowConflictChoice.overlap;
+    var cascadePush = false;
+
+    if (_selectedTaskId == null && _startedAt != null) {
+      final conflicts = app.getTrackNowConflictingBlocks(
+        widget.dateKey,
+        startedAt: _startedAt!,
+        completedAt: DateTime.now(),
+      );
+      if (conflicts.isNotEmpty) {
+        final selectedResolution = await _showConflictChoice(conflicts);
+        if (selectedResolution == null) return;
+        resolution = selectedResolution;
+        if (resolution == TrackNowConflictChoice.push &&
+            app.trackNowPushNeedsCascade(
+              widget.dateKey,
+              startedAt: _startedAt!,
+              completedAt: DateTime.now(),
+            )) {
+          final approved = await _confirmCascadePush();
+          if (!approved) return;
+          cascadePush = true;
+        }
+      }
+    }
+
     await app.stopTrackNow(
       widget.dateKey,
       _trackingActivityId!,
       notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
       linkedTaskIds: _selectedTaskId != null ? [_selectedTaskId!] : null,
+      resolution: resolution,
+      cascadePush: cascadePush,
+      trackedColorHex: _categoryColorHex(_selectedCategory),
     );
 
     _tickTimer?.cancel();
@@ -375,6 +693,34 @@ class _TrackNowScreenState extends State<TrackNowScreen>
           behavior: SnackBarBehavior.floating,
         ),
       );
+
+      if (_pausedPlannedBlockId != null) {
+        Block? pausedBlock;
+        final blocks = app.getDayPlan(widget.dateKey)?.blocks ?? const <Block>[];
+        for (final block in blocks) {
+          if (block.id == _pausedPlannedBlockId) {
+            pausedBlock = block;
+            break;
+          }
+        }
+        if (pausedBlock != null) {
+          final resumeChoice = await _showResumeChoice(pausedBlock.title);
+          if (resumeChoice == TrackNowResumeChoice.now) {
+            await app.startPlannedBlock(widget.dateKey, pausedBlock.id);
+          } else if (resumeChoice == TrackNowResumeChoice.later) {
+            final delayMinutes = await _askDelayMinutes();
+            if (delayMinutes != null) {
+              await app.delayPausedBlock(
+                widget.dateKey,
+                pausedBlock.id,
+                delay: Duration(minutes: delayMinutes),
+              );
+            }
+          }
+        }
+      }
+
+      if (!mounted) return;
       Navigator.of(context).pop();
     }
   }

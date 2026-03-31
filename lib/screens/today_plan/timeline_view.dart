@@ -1377,16 +1377,21 @@ class _TimelineViewState extends State<TimelineView> {
 
         return KeyedSubtree(
           key: ValueKey('block_${block.id}_${slice.relation.name}'),
-          child: _BlockCard(
-            slice: slice,
-            leading: const SizedBox(width: 22),
-            onTap: () => _onBlockTap(block),
-            onLongPress: () => _onBlockLongPress(block),
-            onStatusTap: _isLockedBlock(block) ||
-                    block.status == BlockStatus.done ||
-                    slice.relation == _TimelineBlockRelation.carryIn
-                ? null
-                : () => _markBlockDone(block),
+            child: _BlockCard(
+              slice: slice,
+              leading: const SizedBox(width: 22),
+              onTap: () => _onBlockTap(block),
+              onLongPress: () => _onBlockLongPress(block),
+              onStatusTap: _isLockedBlock(block) ||
+                      block.status == BlockStatus.done ||
+                      slice.relation == _TimelineBlockRelation.carryIn ||
+                      (slice.relation == _TimelineBlockRelation.sameDay &&
+                          !block.isEvent &&
+                          !block.id.startsWith('prayer_') &&
+                          block.type != BlockType.breakBlock &&
+                          block.isAdHocTrack != true)
+                  ? null
+                  : () => _markBlockDone(block),
             onAdjacentDateTap:
                 slice.adjacentDate == null || widget.onOpenDate == null
                     ? null
@@ -2182,6 +2187,121 @@ class _BlockCard extends StatelessWidget {
     );
   }
 
+  bool get _canManageExecution {
+    if (slice.relation != _TimelineBlockRelation.sameDay) return false;
+    if (block.isEvent || block.id.startsWith('prayer_')) return false;
+    if (block.type == BlockType.breakBlock) return false;
+    if (block.isAdHocTrack == true) return false;
+    return true;
+  }
+
+  Widget? _buildExecutionControls(BuildContext context, Color accent) {
+    if (!_canManageExecution) return null;
+
+    final app = context.read<AppProvider>();
+    final dateKey = block.date;
+    if (dateKey.isEmpty) return null;
+
+    Future<void> startAction() => app.startPlannedBlock(dateKey, block.id);
+    Future<void> pauseAction() => app.pausePlannedBlock(dateKey, block.id);
+    Future<void> stopAction() => app.stopPlannedBlock(dateKey, block.id);
+
+    Widget actionChip({
+      required IconData icon,
+      required String label,
+      required VoidCallback onPressed,
+      bool filled = false,
+    }) {
+      final backgroundColor = filled
+          ? accent.withValues(alpha: 0.14)
+          : Theme.of(context).colorScheme.surface.withValues(alpha: 0.85);
+      return InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: accent.withValues(alpha: filled ? 0.25 : 0.14),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: accent),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: accent,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    switch (block.status) {
+      case BlockStatus.notStarted:
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            actionChip(
+              icon: Icons.play_arrow_rounded,
+              label: 'Play',
+              onPressed: () => startAction(),
+              filled: true,
+            ),
+          ],
+        );
+      case BlockStatus.inProgress:
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            actionChip(
+              icon: Icons.pause_rounded,
+              label: 'Pause',
+              onPressed: () => pauseAction(),
+            ),
+            actionChip(
+              icon: Icons.stop_rounded,
+              label: 'Stop',
+              onPressed: () => stopAction(),
+              filled: true,
+            ),
+          ],
+        );
+      case BlockStatus.paused:
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            actionChip(
+              icon: Icons.play_arrow_rounded,
+              label: 'Play',
+              onPressed: () => startAction(),
+            ),
+            actionChip(
+              icon: Icons.stop_rounded,
+              label: 'Stop',
+              onPressed: () => stopAction(),
+              filled: true,
+            ),
+          ],
+        );
+      case BlockStatus.done:
+      case BlockStatus.skipped:
+        return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -2236,6 +2356,7 @@ class _BlockCard extends StatelessWidget {
     final actualMetaLabel = actualEndTime == null
         ? null
         : 'Actual: ${_to12h(actualStartTime)} - ${_to12h(actualEndTime)}';
+    final executionControls = _buildExecutionControls(context, accent);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -2320,6 +2441,27 @@ class _BlockCard extends StatelessWidget {
                             maxLines: isCompactCard ? 1 : 2,
                             overflow: TextOverflow.ellipsis,
                           ),
+                          if (block.isAdHocTrack == true) ...[
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: accent.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                'Tracked',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: accent,
+                                ),
+                              ),
+                            ),
+                          ],
                           SizedBox(height: isCompactCard ? 1 : 4),
                           if (showDualTrack) ...[
                             Text(
@@ -2445,6 +2587,10 @@ class _BlockCard extends StatelessWidget {
                                 ),
                               ),
                             ),
+                          ],
+                          if (executionControls != null) ...[
+                            const SizedBox(height: 10),
+                            executionControls,
                           ],
                         ],
                       ),

@@ -397,6 +397,7 @@ class Block {
 
   // UI
   final bool? isVirtual;
+  final bool? isAdHocTrack;
 
   const Block({
     required this.id,
@@ -440,6 +441,7 @@ class Block {
     this.generatedLogIds,
     this.generatedTimeLogIds,
     this.isVirtual,
+    this.isAdHocTrack,
   }) : remainingDurationMinutes = remainingDurationMinutes ?? plannedDurationMinutes;
 
   factory Block.fromJson(Map<String, dynamic> j) => Block(
@@ -516,6 +518,7 @@ class Block {
             ? List<String>.from(j['generatedTimeLogIds'])
             : null,
         isVirtual: j['isVirtual'],
+        isAdHocTrack: j['isAdHocTrack'],
       );
 
   Map<String, dynamic> toJson() => {
@@ -565,6 +568,7 @@ class Block {
         if (generatedTimeLogIds != null)
           'generatedTimeLogIds': generatedTimeLogIds,
         if (isVirtual != null) 'isVirtual': isVirtual,
+        if (isAdHocTrack != null) 'isAdHocTrack': isAdHocTrack,
       };
 
   Block copyWith({
@@ -609,6 +613,7 @@ class Block {
     List<String>? generatedLogIds,
     List<String>? generatedTimeLogIds,
     bool? isVirtual,
+    bool? isAdHocTrack,
   }) =>
       Block(
         id: id ?? this.id,
@@ -655,6 +660,7 @@ class Block {
         generatedLogIds: generatedLogIds ?? this.generatedLogIds,
         generatedTimeLogIds: generatedTimeLogIds ?? this.generatedTimeLogIds,
         isVirtual: isVirtual ?? this.isVirtual,
+        isAdHocTrack: isAdHocTrack ?? this.isAdHocTrack,
       );
 }
 

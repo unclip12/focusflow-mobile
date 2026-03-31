@@ -53,6 +53,10 @@ import 'package:focusflow_mobile/services/timeline_scheduler.dart';
 // ── AppNotification ───────────────────────────────────────────────
 enum AppNotificationType { reminder, achievement, revisionDue, streak }
 
+enum TrackNowConflictChoice { push, consume, overlap }
+
+enum TrackNowResumeChoice { now, later, keepPaused }
+
 class AppNotification {
   final String id;
   final AppNotificationType type;
@@ -478,6 +482,446 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> upsertDayPlan(DayPlan plan) async {
     await _saveDayPlan(plan);
+  }
+
+  int _plannedStudyMinutes(List<Block> blocks) {
+    return blocks
+        .where(
+          (block) =>
+              block.type != BlockType.breakBlock && block.isAdHocTrack != true,
+        )
+        .fold<int>(0, (sum, block) => sum + block.plannedDurationMinutes);
+  }
+
+  int _plannedBreakMinutes(List<Block> blocks) {
+    return blocks
+        .where((block) => block.type == BlockType.breakBlock)
+        .fold<int>(0, (sum, block) => sum + block.plannedDurationMinutes);
+  }
+
+  List<Block> _sortedReindexedBlocks(List<Block> blocks) {
+    final sortedBlocks = List<Block>.from(blocks)
+      ..sort((a, b) {
+        final startCompare =
+            _toMinutes(a.plannedStartTime).compareTo(_toMinutes(b.plannedStartTime));
+        if (startCompare != 0) return startCompare;
+        final indexCompare = a.index.compareTo(b.index);
+        if (indexCompare != 0) return indexCompare;
+        return a.id.compareTo(b.id);
+      });
+    return [
+      for (int i = 0; i < sortedBlocks.length; i++)
+        sortedBlocks[i].copyWith(index: i),
+    ];
+  }
+
+  DayPlan _dayPlanWithUpdatedBlocks(DayPlan? plan, String date, List<Block> blocks) {
+    final normalizedBlocks = _sortedReindexedBlocks(blocks);
+    final basePlan = plan ??
+        DayPlan(
+          date: date,
+          faPages: const [],
+          faPagesCount: 0,
+          videos: const [],
+          notesFromUser: '',
+          notesFromAI: '',
+          attachments: const [],
+          breaks: const [],
+          blocks: const [],
+          totalStudyMinutesPlanned: 0,
+          totalBreakMinutes: 0,
+        );
+    return basePlan.copyWith(
+      blocks: normalizedBlocks,
+      totalStudyMinutesPlanned: _plannedStudyMinutes(normalizedBlocks),
+      totalBreakMinutes: _plannedBreakMinutes(normalizedBlocks),
+    );
+  }
+
+  FlowActivity? getActivePlannedFlowActivity(String date) {
+    final flow = getDailyFlow(date);
+    if (flow == null) return null;
+    try {
+      return flow.activities.firstWhere(
+        (activity) =>
+            activity.isActive &&
+            activity.id.startsWith('task-') &&
+            activity.activityType != 'TRACK_NOW',
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Block? getActivePlannedBlock(String date) {
+    final activeActivity = getActivePlannedFlowActivity(date);
+    if (activeActivity == null) return null;
+
+    final linkedBlockId = activeActivity.linkedTaskIds.isNotEmpty
+        ? activeActivity.linkedTaskIds.first
+        : activeActivity.id.replaceFirst('task-', '');
+    final blocks = getDayPlan(date)?.blocks ?? const <Block>[];
+    try {
+      return blocks.firstWhere((block) => block.id == linkedBlockId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> startPlannedBlock(
+    String date,
+    String blockId, {
+    DateTime? startedAt,
+  }) async {
+    final plan = getDayPlan(date);
+    final blocks = plan?.blocks;
+    if (plan == null || blocks == null) return;
+
+    final targetIndex = blocks.indexWhere((block) => block.id == blockId);
+    if (targetIndex < 0) return;
+
+    final now = startedAt ?? DateTime.now();
+    final updatedBlocks = List<Block>.from(blocks);
+    for (int i = 0; i < updatedBlocks.length; i++) {
+      final block = updatedBlocks[i];
+      if (block.id == blockId) {
+        updatedBlocks[i] = block.copyWith(
+          status: BlockStatus.inProgress,
+          actualStartTime: block.actualStartTime ?? now.toIso8601String(),
+          actualEndTime: null,
+          actualDurationMinutes: null,
+        );
+      } else if (block.status == BlockStatus.inProgress) {
+        updatedBlocks[i] = block.copyWith(status: BlockStatus.paused);
+      }
+    }
+
+    await _saveDayPlan(
+      _dayPlanWithUpdatedBlocks(plan, date, updatedBlocks),
+      notify: false,
+    );
+    await syncFlowActivitiesFromDayPlan(date, notify: false);
+    notifyListeners();
+  }
+
+  Future<void> pausePlannedBlock(
+    String date,
+    String blockId,
+  ) async {
+    final plan = getDayPlan(date);
+    final blocks = plan?.blocks;
+    if (plan == null || blocks == null) return;
+
+    final targetIndex = blocks.indexWhere((block) => block.id == blockId);
+    if (targetIndex < 0) return;
+
+    final targetBlock = blocks[targetIndex];
+    if (targetBlock.status != BlockStatus.inProgress) return;
+
+    final updatedBlocks = List<Block>.from(blocks);
+    updatedBlocks[targetIndex] = targetBlock.copyWith(status: BlockStatus.paused);
+    await _saveDayPlan(
+      _dayPlanWithUpdatedBlocks(plan, date, updatedBlocks),
+      notify: false,
+    );
+    await syncFlowActivitiesFromDayPlan(date, notify: false);
+    notifyListeners();
+  }
+
+  Future<void> stopPlannedBlock(
+    String date,
+    String blockId, {
+    DateTime? completedAt,
+  }) async {
+    final plan = getDayPlan(date);
+    final blocks = plan?.blocks;
+    if (plan == null || blocks == null) return;
+
+    final targetIndex = blocks.indexWhere((block) => block.id == blockId);
+    if (targetIndex < 0) return;
+
+    final now = completedAt ?? DateTime.now();
+    final targetBlock = blocks[targetIndex];
+    final existingStart = DateTime.tryParse(targetBlock.actualStartTime ?? '');
+    final resolvedStart = existingStart ?? now;
+    final resolvedMinutes =
+        now.isAfter(resolvedStart) ? now.difference(resolvedStart).inMinutes : 0;
+
+    final updatedBlocks = List<Block>.from(blocks);
+    updatedBlocks[targetIndex] = targetBlock.copyWith(
+      status: BlockStatus.done,
+      actualStartTime: targetBlock.actualStartTime ?? resolvedStart.toIso8601String(),
+      actualEndTime: now.toIso8601String(),
+      actualDurationMinutes: resolvedMinutes,
+      completionStatus: 'COMPLETED',
+    );
+    await _saveDayPlan(
+      _dayPlanWithUpdatedBlocks(plan, date, updatedBlocks),
+      notify: false,
+    );
+    await syncFlowActivitiesFromDayPlan(date, notify: false);
+    notifyListeners();
+  }
+
+  Future<void> delayPausedBlock(
+    String date,
+    String blockId, {
+    required Duration delay,
+  }) async {
+    final plan = getDayPlan(date);
+    final blocks = plan?.blocks;
+    if (plan == null || blocks == null) return;
+
+    final targetIndex = blocks.indexWhere((block) => block.id == blockId);
+    if (targetIndex < 0) return;
+
+    final block = blocks[targetIndex];
+    final duration = block.plannedDurationMinutes;
+    final resumeAt = DateTime.now().add(delay);
+    final startMinutes = (resumeAt.hour * 60) + resumeAt.minute;
+
+    final updatedBlocks = List<Block>.from(blocks);
+    updatedBlocks[targetIndex] = block.copyWith(
+      plannedStartTime: _fromMinutes(startMinutes),
+      plannedEndTime: _fromMinutes(startMinutes + duration),
+      plannedDurationMinutes: duration,
+      remainingDurationMinutes: duration,
+      status: BlockStatus.paused,
+    );
+
+    await _saveDayPlan(
+      _dayPlanWithUpdatedBlocks(plan, date, updatedBlocks),
+      notify: false,
+    );
+    await rescheduleFrom(date, resumeAt);
+  }
+
+  Block createAdHocTrackedBlock({
+    required String date,
+    required String title,
+    required DateTime startedAt,
+    required DateTime completedAt,
+    String? notes,
+    String? colorHex,
+  }) {
+    final durationMinutes = completedAt.isAfter(startedAt)
+        ? ((completedAt.difference(startedAt).inSeconds) / 60)
+            .ceil()
+            .clamp(1, 24 * 60)
+            .toInt()
+        : 0;
+    return Block(
+      id: 'tracked_${_uuid.v4()}',
+      index: 0,
+      date: date,
+      plannedStartTime: _fromMinutes((startedAt.hour * 60) + startedAt.minute),
+      plannedEndTime: _fromMinutes((completedAt.hour * 60) + completedAt.minute),
+      type: BlockType.other,
+      title: title,
+      colorHex: colorHex,
+      plannedDurationMinutes: durationMinutes,
+      remainingDurationMinutes: durationMinutes,
+      actualStartTime: startedAt.toIso8601String(),
+      actualEndTime: completedAt.toIso8601String(),
+      actualDurationMinutes: durationMinutes,
+      actualNotes: notes,
+      status: BlockStatus.done,
+      completionStatus: 'COMPLETED',
+      isAdHocTrack: true,
+    );
+  }
+
+  List<Block> getTrackNowConflictingBlocks(
+    String date, {
+    required DateTime startedAt,
+    required DateTime completedAt,
+  }) {
+    final startMinutes = (startedAt.hour * 60) + startedAt.minute;
+    final endMinutes = (completedAt.hour * 60) + completedAt.minute;
+    if (endMinutes <= startMinutes) return const [];
+
+    return (getDayPlan(date)?.blocks ?? const <Block>[])
+        .where((block) {
+          if (block.isEvent || block.type == BlockType.breakBlock) return false;
+          if (block.isAdHocTrack == true) return false;
+          final blockStart = _toMinutes(block.plannedStartTime);
+          final blockEnd = blockStart + block.plannedDurationMinutes;
+          return _rangesOverlap(startMinutes, endMinutes, blockStart, blockEnd);
+        })
+        .toList()
+      ..sort((a, b) =>
+          _toMinutes(a.plannedStartTime).compareTo(_toMinutes(b.plannedStartTime)));
+  }
+
+  bool trackNowPushNeedsCascade(
+    String date, {
+    required DateTime startedAt,
+    required DateTime completedAt,
+  }) {
+    final conflicts = getTrackNowConflictingBlocks(
+      date,
+      startedAt: startedAt,
+      completedAt: completedAt,
+    );
+    if (conflicts.isEmpty) return false;
+
+    final firstConflict = conflicts.first;
+    final shiftMinutes = completedAt.isAfter(startedAt)
+        ? completedAt.difference(startedAt).inMinutes
+        : 0;
+    if (shiftMinutes <= 0) return false;
+
+    final shiftedStart = _toMinutes(firstConflict.plannedStartTime) + shiftMinutes;
+    final shiftedEnd = shiftedStart + firstConflict.plannedDurationMinutes;
+    for (final block in (getDayPlan(date)?.blocks ?? const <Block>[])) {
+      if (block.id == firstConflict.id || block.isAdHocTrack == true) continue;
+      if (block.status == BlockStatus.done || block.status == BlockStatus.skipped) {
+        continue;
+      }
+      final blockStart = _toMinutes(block.plannedStartTime);
+      final blockEnd = blockStart + block.plannedDurationMinutes;
+      if (_rangesOverlap(shiftedStart, shiftedEnd, blockStart, blockEnd)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<void> applyTrackNowToTimeline({
+    required String date,
+    required Block trackedBlock,
+    required TrackNowConflictChoice resolution,
+    bool cascadePush = false,
+  }) async {
+    final plan = getDayPlan(date);
+    final existingBlocks = List<Block>.from(plan?.blocks ?? const <Block>[]);
+    final trackedStart = _toMinutes(trackedBlock.plannedStartTime);
+    final trackedEnd = trackedStart + trackedBlock.plannedDurationMinutes;
+    final conflictingBlocks = getTrackNowConflictingBlocks(
+      date,
+      startedAt: DateTime.parse(trackedBlock.actualStartTime!),
+      completedAt: DateTime.parse(trackedBlock.actualEndTime!),
+    );
+
+    final updatedBlocks = List<Block>.from(existingBlocks)..add(trackedBlock);
+
+    if (conflictingBlocks.isEmpty || resolution == TrackNowConflictChoice.overlap) {
+      await _saveDayPlan(
+        _dayPlanWithUpdatedBlocks(plan, date, updatedBlocks),
+        notify: false,
+      );
+      await syncFlowActivitiesFromDayPlan(date, notify: false);
+      notifyListeners();
+      return;
+    }
+
+    if (resolution == TrackNowConflictChoice.consume) {
+      final normalizedBlocks = <Block>[];
+      for (final block in existingBlocks) {
+        final conflict = conflictingBlocks.any((item) => item.id == block.id);
+        if (!conflict) {
+          normalizedBlocks.add(block);
+          continue;
+        }
+
+        final blockStart = _toMinutes(block.plannedStartTime);
+        final blockEnd = blockStart + block.plannedDurationMinutes;
+        final beforeDuration = trackedStart - blockStart;
+        final afterDuration = blockEnd - trackedEnd;
+
+        if (trackedStart <= blockStart && trackedEnd >= blockEnd) {
+          normalizedBlocks.add(
+            block.copyWith(
+              status: BlockStatus.skipped,
+              completionStatus: 'NOT_DONE',
+              reflectionNotes: 'Consumed by tracked activity',
+            ),
+          );
+          continue;
+        }
+
+        if (beforeDuration > 0) {
+          normalizedBlocks.add(
+            block.copyWith(
+              plannedStartTime: _fromMinutes(blockStart),
+              plannedEndTime: _fromMinutes(blockStart + beforeDuration),
+              plannedDurationMinutes: beforeDuration,
+              remainingDurationMinutes: beforeDuration,
+            ),
+          );
+        }
+
+        if (afterDuration > 0) {
+          final baseBlock = beforeDuration > 0
+              ? block.copyWith(
+                  id: '${block.id}_tracked_${_uuid.v4()}',
+                  splitGroupId: block.splitGroupId ?? block.id,
+                  splitPartIndex: 2,
+                  splitTotalParts: 2,
+                )
+              : block;
+          normalizedBlocks.add(
+            baseBlock.copyWith(
+              plannedStartTime: _fromMinutes(trackedEnd),
+              plannedEndTime: _fromMinutes(trackedEnd + afterDuration),
+              plannedDurationMinutes: afterDuration,
+              remainingDurationMinutes: afterDuration,
+              splitGroupId: beforeDuration > 0 ? (block.splitGroupId ?? block.id) : block.splitGroupId,
+              splitPartIndex: beforeDuration > 0 ? 2 : block.splitPartIndex,
+              splitTotalParts: beforeDuration > 0 ? 2 : block.splitTotalParts,
+            ),
+          );
+        }
+      }
+
+      normalizedBlocks.add(trackedBlock);
+      await _saveDayPlan(
+        _dayPlanWithUpdatedBlocks(plan, date, normalizedBlocks),
+        notify: false,
+      );
+      await syncFlowActivitiesFromDayPlan(date, notify: false);
+      notifyListeners();
+      return;
+    }
+
+    final firstConflict = conflictingBlocks.first;
+    final shiftMinutes = trackedBlock.plannedDurationMinutes;
+    final shiftedBlocks = List<Block>.from(existingBlocks);
+    final firstConflictIndex =
+        shiftedBlocks.indexWhere((block) => block.id == firstConflict.id);
+    if (firstConflictIndex >= 0) {
+      final block = shiftedBlocks[firstConflictIndex];
+      final blockStart = _toMinutes(block.plannedStartTime) + shiftMinutes;
+      final blockEnd = blockStart + block.plannedDurationMinutes;
+      shiftedBlocks[firstConflictIndex] = block.copyWith(
+        plannedStartTime: _fromMinutes(blockStart),
+        plannedEndTime: _fromMinutes(blockEnd),
+      );
+    }
+    shiftedBlocks.add(trackedBlock);
+
+    await _saveDayPlan(
+      _dayPlanWithUpdatedBlocks(plan, date, shiftedBlocks),
+      notify: false,
+    );
+
+    if (cascadePush) {
+      final actualStart = DateTime.parse(trackedBlock.actualStartTime!);
+      final anchorStart =
+          _toMinutes(firstConflict.plannedStartTime) + trackedBlock.plannedDurationMinutes;
+      final anchor = DateTime(
+        actualStart.year,
+        actualStart.month,
+        actualStart.day,
+        anchorStart ~/ 60,
+        anchorStart % 60,
+      );
+      await rescheduleFrom(date, anchor);
+      return;
+    }
+
+    await syncFlowActivitiesFromDayPlan(date, notify: false);
+    notifyListeners();
   }
 
   Future<void> deleteDayPlan(String date) async {
@@ -1619,6 +2063,8 @@ class AppProvider extends ChangeNotifier {
         return 'DONE';
       case BlockStatus.inProgress:
         return 'IN_PROGRESS';
+      case BlockStatus.paused:
+        return 'PAUSED';
       default:
         return 'NOT_STARTED';
     }
@@ -1677,7 +2123,9 @@ class AppProvider extends ChangeNotifier {
 
     final blocks = (plan?.blocks ?? [])
         .where((block) =>
-            block.type != BlockType.breakBlock && block.isVirtual != true)
+            block.type != BlockType.breakBlock &&
+            block.isVirtual != true &&
+            block.isAdHocTrack != true)
         .toList();
     final blockActivityIds = blocks.map((block) => 'task-${block.id}').toSet();
     final existingActivities = List<FlowActivity>.from(flow.activities);
@@ -2024,6 +2472,9 @@ class AppProvider extends ChangeNotifier {
     String activityId, {
     String? notes,
     List<String>? linkedTaskIds,
+    TrackNowConflictChoice resolution = TrackNowConflictChoice.overlap,
+    bool cascadePush = false,
+    String? trackedColorHex,
   }) async {
     final flow = getDailyFlow(date);
     if (flow == null) return;
@@ -2061,6 +2512,21 @@ class AppProvider extends ChangeNotifier {
         startedAtIso: activities[idx].startedAt,
       );
       await _syncTrackNowLinkedLibraryItem(date, linkedId);
+    } else if (startTime != null) {
+      final trackedBlock = createAdHocTrackedBlock(
+        date: date,
+        title: activity.label,
+        startedAt: startTime,
+        completedAt: now,
+        notes: notes,
+        colorHex: trackedColorHex,
+      );
+      await applyTrackNowToTimeline(
+        date: date,
+        trackedBlock: trackedBlock,
+        resolution: resolution,
+        cascadePush: cascadePush,
+      );
     }
     BackgroundTimerService.stop();
   }
@@ -2124,8 +2590,10 @@ class AppProvider extends ChangeNotifier {
       actualDurationMinutes: durationSeconds != null
           ? (durationSeconds / 60).ceil()
           : block.actualDurationMinutes,
+      status: BlockStatus.done,
+      completionStatus: 'COMPLETED',
     );
-    await upsertDayPlan(plan.copyWith(blocks: blocks));
+    await upsertDayPlan(_dayPlanWithUpdatedBlocks(plan, date, blocks));
   }
 
   Map<String, dynamic>? _resolveTrackNowStructuredTarget(
@@ -4533,7 +5001,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   bool _isLockedBlock(Block block) {
-    return block.isEvent || block.id.startsWith('prayer_');
+    return block.isEvent || block.id.startsWith('prayer_') || block.isAdHocTrack == true;
   }
 
   bool _blockStartsBeforeAnchor(Block block, DateTime anchor) {
