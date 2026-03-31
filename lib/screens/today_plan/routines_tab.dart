@@ -9,6 +9,7 @@ import 'package:focusflow_mobile/utils/constants.dart';
 import 'routine_editor_sheet.dart';
 import 'routine_runner_screen.dart';
 import 'study_session_picker.dart';
+import 'planned_insert_conflict_sheet.dart';
 
 class RoutinesTab extends StatelessWidget {
   final String dateKey;
@@ -305,9 +306,24 @@ class _RoutineCard extends StatelessWidget {
   }
 
   Future<void> _addToTodayPlan(BuildContext context) async {
+    final app = context.read<AppProvider>();
+    final now = DateTime.now();
+    final todayDateKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final plannedDurationMinutes = routine.totalSubtaskMinutes > 0
+        ? routine.totalSubtaskMinutes
+        : routine.totalEstimatedMinutes;
+    final requestedStartMinutes = (now.hour * 60) + now.minute;
+    final recommendedStartMinutes = app.recommendedStartMinutesForInsertion(
+      todayDateKey,
+      requestedStartMinutes: requestedStartMinutes,
+      durationMinutes: plannedDurationMinutes,
+    );
     final pickedTime = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.now(),
+      initialTime: TimeOfDay(
+        hour: recommendedStartMinutes ~/ 60,
+        minute: recommendedStartMinutes % 60,
+      ),
       builder: (pickerContext, child) => MediaQuery(
         data:
             MediaQuery.of(pickerContext).copyWith(alwaysUse24HourFormat: false),
@@ -316,11 +332,6 @@ class _RoutineCard extends StatelessWidget {
     );
     if (pickedTime == null || !context.mounted) return;
 
-    final now = DateTime.now();
-    final todayDateKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final plannedDurationMinutes = routine.totalSubtaskMinutes > 0
-        ? routine.totalSubtaskMinutes
-        : routine.totalEstimatedMinutes;
     final startDateTime = DateTime(
       now.year,
       now.month,
@@ -331,7 +342,6 @@ class _RoutineCard extends StatelessWidget {
     final endDateTime =
         startDateTime.add(Duration(minutes: plannedDurationMinutes));
     final timeFormat = DateFormat('HH:mm');
-    final app = context.read<AppProvider>();
 
     final block = Block(
       id: Uuid().v4(),
@@ -347,42 +357,12 @@ class _RoutineCard extends StatelessWidget {
       actualNotes: app.routineBlockSource(routine.id),
     );
 
-    final existingPlan = app.getDayPlan(todayDateKey);
-    final existingBlocks = List<Block>.from(existingPlan?.blocks ?? const []);
-    final allBlocks = [
-      ...existingBlocks,
-      block.copyWith(index: existingBlocks.length),
-    ];
-
-    final updatedPlan = existingPlan?.copyWith(
-          blocks: allBlocks,
-          totalStudyMinutesPlanned: allBlocks
-              .where((item) => item.type != BlockType.breakBlock)
-              .fold<int>(0, (sum, item) => sum + item.plannedDurationMinutes),
-          totalBreakMinutes: allBlocks
-              .where((item) => item.type == BlockType.breakBlock)
-              .fold<int>(0, (sum, item) => sum + item.plannedDurationMinutes),
-        ) ??
-        DayPlan(
-          date: todayDateKey,
-          faPages: const [],
-          faPagesCount: 0,
-          videos: const [],
-          notesFromUser: '',
-          notesFromAI: '',
-          attachments: const [],
-          breaks: const [],
-          blocks: allBlocks,
-          totalStudyMinutesPlanned: allBlocks
-              .where((item) => item.type != BlockType.breakBlock)
-              .fold<int>(0, (sum, item) => sum + item.plannedDurationMinutes),
-          totalBreakMinutes: allBlocks
-              .where((item) => item.type == BlockType.breakBlock)
-              .fold<int>(0, (sum, item) => sum + item.plannedDurationMinutes),
-        );
-
-    await app.upsertDayPlan(updatedPlan);
-    await app.syncFlowActivitiesFromDayPlan(todayDateKey);
+    final inserted = await insertPlannedBlocksWithConflictHandling(
+      context: context,
+      dateKey: todayDateKey,
+      requestedBlocks: [block],
+    );
+    if (!inserted || !context.mounted) return;
     if (!context.mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(

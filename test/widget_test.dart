@@ -9,6 +9,227 @@ import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart';
 
 void main() {
+  testWidgets('planned insertion recommends the next free start time',
+      (tester) async {
+    final app = AppProvider();
+    app.dayPlans = [
+      _buildDayPlan(
+        date: '2026-03-31',
+        blocks: [
+          _block(
+            id: 'morning',
+            date: '2026-03-31',
+            start: '01:00',
+            end: '01:10',
+            duration: 10,
+            title: 'Morning Routine',
+          ),
+        ],
+      ),
+    ];
+
+    final analysis = app.analyzePlannedInsertions(
+      '2026-03-31',
+      [
+        _block(
+          id: 'workout',
+          date: '2026-03-31',
+          start: '01:00',
+          end: '01:30',
+          duration: 30,
+          title: 'Workout',
+        ),
+      ],
+    );
+
+    expect(analysis.recommendedStartMinutes, 70);
+    expect(analysis.conflictingBlocks.map((block) => block.id), contains('morning'));
+  });
+
+  testWidgets('planned insertion allows exact boundary handoff', (tester) async {
+    final app = AppProvider();
+    app.dayPlans = [
+      _buildDayPlan(
+        date: '2026-03-31',
+        blocks: [
+          _block(
+            id: 'morning',
+            date: '2026-03-31',
+            start: '01:00',
+            end: '01:10',
+            duration: 10,
+            title: 'Morning Routine',
+          ),
+        ],
+      ),
+    ];
+
+    final analysis = app.analyzePlannedInsertions(
+      '2026-03-31',
+      [
+        _block(
+          id: 'workout',
+          date: '2026-03-31',
+          start: '01:10',
+          end: '01:40',
+          duration: 30,
+          title: 'Workout',
+        ),
+      ],
+    );
+
+    expect(analysis.hasConflicts, isFalse);
+    expect(analysis.recommendedStartMinutes, 70);
+  });
+
+  testWidgets('long insertion analysis recommends the next contiguous free slot',
+      (tester) async {
+    final app = AppProvider();
+    app.dayPlans = [
+      _buildDayPlan(
+        date: '2026-04-01',
+        blocks: [
+          _block(
+            id: 'eat',
+            date: '2026-04-01',
+            start: '02:00',
+            end: '02:30',
+            duration: 30,
+            title: 'Eating',
+          ),
+        ],
+      ),
+    ];
+
+    final analysis = app.analyzePlannedInsertions(
+      '2026-04-01',
+      [
+        _block(
+          id: 'study',
+          date: '2026-04-01',
+          start: '01:00',
+          end: '04:00',
+          duration: 180,
+          title: 'Study Session',
+        ),
+      ],
+    );
+
+    expect(analysis.conflictingBlocks.map((block) => block.id), ['eat']);
+    expect(analysis.recommendedStartMinutes, 150);
+  });
+
+  testWidgets('long insertion analysis accounts for multiple blockers',
+      (tester) async {
+    final app = AppProvider();
+    app.dayPlans = [
+      _buildDayPlan(
+        date: '2026-04-02',
+        blocks: [
+          _block(
+            id: 'eat',
+            date: '2026-04-02',
+            start: '02:00',
+            end: '02:30',
+            duration: 30,
+            title: 'Eating',
+          ),
+          _block(
+            id: 'call',
+            date: '2026-04-02',
+            start: '03:00',
+            end: '03:15',
+            duration: 15,
+            title: 'Call',
+          ),
+        ],
+      ),
+    ];
+
+    final analysis = app.analyzePlannedInsertions(
+      '2026-04-02',
+      [
+        _block(
+          id: 'study',
+          date: '2026-04-02',
+          start: '01:00',
+          end: '04:00',
+          duration: 180,
+          title: 'Study Session',
+        ),
+      ],
+    );
+
+    expect(
+      analysis.conflictingBlocks.map((block) => block.id),
+      ['eat', 'call'],
+    );
+    expect(analysis.recommendedStartMinutes, 195);
+  });
+
+  testWidgets('manual move validation rejects conflicts and accepts clear timings',
+      (tester) async {
+    final app = AppProvider();
+    app.dayPlans = [
+      _buildDayPlan(
+        date: '2026-04-03',
+        blocks: [
+          _block(
+            id: 'morning',
+            date: '2026-04-03',
+            start: '01:00',
+            end: '01:10',
+            duration: 10,
+            title: 'Morning Routine',
+          ),
+        ],
+      ),
+    ];
+
+    final newWorkout = _block(
+      id: 'workout',
+      date: '2026-04-03',
+      start: '01:00',
+      end: '01:30',
+      duration: 30,
+      title: 'Workout',
+    );
+
+    final invalidMove = app.validatePlannedBlockPlacements(
+      '2026-04-03',
+      [
+        newWorkout,
+        _block(
+          id: 'morning',
+          date: '2026-04-03',
+          start: '01:15',
+          end: '01:25',
+          duration: 10,
+          title: 'Morning Routine',
+        ),
+      ],
+      excludedBlockIds: const {'morning'},
+    );
+    expect(invalidMove.isValid, isFalse);
+
+    final validMove = app.validatePlannedBlockPlacements(
+      '2026-04-03',
+      [
+        newWorkout,
+        _block(
+          id: 'morning',
+          date: '2026-04-03',
+          start: '01:30',
+          end: '01:40',
+          duration: 10,
+          title: 'Morning Routine',
+        ),
+      ],
+      excludedBlockIds: const {'morning'},
+    );
+    expect(validMove.isValid, isTrue);
+  });
+
   testWidgets('current day overnight block renders only the visible slice',
       (tester) async {
     final app = _buildAppProviderWithPlans();
@@ -442,6 +663,55 @@ AppProvider _buildAppProviderWithPlans() {
     ),
   ];
   return app;
+}
+
+DayPlan _buildDayPlan({
+  required String date,
+  required List<Block> blocks,
+}) {
+  final normalizedBlocks = List<Block>.generate(
+    blocks.length,
+    (index) => blocks[index].copyWith(index: index),
+  );
+  return DayPlan(
+    date: date,
+    faPages: const [],
+    faPagesCount: 0,
+    videos: const [],
+    notesFromUser: '',
+    notesFromAI: '',
+    attachments: const [],
+    breaks: const [],
+    blocks: normalizedBlocks,
+    totalStudyMinutesPlanned: normalizedBlocks
+        .where((block) => block.type != BlockType.breakBlock)
+        .fold<int>(0, (sum, block) => sum + block.plannedDurationMinutes),
+    totalBreakMinutes: normalizedBlocks
+        .where((block) => block.type == BlockType.breakBlock)
+        .fold<int>(0, (sum, block) => sum + block.plannedDurationMinutes),
+  );
+}
+
+Block _block({
+  required String id,
+  required String date,
+  required String start,
+  required String end,
+  required int duration,
+  required String title,
+  BlockType type = BlockType.other,
+}) {
+  return Block(
+    id: id,
+    index: 0,
+    date: date,
+    plannedStartTime: start,
+    plannedEndTime: end,
+    type: type,
+    title: title,
+    plannedDurationMinutes: duration,
+    status: BlockStatus.notStarted,
+  );
 }
 
 class _TimelineHarness extends StatefulWidget {

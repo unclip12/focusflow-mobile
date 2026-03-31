@@ -5,6 +5,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:focusflow_mobile/services/backup_service.dart';
@@ -56,6 +57,51 @@ enum AppNotificationType { reminder, achievement, revisionDue, streak }
 enum TrackNowConflictChoice { push, consume, overlap }
 
 enum TrackNowResumeChoice { now, later, keepPaused }
+
+enum PlannedInsertResolutionChoice {
+  splitCurrentTask,
+  moveExistingTasks,
+  keepOverlap,
+}
+
+class PlannedInsertAnalysis {
+  final List<Block> requestedBlocks;
+  final int requestedStartMinutes;
+  final int requestedEndMinutes;
+  final int recommendedStartMinutes;
+  final int recommendedEndMinutes;
+  final List<Block> conflictingBlocks;
+
+  const PlannedInsertAnalysis({
+    required this.requestedBlocks,
+    required this.requestedStartMinutes,
+    required this.requestedEndMinutes,
+    required this.recommendedStartMinutes,
+    required this.recommendedEndMinutes,
+    required this.conflictingBlocks,
+  });
+
+  bool get hasConflicts => conflictingBlocks.isNotEmpty;
+
+  int get shiftMinutes => recommendedStartMinutes - requestedStartMinutes;
+
+  bool get canSplitCurrentTask =>
+      requestedBlocks.isNotEmpty &&
+      requestedBlocks.every((block) => !block.isEvent) &&
+      requestedBlocks.any((block) => block.plannedDurationMinutes > 0);
+}
+
+class PlannedInsertValidationResult {
+  final bool isValid;
+  final String? message;
+  final List<Block> conflictingBlocks;
+
+  const PlannedInsertValidationResult({
+    required this.isValid,
+    this.message,
+    this.conflictingBlocks = const [],
+  });
+}
 
 class AppNotification {
   final String id;
@@ -536,6 +582,464 @@ class AppProvider extends ChangeNotifier {
       totalStudyMinutesPlanned: _plannedStudyMinutes(normalizedBlocks),
       totalBreakMinutes: _plannedBreakMinutes(normalizedBlocks),
     );
+  }
+
+  int recommendedStartMinutesForInsertion(
+    String date, {
+    required int requestedStartMinutes,
+    required int durationMinutes,
+    Iterable<String> excludedBlockIds = const [],
+  }) {
+    if (durationMinutes <= 0) {
+      return requestedStartMinutes;
+    }
+
+    final draftBlock = Block(
+      id: 'planned_insert_recommendation',
+      index: 0,
+      date: date,
+      plannedStartTime: _fromMinutes(requestedStartMinutes),
+      plannedEndTime: _fromMinutes(requestedStartMinutes + durationMinutes),
+      type: BlockType.other,
+      title: 'Draft',
+      plannedDurationMinutes: durationMinutes,
+      status: BlockStatus.notStarted,
+    );
+
+    return analyzePlannedInsertions(
+      date,
+      [draftBlock],
+      excludedBlockIds: excludedBlockIds,
+    ).recommendedStartMinutes;
+  }
+
+  PlannedInsertAnalysis analyzePlannedInsertions(
+    String date,
+    List<Block> requestedBlocks, {
+    Iterable<String> excludedBlockIds = const [],
+  }) {
+    final normalizedRequested = _sortedReindexedBlocks(requestedBlocks);
+    if (normalizedRequested.isEmpty) {
+      return const PlannedInsertAnalysis(
+        requestedBlocks: [],
+        requestedStartMinutes: 0,
+        requestedEndMinutes: 0,
+        recommendedStartMinutes: 0,
+        recommendedEndMinutes: 0,
+        conflictingBlocks: [],
+      );
+    }
+
+    final requestedStart = normalizedRequested
+        .map((block) => _toMinutes(block.plannedStartTime))
+        .reduce((a, b) => a < b ? a : b);
+    final requestedEnd = normalizedRequested
+        .map((block) => _toMinutes(block.plannedEndTime))
+        .reduce((a, b) => a > b ? a : b);
+    final blockingBlocks = _plannedInsertionBlockingBlocks(
+      date,
+      excludedBlockIds: {
+        ...excludedBlockIds,
+        ...normalizedRequested.map((block) => block.id),
+      },
+    );
+
+    final conflicts = _findConflictsForBlocks(
+      requestedBlocks: normalizedRequested,
+      existingBlocks: blockingBlocks,
+    );
+    final recommendedStart = _findRecommendedStartForBlocks(
+      normalizedRequested,
+      blockingBlocks,
+    );
+    final recommendedEnd =
+        recommendedStart + (requestedEnd - requestedStart).clamp(0, 24 * 60);
+
+    return PlannedInsertAnalysis(
+      requestedBlocks: normalizedRequested,
+      requestedStartMinutes: requestedStart,
+      requestedEndMinutes: requestedEnd,
+      recommendedStartMinutes: recommendedStart,
+      recommendedEndMinutes: recommendedEnd,
+      conflictingBlocks: conflicts,
+    );
+  }
+
+  PlannedInsertValidationResult validatePlannedBlockPlacements(
+    String date,
+    List<Block> candidateBlocks, {
+    Iterable<String> excludedBlockIds = const [],
+  }) {
+    final normalizedCandidates = _sortedReindexedBlocks(candidateBlocks);
+    final ignoredIds = {
+      ...excludedBlockIds,
+      ...normalizedCandidates.map((block) => block.id),
+    };
+    final existingBlocks = _plannedInsertionBlockingBlocks(
+      date,
+      excludedBlockIds: ignoredIds,
+    );
+    final relevantBlocks = [
+      ...existingBlocks,
+      ...normalizedCandidates.where(_isPlannedInsertionBlockingBlock),
+    ]..sort((a, b) => _toMinutes(a.plannedStartTime).compareTo(
+          _toMinutes(b.plannedStartTime),
+        ));
+    final conflicts = <Block>[];
+    for (int i = 0; i < relevantBlocks.length; i++) {
+      final current = relevantBlocks[i];
+      final currentEnd = _toMinutes(current.plannedEndTime);
+      for (int j = i + 1; j < relevantBlocks.length; j++) {
+        final next = relevantBlocks[j];
+        final nextStart = _toMinutes(next.plannedStartTime);
+        if (nextStart >= currentEnd) {
+          break;
+        }
+        if (_rangesOverlap(
+          _toMinutes(current.plannedStartTime),
+          currentEnd,
+          nextStart,
+          _toMinutes(next.plannedEndTime),
+        )) {
+          conflicts
+            ..add(current)
+            ..add(next);
+          i = relevantBlocks.length;
+          break;
+        }
+      }
+    }
+    if (conflicts.isEmpty) {
+      return const PlannedInsertValidationResult(isValid: true);
+    }
+
+    final conflictingTitles = conflicts.take(2).map((block) => block.title).toSet();
+    final conflictLabel = conflictingTitles.join(' and ');
+    return PlannedInsertValidationResult(
+      isValid: false,
+      message: conflictLabel.isEmpty
+          ? 'The selected timing is still conflicting. Please update the timing.'
+          : 'Still conflicting with $conflictLabel. Please update the timing.',
+      conflictingBlocks: conflicts,
+    );
+  }
+
+  Future<void> insertPlannedBlocksWithResolution({
+    required String date,
+    required List<Block> requestedBlocks,
+    required PlannedInsertResolutionChoice resolution,
+    List<Block> editedExistingBlocks = const [],
+  }) async {
+    final normalizedRequested = _sortedReindexedBlocks(requestedBlocks);
+    final existingIdsToReplace = editedExistingBlocks.map((block) => block.id).toSet();
+
+    switch (resolution) {
+      case PlannedInsertResolutionChoice.keepOverlap:
+        await _persistInsertedBlocks(
+          date,
+          blocksToInsert: normalizedRequested,
+          replaceBlockIds: existingIdsToReplace,
+          additionalBlocks: editedExistingBlocks,
+        );
+        return;
+      case PlannedInsertResolutionChoice.moveExistingTasks:
+        final validation = validatePlannedBlockPlacements(
+          date,
+          [...normalizedRequested, ...editedExistingBlocks],
+          excludedBlockIds: existingIdsToReplace,
+        );
+        if (!validation.isValid) {
+          throw StateError(
+            validation.message ??
+                'The selected timing is still conflicting. Please update the timing.',
+          );
+        }
+        await _persistInsertedBlocks(
+          date,
+          blocksToInsert: normalizedRequested,
+          replaceBlockIds: existingIdsToReplace,
+          additionalBlocks: editedExistingBlocks,
+        );
+        return;
+      case PlannedInsertResolutionChoice.splitCurrentTask:
+        final splitBlocks = _placeNewBlocksAroundExisting(
+          date,
+          normalizedRequested,
+        );
+        await _persistInsertedBlocks(
+          date,
+          blocksToInsert: splitBlocks,
+        );
+        return;
+    }
+  }
+
+  Future<void> _persistInsertedBlocks(
+    String date, {
+    required List<Block> blocksToInsert,
+    Set<String> replaceBlockIds = const {},
+    List<Block> additionalBlocks = const [],
+  }) async {
+    final plan = getDayPlan(date);
+    final existingBlocks = List<Block>.from(plan?.blocks ?? const <Block>[])
+        .where((block) => !replaceBlockIds.contains(block.id))
+        .toList();
+    final updatedPlan = _dayPlanWithUpdatedBlocks(
+      plan,
+      date,
+      [...existingBlocks, ...additionalBlocks, ...blocksToInsert],
+    );
+    await _saveDayPlan(updatedPlan, notify: false);
+    await syncFlowActivitiesFromDayPlan(date, notify: false);
+    notifyListeners();
+  }
+
+  List<Block> _placeNewBlocksAroundExisting(
+    String date,
+    List<Block> requestedBlocks,
+  ) {
+    final blockingIntervals = _plannedInsertionBlockingIntervals(
+      date,
+      excludedBlockIds: requestedBlocks.map((block) => block.id).toSet(),
+    );
+    final placedIntervals = List<({int start, int end})>.from(blockingIntervals);
+    final placedBlocks = <Block>[];
+    final sortedRequested = _sortedReindexedBlocks(requestedBlocks);
+    var cursor = sortedRequested.isEmpty
+        ? 0
+        : _toMinutes(sortedRequested.first.plannedStartTime);
+
+    for (final block in sortedRequested) {
+      if (block.plannedDurationMinutes <= 0) {
+        final zeroDurationStart = math.max(cursor, _toMinutes(block.plannedStartTime));
+        final normalizedBlock = block.copyWith(
+          plannedStartTime: _fromMinutes(zeroDurationStart),
+          plannedEndTime: _fromMinutes(zeroDurationStart),
+        );
+        placedBlocks.add(normalizedBlock);
+        cursor = zeroDurationStart;
+        continue;
+      }
+
+      final blockRequestedStart = _toMinutes(block.plannedStartTime);
+      cursor = math.max(cursor, blockRequestedStart);
+      final partPlacements = <({int start, int end})>[];
+      var remaining = block.plannedDurationMinutes;
+
+      while (remaining > 0) {
+        cursor = _advancePastBlockedIntervals(placedIntervals, cursor);
+        final overlap = _firstOverlappingPlacedInterval(
+          placedIntervals,
+          cursor,
+          cursor + remaining,
+        );
+        if (overlap == null) {
+          partPlacements.add((start: cursor, end: cursor + remaining));
+          placedIntervals.add((start: cursor, end: cursor + remaining));
+          remaining = 0;
+          cursor += block.plannedDurationMinutes;
+          continue;
+        }
+
+        final beforeConflict = overlap.start - cursor;
+        if (beforeConflict > 0) {
+          partPlacements.add((start: cursor, end: overlap.start));
+          placedIntervals.add((start: cursor, end: overlap.start));
+          remaining -= beforeConflict;
+        }
+        cursor = overlap.end;
+      }
+
+      placedIntervals.sort((a, b) => a.start.compareTo(b.start));
+      placedBlocks.addAll(_materializeSplitPlacements(block, partPlacements));
+      if (partPlacements.isNotEmpty) {
+        cursor = partPlacements.last.end;
+      }
+    }
+
+    return _sortedReindexedBlocks(placedBlocks);
+  }
+
+  List<Block> _materializeSplitPlacements(
+    Block block,
+    List<({int start, int end})> placements,
+  ) {
+    if (placements.isEmpty) {
+      return [block];
+    }
+    if (placements.length == 1) {
+      final placement = placements.first;
+      return [
+        block.copyWith(
+          plannedStartTime: _fromMinutes(placement.start),
+          plannedEndTime: _fromMinutes(placement.end),
+          plannedDurationMinutes: placement.end - placement.start,
+          remainingDurationMinutes: placement.end - placement.start,
+        ),
+      ];
+    }
+
+    return List<Block>.generate(placements.length, (index) {
+      final placement = placements[index];
+      return block.copyWith(
+        id: index == 0 ? block.id : '${block.id}_p${index + 1}',
+        plannedStartTime: _fromMinutes(placement.start),
+        plannedEndTime: _fromMinutes(placement.end),
+        plannedDurationMinutes: placement.end - placement.start,
+        remainingDurationMinutes: placement.end - placement.start,
+        splitGroupId: block.splitGroupId ?? block.id,
+        splitPartIndex: index + 1,
+        splitTotalParts: placements.length,
+      );
+    });
+  }
+
+  int _findRecommendedStartForBlocks(
+    List<Block> requestedBlocks,
+    List<Block> blockingBlocks,
+  ) {
+    if (requestedBlocks.isEmpty) return 0;
+    final requestedStart = requestedBlocks
+        .map((block) => _toMinutes(block.plannedStartTime))
+        .reduce((a, b) => a < b ? a : b);
+    var candidateStart = requestedStart;
+
+    while (true) {
+      final shiftedBlocks = _shiftBlocksToStart(requestedBlocks, candidateStart);
+      final overlap = _firstConflictingBlock(
+        requestedBlocks: shiftedBlocks,
+        existingBlocks: blockingBlocks,
+      );
+      if (overlap == null) {
+        return candidateStart;
+      }
+      candidateStart = _toMinutes(overlap.plannedEndTime);
+    }
+  }
+
+  List<Block> _shiftBlocksToStart(List<Block> blocks, int targetStartMinutes) {
+    if (blocks.isEmpty) return const [];
+    final sortedBlocks = _sortedReindexedBlocks(blocks);
+    final firstStart = _toMinutes(sortedBlocks.first.plannedStartTime);
+    final delta = targetStartMinutes - firstStart;
+    return sortedBlocks.map((block) {
+      final start = _toMinutes(block.plannedStartTime) + delta;
+      final end = _toMinutes(block.plannedEndTime) + delta;
+      return block.copyWith(
+        plannedStartTime: _fromMinutes(start),
+        plannedEndTime: _fromMinutes(end),
+      );
+    }).toList();
+  }
+
+  List<Block> _findConflictsForBlocks({
+    required List<Block> requestedBlocks,
+    required List<Block> existingBlocks,
+    bool includeCandidatePairConflicts = false,
+  }) {
+    final conflicts = <Block>{};
+    for (final requested in requestedBlocks) {
+      if (!_isPlannedInsertionBlockingBlock(requested)) {
+        continue;
+      }
+      final requestStart = _toMinutes(requested.plannedStartTime);
+      final requestEnd = _toMinutes(requested.plannedEndTime);
+      for (final existing in existingBlocks) {
+        if (!_isPlannedInsertionBlockingBlock(existing)) {
+          continue;
+        }
+        final existingStart = _toMinutes(existing.plannedStartTime);
+        final existingEnd = _toMinutes(existing.plannedEndTime);
+        if (_rangesOverlap(requestStart, requestEnd, existingStart, existingEnd)) {
+          conflicts.add(existing);
+          if (includeCandidatePairConflicts) {
+            conflicts.add(requested);
+          }
+        }
+      }
+    }
+    return conflicts.toList()
+      ..sort((a, b) => _toMinutes(a.plannedStartTime).compareTo(
+            _toMinutes(b.plannedStartTime),
+          ));
+  }
+
+  Block? _firstConflictingBlock({
+    required List<Block> requestedBlocks,
+    required List<Block> existingBlocks,
+  }) {
+    final conflicts = _findConflictsForBlocks(
+      requestedBlocks: requestedBlocks,
+      existingBlocks: existingBlocks,
+    );
+    return conflicts.isEmpty ? null : conflicts.first;
+  }
+
+  List<Block> _plannedInsertionBlockingBlocks(
+    String date, {
+    Iterable<String> excludedBlockIds = const [],
+  }) {
+    final excluded = excludedBlockIds.toSet();
+    return (getDayPlan(date)?.blocks ?? const <Block>[])
+        .where((block) =>
+            !excluded.contains(block.id) && _isPlannedInsertionBlockingBlock(block))
+        .toList()
+      ..sort((a, b) => _toMinutes(a.plannedStartTime).compareTo(
+            _toMinutes(b.plannedStartTime),
+          ));
+  }
+
+  bool _isPlannedInsertionBlockingBlock(Block block) {
+    return block.isVirtual != true &&
+        block.status != BlockStatus.skipped &&
+        block.plannedDurationMinutes > 0 &&
+        block.plannedStartTime.isNotEmpty &&
+        block.plannedEndTime.isNotEmpty;
+  }
+
+  List<({int start, int end})> _plannedInsertionBlockingIntervals(
+    String date, {
+    Iterable<String> excludedBlockIds = const [],
+  }) {
+    return _plannedInsertionBlockingBlocks(
+      date,
+      excludedBlockIds: excludedBlockIds,
+    ).map((block) => (
+          start: _toMinutes(block.plannedStartTime),
+          end: _toMinutes(block.plannedEndTime),
+        )).toList();
+  }
+
+  int _advancePastBlockedIntervals(List<({int start, int end})> intervals, int cursor) {
+    var updatedCursor = cursor;
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (final interval in intervals) {
+        if (updatedCursor >= interval.start && updatedCursor < interval.end) {
+          updatedCursor = interval.end;
+          changed = true;
+        }
+      }
+    }
+    return updatedCursor;
+  }
+
+  ({int start, int end})? _firstOverlappingPlacedInterval(
+    List<({int start, int end})> intervals,
+    int start,
+    int end,
+  ) {
+    ({int start, int end})? firstOverlap;
+    for (final interval in intervals) {
+      if (!_rangesOverlap(start, end, interval.start, interval.end)) {
+        continue;
+      }
+      if (firstOverlap == null || interval.start < firstOverlap.start) {
+        firstOverlap = interval;
+      }
+    }
+    return firstOverlap;
   }
 
   FlowActivity? getActivePlannedFlowActivity(String date) {

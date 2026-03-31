@@ -16,6 +16,7 @@ import 'package:focusflow_mobile/models/knowledge_base.dart';
 import 'package:focusflow_mobile/services/srs_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/focus_batch_calculator.dart';
+import 'planned_insert_conflict_sheet.dart';
 
 // ── General task categories ──────────────────────────────────────
 // ── Study task type enums (unchanged) ───────────────────────────
@@ -209,6 +210,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   static const _uuid = Uuid();
   int _step = 0;
   _TaskPath? _taskPath;
+  bool _seededDefaultTimes = false;
 
   // ── Top-level path ──────────────────────────────────────
   // null = not chosen yet, 'study' or 'general'
@@ -262,6 +264,31 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_seededDefaultTimes) return;
+    _seededDefaultTimes = true;
+    if (_startTime != null || _endTime != null) return;
+
+    final app = context.read<AppProvider>();
+    final requestedStartMinutes = _defaultRequestedStartMinutes();
+    final recommendedStartMinutes = app.recommendedStartMinutesForInsertion(
+      widget.dateKey,
+      requestedStartMinutes: requestedStartMinutes,
+      durationMinutes: 60,
+    );
+    final endMinutes = (recommendedStartMinutes + 60).clamp(0, 23 * 60 + 59);
+    _startTime = TimeOfDay(
+      hour: recommendedStartMinutes ~/ 60,
+      minute: recommendedStartMinutes % 60,
+    );
+    _endTime = TimeOfDay(
+      hour: endMinutes ~/ 60,
+      minute: endMinutes % 60,
+    );
+  }
+
+  @override
   void dispose() {
     _pageCtrl.removeListener(_onPageNumberChanged);
     _pageCtrl.dispose(); _topicCtrl.dispose(); _titleCtrl.dispose();
@@ -306,6 +333,18 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
 
   String _fmtHHMM(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  int _defaultRequestedStartMinutes() {
+    final selectedDate = DateTime.tryParse(widget.dateKey);
+    final now = DateTime.now();
+    if (selectedDate != null &&
+        selectedDate.year == now.year &&
+        selectedDate.month == now.month &&
+        selectedDate.day == now.day) {
+      return (now.hour * 60) + now.minute;
+    }
+    return 9 * 60;
+  }
 
   int get _durationMinutes {
     if (_startTime == null || _endTime == null) return 0;
@@ -488,12 +527,10 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     final app = context.read<AppProvider>();
     app.saveGeneralTaskName(title);
 
-    final existing = app.getDayPlan(widget.dateKey);
-    final existingBlocks = List<Block>.from(existing?.blocks ?? const []);
     final durationMinutes = _generalDurationMinutes ?? 0;
     final block = Block(
       id: _uuid.v4(),
-      index: existingBlocks.length,
+      index: 0,
       date: widget.dateKey,
       plannedStartTime:
           _startTime != null ? _fmtHHMM(_startTime!) : '00:00',
@@ -506,36 +543,12 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       isEvent: _isEvent,
       status: BlockStatus.notStarted,
     );
-    final allBlocks = [...existingBlocks, block];
-    final updatedPlan = existing?.copyWith(
-          blocks: allBlocks,
-          totalStudyMinutesPlanned: allBlocks
-              .where((b) => b.type != BlockType.breakBlock)
-              .fold<int>(0, (sum, b) => sum + b.plannedDurationMinutes),
-          totalBreakMinutes: allBlocks
-              .where((b) => b.type == BlockType.breakBlock)
-              .fold<int>(0, (sum, b) => sum + b.plannedDurationMinutes),
-        ) ??
-        DayPlan(
-          date: widget.dateKey,
-          faPages: const [],
-          faPagesCount: 0,
-          videos: const [],
-          notesFromUser: '',
-          notesFromAI: '',
-          attachments: const [],
-          breaks: const [],
-          blocks: allBlocks,
-          totalStudyMinutesPlanned: allBlocks
-              .where((b) => b.type != BlockType.breakBlock)
-              .fold<int>(0, (sum, b) => sum + b.plannedDurationMinutes),
-          totalBreakMinutes: allBlocks
-              .where((b) => b.type == BlockType.breakBlock)
-              .fold<int>(0, (sum, b) => sum + b.plannedDurationMinutes),
-        );
-
-    await app.upsertDayPlan(updatedPlan);
-    await app.syncFlowActivitiesFromDayPlan(widget.dateKey);
+    final inserted = await insertPlannedBlocksWithConflictHandling(
+      context: context,
+      dateKey: widget.dateKey,
+      requestedBlocks: [block],
+    );
+    if (!inserted) return;
 
     if (!mounted) return;
     Navigator.of(context).pop();
@@ -558,26 +571,23 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       }
     }
     if (!mounted) return;
-    final app = context.read<AppProvider>();
 
     final batches = _focusBatches;
     final title = _studyTaskTitle;
     final blockType = _studyBlockType;
-    final existing = app.getDayPlan(widget.dateKey);
-    final existingBlocks = List<Block>.from(existing?.blocks ?? []);
     final newBlocks = <Block>[];
     final timeFormat = DateFormat('HH:mm');
 
     if (_startTime == null || _endTime == null) {
       newBlocks.add(Block(
-        id: _uuid.v4(), index: existingBlocks.length, date: widget.dateKey,
+        id: _uuid.v4(), index: 0, date: widget.dateKey,
         plannedStartTime: '00:00', plannedEndTime: '00:00',
         type: blockType, title: title,
         plannedDurationMinutes: 0, isEvent: false, status: BlockStatus.notStarted,
       ));
     } else if (batches.isEmpty) {
       newBlocks.add(Block(
-        id: _uuid.v4(), index: existingBlocks.length, date: widget.dateKey,
+        id: _uuid.v4(), index: 0, date: widget.dateKey,
         plannedStartTime: _fmtHHMM(_startTime!),
         plannedEndTime: _fmtHHMM(_endTime!),
         type: blockType, title: title,
@@ -588,7 +598,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       for (int i = 0; i < batches.length; i++) {
         final b = batches[i];
         newBlocks.add(Block(
-          id: _uuid.v4(), index: existingBlocks.length + newBlocks.length,
+          id: _uuid.v4(), index: newBlocks.length,
           date: widget.dateKey,
           plannedStartTime: timeFormat.format(b.startTime),
           plannedEndTime: timeFormat.format(b.endTime),
@@ -600,17 +610,12 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       }
     }
 
-    final allBlocks = [...existingBlocks, ...newBlocks];
-    final plan = existing?.copyWith(blocks: allBlocks) ??
-        DayPlan(
-          date: widget.dateKey, faPages: const [], faPagesCount: 0,
-          videos: const [], notesFromUser: '', notesFromAI: '',
-          attachments: const [], breaks: const [], blocks: allBlocks,
-          totalStudyMinutesPlanned: 0, totalBreakMinutes: 0,
-        );
-
-    await app.upsertDayPlan(plan);
-    await app.syncFlowActivitiesFromDayPlan(widget.dateKey);
+    final inserted = await insertPlannedBlocksWithConflictHandling(
+      context: context,
+      dateKey: widget.dateKey,
+      requestedBlocks: newBlocks,
+    );
+    if (!inserted) return;
 
     if (mounted) {
       Navigator.of(context).pop();

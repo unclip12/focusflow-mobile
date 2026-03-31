@@ -18,6 +18,7 @@ import 'package:provider/provider.dart';
 
 import 'study_flow_screen.dart';
 import 'package:focusflow_mobile/utils/show_app_bottom_sheet.dart';
+import 'planned_insert_conflict_sheet.dart';
 
 class PlannedStudySessionData {
   final List<StudyTask> tasks;
@@ -597,8 +598,19 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
     }
 
     var plannedQueue = _queueWithPlanningDefaults(_queue);
-    TimeOfDay selectedTime =
-        _isBlockBound ? _boundStartTime() : TimeOfDay.now();
+    final estimatedMinutes =
+        StudyTask.estimateQueueDurationMinutes(plannedQueue);
+    final recommendedStartMinutes = _isBlockBound
+        ? (_boundStartTime().hour * 60) + _boundStartTime().minute
+        : context.read<AppProvider>().recommendedStartMinutesForInsertion(
+              widget.dateKey,
+              requestedStartMinutes: _defaultRequestedStartMinutes(),
+              durationMinutes: estimatedMinutes,
+            );
+    TimeOfDay selectedTime = TimeOfDay(
+      hour: recommendedStartMinutes ~/ 60,
+      minute: recommendedStartMinutes % 60,
+    );
 
     await showAppBottomSheet(
       context: context,
@@ -901,49 +913,26 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
       ),
     );
 
-    final existingPlan = app.getDayPlan(widget.dateKey);
-    final allBlocks = [...(existingPlan?.blocks ?? const <Block>[]), block]
-      ..sort((a, b) => a.plannedStartTime.compareTo(b.plannedStartTime));
-    final reindexedBlocks = List<Block>.generate(
-      allBlocks.length,
-      (index) => allBlocks[index].copyWith(index: index),
+    final inserted = await insertPlannedBlocksWithConflictHandling(
+      context: context,
+      dateKey: widget.dateKey,
+      requestedBlocks: [block],
     );
-    final totalStudyMinutes = reindexedBlocks
-        .where((entry) => entry.type != BlockType.breakBlock)
-        .fold<int>(0, (sum, entry) => sum + entry.plannedDurationMinutes);
-    final totalBreakMinutes = reindexedBlocks
-        .where((entry) => entry.type == BlockType.breakBlock)
-        .fold<int>(0, (sum, entry) => sum + entry.plannedDurationMinutes);
+    if (!inserted) return;
 
-    final plan = existingPlan?.copyWith(
-          blocks: reindexedBlocks,
-          totalStudyMinutesPlanned: totalStudyMinutes,
-          totalBreakMinutes: totalBreakMinutes,
-        ) ??
-        DayPlan(
-          date: widget.dateKey,
-          faPages: const [],
-          faPagesCount: 0,
-          videos: const [],
-          notesFromUser: '',
-          notesFromAI: '',
-          attachments: const [],
-          breaks: const [],
-          blocks: reindexedBlocks,
-          totalStudyMinutesPlanned: totalStudyMinutes,
-          totalBreakMinutes: totalBreakMinutes,
-        );
-
-    await app.upsertDayPlan(plan);
-    await app.syncFlowActivitiesFromDayPlan(widget.dateKey);
-
-    if (scheduledAt.isAfter(DateTime.now())) {
+    final savedBlocks = (app.getDayPlan(widget.dateKey)?.blocks ?? const <Block>[])
+        .where((entry) => entry.id == block.id || entry.splitGroupId == block.id)
+        .toList()
+      ..sort((a, b) => a.plannedStartTime.compareTo(b.plannedStartTime));
+    final reminderBlock = savedBlocks.isNotEmpty ? savedBlocks.first : block;
+    final reminderStart = _blockStartDateTime(reminderBlock);
+    if (reminderStart.isAfter(DateTime.now())) {
       await NotificationService.instance.scheduleStudySessionReminder(
-        id: _notificationIdForBlock(block.id),
+        id: _notificationIdForBlock(reminderBlock.id),
         blockTitle: title,
-        when: scheduledAt,
-        dateKey: block.date,
-        blockId: block.id,
+        when: reminderStart,
+        dateKey: reminderBlock.date,
+        blockId: reminderBlock.id,
       );
     }
 
@@ -954,7 +943,7 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            'Study session planned for ${DateFormat('h:mm a').format(scheduledAt)}',
+            'Study session planned for ${DateFormat('h:mm a').format(reminderStart)}',
           ),
         ),
       );
@@ -1436,6 +1425,18 @@ class _StudySessionPickerState extends State<StudySessionPicker> {
       return TimeOfDay.now();
     }
     return _timeOfDayFromString(plannedStartTime) ?? TimeOfDay.now();
+  }
+
+  int _defaultRequestedStartMinutes() {
+    final selectedDate = DateTime.tryParse(widget.dateKey);
+    final now = DateTime.now();
+    if (selectedDate != null &&
+        selectedDate.year == now.year &&
+        selectedDate.month == now.month &&
+        selectedDate.day == now.day) {
+      return (now.hour * 60) + now.minute;
+    }
+    return 9 * 60;
   }
 
   int _boundSlotDurationMinutes() {

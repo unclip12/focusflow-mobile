@@ -26,6 +26,7 @@ import 'study_session_screen.dart';
 import 'todo_tab.dart';
 import 'track_now_screen.dart';
 import 'package:focusflow_mobile/screens/today_plan/timeline_view.dart';
+import 'planned_insert_conflict_sheet.dart';
 
 Color _todayPlanAccent(BuildContext context) =>
     Theme.of(context).colorScheme.primary;
@@ -419,7 +420,12 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     final rolledHour = now.hour + (roundedMinutes ~/ 60);
     final normalizedHour = rolledHour.clamp(0, 23);
     final normalizedMinute = roundedMinutes % 60;
-    return normalizedHour * 60 + normalizedMinute;
+    final requestedStart = (normalizedHour * 60) + normalizedMinute;
+    return context.read<AppProvider>().recommendedStartMinutesForInsertion(
+          _dateKey,
+          requestedStartMinutes: requestedStart,
+          durationMinutes: 60,
+        );
   }
 
   String _formatMinutesOfDay(int totalMinutes) {
@@ -427,12 +433,6 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     final hours = normalized ~/ 60;
     final minutes = normalized % 60;
     return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
-  }
-
-  int _sumMinutesByType(List<Block> blocks, bool Function(Block block) test) {
-    return blocks
-        .where(test)
-        .fold<int>(0, (sum, block) => sum + block.plannedDurationMinutes);
   }
 
   Block _buildDraftBlock({
@@ -460,11 +460,9 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
 
   Future<void> _saveNewBlock(BlockEditorUpdate update, String blockId) async {
     final app = context.read<AppProvider>();
-    final existingPlan = app.getDayPlan(update.dateKey);
-    final existingBlocks = List<Block>.from(existingPlan?.blocks ?? const []);
     final newBlock = Block(
       id: blockId,
-      index: existingBlocks.length,
+      index: 0,
       date: update.dateKey,
       plannedStartTime: update.plannedStartTime,
       plannedEndTime: update.plannedEndTime,
@@ -479,40 +477,12 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
       isEvent: update.isEvent,
       status: BlockStatus.notStarted,
     );
-    final allBlocks = [...existingBlocks, newBlock];
-    final updatedPlan = existingPlan?.copyWith(
-          blocks: allBlocks,
-          totalStudyMinutesPlanned: _sumMinutesByType(
-            allBlocks,
-            (block) => block.type != BlockType.breakBlock,
-          ),
-          totalBreakMinutes: _sumMinutesByType(
-            allBlocks,
-            (block) => block.type == BlockType.breakBlock,
-          ),
-        ) ??
-        DayPlan(
-          date: update.dateKey,
-          faPages: const [],
-          faPagesCount: 0,
-          videos: const [],
-          notesFromUser: '',
-          notesFromAI: '',
-          attachments: const [],
-          breaks: const [],
-          blocks: allBlocks,
-          totalStudyMinutesPlanned: _sumMinutesByType(
-            allBlocks,
-            (block) => block.type != BlockType.breakBlock,
-          ),
-          totalBreakMinutes: _sumMinutesByType(
-            allBlocks,
-            (block) => block.type == BlockType.breakBlock,
-          ),
-        );
-
-    await app.upsertDayPlan(updatedPlan);
-    await app.syncFlowActivitiesFromDayPlan(update.dateKey);
+    final inserted = await insertPlannedBlocksWithConflictHandling(
+      context: context,
+      dateKey: update.dateKey,
+      requestedBlocks: [newBlock],
+    );
+    if (!inserted) return;
     await app.ensureRecurringBlocksForDate(update.dateKey);
   }
 
