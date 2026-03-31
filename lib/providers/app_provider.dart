@@ -1373,6 +1373,57 @@ class AppProvider extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════════
+  Future<RoutineLog> updateCompletedRoutineActuals({
+    required RoutineLog log,
+    String? sourceBlockId,
+  }) async {
+    final normalizedLog = log.copyWith(
+      endTime: log.endTime ?? log.startTime,
+      totalDurationSeconds: log.totalDurationSeconds ?? 0,
+    );
+
+    String? targetBlockId = sourceBlockId;
+    if (targetBlockId == null || targetBlockId.isEmpty) {
+      targetBlockId = _findRoutineBlockIdForDate(
+        normalizedLog.date,
+        normalizedLog.routineId,
+      );
+    }
+
+    final plan = getDayPlan(normalizedLog.date);
+    final blocks = plan?.blocks;
+    if (targetBlockId != null &&
+        targetBlockId.isNotEmpty &&
+        plan != null &&
+        blocks != null) {
+      final idx = blocks.indexWhere((block) => block.id == targetBlockId);
+      if (idx >= 0) {
+        final updatedBlocks = List<Block>.from(blocks);
+        final block = updatedBlocks[idx];
+        updatedBlocks[idx] = block.copyWith(
+          actualStartTime: normalizedLog.startTime,
+          actualEndTime: normalizedLog.endTime,
+          actualDurationMinutes:
+              ((normalizedLog.totalDurationSeconds ?? 0) / 60).ceil(),
+          status: BlockStatus.done,
+          completionStatus: 'COMPLETED',
+        );
+        await _saveDayPlan(plan.copyWith(blocks: updatedBlocks), notify: false);
+        await syncFlowActivitiesFromDayPlan(normalizedLog.date, notify: false);
+      }
+    }
+
+    await _db.upsertRoutineLog(normalizedLog.toJson());
+    final idx = routineLogs.indexWhere((l) => l.id == normalizedLog.id);
+    if (idx >= 0) {
+      routineLogs[idx] = normalizedLog;
+    } else {
+      routineLogs.add(normalizedLog);
+    }
+    notifyListeners();
+    return normalizedLog;
+  }
+
   // BUYING ITEMS (V6)
   // ═══════════════════════════════════════════════════════════════
 

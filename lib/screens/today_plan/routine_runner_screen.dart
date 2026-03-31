@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:focusflow_mobile/models/routine.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
@@ -386,7 +387,7 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen> {
   }
 }
 
-class RoutineLogSummaryScreen extends StatelessWidget {
+class RoutineLogSummaryScreen extends StatefulWidget {
   final RoutineLog log;
   final Routine? routine;
   final String? sourceBlockId;
@@ -402,29 +403,116 @@ class RoutineLogSummaryScreen extends StatelessWidget {
     required this.onDone,
   });
 
+  @override
+  State<RoutineLogSummaryScreen> createState() => _RoutineLogSummaryScreenState();
+}
+
+class _RoutineLogSummaryScreenState extends State<RoutineLogSummaryScreen> {
+  late RoutineLog _log;
+  bool _isUpdatingActuals = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _log = widget.log;
+  }
+
   String _fmt(int seconds) {
+    final hours = seconds ~/ 3600;
     final minutes = seconds ~/ 60;
+    final remainingMinutes = (seconds % 3600) ~/ 60;
     final remainingSeconds = seconds % 60;
+    if (hours > 0) {
+      return '${hours}h ${remainingMinutes}m';
+    }
     if (minutes > 0) return '${minutes}m ${remainingSeconds}s';
     return '${remainingSeconds}s';
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    Routine? resolvedRoutine = routine;
+  Routine? _resolveRoutine(BuildContext context) {
+    Routine? resolvedRoutine = widget.routine;
     if (resolvedRoutine == null) {
       final app = context.read<AppProvider>();
       for (final candidate in app.routines) {
-        if (candidate.id == log.routineId) {
+        if (candidate.id == _log.routineId) {
           resolvedRoutine = candidate;
           break;
         }
       }
     }
+    return resolvedRoutine;
+  }
 
-    final totalSeconds = log.totalDurationSeconds ?? 0;
-    final title = resolvedRoutine?.name ?? log.routineName;
+  RoutineLog _rebuildLogFromEdits(List<_RoutineLogEditValue> edits) {
+    var cursor = DateTime.tryParse(_log.startTime) ?? DateTime.now();
+    var totalDurationSeconds = 0;
+    final rebuiltEntries = <RoutineLogEntry>[];
+
+    for (var index = 0; index < _log.entries.length; index++) {
+      final originalEntry = _log.entries[index];
+      final edit = edits[index];
+      final durationSeconds = edit.durationMinutes * 60;
+      final startTime = cursor;
+      cursor = cursor.add(Duration(minutes: edit.durationMinutes));
+      totalDurationSeconds += durationSeconds;
+
+      rebuiltEntries.add(
+        originalEntry.copyWith(
+          startTime: startTime.toIso8601String(),
+          endTime: cursor.toIso8601String(),
+          durationSeconds: durationSeconds,
+          skipped: edit.skipped,
+        ),
+      );
+    }
+
+    return _log.copyWith(
+      entries: rebuiltEntries,
+      totalDurationSeconds: totalDurationSeconds,
+      endTime: cursor.toIso8601String(),
+    );
+  }
+
+  Future<void> _editActuals() async {
+    final edits = await showModalBottomSheet<List<_RoutineLogEditValue>>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _RoutineLogEditSheet(log: _log, formatDuration: _fmt),
+    );
+    if (edits == null || !mounted) return;
+
+    setState(() => _isUpdatingActuals = true);
+    try {
+      final updatedLog = _rebuildLogFromEdits(edits);
+      final savedLog = await context.read<AppProvider>().updateCompletedRoutineActuals(
+        log: updatedLog,
+        sourceBlockId: widget.sourceBlockId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _log = savedLog;
+        _isUpdatingActuals = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Routine actuals updated')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isUpdatingActuals = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to update routine actuals')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final resolvedRoutine = _resolveRoutine(context);
+    final totalSeconds = _log.totalDurationSeconds ?? 0;
+    final title = resolvedRoutine?.name ?? _log.routineName;
     final icon = resolvedRoutine?.icon ?? 'R';
 
     return Scaffold(
@@ -456,13 +544,40 @@ class RoutineLogSummaryScreen extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton.icon(
+                  onPressed: _isUpdatingActuals ? null : _editActuals,
+                  icon: _isUpdatingActuals
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.edit_rounded, size: 18),
+                  label: Text(_isUpdatingActuals ? 'Updating...' : 'Edit'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 24),
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: log.entries.length,
+                itemCount: _log.entries.length,
                 itemBuilder: (context, index) {
-                  final entry = log.entries[index];
+                  final entry = _log.entries[index];
                   return Container(
                     margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.all(14),
@@ -524,16 +639,18 @@ class RoutineLogSummaryScreen extends StatelessWidget {
               padding: const EdgeInsets.all(20),
               child: Row(
                 children: [
-                  if (showRerun && resolvedRoutine != null) ...[
+                  if (widget.showRerun && resolvedRoutine != null) ...[
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () {
+                        onPressed: _isUpdatingActuals
+                            ? null
+                            : () {
                           Navigator.of(context).pushReplacement(
                             MaterialPageRoute(
                               builder: (_) => RoutineRunnerScreen(
-                                routine: resolvedRoutine!,
-                                dateKey: log.date,
-                                sourceBlockId: sourceBlockId,
+                                routine: resolvedRoutine,
+                                dateKey: _log.date,
+                                sourceBlockId: widget.sourceBlockId,
                               ),
                             ),
                           );
@@ -552,20 +669,284 @@ class RoutineLogSummaryScreen extends StatelessWidget {
                   ],
                   Expanded(
                     child: FilledButton(
-                      onPressed: onDone,
+                      onPressed: _isUpdatingActuals ? null : widget.onDone,
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: Text(showRerun ? 'Close' : 'Continue'),
+                      child: Text(widget.showRerun ? 'Close' : 'Continue'),
                     ),
                   ),
                 ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RoutineLogEditValue {
+  final int durationMinutes;
+  final bool skipped;
+
+  const _RoutineLogEditValue({
+    required this.durationMinutes,
+    required this.skipped,
+  });
+}
+
+class _RoutineLogEditSheet extends StatefulWidget {
+  final RoutineLog log;
+  final String Function(int seconds) formatDuration;
+
+  const _RoutineLogEditSheet({
+    required this.log,
+    required this.formatDuration,
+  });
+
+  @override
+  State<_RoutineLogEditSheet> createState() => _RoutineLogEditSheetState();
+}
+
+class _RoutineLogEditSheetState extends State<_RoutineLogEditSheet> {
+  late final List<TextEditingController> _durationControllers;
+  late final List<bool> _skippedStates;
+
+  @override
+  void initState() {
+    super.initState();
+    _durationControllers = widget.log.entries
+        .map(
+          (entry) => TextEditingController(
+            text: _initialMinutes(entry).toString(),
+          ),
+        )
+        .toList(growable: false);
+    _skippedStates = widget.log.entries
+        .map((entry) => entry.skipped)
+        .toList(growable: false);
+  }
+
+  int _initialMinutes(RoutineLogEntry entry) {
+    final seconds = entry.durationSeconds ?? 0;
+    if (seconds <= 0) return 0;
+    return (seconds / 60).ceil();
+  }
+
+  @override
+  void dispose() {
+    for (final controller in _durationControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _save() {
+    final values = List<_RoutineLogEditValue>.generate(widget.log.entries.length, (
+      index,
+    ) {
+      final isSkipped = _skippedStates[index];
+      final parsedMinutes = int.tryParse(_durationControllers[index].text.trim()) ?? 0;
+      final durationMinutes = isSkipped
+          ? 0
+          : parsedMinutes.clamp(0, 24 * 60).toInt();
+      return _RoutineLogEditValue(
+        durationMinutes: durationMinutes,
+        skipped: isSkipped,
+      );
+    });
+
+    Navigator.of(context).pop(values);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final maxHeight = MediaQuery.of(context).size.height * 0.82;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SizedBox(
+        height: maxHeight,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Edit Actual Durations',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Update what you actually did for each step.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: cs.onSurface.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: widget.log.entries.length,
+                  itemBuilder: (context, index) {
+                    final entry = widget.log.entries[index];
+                    final isSkipped = _skippedStates[index];
+                    final enabled = !isSkipped;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 30,
+                                height: 30,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: enabled
+                                      ? cs.primary.withValues(alpha: 0.12)
+                                      : cs.error.withValues(alpha: 0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  enabled
+                                      ? Icons.check_rounded
+                                      : Icons.skip_next_rounded,
+                                  size: 16,
+                                  color: enabled ? cs.primary : cs.error,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  entry.stepTitle,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: cs.onSurface,
+                                    decoration: isSkipped
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Original: ${widget.formatDuration(entry.durationSeconds ?? 0)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: cs.onSurface.withValues(alpha: 0.58),
+                            ),
+                          ),
+                          if (entry.skipped) ...[
+                            const SizedBox(height: 12),
+                            CheckboxListTile(
+                              value: !isSkipped,
+                              onChanged: (value) {
+                                setState(() {
+                                  _skippedStates[index] = !(value ?? false);
+                                  if (_skippedStates[index]) {
+                                    _durationControllers[index].text = '0';
+                                  }
+                                });
+                              },
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              controlAffinity: ListTileControlAffinity.leading,
+                              title: const Text('I actually completed this step'),
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _durationControllers[index],
+                            enabled: enabled,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            decoration: InputDecoration(
+                              labelText: 'Actual minutes',
+                              hintText: '0',
+                              helperText: enabled
+                                  ? 'Enter minutes for this step'
+                                  : 'Marked as skipped',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _save,
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text('Update'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
