@@ -444,7 +444,7 @@ class _ReminderEditorSheetState extends State<_ReminderEditorSheet> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              initialValue: _recurrenceType,
+              value: _recurrenceType,
               decoration: const InputDecoration(labelText: 'Repeat'),
               items: const [
                 DropdownMenuItem(

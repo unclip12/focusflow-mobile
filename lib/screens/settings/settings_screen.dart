@@ -1630,7 +1630,7 @@ class _TaskReminderRuleEditorPanelState
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   key: ValueKey<String>('task_reminder_anchor_$_anchor'),
-                  initialValue: _anchor,
+                  value: _anchor,
                   decoration: const InputDecoration(
                     labelText: 'When should this fire?',
                   ),
@@ -1658,7 +1658,7 @@ class _TaskReminderRuleEditorPanelState
                     key: ValueKey<String>(
                       'task_reminder_minutes_$minuteDropdownValue',
                     ),
-                    initialValue: minuteDropdownValue,
+                    value: minuteDropdownValue,
                     decoration: const InputDecoration(
                       labelText: 'Minutes',
                     ),
