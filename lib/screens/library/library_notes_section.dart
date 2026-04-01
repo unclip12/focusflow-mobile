@@ -94,6 +94,101 @@ class _LibraryNotesSectionState extends State<LibraryNotesSection> {
     await _loadNotes();
   }
 
+  Future<void> _deleteAttachment(
+    LibraryNote note,
+    int attachmentIndex,
+  ) async {
+    if (attachmentIndex < 0 || attachmentIndex >= note.attachments.length) {
+      return;
+    }
+
+    final attachment = note.attachments[attachmentIndex];
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete attachment?'),
+          content: Text(
+            'Remove "${attachment.displayName}" from this note?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: DashboardColors.danger,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+
+    final willBecomeEmpty = note.attachments.length == 1 &&
+        note.noteText.trim().isEmpty &&
+        note.tags.isEmpty;
+
+    var deleteEmptyNote = false;
+    if (willBecomeEmpty) {
+      final shouldDeleteNote = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Delete empty note?'),
+            content: const Text(
+              'Removing this attachment will leave the note empty. Delete the note too?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Keep note'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: DashboardColors.danger,
+                ),
+                child: const Text('Delete note'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (shouldDeleteNote == null) {
+        return;
+      }
+      if (!shouldDeleteNote) {
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      deleteEmptyNote = true;
+    }
+
+    await widget.app.removeLibraryNoteAttachment(
+      note: note,
+      attachmentIndex: attachmentIndex,
+      deleteEmptyNote: deleteEmptyNote,
+    );
+    if (!mounted) {
+      return;
+    }
+    await _loadNotes();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
@@ -172,6 +267,8 @@ class _LibraryNotesSectionState extends State<LibraryNotesSection> {
                       isDark: isDark,
                       onRenameAttachment: (attachmentIndex) =>
                           _renameAttachment(note, attachmentIndex),
+                      onDeleteAttachment: (attachmentIndex) =>
+                          _deleteAttachment(note, attachmentIndex),
                     );
                   },
                 ),
@@ -226,11 +323,13 @@ class _LibraryNoteCard extends StatelessWidget {
   final LibraryNote note;
   final bool isDark;
   final ValueChanged<int> onRenameAttachment;
+  final ValueChanged<int> onDeleteAttachment;
 
   const _LibraryNoteCard({
     required this.note,
     required this.isDark,
     required this.onRenameAttachment,
+    required this.onDeleteAttachment,
   });
 
   @override
@@ -309,6 +408,7 @@ class _LibraryNoteCard extends StatelessWidget {
                       note.attachments[index],
                     ),
                     onRename: () => onRenameAttachment(index),
+                    onDelete: () => onDeleteAttachment(index),
                   ),
                 ],
               ],
@@ -325,12 +425,14 @@ class _AttachmentRow extends StatelessWidget {
   final bool isDark;
   final VoidCallback onOpen;
   final VoidCallback onRename;
+  final VoidCallback onDelete;
 
   const _AttachmentRow({
     required this.attachment,
     required this.isDark,
     required this.onOpen,
     required this.onRename,
+    required this.onDelete,
   });
 
   @override
@@ -340,6 +442,7 @@ class _AttachmentRow extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onOpen,
+        onLongPress: onDelete,
         borderRadius: BorderRadius.circular(12),
         child: Ink(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

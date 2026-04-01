@@ -6170,6 +6170,38 @@ class AppProvider extends ChangeNotifier {
     unawaited(_triggerBackup());
   }
 
+  Future<void> removeLibraryNoteAttachment({
+    required LibraryNote note,
+    required int attachmentIndex,
+    required bool deleteEmptyNote,
+  }) async {
+    if (attachmentIndex < 0 || attachmentIndex >= note.attachments.length) {
+      return;
+    }
+
+    final updatedAttachments = List<LibraryNoteAttachment>.from(note.attachments)
+      ..removeAt(attachmentIndex);
+
+    final shouldDeleteNote = deleteEmptyNote &&
+        updatedAttachments.isEmpty &&
+        note.noteText.trim().isEmpty &&
+        note.tags.isEmpty;
+
+    await AttachmentStorageService.deleteManagedAttachmentPath(
+      note.attachments[attachmentIndex].source,
+    );
+
+    if (shouldDeleteNote) {
+      await DatabaseService.instance.deleteLibraryNote(note.id);
+    } else {
+      final updatedNote = note.copyWith(attachments: updatedAttachments);
+      await DatabaseService.instance.upsertLibraryNote(updatedNote.toJson());
+    }
+
+    notifyListeners();
+    unawaited(_triggerBackup());
+  }
+
   // ═════════════════════════════════════════════════════════════════
   // LIBRARY ITEM METADATA
   // ═════════════════════════════════════════════════════════════════

@@ -151,6 +151,28 @@ class AttachmentStorageService {
     return p.normalize(destination.path);
   }
 
+  static Future<bool> deleteManagedAttachmentPath(String path) async {
+    final trimmed = path.trim();
+    if (trimmed.isEmpty || isWebLink(trimmed)) {
+      return false;
+    }
+
+    final attachmentsDir = await getAttachmentsDirectory();
+    final normalizedPath = p.normalize(File(trimmed).absolute.path);
+    final normalizedRoot = p.normalize(attachmentsDir.absolute.path);
+    if (!_isWithinDirectory(normalizedPath, normalizedRoot)) {
+      return false;
+    }
+
+    final file = File(normalizedPath);
+    if (!await file.exists()) {
+      return false;
+    }
+
+    await file.delete();
+    return true;
+  }
+
   static String buildArchiveFileName(int index, String sourcePath) {
     final extension = p.extension(sourcePath);
     final suffix = index.toString().padLeft(4, '0');
