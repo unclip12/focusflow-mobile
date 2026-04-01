@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +7,7 @@ import 'package:focusflow_mobile/models/routine.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/services/notification_service.dart';
+import 'package:focusflow_mobile/services/offline_suggestion_catalog.dart';
 import 'package:focusflow_mobile/services/timer_reminder_service.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:provider/provider.dart';
@@ -251,6 +253,19 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen>
     return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
+  Future<void> _setChecklistItemChecked(
+    AppProvider app, {
+    required String stepId,
+    required String itemId,
+    required bool checked,
+  }) async {
+    await app.setActiveRoutineChecklistItemChecked(
+      stepId: stepId,
+      itemId: itemId,
+      checked: checked,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final completedLog = _completedLog;
@@ -348,8 +363,15 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen>
     final totalElapsed = activeRun.totalElapsedSecondsAt();
     final stepElapsed = activeRun.currentStepElapsedSecondsAt();
     final step = steps[currentStepIndex];
+    final remainingStepSeconds = step.estimatedMinutes == null
+        ? 0
+        : math.max(0, (step.estimatedMinutes! * 60) - stepElapsed);
     final progress = (currentStepIndex + 1) / steps.length;
     final motivation = _motivations[currentStepIndex % _motivations.length];
+    final stepEmoji = step.emoji.trim().isEmpty ? routine.icon : step.emoji;
+    final animationPreset = OfflineSuggestionCatalog.animationPresetFor(
+      step.title,
+    );
 
     return Scaffold(
       backgroundColor: cs.surface,
@@ -418,28 +440,17 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen>
               ),
             ),
             Expanded(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(28),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(28),
+                child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: 88,
-                        height: 88,
-                        decoration: BoxDecoration(
-                          color: Color(widget.routine.color).withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          '${currentStepIndex + 1}',
-                          style: TextStyle(
-                            fontSize: 34,
-                            fontWeight: FontWeight.w800,
-                            color: Color(routine.color),
-                          ),
-                        ),
+                      _AnimatedStepEmojiCard(
+                        emoji: stepEmoji,
+                        color: Color(routine.color),
+                        animationPreset: animationPreset,
+                        stepLabel: '${currentStepIndex + 1}',
                       ),
                       const SizedBox(height: 24),
                       Text(
@@ -470,6 +481,59 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen>
                           color: cs.primary.withValues(alpha: 0.8),
                         ),
                       ),
+                      if (step.checklistItems.isNotEmpty) ...[
+                        const SizedBox(height: 20),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: cs.surfaceContainerHighest.withValues(alpha: 0.32),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Checklist',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: cs.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              for (final item in step.checklistItems)
+                                CheckboxListTile(
+                                  value: activeRun.isChecklistItemChecked(
+                                    step.id,
+                                    item.id,
+                                  ),
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  visualDensity: VisualDensity.compact,
+                                  controlAffinity:
+                                      ListTileControlAffinity.leading,
+                                  title: Text(
+                                    item.title,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: cs.onSurface,
+                                    ),
+                                  ),
+                                  onChanged: (value) {
+                                    _setChecklistItemChecked(
+                                      app,
+                                      stepId: step.id,
+                                      itemId: item.id,
+                                      checked: value ?? false,
+                                    );
+                                  },
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -489,6 +553,13 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen>
                         child: _TimerCard(
                           label: 'This step',
                           value: _fmtTimer(stepElapsed),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _TimerCard(
+                          label: 'Remaining',
+                          value: _fmtTimer(remainingStepSeconds),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -554,6 +625,137 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen>
         ),
       ),
     );
+  }
+}
+
+class _AnimatedStepEmojiCard extends StatefulWidget {
+  final String emoji;
+  final Color color;
+  final String animationPreset;
+  final String stepLabel;
+
+  const _AnimatedStepEmojiCard({
+    required this.emoji,
+    required this.color,
+    required this.animationPreset,
+    required this.stepLabel,
+  });
+
+  @override
+  State<_AnimatedStepEmojiCard> createState() => _AnimatedStepEmojiCardState();
+}
+
+class _AnimatedStepEmojiCardState extends State<_AnimatedStepEmojiCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final curved = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    );
+
+    Widget child = Container(
+      width: 108,
+      height: 108,
+      decoration: BoxDecoration(
+        color: widget.color.withValues(alpha: 0.15),
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: widget.color.withValues(alpha: 0.12),
+            blurRadius: 26,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      alignment: Alignment.center,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Text(
+            widget.emoji,
+            style: const TextStyle(fontSize: 44),
+          ),
+          Positioned(
+            bottom: 14,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.82),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                'Step ${widget.stepLabel}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: widget.color,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    switch (widget.animationPreset) {
+      case 'bounce':
+        child = ScaleTransition(
+          scale: Tween<double>(begin: 0.96, end: 1.05).animate(curved),
+          child: child,
+        );
+        break;
+      case 'slide':
+        child = SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(-0.03, 0),
+            end: const Offset(0.03, 0),
+          ).animate(curved),
+          child: child,
+        );
+        break;
+      case 'breathe':
+        child = FadeTransition(
+          opacity: Tween<double>(begin: 0.78, end: 1).animate(curved),
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.98, end: 1.03).animate(curved),
+            child: child,
+          ),
+        );
+        break;
+      case 'float':
+      case 'sunrise':
+      case 'sway':
+      case 'bob':
+      default:
+        child = SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.02),
+            end: const Offset(0, -0.02),
+          ).animate(curved),
+          child: child,
+        );
+        break;
+    }
+
+    return child;
   }
 }
 

@@ -1,0 +1,365 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "keywords": ["morning", "morning routine", "wake up", "start day", "sunrise routine"],
+      "emoji": "🌅",
+      "defaultMinutes": 25,
+      "checklistSuggestions": ["Open curtains", "Drink water", "Brush teeth"],
+      "animationPreset": "sunrise",
+      "blockType": "OTHER",
+      "colorHex": "#F59E0B"
+    },
+    {
+      "keywords": ["evening", "evening routine", "wind down", "night routine", "shutdown routine"],
+      "emoji": "🌙",
+      "defaultMinutes": 25,
+      "checklistSuggestions": ["Dim lights", "Put phone away", "Set tomorrow plan"],
+      "animationPreset": "float",
+      "blockType": "OTHER",
+      "colorHex": "#6366F1"
+    },
+    {
+      "keywords": ["sleep", "bedtime", "go to bed", "sleep prep", "lights out"],
+      "emoji": "🛌",
+      "defaultMinutes": 15,
+      "checklistSuggestions": ["Brush teeth", "Set alarm", "Get into bed"],
+      "animationPreset": "breathe",
+      "blockType": "OTHER",
+      "colorHex": "#4338CA"
+    },
+    {
+      "keywords": ["bath", "taking bath", "take bath", "shower", "take shower", "bathroom routine"],
+      "emoji": "🛁",
+      "defaultMinutes": 15,
+      "checklistSuggestions": ["Take clothes", "Heat water", "Get towel"],
+      "animationPreset": "sway",
+      "blockType": "OTHER",
+      "colorHex": "#06B6D4"
+    },
+    {
+      "keywords": ["brush teeth", "toothbrush", "oral care", "brush"],
+      "emoji": "🪥",
+      "defaultMinutes": 3,
+      "checklistSuggestions": ["Take toothbrush", "Apply toothpaste", "Rinse mouth"],
+      "animationPreset": "pulse",
+      "blockType": "OTHER",
+      "colorHex": "#0EA5E9"
+    },
+    {
+      "keywords": ["skincare", "skin care", "face wash", "wash face", "skin routine"],
+      "emoji": "🧴",
+      "defaultMinutes": 10,
+      "checklistSuggestions": ["Cleanse face", "Apply serum", "Moisturize"],
+      "animationPreset": "pulse",
+      "blockType": "OTHER",
+      "colorHex": "#EC4899"
+    },
+    {
+      "keywords": ["get ready", "dress up", "getting ready", "ready up", "dress"],
+      "emoji": "👔",
+      "defaultMinutes": 15,
+      "checklistSuggestions": ["Pick outfit", "Wear clothes", "Check essentials"],
+      "animationPreset": "pulse",
+      "blockType": "OTHER",
+      "colorHex": "#7C3AED"
+    },
+    {
+      "keywords": ["breakfast", "eat breakfast", "morning meal"],
+      "emoji": "🍳",
+      "defaultMinutes": 20,
+      "checklistSuggestions": ["Prepare food", "Eat meal", "Clean dishes"],
+      "animationPreset": "bob",
+      "blockType": "BREAK",
+      "colorHex": "#F97316"
+    },
+    {
+      "keywords": ["lunch", "eat lunch", "afternoon meal"],
+      "emoji": "🍽️",
+      "defaultMinutes": 30,
+      "checklistSuggestions": ["Prepare lunch", "Eat meal", "Clean up"],
+      "animationPreset": "bob",
+      "blockType": "BREAK",
+      "colorHex": "#F97316"
+    },
+    {
+      "keywords": ["dinner", "eat dinner", "night meal", "supper"],
+      "emoji": "🍛",
+      "defaultMinutes": 30,
+      "checklistSuggestions": ["Prepare dinner", "Eat meal", "Wash dishes"],
+      "animationPreset": "bob",
+      "blockType": "BREAK",
+      "colorHex": "#EA580C"
+    },
+    {
+      "keywords": ["tea", "chai", "coffee", "drink coffee", "drink tea"],
+      "emoji": "☕",
+      "defaultMinutes": 10,
+      "checklistSuggestions": ["Boil water", "Prepare drink", "Sip slowly"],
+      "animationPreset": "float",
+      "blockType": "BREAK",
+      "colorHex": "#C2410C"
+    },
+    {
+      "keywords": ["drink water", "hydration", "water break", "hydrate"],
+      "emoji": "💧",
+      "defaultMinutes": 5,
+      "checklistSuggestions": ["Fill bottle", "Drink water", "Refill if needed"],
+      "animationPreset": "pulse",
+      "blockType": "BREAK",
+      "colorHex": "#0EA5E9"
+    },
+    {
+      "keywords": ["workout", "exercise", "gym", "training", "fitness"],
+      "emoji": "🏋️",
+      "defaultMinutes": 45,
+      "checklistSuggestions": ["Wear workout clothes", "Warm up", "Start workout"],
+      "animationPreset": "bounce",
+      "blockType": "OTHER",
+      "colorHex": "#EF4444"
+    },
+    {
+      "keywords": ["walk", "walking", "morning walk", "evening walk"],
+      "emoji": "🚶",
+      "defaultMinutes": 20,
+      "checklistSuggestions": ["Wear shoes", "Take keys", "Start walking"],
+      "animationPreset": "slide",
+      "blockType": "OTHER",
+      "colorHex": "#10B981"
+    },
+    {
+      "keywords": ["run", "running", "jog", "jogging"],
+      "emoji": "🏃",
+      "defaultMinutes": 30,
+      "checklistSuggestions": ["Wear shoes", "Warm up", "Start run"],
+      "animationPreset": "bounce",
+      "blockType": "OTHER",
+      "colorHex": "#DC2626"
+    },
+    {
+      "keywords": ["yoga", "stretch", "stretching", "mobility"],
+      "emoji": "🧘",
+      "defaultMinutes": 20,
+      "checklistSuggestions": ["Spread mat", "Breathe deeply", "Begin flow"],
+      "animationPreset": "breathe",
+      "blockType": "OTHER",
+      "colorHex": "#8B5CF6"
+    },
+    {
+      "keywords": ["meditate", "meditation", "mindfulness", "breathing"],
+      "emoji": "🧘",
+      "defaultMinutes": 10,
+      "checklistSuggestions": ["Sit comfortably", "Close eyes", "Focus on breath"],
+      "animationPreset": "breathe",
+      "blockType": "OTHER",
+      "colorHex": "#7C3AED"
+    },
+    {
+      "keywords": ["prayer", "pray", "namaz", "salah", "fajr", "maghrib", "isha"],
+      "emoji": "🕌",
+      "defaultMinutes": 10,
+      "checklistSuggestions": ["Prepare place", "Keep prayer mat", "Begin prayer"],
+      "animationPreset": "float",
+      "blockType": "OTHER",
+      "colorHex": "#A855F7"
+    },
+    {
+      "keywords": ["study", "study session", "study block", "self study", "learning"],
+      "emoji": "📚",
+      "defaultMinutes": 60,
+      "checklistSuggestions": ["Open material", "Set timer", "Start studying"],
+      "animationPreset": "pulse",
+      "blockType": "STUDY_SESSION",
+      "colorHex": "#4A90D9"
+    },
+    {
+      "keywords": ["revision", "revise", "review notes", "fa revision", "first aid"],
+      "emoji": "📝",
+      "defaultMinutes": 45,
+      "checklistSuggestions": ["Open notes", "Highlight key points", "Review mistakes"],
+      "animationPreset": "pulse",
+      "blockType": "REVISION_FA",
+      "colorHex": "#4A90D9"
+    },
+    {
+      "keywords": ["anki", "flashcards", "review cards", "deck review"],
+      "emoji": "🧠",
+      "defaultMinutes": 30,
+      "checklistSuggestions": ["Open deck", "Review due cards", "Mark difficult cards"],
+      "animationPreset": "pulse",
+      "blockType": "ANKI",
+      "colorHex": "#4A90D9"
+    },
+    {
+      "keywords": ["qbank", "uworld", "practice questions", "mcq", "question bank"],
+      "emoji": "❓",
+      "defaultMinutes": 50,
+      "checklistSuggestions": ["Open qbank", "Start block", "Review explanations"],
+      "animationPreset": "pulse",
+      "blockType": "QBANK",
+      "colorHex": "#4A90D9"
+    },
+    {
+      "keywords": ["video lecture", "watch lecture", "watch video", "pathoma", "sketchy"],
+      "emoji": "🎥",
+      "defaultMinutes": 45,
+      "checklistSuggestions": ["Open video", "Keep notebook ready", "Start playback"],
+      "animationPreset": "float",
+      "blockType": "VIDEO",
+      "colorHex": "#4A90D9"
+    },
+    {
+      "keywords": ["meeting", "team meeting", "client meeting", "standup", "sync"],
+      "emoji": "💼",
+      "defaultMinutes": 30,
+      "checklistSuggestions": ["Open agenda", "Join call", "Capture notes"],
+      "animationPreset": "pulse",
+      "blockType": "OTHER",
+      "colorHex": "#5856D6"
+    },
+    {
+      "keywords": ["coding", "programming", "feature work", "debugging", "development"],
+      "emoji": "💻",
+      "defaultMinutes": 60,
+      "checklistSuggestions": ["Open project", "Review task", "Start coding"],
+      "animationPreset": "pulse",
+      "blockType": "OTHER",
+      "colorHex": "#2563EB"
+    },
+    {
+      "keywords": ["planning", "plan day", "schedule", "time block", "organize day"],
+      "emoji": "🗓️",
+      "defaultMinutes": 15,
+      "checklistSuggestions": ["Review tasks", "Set priorities", "Arrange schedule"],
+      "animationPreset": "float",
+      "blockType": "OTHER",
+      "colorHex": "#0F766E"
+    },
+    {
+      "keywords": ["journal", "journaling", "write journal", "gratitude"],
+      "emoji": "📓",
+      "defaultMinutes": 10,
+      "checklistSuggestions": ["Open journal", "Write thoughts", "Close with next step"],
+      "animationPreset": "float",
+      "blockType": "OTHER",
+      "colorHex": "#8B5CF6"
+    },
+    {
+      "keywords": ["laundry", "wash clothes", "fold clothes", "iron clothes"],
+      "emoji": "🧺",
+      "defaultMinutes": 30,
+      "checklistSuggestions": ["Collect clothes", "Start wash", "Fold dry clothes"],
+      "animationPreset": "slide",
+      "blockType": "OTHER",
+      "colorHex": "#14B8A6"
+    },
+    {
+      "keywords": ["clean room", "room clean", "tidy room", "organize room"],
+      "emoji": "🧹",
+      "defaultMinutes": 20,
+      "checklistSuggestions": ["Pick up items", "Wipe surfaces", "Reset room"],
+      "animationPreset": "slide",
+      "blockType": "OTHER",
+      "colorHex": "#14B8A6"
+    },
+    {
+      "keywords": ["wash dishes", "dishes", "dishwashing", "kitchen clean"],
+      "emoji": "🍽️",
+      "defaultMinutes": 15,
+      "checklistSuggestions": ["Collect dishes", "Wash plates", "Dry and keep"],
+      "animationPreset": "slide",
+      "blockType": "OTHER",
+      "colorHex": "#14B8A6"
+    },
+    {
+      "keywords": ["shopping", "grocery", "groceries", "buy groceries", "market"],
+      "emoji": "🛒",
+      "defaultMinutes": 45,
+      "checklistSuggestions": ["Make list", "Take bags", "Buy items"],
+      "animationPreset": "slide",
+      "blockType": "OTHER",
+      "colorHex": "#3B82F6"
+    },
+    {
+      "keywords": ["commute", "travel", "drive", "bus", "metro", "train ride"],
+      "emoji": "🚌",
+      "defaultMinutes": 30,
+      "checklistSuggestions": ["Take essentials", "Check route", "Leave on time"],
+      "animationPreset": "slide",
+      "blockType": "OTHER",
+      "colorHex": "#2563EB"
+    },
+    {
+      "keywords": ["doctor", "doctor appointment", "clinic", "dentist"],
+      "emoji": "🩺",
+      "defaultMinutes": 30,
+      "checklistSuggestions": ["Carry documents", "Reach clinic", "Attend appointment"],
+      "animationPreset": "pulse",
+      "blockType": "OTHER",
+      "colorHex": "#10B981"
+    },
+    {
+      "keywords": ["medicine", "meds", "take medicine", "take meds", "supplements"],
+      "emoji": "💊",
+      "defaultMinutes": 5,
+      "checklistSuggestions": ["Take water", "Take medicine", "Mark dose done"],
+      "animationPreset": "pulse",
+      "blockType": "OTHER",
+      "colorHex": "#10B981"
+    },
+    {
+      "keywords": ["family time", "call family", "call mom", "call dad", "visit family"],
+      "emoji": "👨‍👩‍👧‍👦",
+      "defaultMinutes": 20,
+      "checklistSuggestions": ["Keep phone ready", "Call family", "Share updates"],
+      "animationPreset": "float",
+      "blockType": "OTHER",
+      "colorHex": "#EC4899"
+    },
+    {
+      "keywords": ["reading", "read book", "read chapter", "read novel"],
+      "emoji": "📖",
+      "defaultMinutes": 25,
+      "checklistSuggestions": ["Open book", "Bookmark last page", "Read without distractions"],
+      "animationPreset": "float",
+      "blockType": "OTHER",
+      "colorHex": "#6366F1"
+    },
+    {
+      "keywords": ["nap", "power nap", "rest"],
+      "emoji": "😴",
+      "defaultMinutes": 20,
+      "checklistSuggestions": ["Set alarm", "Lie down", "Rest fully"],
+      "animationPreset": "breathe",
+      "blockType": "BREAK",
+      "colorHex": "#6366F1"
+    },
+    {
+      "keywords": ["pack bag", "prepare bag", "pack essentials"],
+      "emoji": "🎒",
+      "defaultMinutes": 10,
+      "checklistSuggestions": ["Keep charger", "Add wallet", "Zip bag"],
+      "animationPreset": "pulse",
+      "blockType": "OTHER",
+      "colorHex": "#7C3AED"
+    },
+    {
+      "keywords": ["office", "work", "job", "office work", "deep work"],
+      "emoji": "💼",
+      "defaultMinutes": 60,
+      "checklistSuggestions": ["Review priorities", "Open tools", "Start focused work"],
+      "animationPreset": "pulse",
+      "blockType": "OTHER",
+      "colorHex": "#5856D6"
+    },
+    {
+      "keywords": ["cook", "cooking", "cook dinner", "cook lunch", "meal prep"],
+      "emoji": "🍳",
+      "defaultMinutes": 30,
+      "checklistSuggestions": ["Take ingredients", "Prepare food", "Serve meal"],
+      "animationPreset": "bob",
+      "blockType": "BREAK",
+      "colorHex": "#FB923C"
+    }
+  ]
+}

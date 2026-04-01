@@ -2834,6 +2834,27 @@ class AppProvider extends ChangeNotifier {
     return _activeRoutineRun;
   }
 
+  Future<void> setActiveRoutineChecklistItemChecked({
+    required String stepId,
+    required String itemId,
+    required bool checked,
+  }) async {
+    final run = getActiveRoutineRun();
+    if (run == null) return;
+
+    final updatedState = Map<String, bool>.from(run.checklistState);
+    final key = ActiveRoutineRun.checklistKey(stepId, itemId);
+    if (checked) {
+      updatedState[key] = true;
+    } else {
+      updatedState.remove(key);
+    }
+
+    _activeRoutineRun = run.copyWith(checklistState: updatedState);
+    await _persistActiveRoutineRun();
+    notifyListeners();
+  }
+
   Future<void> cancelActiveRoutineRun() async {
     final run = getActiveRoutineRun();
     if (run == null) return;

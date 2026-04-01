@@ -8,41 +8,87 @@ const Object _routineFieldUnset = Object();
 class RoutineStep {
   final String id;
   final String title;
+  final String emoji;
   final int? estimatedMinutes;
+  final List<RoutineChecklistItem> checklistItems;
   final int sortOrder;
 
   const RoutineStep({
     required this.id,
     required this.title,
+    this.emoji = '✨',
     this.estimatedMinutes,
+    this.checklistItems = const [],
     required this.sortOrder,
   });
 
   factory RoutineStep.fromJson(Map<String, dynamic> j) => RoutineStep(
         id: j['id'] ?? '',
         title: j['title'] ?? '',
+        emoji: j['emoji'] ?? '✨',
         estimatedMinutes: j['estimatedMinutes'],
+        checklistItems: (j['checklistItems'] as List?)
+                ?.map((item) => RoutineChecklistItem.fromJson(item))
+                .toList() ??
+            const [],
         sortOrder: j['sortOrder'] ?? 0,
       );
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
+        'emoji': emoji,
         if (estimatedMinutes != null) 'estimatedMinutes': estimatedMinutes,
+        if (checklistItems.isNotEmpty)
+          'checklistItems': checklistItems.map((item) => item.toJson()).toList(),
         'sortOrder': sortOrder,
       };
 
   RoutineStep copyWith({
     String? id,
     String? title,
+    String? emoji,
     int? estimatedMinutes,
+    List<RoutineChecklistItem>? checklistItems,
     int? sortOrder,
   }) =>
       RoutineStep(
         id: id ?? this.id,
         title: title ?? this.title,
+        emoji: emoji ?? this.emoji,
         estimatedMinutes: estimatedMinutes ?? this.estimatedMinutes,
+        checklistItems: checklistItems ?? this.checklistItems,
         sortOrder: sortOrder ?? this.sortOrder,
+      );
+}
+
+class RoutineChecklistItem {
+  final String id;
+  final String title;
+
+  const RoutineChecklistItem({
+    required this.id,
+    required this.title,
+  });
+
+  factory RoutineChecklistItem.fromJson(Map<String, dynamic> j) =>
+      RoutineChecklistItem(
+        id: j['id'] ?? '',
+        title: j['title'] ?? '',
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+      };
+
+  RoutineChecklistItem copyWith({
+    String? id,
+    String? title,
+  }) =>
+      RoutineChecklistItem(
+        id: id ?? this.id,
+        title: title ?? this.title,
       );
 }
 
@@ -219,6 +265,7 @@ class ActiveRoutineRun {
   final DateTime currentStepStartedAt;
   final int currentStepIndex;
   final List<RoutineLogEntry> entries;
+  final Map<String, bool> checklistState;
   final String status; // 'active' | 'cancelled' | 'completed'
 
   const ActiveRoutineRun({
@@ -229,6 +276,7 @@ class ActiveRoutineRun {
     required this.currentStepStartedAt,
     required this.currentStepIndex,
     this.entries = const [],
+    this.checklistState = const {},
     this.status = 'active',
   });
 
@@ -246,6 +294,14 @@ class ActiveRoutineRun {
               ?.map((e) => RoutineLogEntry.fromJson(e))
               .toList() ??
           const [],
+      checklistState: (j['checklistState'] as Map?)
+              ?.map(
+                (key, value) => MapEntry(
+                  key.toString(),
+                  value == true,
+                ),
+              ) ??
+          const {},
       status: j['status'] ?? 'active',
     );
   }
@@ -258,6 +314,7 @@ class ActiveRoutineRun {
         'currentStepStartedAt': currentStepStartedAt.toIso8601String(),
         'currentStepIndex': currentStepIndex,
         'entries': entries.map((entry) => entry.toJson()).toList(),
+        if (checklistState.isNotEmpty) 'checklistState': checklistState,
         'status': status,
       };
 
@@ -277,6 +334,18 @@ class ActiveRoutineRun {
     return elapsed < 0 ? 0 : elapsed;
   }
 
+  bool isChecklistItemChecked(String stepId, String itemId) {
+    return checklistState[_checklistKey(stepId, itemId)] ?? false;
+  }
+
+  static String checklistKey(String stepId, String itemId) {
+    return _checklistKey(stepId, itemId);
+  }
+
+  static String _checklistKey(String stepId, String itemId) {
+    return '$stepId::$itemId';
+  }
+
   ActiveRoutineRun copyWith({
     String? routineId,
     String? dateKey,
@@ -285,6 +354,7 @@ class ActiveRoutineRun {
     DateTime? currentStepStartedAt,
     int? currentStepIndex,
     List<RoutineLogEntry>? entries,
+    Map<String, bool>? checklistState,
     String? status,
   }) =>
       ActiveRoutineRun(
@@ -297,6 +367,7 @@ class ActiveRoutineRun {
         currentStepStartedAt: currentStepStartedAt ?? this.currentStepStartedAt,
         currentStepIndex: currentStepIndex ?? this.currentStepIndex,
         entries: entries ?? this.entries,
+        checklistState: checklistState ?? this.checklistState,
         status: status ?? this.status,
       );
 }

@@ -380,58 +380,13 @@ class _RoutineCard extends StatelessWidget {
     );
   }
 
-  Widget _buildSubtaskPreview(
-    BuildContext context,
-    List<RoutineSubtask> subtasks,
-  ) {
-    final cs = Theme.of(context).colorScheme;
-    final previewSubtasks = subtasks.take(3).toList();
-    final remainingCount = subtasks.length - previewSubtasks.length;
-
-    return Wrap(
-      spacing: 8,
-      runSpacing: 6,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        for (final subtask in previewSubtasks)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: cs.surface,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: cs.outlineVariant),
-            ),
-            child: Text(
-              '${subtask.emoji} ${subtask.name}',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: cs.onSurface.withValues(alpha: 0.8),
-              ),
-            ),
-          ),
-        if (remainingCount > 0)
-          Text(
-            '+$remainingCount more',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: cs.onSurface.withValues(alpha: 0.55),
-            ),
-          ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final routineColor = Color(routine.color);
     final reminderLabel = _formatReminderTime();
     final recurrenceBadge = _recurrenceBadge();
-    final durationMinutes = routine.subtasks.isNotEmpty
-        ? routine.totalSubtaskMinutes
-        : routine.totalEstimatedMinutes;
+    final durationMinutes = routine.totalEstimatedMinutes;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -581,10 +536,6 @@ class _RoutineCard extends StatelessWidget {
                   ),
                 ],
               ),
-              if (routine.subtasks.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                _buildSubtaskPreview(context, routine.subtasks),
-              ],
               const SizedBox(height: 12),
               Row(
                 children: [

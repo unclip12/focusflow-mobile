@@ -7,6 +7,7 @@ import 'providers/app_provider.dart';
 import 'providers/settings_provider.dart';
 import 'services/notification_service.dart';
 import 'services/background_timer_service.dart';
+import 'services/offline_suggestion_catalog.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +17,7 @@ void main() async {
   await NotificationService.instance.init();
   await NotificationService.instance.requestPermission();
   await BackgroundTimerService.initialize();
+  await OfflineSuggestionCatalog.ensureInitialized();
 
   // Portrait-only layout
   await SystemChrome.setPreferredOrientations([

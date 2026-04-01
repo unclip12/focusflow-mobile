@@ -23,6 +23,7 @@ import 'package:focusflow_mobile/models/video_lecture.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/screens/settings/settings_screen.dart';
+import 'package:focusflow_mobile/screens/today_plan/routine_editor_sheet.dart';
 import 'package:focusflow_mobile/screens/today_plan/routine_runner_screen.dart';
 import 'package:focusflow_mobile/screens/today_plan/study_flow_screen.dart';
 import 'package:focusflow_mobile/screens/today_plan/timeline_view.dart';
@@ -30,6 +31,7 @@ import 'package:focusflow_mobile/services/attachment_storage_service.dart';
 import 'package:focusflow_mobile/services/backup_service.dart';
 import 'package:focusflow_mobile/services/database_service.dart';
 import 'package:focusflow_mobile/services/notification_service.dart';
+import 'package:focusflow_mobile/services/offline_suggestion_catalog.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart';
 
@@ -134,6 +136,7 @@ void main() {
     );
 
     await NotificationService.instance.init();
+    await OfflineSuggestionCatalog.ensureInitialized();
   });
 
   tearDownAll(() async {
@@ -335,6 +338,22 @@ void main() {
           .copyWith(reminderTime: '09:15', recurrence: 'daily')
           .toJson(),
     );
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'active_routine_run',
+      jsonEncode(
+        ActiveRoutineRun(
+          routineId: 'morning_routine',
+          dateKey: '2026-04-01',
+          startedAt: DateTime.parse('2026-04-01T07:00:00.000'),
+          currentStepStartedAt: DateTime.parse('2026-04-01T07:05:00.000'),
+          currentStepIndex: 0,
+          checklistState: const <String, bool>{
+            'step_1::take_toothbrush': true,
+          },
+        ).toJson(),
+      ),
+    );
     await DatabaseService.instance.upsertRevisionItem(
       RevisionItem(
         id: 'rev-1',
@@ -371,6 +390,14 @@ void main() {
     expect(restoredVideoRows.single['watched'], 1);
     expect(restoredVideoRows.single['watched_minutes'], 312);
 
+    final restoredRoutineRows =
+        await DatabaseService.instance.getAllRoutines();
+    expect(restoredRoutineRows, hasLength(1));
+    final restoredRoutine = Routine.fromJson(restoredRoutineRows.single);
+    expect(restoredRoutine.steps.first.emoji, '🪥');
+    expect(restoredRoutine.steps.first.checklistItems.first.title,
+        'Take toothbrush');
+
     final restoredNoteRows =
         await DatabaseService.instance.getLibraryNotes('video-7');
     final restoredNote = LibraryNote.fromJson(restoredNoteRows.single);
@@ -396,6 +423,10 @@ void main() {
           .where((method) => method == 'zonedSchedule')
           .length,
       greaterThanOrEqualTo(2),
+    );
+    expect(
+      prefs.getString('active_routine_run'),
+      contains('take_toothbrush'),
     );
   });
 
@@ -1412,6 +1443,11 @@ void main() {
       skipped: false,
       now: startedAt.add(const Duration(seconds: 30)),
     );
+    await app.setActiveRoutineChecklistItemChecked(
+      stepId: 'step_1',
+      itemId: 'take_toothbrush',
+      checked: true,
+    );
 
     final activeRun =
         app.getActiveRoutineRunForRoutine(routine.id, '2026-03-31');
@@ -1428,6 +1464,54 @@ void main() {
     );
     expect(decoded.currentStepIndex, 1);
     expect(decoded.entries.length, 1);
+    expect(
+      decoded.checklistState,
+      containsPair('step_1::take_toothbrush', true),
+    );
+  });
+
+  testWidgets(
+      'routine editor auto-fills step emoji, duration, suggestions, and preserves manual overrides',
+      (tester) async {
+    final app = AppProvider();
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<AppProvider>.value(
+        value: app,
+        child: const MaterialApp(
+          home: Scaffold(
+            body: RoutineEditorSheet(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Add Step'));
+    await tester.pumpAndSettle();
+
+    final stepTitleFinder = _findTextFieldWithLabel('Step title');
+    final emojiFinder = _findTextFieldWithLabel('Emoji');
+    final minutesFinder = _findTextFieldWithLabel('Estimated minutes');
+
+    await tester.enterText(stepTitleFinder, 'Taking bath');
+    await tester.pumpAndSettle();
+
+    expect(_readTextFieldValue(tester, emojiFinder), '🛁');
+    expect(_readTextFieldValue(tester, minutesFinder), '15');
+    expect(find.text('Take clothes'), findsOneWidget);
+    expect(find.text('Heat water'), findsOneWidget);
+
+    await tester.enterText(emojiFinder, '🚿');
+    await tester.pumpAndSettle();
+    await tester.enterText(minutesFinder, '12');
+    await tester.pumpAndSettle();
+
+    await tester.enterText(stepTitleFinder, 'Taking bath slowly');
+    await tester.pumpAndSettle();
+
+    expect(_readTextFieldValue(tester, emojiFinder), '🚿');
+    expect(_readTextFieldValue(tester, minutesFinder), '12');
   });
 
   testWidgets('routine runner reopens without resetting elapsed time',
@@ -1442,6 +1526,11 @@ void main() {
       dateKey: '2026-03-31',
       now: startedAt,
     );
+    await app.setActiveRoutineChecklistItemChecked(
+      stepId: 'step_1',
+      itemId: 'take_toothbrush',
+      checked: true,
+    );
 
     await tester.pumpWidget(
       _RoutineRunnerHarness(
@@ -1454,6 +1543,11 @@ void main() {
 
     expect(find.text('Brush Teeth'), findsOneWidget);
     expect(find.text('01:10'), findsWidgets);
+    expect(find.text('00:50'), findsOneWidget);
+    expect(
+      tester.widget<CheckboxListTile>(find.byType(CheckboxListTile).first).value,
+      isTrue,
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
@@ -1469,6 +1563,11 @@ void main() {
 
     expect(find.text('Brush Teeth'), findsOneWidget);
     expect(find.text('01:10'), findsWidgets);
+    expect(find.text('00:50'), findsOneWidget);
+    expect(
+      tester.widget<CheckboxListTile>(find.byType(CheckboxListTile).first).value,
+      isTrue,
+    );
   });
 
   testWidgets('routine runner resumes the current step instead of restarting',
@@ -1518,6 +1617,11 @@ void main() {
       dateKey: '2026-03-31',
       now: startedAt,
     );
+    await app.setActiveRoutineChecklistItemChecked(
+      stepId: 'step_1',
+      itemId: 'take_toothbrush',
+      checked: true,
+    );
     await app.cancelActiveRoutineRun();
 
     expect(app.getActiveRoutineRun(), isNull);
@@ -1539,6 +1643,10 @@ void main() {
 
     expect(find.text('Brush Teeth'), findsOneWidget);
     expect(find.text('00:00'), findsWidgets);
+    expect(
+      tester.widget<CheckboxListTile>(find.byType(CheckboxListTile).first).value,
+      isFalse,
+    );
   });
 
   testWidgets(
@@ -1783,6 +1891,17 @@ Finder _findRichTextContaining(String text) {
   );
 }
 
+Finder _findTextFieldWithLabel(String label) {
+  return find.byWidgetPredicate(
+    (widget) =>
+        widget is TextField && widget.decoration?.labelText == label,
+  );
+}
+
+String _readTextFieldValue(WidgetTester tester, Finder finder) {
+  return tester.widget<TextField>(finder).controller?.text ?? '';
+}
+
 Routine _buildRoutineFixture() {
   return Routine(
     id: 'morning_routine',
@@ -1793,12 +1912,20 @@ Routine _buildRoutineFixture() {
       RoutineStep(
         id: 'step_1',
         title: 'Brush Teeth',
+        emoji: '🪥',
         estimatedMinutes: 2,
+        checklistItems: [
+          RoutineChecklistItem(
+            id: 'take_toothbrush',
+            title: 'Take toothbrush',
+          ),
+        ],
         sortOrder: 0,
       ),
       RoutineStep(
         id: 'step_2',
         title: 'Washroom',
+        emoji: '🚿',
         estimatedMinutes: 5,
         sortOrder: 1,
       ),
@@ -1955,8 +2082,13 @@ class _RoutineRunnerHarness extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<AppProvider>.value(
-      value: app,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AppProvider>.value(value: app),
+        ChangeNotifierProvider<SettingsProvider>.value(
+          value: _TestSettingsProvider(),
+        ),
+      ],
       child: MaterialApp(
         home: RoutineRunnerScreen(
           routine: routine,

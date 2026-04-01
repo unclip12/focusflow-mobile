@@ -277,7 +277,7 @@ class FreeGapPanel extends StatelessWidget {
                           style: const TextStyle(
                               fontWeight: FontWeight.w600)),
                       subtitle: Text(
-                          '~${r.subtasks.isNotEmpty ? r.totalSubtaskMinutes : r.totalEstimatedMinutes} min'),
+                          '~${r.totalEstimatedMinutes} min'),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () {
                         Navigator.pop(ctx);
@@ -294,9 +294,7 @@ class FreeGapPanel extends StatelessWidget {
 
   Future<void> _insertRoutineAsBlock(BuildContext context, Routine routine) async {
     final app = context.read<AppProvider>();
-    final durationMin = routine.subtasks.isNotEmpty
-        ? routine.totalSubtaskMinutes
-        : routine.totalEstimatedMinutes;
+    final durationMin = routine.totalEstimatedMinutes;
     final startMin = gapStart.hour * 60 + gapStart.minute;
     final endMin = startMin + durationMin;
     final endH = (endMin ~/ 60).clamp(0, 23);

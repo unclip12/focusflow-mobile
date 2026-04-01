@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package:focusflow_mobile/models/routine.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
+import 'package:focusflow_mobile/services/offline_suggestion_catalog.dart';
 
 class RoutineEditorSheet extends StatefulWidget {
   final Routine? existing;
@@ -19,12 +20,16 @@ class RoutineEditorSheet extends StatefulWidget {
 }
 
 class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
-  static const _defaultSubtaskEmoji = '\u{1F4CC}';
+  static const _defaultStepEmoji = '✨';
 
   final _nameCtrl = TextEditingController();
   final _uuid = const Uuid();
-  final Map<String, TextEditingController> _subtaskNameCtrls = {};
-  final Map<String, TextEditingController> _subtaskEmojiCtrls = {};
+  final Map<String, TextEditingController> _stepTitleCtrls = {};
+  final Map<String, TextEditingController> _stepEmojiCtrls = {};
+  final Map<String, TextEditingController> _stepMinutesCtrls = {};
+  final Map<String, TextEditingController> _stepChecklistInputCtrls = {};
+  final Set<String> _stepEmojiOverrides = <String>{};
+  final Set<String> _stepDurationOverrides = <String>{};
 
   String _icon = '\u{1F305}';
   int _color = 0xFF6366F1;
@@ -36,7 +41,7 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
   int? _reminderWeekday;
   String _recurrenceType = 'none';
   List<int> _recurrenceDays = [];
-  String? _expandedEmojiEditorId;
+  bool _routineIconOverridden = false;
 
   static const _icons = [
     '\u{1F305}',
@@ -75,111 +80,170 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
   void initState() {
     super.initState();
     final existing = widget.existing;
-    if (existing == null) return;
+    if (existing != null) {
+      _nameCtrl.text = existing.name;
+      _icon = existing.icon;
+      _color = existing.color;
+      _steps = List<RoutineStep>.from(existing.steps);
+      _subtasks = List<RoutineSubtask>.from(existing.subtasks);
+      _reminderTime = existing.reminderTime;
+      _recurrence = existing.recurrence ?? 'daily';
+      _recurrenceEndDate = existing.recurrenceEndDate;
+      _reminderWeekday = existing.reminderWeekday;
+      _recurrenceType = existing.recurrenceType;
+      _recurrenceDays = List<int>.from(existing.recurrenceDays);
+      _routineIconOverridden = true;
 
-    _nameCtrl.text = existing.name;
-    _icon = existing.icon;
-    _color = existing.color;
-    _steps = List<RoutineStep>.from(existing.steps);
-    _subtasks = List<RoutineSubtask>.from(existing.subtasks);
-    _reminderTime = existing.reminderTime;
-    _recurrence = existing.recurrence ?? 'daily';
-    _recurrenceEndDate = existing.recurrenceEndDate;
-    _reminderWeekday = existing.reminderWeekday;
-    _recurrenceType = existing.recurrenceType;
-    _recurrenceDays = List<int>.from(existing.recurrenceDays);
+      for (final step in _steps) {
+        _ensureStepControllers(step);
+      }
 
-    for (final subtask in _subtasks) {
-      _ensureSubtaskControllers(subtask);
-    }
-
-    if (_reminderTime != null &&
-        _recurrence == 'weekly' &&
-        (_reminderWeekday == null ||
-            _reminderWeekday! < 1 ||
-            _reminderWeekday! > 7)) {
-      _reminderWeekday = DateTime.now().weekday;
+      if (_reminderTime != null &&
+          _recurrence == 'weekly' &&
+          (_reminderWeekday == null ||
+              _reminderWeekday! < 1 ||
+              _reminderWeekday! > 7)) {
+        _reminderWeekday = DateTime.now().weekday;
+      }
     }
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
-    for (final controller in _subtaskNameCtrls.values) {
+    for (final controller in _stepTitleCtrls.values) {
       controller.dispose();
     }
-    for (final controller in _subtaskEmojiCtrls.values) {
+    for (final controller in _stepEmojiCtrls.values) {
+      controller.dispose();
+    }
+    for (final controller in _stepMinutesCtrls.values) {
+      controller.dispose();
+    }
+    for (final controller in _stepChecklistInputCtrls.values) {
       controller.dispose();
     }
     super.dispose();
   }
 
-  void _ensureSubtaskControllers(RoutineSubtask subtask) {
-    _subtaskNameCtrls.putIfAbsent(
-      subtask.id,
-      () => TextEditingController(text: subtask.name),
+  void _ensureStepControllers(RoutineStep step) {
+    _stepTitleCtrls.putIfAbsent(
+      step.id,
+      () => TextEditingController(text: step.title),
     );
-    _subtaskEmojiCtrls.putIfAbsent(
-      subtask.id,
-      () => TextEditingController(text: subtask.emoji),
+    _stepEmojiCtrls.putIfAbsent(
+      step.id,
+      () => TextEditingController(text: step.emoji),
+    );
+    _stepMinutesCtrls.putIfAbsent(
+      step.id,
+      () => TextEditingController(
+        text: step.estimatedMinutes?.toString() ?? '',
+      ),
+    );
+    _stepChecklistInputCtrls.putIfAbsent(
+      step.id,
+      () => TextEditingController(),
     );
   }
 
-  void _disposeSubtaskControllers(String id) {
-    _subtaskNameCtrls.remove(id)?.dispose();
-    _subtaskEmojiCtrls.remove(id)?.dispose();
+  void _disposeStepControllers(String id) {
+    _stepTitleCtrls.remove(id)?.dispose();
+    _stepEmojiCtrls.remove(id)?.dispose();
+    _stepMinutesCtrls.remove(id)?.dispose();
+    _stepChecklistInputCtrls.remove(id)?.dispose();
+    _stepEmojiOverrides.remove(id);
+    _stepDurationOverrides.remove(id);
   }
 
-  void _updateSubtask(
+  void _updateStep(
     String id, {
-    String? name,
+    String? title,
     String? emoji,
-    int? durationMinutes,
+    int? estimatedMinutes,
+    List<RoutineChecklistItem>? checklistItems,
   }) {
-    final index = _subtasks.indexWhere((subtask) => subtask.id == id);
+    final index = _steps.indexWhere((step) => step.id == id);
     if (index == -1) return;
 
     setState(() {
-      _subtasks[index] = _subtasks[index].copyWith(
-        name: name,
+      _steps[index] = _steps[index].copyWith(
+        title: title,
         emoji: emoji,
-        durationMinutes: durationMinutes,
+        estimatedMinutes: estimatedMinutes,
+        checklistItems: checklistItems,
       );
     });
   }
 
-  void _addSubtask() {
-    final subtask = RoutineSubtask(
-      id: _uuid.v4(),
-      name: '',
-      emoji: _defaultSubtaskEmoji,
-      durationMinutes: 0,
-    );
-    _ensureSubtaskControllers(subtask);
-
+  void _applyRoutineSuggestion(String title) {
+    if (_routineIconOverridden) return;
+    final suggestion = OfflineSuggestionCatalog.suggest(title);
     setState(() {
-      _subtasks.add(subtask);
-      _expandedEmojiEditorId = subtask.id;
+      _icon = suggestion.emoji;
     });
   }
 
-  void _removeSubtask(String id) {
-    setState(() {
-      _subtasks.removeWhere((subtask) => subtask.id == id);
-      if (_expandedEmojiEditorId == id) {
-        _expandedEmojiEditorId = null;
-      }
-    });
-    _disposeSubtaskControllers(id);
-  }
-
-  void _changeSubtaskDuration(String id, int deltaMinutes) {
-    final index = _subtasks.indexWhere((subtask) => subtask.id == id);
+  void _applyStepSuggestion(String stepId, String title) {
+    final suggestion = OfflineSuggestionCatalog.suggest(title);
+    final emojiCtrl = _stepEmojiCtrls[stepId];
+    final minutesCtrl = _stepMinutesCtrls[stepId];
+    final index = _steps.indexWhere((step) => step.id == stepId);
     if (index == -1) return;
 
-    final updated =
-        (_subtasks[index].durationMinutes + deltaMinutes).clamp(0, 24 * 60);
-    _updateSubtask(id, durationMinutes: updated);
+    final step = _steps[index];
+    final nextEmoji = _stepEmojiOverrides.contains(stepId)
+        ? step.emoji
+        : suggestion.emoji;
+    final nextMinutes = _stepDurationOverrides.contains(stepId)
+        ? step.estimatedMinutes
+        : suggestion.defaultMinutes;
+
+    if (!_stepEmojiOverrides.contains(stepId) && emojiCtrl != null) {
+      emojiCtrl.text = nextEmoji;
+    }
+    if (!_stepDurationOverrides.contains(stepId) && minutesCtrl != null) {
+      minutesCtrl.text = nextMinutes?.toString() ?? '';
+    }
+
+    _updateStep(
+      stepId,
+      title: title,
+      emoji: nextEmoji,
+      estimatedMinutes: nextMinutes,
+    );
+  }
+
+  void _addChecklistItem(String stepId, String title) {
+    final trimmedTitle = title.trim();
+    if (trimmedTitle.isEmpty) return;
+
+    final index = _steps.indexWhere((step) => step.id == stepId);
+    if (index == -1) return;
+    final existingTitles = _steps[index].checklistItems
+        .map((item) => item.title.toLowerCase())
+        .toSet();
+    if (existingTitles.contains(trimmedTitle.toLowerCase())) {
+      _stepChecklistInputCtrls[stepId]?.clear();
+      return;
+    }
+
+    final updatedItems = [
+      ..._steps[index].checklistItems,
+      RoutineChecklistItem(id: _uuid.v4(), title: trimmedTitle),
+    ];
+    _stepChecklistInputCtrls[stepId]?.clear();
+    _updateStep(stepId, checklistItems: updatedItems);
+  }
+
+  void _removeChecklistItem(String stepId, String itemId) {
+    final index = _steps.indexWhere((step) => step.id == stepId);
+    if (index == -1) return;
+    final updatedItems = _steps[index]
+        .checklistItems
+        .where((item) => item.id != itemId)
+        .toList();
+    _updateStep(stepId, checklistItems: updatedItems);
   }
 
   void _toggleRecurrenceDay(int weekday) {
@@ -191,9 +255,6 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
       }
     });
   }
-
-  int get _totalSubtaskMinutes =>
-      _subtasks.fold(0, (sum, subtask) => sum + subtask.durationMinutes);
 
   TimeOfDay? _parseReminderTime(String? hhmm) {
     if (hhmm == null || hhmm.isEmpty) return null;
@@ -238,14 +299,6 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
     final date = _parseStoredDate(ymd);
     if (date == null) return ymd;
     return MaterialLocalizations.of(context).formatMediumDate(date);
-  }
-
-  String _formatMinutesLabel(int totalMinutes) {
-    final hours = totalMinutes ~/ 60;
-    final minutes = totalMinutes % 60;
-    if (hours > 0 && minutes > 0) return '${hours}h ${minutes}min';
-    if (hours > 0) return '${hours}h';
-    return '${minutes}min';
   }
 
   void _clearReminder() {
@@ -312,79 +365,18 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
   }
 
   void _addStep() {
-    final ctrl = TextEditingController();
-    final durCtrl = TextEditingController();
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add Step'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ColoredBox(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              child: TextField(
-                controller: ctrl,
-                autofocus: true,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-                cursorColor: const Color(0xFFE8837A),
-                decoration: InputDecoration(
-                  hintText: 'Step title',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            ColoredBox(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              child: TextField(
-                controller: durCtrl,
-                keyboardType: TextInputType.number,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-                cursorColor: const Color(0xFFE8837A),
-                decoration: InputDecoration(
-                  hintText: 'Estimated minutes (optional)',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  isDense: true,
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (ctrl.text.trim().isNotEmpty) {
-                setState(() {
-                  _steps.add(
-                    RoutineStep(
-                      id: _uuid.v4(),
-                      title: ctrl.text.trim(),
-                      estimatedMinutes: int.tryParse(durCtrl.text),
-                      sortOrder: _steps.length,
-                    ),
-                  );
-                });
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
+    final step = RoutineStep(
+      id: _uuid.v4(),
+      title: '',
+      emoji: _defaultStepEmoji,
+      estimatedMinutes: null,
+      checklistItems: const [],
+      sortOrder: _steps.length,
     );
+    _ensureStepControllers(step);
+    setState(() {
+      _steps.add(step);
+    });
   }
 
   Future<void> _save() async {
@@ -393,17 +385,6 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
     final app = context.read<AppProvider>();
     final now = DateTime.now().toIso8601String();
     final reminderTime = _reminderTime;
-    final sanitizedSubtasks = _subtasks
-        .map((subtask) {
-          final emojiText = _subtaskEmojiCtrls[subtask.id]?.text.trim() ?? '';
-          return subtask.copyWith(
-            name: _subtaskNameCtrls[subtask.id]?.text.trim() ?? subtask.name,
-            emoji: emojiText.isNotEmpty ? emojiText : _defaultSubtaskEmoji,
-            durationMinutes: subtask.durationMinutes.clamp(0, 24 * 60),
-          );
-        })
-        .where((subtask) => subtask.name.trim().isNotEmpty)
-        .toList();
     final recurrenceDays =
         _recurrenceType == 'weekly' ? ([..._recurrenceDays]..sort()) : <int>[];
 
@@ -443,7 +424,19 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
       steps: _steps
           .asMap()
           .entries
-          .map((entry) => entry.value.copyWith(sortOrder: entry.key))
+          .map((entry) {
+            final step = entry.value;
+            final emojiText = _stepEmojiCtrls[step.id]?.text.trim() ?? '';
+            final minutesText = _stepMinutesCtrls[step.id]?.text.trim() ?? '';
+            final titleText = _stepTitleCtrls[step.id]?.text.trim() ?? '';
+            return step.copyWith(
+              title: titleText,
+              emoji: emojiText.isNotEmpty ? emojiText : _defaultStepEmoji,
+              estimatedMinutes: int.tryParse(minutesText),
+              sortOrder: entry.key,
+            );
+          })
+          .where((step) => step.title.trim().isNotEmpty)
           .toList(),
       reminderTime: reminderTime,
       recurrence: recurrence,
@@ -451,7 +444,7 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
       reminderWeekday: reminderWeekday,
       recurrenceType: _recurrenceType,
       recurrenceDays: recurrenceDays,
-      subtasks: sanitizedSubtasks,
+      subtasks: _subtasks,
       createdAt: widget.existing?.createdAt ?? now,
       updatedAt: now,
     );
@@ -692,284 +685,264 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
             },
             itemBuilder: (context, index) {
               final step = _steps[index];
-              return ListTile(
-                key: Key(step.id),
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(
-                  radius: 14,
-                  backgroundColor: Color(_color).withValues(alpha: 0.15),
-                  child: Text(
-                    '${index + 1}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Color(_color),
+              _ensureStepControllers(step);
+              final titleCtrl = _stepTitleCtrls[step.id]!;
+              final emojiCtrl = _stepEmojiCtrls[step.id]!;
+              final minutesCtrl = _stepMinutesCtrls[step.id]!;
+              final checklistInputCtrl = _stepChecklistInputCtrls[step.id]!;
+              final suggestedChecklistItems = OfflineSuggestionCatalog
+                  .checklistSuggestionsFor(step.title)
+                  .where(
+                    (suggestion) => !step.checklistItems.any(
+                      (item) =>
+                          item.title.toLowerCase() == suggestion.toLowerCase(),
                     ),
-                  ),
-                ),
-                title: Text(
-                  step.title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                subtitle: step.estimatedMinutes != null
-                    ? Text(
-                        '~${step.estimatedMinutes} min',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: cs.onSurface.withValues(alpha: 0.4),
-                        ),
-                      )
-                    : null,
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        Icons.delete_outline_rounded,
-                        size: 18,
-                        color: cs.error.withValues(alpha: 0.6),
-                      ),
-                      onPressed: () => setState(() => _steps.removeAt(index)),
-                    ),
-                    ReorderableDragStartListener(
-                      index: index,
-                      child: Icon(
-                        Icons.drag_handle_rounded,
-                        size: 18,
-                        color: cs.onSurface.withValues(alpha: 0.2),
-                      ),
-                    ),
-                  ],
-                ),
-                dense: true,
-              );
-            },
-          ),
-      ],
-    );
-  }
-
-  Widget _buildDurationStepper(ColorScheme cs, RoutineSubtask subtask) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            onPressed: subtask.durationMinutes <= 0
-                ? null
-                : () => _changeSubtaskDuration(subtask.id, -5),
-            icon: const Icon(Icons.remove_rounded, size: 16),
-            visualDensity: VisualDensity.compact,
-            constraints: const BoxConstraints.tightFor(width: 28, height: 28),
-            padding: EdgeInsets.zero,
-          ),
-          SizedBox(
-            width: 34,
-            child: Text(
-              '${subtask.durationMinutes}',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface,
-              ),
-            ),
-          ),
-          IconButton(
-            onPressed: () => _changeSubtaskDuration(subtask.id, 5),
-            icon: const Icon(Icons.add_rounded, size: 16),
-            visualDensity: VisualDensity.compact,
-            constraints: const BoxConstraints.tightFor(width: 28, height: 28),
-            padding: EdgeInsets.zero,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSubtasksSection(ColorScheme cs) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Subtasks',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: cs.onSurface,
-          ),
-        ),
-        const SizedBox(height: 10),
-        if (_subtasks.isEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest.withValues(alpha: 0.25),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Text(
-              'No subtasks yet.',
-              style: TextStyle(
-                fontSize: 13,
-                color: cs.onSurface.withValues(alpha: 0.5),
-              ),
-            ),
-          )
-        else
-          ReorderableListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            buildDefaultDragHandles: false,
-            itemCount: _subtasks.length,
-            onReorder: (oldIndex, newIndex) {
-              setState(() {
-                if (newIndex > oldIndex) newIndex--;
-                final subtask = _subtasks.removeAt(oldIndex);
-                _subtasks.insert(newIndex, subtask);
-              });
-            },
-            itemBuilder: (context, index) {
-              final subtask = _subtasks[index];
-              _ensureSubtaskControllers(subtask);
-              final nameCtrl = _subtaskNameCtrls[subtask.id]!;
-              final emojiCtrl = _subtaskEmojiCtrls[subtask.id]!;
-              final emojiLabel = subtask.emoji.trim().isEmpty
-                  ? _defaultSubtaskEmoji
-                  : subtask.emoji;
-              final isEmojiEditorOpen = _expandedEmojiEditorId == subtask.id;
+                  )
+                  .toList();
 
               return Container(
-                key: Key(subtask.id),
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(12),
+                key: Key(step.id),
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerHighest.withValues(alpha: 0.28),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ReorderableDragStartListener(
-                          index: index,
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 10),
-                            child: Icon(
-                              Icons.drag_handle_rounded,
-                              color: cs.onSurface.withValues(alpha: 0.35),
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundColor: Color(_color).withValues(alpha: 0.15),
+                          child: Text(
+                            '${index + 1}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(_color),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        InkWell(
-                          onTap: () {
-                            setState(() {
-                              _expandedEmojiEditorId =
-                                  isEmojiEditorOpen ? null : subtask.id;
-                            });
-                          },
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            width: 42,
-                            height: 42,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: cs.surface,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: cs.outlineVariant),
-                            ),
-                            child: Text(
-                              emojiLabel,
-                              style: const TextStyle(fontSize: 20),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 10),
                         Expanded(
-                          child: ColoredBox(
-                            color: Theme.of(context).scaffoldBackgroundColor,
-                            child: TextField(
-                              controller: nameCtrl,
-                              onChanged: (value) =>
-                                  _updateSubtask(subtask.id, name: value),
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
-                              ),
-                              cursorColor: const Color(0xFFE8837A),
-                              decoration: InputDecoration(
-                                hintText: 'Subtask name',
-                                isDense: true,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
+                          child: TextField(
+                            controller: titleCtrl,
+                            onChanged: (value) => _applyStepSuggestion(
+                              step.id,
+                              value.trim(),
+                            ),
+                            style: TextStyle(color: cs.onSurface),
+                            cursorColor: const Color(0xFFE8837A),
+                            decoration: InputDecoration(
+                              labelText: 'Step title',
+                              hintText: 'e.g., Taking bath',
+                              isDense: true,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
-                        _buildDurationStepper(cs, subtask),
                         IconButton(
-                          onPressed: () => _removeSubtask(subtask.id),
                           icon: Icon(
                             Icons.delete_outline_rounded,
+                            size: 18,
                             color: cs.error.withValues(alpha: 0.7),
+                          ),
+                          onPressed: () {
+                            setState(() => _steps.removeAt(index));
+                            _disposeStepControllers(step.id);
+                          },
+                        ),
+                        ReorderableDragStartListener(
+                          index: index,
+                          child: Icon(
+                            Icons.drag_handle_rounded,
+                            size: 18,
+                            color: cs.onSurface.withValues(alpha: 0.2),
                           ),
                         ),
                       ],
                     ),
-                    if (isEmojiEditorOpen) ...[
-                      const SizedBox(height: 10),
-                      ColoredBox(
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                        child: TextField(
-                          controller: emojiCtrl,
-                          onChanged: (value) =>
-                              _updateSubtask(subtask.id, emoji: value),
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                          cursorColor: const Color(0xFFE8837A),
-                          decoration: InputDecoration(
-                            labelText: 'Emoji',
-                            hintText: 'Type emoji',
-                            isDense: true,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        SizedBox(
+                          width: 72,
+                          child: TextField(
+                            controller: emojiCtrl,
+                            onChanged: (value) {
+                              _stepEmojiOverrides.add(step.id);
+                              _updateStep(
+                                step.id,
+                                emoji: value.trim().isEmpty
+                                    ? _defaultStepEmoji
+                                    : value.trim(),
+                              );
+                            },
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 22,
+                              color: cs.onSurface,
+                            ),
+                            cursorColor: const Color(0xFFE8837A),
+                            decoration: InputDecoration(
+                              labelText: 'Emoji',
+                              isDense: true,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                           ),
                         ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: minutesCtrl,
+                            keyboardType: TextInputType.number,
+                            onChanged: (value) {
+                              _stepDurationOverrides.add(step.id);
+                              _updateStep(
+                                step.id,
+                                estimatedMinutes: int.tryParse(value),
+                              );
+                            },
+                            style: TextStyle(color: cs.onSurface),
+                            cursorColor: const Color(0xFFE8837A),
+                            decoration: InputDecoration(
+                              labelText: 'Estimated minutes',
+                              hintText: 'Auto-suggested',
+                              isDense: true,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Checklist',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (step.checklistItems.isEmpty)
+                      Text(
+                        'No checklist items yet. Add your own or tap suggestions below.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurface.withValues(alpha: 0.45),
+                        ),
+                      )
+                    else
+                      Column(
+                        children: [
+                          for (final item in step.checklistItems)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: cs.surface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: cs.outlineVariant),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.checklist_rounded,
+                                    size: 16,
+                                    color: cs.primary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      item.title,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: cs.onSurface,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () =>
+                                        _removeChecklistItem(step.id, item.id),
+                                    icon: Icon(
+                                      Icons.close_rounded,
+                                      size: 16,
+                                      color: cs.error.withValues(alpha: 0.7),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    if (suggestedChecklistItems.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: suggestedChecklistItems.map((suggestion) {
+                          return ActionChip(
+                            avatar: const Icon(Icons.add_rounded, size: 16),
+                            label: Text(suggestion),
+                            onPressed: () => _addChecklistItem(
+                              step.id,
+                              suggestion,
+                            ),
+                          );
+                        }).toList(),
                       ),
                     ],
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: checklistInputCtrl,
+                            style: TextStyle(color: cs.onSurface),
+                            cursorColor: const Color(0xFFE8837A),
+                            decoration: InputDecoration(
+                              labelText: 'Add checklist item',
+                              hintText: 'e.g., Take towel',
+                              isDense: true,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onSubmitted: (value) =>
+                                _addChecklistItem(step.id, value),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          onPressed: () => _addChecklistItem(
+                            step.id,
+                            checklistInputCtrl.text,
+                          ),
+                          child: const Text('Add'),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               );
             },
           ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton(
-            onPressed: _addSubtask,
-            child: const Text('Add Subtask'),
-          ),
-        ),
-        Text(
-          'Total: ${_formatMinutesLabel(_totalSubtaskMinutes)}',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: cs.onSurface.withValues(alpha: 0.75),
-          ),
-        ),
       ],
     );
   }
@@ -1088,6 +1061,7 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
                     color: scaffoldBackgroundColor,
                     child: TextField(
                       controller: _nameCtrl,
+                      onChanged: (value) => _applyRoutineSuggestion(value.trim()),
                       style: TextStyle(color: cs.onSurface),
                       cursorColor: const Color(0xFFE8837A),
                       decoration: InputDecoration(
@@ -1106,7 +1080,10 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
                       children: _icons.map((icon) {
                         final selected = _icon == icon;
                         return GestureDetector(
-                          onTap: () => setState(() => _icon = icon),
+                          onTap: () => setState(() {
+                            _routineIconOverridden = true;
+                            _icon = icon;
+                          }),
                           child: Container(
                             width: 40,
                             margin: const EdgeInsets.only(right: 6),
@@ -1181,8 +1158,6 @@ class _RoutineEditorSheetState extends State<RoutineEditorSheet> {
                   _buildReminderRepeatCard(cs),
                   if (_reminderTime != null) const SizedBox(height: 16),
                   _buildStepsSection(cs),
-                  const SizedBox(height: 16),
-                  _buildSubtasksSection(cs),
                   const SizedBox(height: 16),
                   _buildRoutineRecurrenceSection(cs),
                   const SizedBox(height: 16),
