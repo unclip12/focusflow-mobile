@@ -129,15 +129,15 @@ class _BackupScreenState extends State<BackupScreen> {
       await _nextFrame();
 
       final data = await BackupService.buildBackupData();
-      final jsonString = jsonEncode(data);
+      final bytes = await BackupService.buildBackupFileBytes(data);
       final fileName = BackupService.generateFileName();
 
-      await FlutterFileSaver().writeFileAsString(
+      await FlutterFileSaver().writeFileAsBytes(
         fileName: fileName,
-        data: jsonString,
+        bytes: bytes,
       );
 
-      final sizeBytes = utf8.encode(jsonString).length;
+      final sizeBytes = bytes.length;
       final entry = _buildHistoryEntryFromSize(
         sizeBytes: sizeBytes,
         fileName: fileName,

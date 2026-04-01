@@ -570,6 +570,29 @@ class DatabaseService {
     await db.insert(table, row, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
+  /// Return all user-managed SQLite tables for dynamic backup/restore.
+  Future<List<String>> getUserTableNames() async {
+    final db = await database;
+    return _getUserTableNamesForExecutor(db);
+  }
+
+  Future<List<String>> _getUserTableNamesForExecutor(
+    DatabaseExecutor executor,
+  ) async {
+    final rows = await executor.rawQuery('''
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'table'
+        AND name NOT LIKE 'sqlite_%'
+        AND name != 'android_metadata'
+      ORDER BY name ASC
+    ''');
+    return rows
+        .map((row) => row['name'] as String?)
+        .whereType<String>()
+        .toList();
+  }
+
   /// The current database schema version.
   static int get dbVersion => _dbVersion;
 
@@ -1460,16 +1483,8 @@ class DatabaseService {
   Future<void> clearAllData() async {
     final db = await database;
     await db.transaction((txn) async {
-      for (final table in [
-        tKnowledgeBase, tDayPlans, tStudyPlan, tFmgeEntries,
-        tTimeLogs, tDailyTracker, tStudyEntries, tStudyMaterials,
-        tMentorMessages, tMentorMemory, tAiSettings, tUserProfile,
-        tSettings, tHistory, tRevisionSettings, tRevisionItems,
-        tFaPages, tSketchyItems, tPathomaItems, tUworldSessions, tUworldTopics,
-        tSketchyMicroVideos, tSketchyPharmVideos, tPathomaChapters, tFaSubtopics,
-        tStreakData, tRoutines, tRoutineLogs, tBuyingItems, tTodoItems,
-        tDefaultRoutineOrder, tDailyFlows, tActivityLogs, tVideoLectures,
-      ]) {
+      final tables = await _getUserTableNamesForExecutor(txn);
+      for (final table in tables) {
         await txn.delete(table);
       }
     });

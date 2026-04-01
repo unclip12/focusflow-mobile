@@ -7,6 +7,7 @@
       "name": "focusflow_mobile",
       "version": "2.0.0+2",
       "dependencies": [
+        "archive",
         "collection",
         "file_picker",
         "fl_chart",
@@ -267,6 +268,14 @@
         "flutter",
         "http",
         "path_provider"
+      ]
+    },
+    {
+      "name": "archive",
+      "version": "4.0.9",
+      "dependencies": [
+        "path",
+        "posix"
       ]
     },
     {
@@ -982,6 +991,15 @@
       ]
     },
     {
+      "name": "posix",
+      "version": "6.5.0",
+      "dependencies": [
+        "ffi",
+        "meta",
+        "path"
+      ]
+    },
+    {
       "name": "ffi",
       "version": "2.2.0",
       "dependencies": []
@@ -1332,14 +1350,6 @@
       ]
     },
     {
-      "name": "archive",
-      "version": "4.0.9",
-      "dependencies": [
-        "path",
-        "posix"
-      ]
-    },
-    {
       "name": "convert",
       "version": "3.1.2",
       "dependencies": [
@@ -1459,15 +1469,6 @@
       "dependencies": [
         "collection",
         "meta"
-      ]
-    },
-    {
-      "name": "posix",
-      "version": "6.5.0",
-      "dependencies": [
-        "ffi",
-        "meta",
-        "path"
       ]
     },
     {

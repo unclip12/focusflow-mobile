@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -534,6 +535,49 @@ void main() {
     expect(find.text('Tasks are overlapping'), findsOneWidget);
   });
 
+  testWidgets('past gap shows time range and duration above add log',
+      (tester) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dateKey = AppDateUtils.formatDate(today);
+    final nowMinutes = now.hour * 60 + now.minute;
+    final blockStartMinutes = nowMinutes < 10
+        ? 10
+        : math.min(nowMinutes + 30, (24 * 60) - 31);
+    final blockEndMinutes = blockStartMinutes + 30;
+    final expectedGapLabel =
+        '12:00 AM - ${_formatFullTimeForTest(blockStartMinutes)} • ${_formatCompactDurationForTest(blockStartMinutes)}';
+
+    final app = AppProvider();
+    app.dayPlans = [
+      _buildDayPlan(
+        date: dateKey,
+        blocks: [
+          _block(
+            id: 'later_block',
+            date: dateKey,
+            start: _formatMinutesForTest(blockStartMinutes),
+            end: _formatMinutesForTest(blockEndMinutes),
+            duration: blockEndMinutes - blockStartMinutes,
+            title: 'Later Block',
+          ),
+        ],
+      ),
+    ];
+
+    await tester.pumpWidget(
+      _TimelineHarness(
+        app: app,
+        initialDate: today,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('What did you do here?'), findsOneWidget);
+    expect(find.text(expectedGapLabel), findsOneWidget);
+    expect(find.text('Add Log'), findsOneWidget);
+  });
+
   testWidgets('planned block shows play control before starting',
       (tester) async {
     final app = AppProvider();
@@ -1047,6 +1091,32 @@ Block _block({
     plannedDurationMinutes: duration,
     status: BlockStatus.notStarted,
   );
+}
+
+String _formatMinutesForTest(int minutes) {
+  final safeMinutes = minutes.clamp(0, (24 * 60) - 1);
+  final hour = safeMinutes ~/ 60;
+  final minute = safeMinutes % 60;
+  return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+}
+
+String _formatFullTimeForTest(int minutes) {
+  final safeMinutes = minutes.clamp(0, (24 * 60) - 1);
+  final hour24 = safeMinutes ~/ 60;
+  final minute = safeMinutes % 60;
+  final suffix = hour24 < 12 ? 'AM' : 'PM';
+  final hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
+  return '$hour12:${minute.toString().padLeft(2, '0')} $suffix';
+}
+
+String _formatCompactDurationForTest(int minutes) {
+  final hours = minutes ~/ 60;
+  final remainingMinutes = minutes % 60;
+  if (hours > 0 && remainingMinutes > 0) {
+    return '${hours}h ${remainingMinutes}m';
+  }
+  if (hours > 0) return '${hours}h';
+  return '${remainingMinutes}m';
 }
 
 Routine _buildRoutineFixture() {

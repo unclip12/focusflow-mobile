@@ -3042,6 +3042,8 @@ class _GapSlot extends StatelessWidget {
 
     final startLabel = _to12hShort(_minutesToHHMM(startMinutes));
     final durationLabel = _formatGapDurationCompact(gapMinutes);
+    final gapRangeLabel =
+        '${_to12h(_minutesToHHMM(startMinutes))} - ${_to12h(_minutesToHHMM(endMinutes))} • $durationLabel';
     final futureLabel = _formatGapDurationCompact(
       futureDurationMinutes > 0 ? futureDurationMinutes : gapMinutes,
     );
@@ -3167,6 +3169,18 @@ class _GapSlot extends StatelessWidget {
                                         color:
                                             onSurface.withValues(alpha: 0.55),
                                       ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    gapRangeLabel,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: onSurface.withValues(alpha: 0.55),
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures(),
+                                      ],
                                     ),
                                   ),
                                   if (onAddLog != null) ...[

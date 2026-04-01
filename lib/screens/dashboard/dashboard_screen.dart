@@ -15,6 +15,8 @@ import 'package:focusflow_mobile/models/knowledge_base.dart';
 import 'package:focusflow_mobile/models/revision_item.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
+import 'package:focusflow_mobile/screens/today_plan/study_session_picker.dart';
+import 'package:focusflow_mobile/screens/today_plan/track_now_screen.dart';
 import 'package:focusflow_mobile/services/srs_service.dart';
 import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
@@ -636,6 +638,34 @@ class _QuickActionsRow extends StatelessWidget {
 
   final bool isDark;
 
+  void _openStudySession(BuildContext context) {
+    final app = context.read<AppProvider>();
+    final currentDateKey = app.todayDateKey;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StudySessionPicker(dateKey: currentDateKey),
+    );
+  }
+
+  void _openTrackNow(BuildContext context) {
+    final app = context.read<AppProvider>();
+    final currentDateKey = app.todayDateKey;
+    final activeTrackNow = app.getActiveTrackNow(currentDateKey);
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => TrackNowScreen(
+          dateKey: currentDateKey,
+          existingActivityId: activeTrackNow?.id,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -645,7 +675,7 @@ class _QuickActionsRow extends StatelessWidget {
           label: 'Study',
           color: DashboardColors.primary,
           isDark: isDark,
-          onTap: () => context.go('/today'),
+          onTap: () => _openStudySession(context),
         ),
         const SizedBox(width: 10),
         _QuickActionButton(
@@ -653,7 +683,7 @@ class _QuickActionsRow extends StatelessWidget {
           label: 'Track Now',
           color: DashboardColors.primaryViolet,
           isDark: isDark,
-          onTap: () => context.go('/time'),
+          onTap: () => _openTrackNow(context),
         ),
         const SizedBox(width: 10),
         _QuickActionButton(

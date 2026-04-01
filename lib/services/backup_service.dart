@@ -1,93 +1,62 @@
-// =============================================================
-// BackupService — Complete backup & restore for all 34 tables
-//                 + SharedPreferences
-// File format: .ffbackup (JSON internally)
-// Manual backup: temp file → share_plus ShareXFiles (all platforms)
-// Auto backup:   Documents/FocusFlow (always writable)
-// =============================================================
-
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:focusflow_mobile/models/library_note.dart';
+import 'package:focusflow_mobile/services/attachment_storage_service.dart';
 import 'package:focusflow_mobile/services/database_service.dart';
-import 'package:focusflow_mobile/models/sketchy_video.dart';
-import 'package:focusflow_mobile/models/pathoma_chapter.dart';
-import 'package:focusflow_mobile/models/uworld_topic.dart';
-import 'package:focusflow_mobile/models/fa_subtopic.dart';
-import 'package:focusflow_mobile/models/activity_log.dart';
 
-// ── Isolate helpers ─────────────────────────────────────────────
 String _encodeBackupPayload(Map<String, dynamic> data) => jsonEncode(data);
 
 Object? _decodeBackupPayload(String contents) => jsonDecode(contents);
 
+class _BackupAttachmentAsset {
+  final String originalPath;
+  final String archivePath;
+  final String fileName;
+
+  const _BackupAttachmentAsset({
+    required this.originalPath,
+    required this.archivePath,
+    required this.fileName,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'original_path': originalPath,
+        'archive_path': archivePath,
+        'file_name': fileName,
+      };
+
+  factory _BackupAttachmentAsset.fromJson(Map<String, dynamic> json) {
+    return _BackupAttachmentAsset(
+      originalPath: json['original_path'] as String? ?? '',
+      archivePath: json['archive_path'] as String? ?? '',
+      fileName: json['file_name'] as String? ?? '',
+    );
+  }
+}
+
 class BackupService {
   static const _kLastBackupPath = 'last_backup_path';
   static const _kLastBackupTime = 'last_backup_time';
+  static const _manifestFileName = 'manifest.json';
+  static const _attachmentsRoot = 'attachments';
 
-  static const int backupSchemaVersion = 1;
+  static const int backupSchemaVersion = 2;
   static const String appVersion = '2.0.0';
 
-  // ── Standard tables (use getRawTableRows → insertRawRow) ──────
-  static const List<String> standardTables = [
-    DatabaseService.tDayPlans,
-    DatabaseService.tStudyPlan,
-    DatabaseService.tFmgeEntries,
-    DatabaseService.tTimeLogs,
-    DatabaseService.tDailyTracker,
-    DatabaseService.tStudyEntries,
-    DatabaseService.tStudyMaterials,
-    DatabaseService.tMentorMessages,
-    DatabaseService.tMentorMemory,
-    DatabaseService.tAiSettings,
-    DatabaseService.tUserProfile,
-    DatabaseService.tSettings,
-    DatabaseService.tHistory,
-    DatabaseService.tRevisionSettings,
-    DatabaseService.tRevisionItems,
-    DatabaseService.tFaPages,
-    DatabaseService.tSketchyItems,
-    DatabaseService.tPathomaItems,
-    DatabaseService.tUworldSessions,
-    DatabaseService.tRoutines,
-    DatabaseService.tRoutineLogs,
-    DatabaseService.tBuyingItems,
-    DatabaseService.tTodoItems,
-    DatabaseService.tDefaultRoutineOrder,
-    DatabaseService.tDailyFlows,
-    DatabaseService.tLibraryNotes,
-    DatabaseService.tKnowledgeBase,
-    DatabaseService.tStreakData,
-  ];
-
-  // ── Special-structure tables (use model toMap/fromMap) ─────────
-  static const List<String> specialTables = [
-    DatabaseService.tSketchyMicroVideos,
-    DatabaseService.tSketchyPharmVideos,
-    DatabaseService.tPathomaChapters,
-    DatabaseService.tUworldTopics,
-    DatabaseService.tFaSubtopics,
-    DatabaseService.tActivityLogs,
-  ];
-
-  // ═════════════════════════════════════════════════════════════════
-  // SHARED PREFERENCES HELPERS
-  // ═════════════════════════════════════════════════════════════════
-
-
-  /// Record last backup path + time in SharedPreferences.
   static Future<void> _recordBackupInfo(String path) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kLastBackupPath, path);
     await prefs.setString(_kLastBackupTime, DateTime.now().toIso8601String());
   }
 
-  /// Get last backup timestamp.
   static Future<DateTime?> lastBackupTime() async {
     final prefs = await SharedPreferences.getInstance();
     final ts = prefs.getString(_kLastBackupTime);
@@ -95,62 +64,21 @@ class BackupService {
     return DateTime.tryParse(ts);
   }
 
-  /// Get last backup path.
   static Future<String?> getLastBackupPath() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_kLastBackupPath);
   }
 
-  // ═════════════════════════════════════════════════════════════════
-  // BUILD BACKUP DATA — reads from DB directly, covers all 34 tables
-  // ═════════════════════════════════════════════════════════════════
-
-  /// Build the complete backup payload asynchronously from the database.
   static Future<Map<String, dynamic>> buildBackupData() async {
     final db = DatabaseService.instance;
     final tables = <String, dynamic>{};
 
-    // ── 28 standard tables ──────────────────────────────────────
-    for (final table in standardTables) {
+    for (final table in await db.getUserTableNames()) {
       tables[table] = await db.getRawTableRows(table);
     }
 
-    // ── 6 special-structure tables ──────────────────────────────
-    final microVideos = await db.getSketchyMicroVideos();
-    tables[DatabaseService.tSketchyMicroVideos] =
-        microVideos.map((v) => v.toMap()).toList();
-
-    final pharmVideos = await db.getSketchyPharmVideos();
-    tables[DatabaseService.tSketchyPharmVideos] =
-        pharmVideos.map((v) => v.toMap()).toList();
-
-    final chapters = await db.getPathomaChapters();
-    tables[DatabaseService.tPathomaChapters] =
-        chapters.map((c) => c.toMap()).toList();
-
-    final topics = await db.getUWorldTopics();
-    tables[DatabaseService.tUworldTopics] =
-        topics.map((t) => t.toMap()).toList();
-
-    final subtopics = await db.getAllFASubtopics();
-    tables[DatabaseService.tFaSubtopics] =
-        subtopics.map((s) => s.toJson()).toList();
-
-    final logs = await db.getAllActivityLogs();
-    tables[DatabaseService.tActivityLogs] =
-        logs.map((l) => l.toMap()).toList();
-
-    // ── SharedPreferences ───────────────────────────────────────
-    final prefs = await SharedPreferences.getInstance();
-    final spMap = <String, dynamic>{};
-    for (final key in prefs.getKeys()) {
-      final value = prefs.get(key);
-      if (value is List<String>) {
-        spMap[key] = {'_type': 'StringList', '_value': value};
-      } else {
-        spMap[key] = value;
-      }
-    }
+    final sharedPreferences = await _collectSharedPreferences();
+    final attachments = await _collectAttachmentAssets(tables);
 
     return {
       'backup_schema_version': backupSchemaVersion,
@@ -158,38 +86,123 @@ class BackupService {
       'exported_at': DateTime.now().toIso8601String(),
       'db_version': DatabaseService.dbVersion,
       'tables': tables,
-      'shared_preferences': spMap,
+      'shared_preferences': sharedPreferences,
+      'attachments': attachments.map((asset) => asset.toJson()).toList(),
     };
   }
 
-  // ═════════════════════════════════════════════════════════════════
-  // SAVE BACKUP TO FILE
-  // ═════════════════════════════════════════════════════════════════
+  static Future<Map<String, dynamic>> _collectSharedPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    final values = <String, dynamic>{};
+    for (final key in prefs.getKeys()) {
+      final value = prefs.get(key);
+      if (value is List<String>) {
+        values[key] = {'_type': 'StringList', '_value': value};
+      } else {
+        values[key] = value;
+      }
+    }
+    return values;
+  }
 
-  /// Generate a timestamped backup filename.
+  static Future<List<_BackupAttachmentAsset>> _collectAttachmentAssets(
+    Map<String, dynamic> tables,
+  ) async {
+    final rows = tables[DatabaseService.tLibraryNotes];
+    if (rows is! List) return const [];
+
+    final assets = <_BackupAttachmentAsset>[];
+    final seenPaths = <String>{};
+    var index = 0;
+
+    for (final row in rows) {
+      if (row is! Map) continue;
+      final data = row['data'];
+      if (data is! String || data.isEmpty) continue;
+
+      try {
+        final decoded = jsonDecode(data);
+        if (decoded is! Map) continue;
+        final note = LibraryNote.fromJson(Map<String, dynamic>.from(decoded));
+        for (final attachmentPath in note.attachmentPaths) {
+          final trimmedPath = attachmentPath.trim();
+          if (trimmedPath.isEmpty ||
+              AttachmentStorageService.isWebLink(trimmedPath) ||
+              !seenPaths.add(trimmedPath)) {
+            continue;
+          }
+          final file = File(trimmedPath);
+          if (!await file.exists()) continue;
+
+          index++;
+          assets.add(
+            _BackupAttachmentAsset(
+              originalPath: trimmedPath,
+              archivePath:
+                  '$_attachmentsRoot/${AttachmentStorageService.buildArchiveFileName(index, trimmedPath)}',
+              fileName: file.uri.pathSegments.isNotEmpty
+                  ? file.uri.pathSegments.last
+                  : 'attachment_$index',
+            ),
+          );
+        }
+      } catch (_) {
+        // Keep backup resilient even if one note row is malformed.
+      }
+    }
+
+    return assets;
+  }
+
+  static List<_BackupAttachmentAsset> _attachmentAssetsFromData(
+    Map<String, dynamic> data,
+  ) {
+    final rawAssets = data['attachments'];
+    if (rawAssets is! List) return const [];
+
+    final assets = <_BackupAttachmentAsset>[];
+    for (final rawAsset in rawAssets) {
+      if (rawAsset is! Map) continue;
+      assets.add(
+        _BackupAttachmentAsset.fromJson(Map<String, dynamic>.from(rawAsset)),
+      );
+    }
+    return assets;
+  }
+
   static String generateFileName() {
     final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
     return 'focusflow_backup_$timestamp.ffbackup';
   }
 
-  /// Write backup data to a temp directory for sharing.
-  /// Returns the full path of the temp file.
+  static Future<Uint8List> buildBackupFileBytes(
+    Map<String, dynamic> data,
+  ) async {
+    final archive = Archive();
+    final manifestJson = await compute(_encodeBackupPayload, data);
+    archive.addFile(ArchiveFile.string(_manifestFileName, manifestJson));
+
+    for (final asset in _attachmentAssetsFromData(data)) {
+      final file = File(asset.originalPath);
+      if (!await file.exists()) continue;
+      final bytes = await file.readAsBytes();
+      archive.addFile(ArchiveFile.bytes(asset.archivePath, bytes));
+    }
+
+    return Uint8List.fromList(ZipEncoder().encode(archive));
+  }
+
   static Future<String> saveBackupToTemp(Map<String, dynamic> data) async {
     final dir = await getTemporaryDirectory();
     final fileName = generateFileName();
     final filePath = '${dir.path}/$fileName';
-    final file = File(filePath);
-
-    final payload = await compute(_encodeBackupPayload, data);
-    await file.writeAsString(payload);
-
-    await _recordBackupInfo(filePath);
+    await _writeBackupFile(data, filePath);
     return filePath;
   }
 
-  /// Fallback: write to Documents/FocusFlow (used by auto-backup).
   static Future<String> saveBackupToDocuments(
-      Map<String, dynamic> data) async {
+    Map<String, dynamic> data,
+  ) async {
     final docsDir = await getApplicationDocumentsDirectory();
     final backupDir = Directory('${docsDir.path}/FocusFlow');
     if (!await backupDir.exists()) {
@@ -197,37 +210,75 @@ class BackupService {
     }
     final fileName = generateFileName();
     final filePath = '${backupDir.path}/$fileName';
-    final file = File(filePath);
-
-    final payload = await compute(_encodeBackupPayload, data);
-    await file.writeAsString(payload);
-
-    await _recordBackupInfo(filePath);
+    await _writeBackupFile(data, filePath);
     return filePath;
   }
 
-  // ═════════════════════════════════════════════════════════════════
-  // READ & DECODE BACKUP FILE
-  // ═════════════════════════════════════════════════════════════════
+  static Future<void> _writeBackupFile(
+    Map<String, dynamic> data,
+    String filePath,
+  ) async {
+    final file = File(filePath);
+    final payload = await buildBackupFileBytes(data);
+    await file.writeAsBytes(payload, flush: true);
+    await _recordBackupInfo(filePath);
+  }
 
-  /// Reads and decodes a backup file off the UI isolate.
   static Future<Map<String, dynamic>> readBackupFile(String filePath) async {
     final file = File(filePath);
     if (!await file.exists()) {
       throw Exception('Backup file not found: $filePath');
     }
 
-    final contents = await file.readAsString();
+    final bytes = await file.readAsBytes();
+    if (_looksLikeZip(bytes)) {
+      return _readZipBackup(bytes);
+    }
+
+    final contents = utf8.decode(bytes);
     final decoded = await compute(_decodeBackupPayload, contents);
     if (decoded is! Map) {
       throw const FormatException(
-          'Backup file does not contain a valid JSON object.');
+        'Backup file does not contain a valid JSON object.',
+      );
     }
 
     return Map<String, dynamic>.from(decoded);
   }
 
-  /// Validate backup data structure. Returns null if valid, error message if not.
+  static bool _looksLikeZip(List<int> bytes) {
+    return bytes.length >= 4 &&
+        bytes[0] == 0x50 &&
+        bytes[1] == 0x4B &&
+        (bytes[2] == 0x03 || bytes[2] == 0x05 || bytes[2] == 0x07) &&
+        (bytes[3] == 0x04 || bytes[3] == 0x06 || bytes[3] == 0x08);
+  }
+
+  static Future<Map<String, dynamic>> _readZipBackup(List<int> bytes) async {
+    final archive = ZipDecoder().decodeBytes(bytes);
+    final manifestFile = archive.findFile(_manifestFileName);
+    if (manifestFile == null || !manifestFile.isFile) {
+      throw const FormatException('Backup archive is missing manifest.json.');
+    }
+
+    final manifestString = utf8.decode(manifestFile.content);
+    final decodedManifest = await compute(_decodeBackupPayload, manifestString);
+    if (decodedManifest is! Map) {
+      throw const FormatException('Backup manifest is corrupted.');
+    }
+
+    final data = Map<String, dynamic>.from(decodedManifest);
+    final attachmentBytes = <String, List<int>>{};
+    for (final file in archive) {
+      if (!file.isFile || !file.name.startsWith('$_attachmentsRoot/')) {
+        continue;
+      }
+      attachmentBytes[file.name] = List<int>.from(file.content);
+    }
+    data['_attachment_bytes'] = attachmentBytes;
+    return data;
+  }
+
   static String? validateBackupData(Map<String, dynamic> data) {
     final version = data['backup_schema_version'];
     if (version == null) {
@@ -240,175 +291,139 @@ class BackupService {
     if (data['tables'] is! Map) {
       return 'This backup file is corrupted (missing tables data).';
     }
-    return null; // valid
+    return null;
   }
 
-  /// Extract the exported_at timestamp from backup data, formatted for display.
   static String getExportedAtLabel(Map<String, dynamic> data) {
     final isoString = data['exported_at'] as String?;
     if (isoString == null) return 'Unknown date';
     final dt = DateTime.tryParse(isoString);
     if (dt == null) return isoString;
-    return DateFormat('MMM d, yyyy – h:mm a').format(dt.toLocal());
+    return DateFormat('MMM d, yyyy � h:mm a').format(dt.toLocal());
   }
 
-  // ═════════════════════════════════════════════════════════════════
-  // RESTORE BACKUP DATA INTO DATABASE
-  // ═════════════════════════════════════════════════════════════════
-
-  /// Restore all data from a decoded backup map.
-  /// Call this AFTER clearing the database.
   static Future<void> restoreFromBackupData(Map<String, dynamic> data) async {
     final db = DatabaseService.instance;
     final tables = data['tables'] as Map<String, dynamic>? ?? {};
+    final attachmentPathMap = await _restoreAttachmentFiles(data);
 
-    // ── 28 standard tables ──────────────────────────────────────
-    for (final table in standardTables) {
-      final rows = tables[table];
+    for (final entry in tables.entries) {
+      final rows = entry.value;
       if (rows is! List) continue;
+
       for (final row in rows) {
-        if (row is Map<String, dynamic>) {
-          await db.insertRawRow(table, Map<String, dynamic>.from(row));
-        }
+        if (row is! Map) continue;
+        final restoredRow = await _prepareRowForRestore(
+          table: entry.key,
+          row: Map<String, dynamic>.from(row),
+          attachmentPathMap: attachmentPathMap,
+        );
+        await db.insertRawRow(entry.key, restoredRow);
       }
     }
 
-    // ── 6 special-structure tables ──────────────────────────────
-    // Sketchy Micro Videos
-    final microRows = tables[DatabaseService.tSketchyMicroVideos];
-    if (microRows is List) {
-      for (final row in microRows) {
-        if (row is Map<String, dynamic>) {
-          final video = SketchyVideo.fromMap(Map<String, dynamic>.from(row));
-          await db.insertRawRow(
-            DatabaseService.tSketchyMicroVideos,
-            video.toMap()..remove('id'),
-          );
-        }
+    await _restoreSharedPreferences(data);
+  }
+
+  static Future<Map<String, String>> _restoreAttachmentFiles(
+    Map<String, dynamic> data,
+  ) async {
+    final restoredPaths = <String, String>{};
+    final attachmentBytesRaw = data['_attachment_bytes'];
+    if (attachmentBytesRaw is! Map) return restoredPaths;
+
+    final attachmentBytes = <String, List<int>>{};
+    for (final entry in attachmentBytesRaw.entries) {
+      if (entry.key is! String) continue;
+      final value = entry.value;
+      if (value is Uint8List) {
+        attachmentBytes[entry.key as String] = value;
+      } else if (value is List<int>) {
+        attachmentBytes[entry.key as String] = value;
+      } else if (value is List) {
+        attachmentBytes[entry.key as String] = value.cast<int>();
       }
     }
 
-    // Sketchy Pharm Videos
-    final pharmRows = tables[DatabaseService.tSketchyPharmVideos];
-    if (pharmRows is List) {
-      for (final row in pharmRows) {
-        if (row is Map<String, dynamic>) {
-          final video = SketchyVideo.fromMap(Map<String, dynamic>.from(row));
-          await db.insertRawRow(
-            DatabaseService.tSketchyPharmVideos,
-            video.toMap()..remove('id'),
-          );
-        }
-      }
+    for (final asset in _attachmentAssetsFromData(data)) {
+      final bytes = attachmentBytes[asset.archivePath];
+      if (bytes == null) continue;
+      final restoredPath = await AttachmentStorageService.writeRestoredAttachment(
+        originalPath: asset.originalPath,
+        suggestedFileName: asset.fileName,
+        bytes: bytes,
+      );
+      restoredPaths[asset.originalPath] = restoredPath;
     }
 
-    // Pathoma Chapters
-    final pathomaRows = tables[DatabaseService.tPathomaChapters];
-    if (pathomaRows is List) {
-      for (final row in pathomaRows) {
-        if (row is Map<String, dynamic>) {
-          final chapter =
-              PathomaChapter.fromMap(Map<String, dynamic>.from(row));
-          await db.insertRawRow(
-            DatabaseService.tPathomaChapters,
-            chapter.toMap()..remove('id'),
-          );
-        }
-      }
+    return restoredPaths;
+  }
+
+  static Future<Map<String, dynamic>> _prepareRowForRestore({
+    required String table,
+    required Map<String, dynamic> row,
+    required Map<String, String> attachmentPathMap,
+  }) async {
+    if (table != DatabaseService.tLibraryNotes || attachmentPathMap.isEmpty) {
+      return row;
     }
 
-    // UWorld Topics
-    final uworldRows = tables[DatabaseService.tUworldTopics];
-    if (uworldRows is List) {
-      for (final row in uworldRows) {
-        if (row is Map<String, dynamic>) {
-          final topic = UWorldTopic.fromMap(Map<String, dynamic>.from(row));
-          final map = topic.toMap();
-          map.remove('id');
-          await db.insertRawRow(DatabaseService.tUworldTopics, map);
-        }
-      }
+    final encodedData = row['data'];
+    if (encodedData is! String || encodedData.isEmpty) {
+      return row;
     }
 
-    // FA Subtopics
-    final faSubRows = tables[DatabaseService.tFaSubtopics];
-    if (faSubRows is List) {
-      for (final row in faSubRows) {
-        if (row is Map<String, dynamic>) {
-          final sub = FASubtopic.fromJson(Map<String, dynamic>.from(row));
-          await db.insertRawRow(DatabaseService.tFaSubtopics, {
-            'pageNum': sub.pageNum,
-            'name': sub.name,
-            'status': sub.status,
-            'firstReadAt': sub.firstReadAt,
-            'ankiDoneAt': sub.ankiDoneAt,
-            'revisionCount': sub.revisionCount,
-            'lastRevisedAt': sub.lastRevisedAt,
-            'revisionHistory':
-                jsonEncode(sub.revisionHistory.map((r) => r.toJson()).toList()),
-          });
-        }
-      }
+    try {
+      final decodedData = jsonDecode(encodedData);
+      if (decodedData is! Map) return row;
+      final note = LibraryNote.fromJson(Map<String, dynamic>.from(decodedData));
+      final restoredPaths = note.attachmentPaths
+          .map((path) => attachmentPathMap[path] ?? path)
+          .toList();
+      final restoredNote = note.copyWith(attachmentPaths: restoredPaths);
+      row['data'] = jsonEncode(restoredNote.toJson());
+    } catch (_) {
+      // Preserve the row as-is if it cannot be rewritten.
     }
 
-    // Activity Logs
-    final activityRows = tables[DatabaseService.tActivityLogs];
-    if (activityRows is List) {
-      for (final row in activityRows) {
-        if (row is Map<String, dynamic>) {
-          final entry =
-              ActivityLogEntry.fromMap(Map<String, dynamic>.from(row));
-          await db.insertActivityLog(entry);
-        }
-      }
-    }
+    return row;
+  }
 
-    // ── Restore SharedPreferences ───────────────────────────────
+  static Future<void> _restoreSharedPreferences(
+    Map<String, dynamic> data,
+  ) async {
     final spMap = data['shared_preferences'] as Map<String, dynamic>?;
-    if (spMap != null) {
-      final prefs = await SharedPreferences.getInstance();
+    if (spMap == null) return;
 
-
-      for (final entry in spMap.entries) {
-        final key = entry.key;
-        final value = entry.value;
-
-
-
-        try {
-          if (value is bool) {
-            await prefs.setBool(key, value);
-          } else if (value is int) {
-            await prefs.setInt(key, value);
-          } else if (value is double) {
-            await prefs.setDouble(key, value);
-          } else if (value is String) {
-            await prefs.setString(key, value);
-          } else if (value is Map &&
-              value['_type'] == 'StringList' &&
-              value['_value'] is List) {
-            await prefs.setStringList(
-              key,
-              (value['_value'] as List).cast<String>(),
-            );
-          } else if (value is List) {
-            // Legacy format: plain list
-            await prefs.setStringList(key, value.cast<String>());
-          }
-        } catch (_) {
-          // Skip keys that can't be restored
+    final prefs = await SharedPreferences.getInstance();
+    for (final entry in spMap.entries) {
+      final key = entry.key;
+      final value = entry.value;
+      try {
+        if (value is bool) {
+          await prefs.setBool(key, value);
+        } else if (value is int) {
+          await prefs.setInt(key, value);
+        } else if (value is double) {
+          await prefs.setDouble(key, value);
+        } else if (value is String) {
+          await prefs.setString(key, value);
+        } else if (value is Map &&
+            value['_type'] == 'StringList' &&
+            value['_value'] is List) {
+          await prefs.setStringList(
+            key,
+            (value['_value'] as List).cast<String>(),
+          );
+        } else if (value is List) {
+          await prefs.setStringList(key, value.cast<String>());
         }
+      } catch (_) {
+        // Skip keys that cannot be restored.
       }
-
-
     }
   }
 
-  // ═════════════════════════════════════════════════════════════════
-  // LEGACY COMPAT — keep old callers working during transition
-  // ═════════════════════════════════════════════════════════════════
-
-  /// Returns the Documents/FocusFlow folder (always writable).
   static Future<String> getBackupFolder() async {
     final docsDir = await getApplicationDocumentsDirectory();
     final backupDir = Directory('${docsDir.path}/FocusFlow');
@@ -418,17 +433,14 @@ class BackupService {
     return backupDir.path;
   }
 
-  /// Quick save to Documents/FocusFlow (used by auto-backup trigger).
-  static Future<String> saveBackup(Map<String, dynamic> data, {
+  static Future<String> saveBackup(
+    Map<String, dynamic> data, {
     String filePrefix = 'focusflow_backup',
   }) async {
     final folder = await getBackupFolder();
     final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
     final filePath = '$folder/${filePrefix}_$timestamp.ffbackup';
-    final file = File(filePath);
-    final payload = await compute(_encodeBackupPayload, data);
-    await file.writeAsString(payload);
-    await _recordBackupInfo(filePath);
+    await _writeBackupFile(data, filePath);
     return filePath;
   }
 }
