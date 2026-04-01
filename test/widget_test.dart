@@ -1131,17 +1131,57 @@ void main() {
     expect(find.text('Tasks are overlapping'), findsOneWidget);
   });
 
-  testWidgets('past gap shows time range and duration above add log',
+  testWidgets('full-day gap caps past log range at the current time',
       (tester) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final dateKey = AppDateUtils.formatDate(today);
     final nowMinutes = now.hour * 60 + now.minute;
-    final blockStartMinutes =
-        nowMinutes < 10 ? 10 : math.min(nowMinutes + 30, (24 * 60) - 31);
-    final blockEndMinutes = blockStartMinutes + 30;
     final expectedGapLabel =
-        '12:00 AM - ${_formatFullTimeForTest(blockStartMinutes)} • ${_formatCompactDurationForTest(blockStartMinutes)}';
+        '12:00 AM - ${_formatFullTimeForTest(nowMinutes)} • ${_formatCompactDurationForTest(nowMinutes)}';
+    final futureStartMinutes = _roundUpToNextFiveMinutesForTest(nowMinutes);
+    final expectedFutureText =
+        'Use ${_formatCompactDurationForTest(math.max(0, (24 * 60) - futureStartMinutes))} from here onward';
+
+    final app = AppProvider();
+    app.dayPlans = [
+      _buildDayPlan(
+        date: dateKey,
+        blocks: const [],
+      ),
+    ];
+
+    await tester.pumpWidget(
+      _TimelineHarness(
+        app: app,
+        initialDate: today,
+        onAddTask: ({int? startMinutes, bool isEvent = false}) async {},
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('What did you do here?'), findsOneWidget);
+    expect(find.text(expectedGapLabel), findsOneWidget);
+    expect(find.text('Add Log'), findsOneWidget);
+    expect(_findRichTextContaining(expectedFutureText), findsOneWidget);
+    expect(find.text('Add Task'), findsOneWidget);
+  });
+
+  testWidgets('gap crossing now splits past log label from future task CTA',
+      (tester) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dateKey = AppDateUtils.formatDate(today);
+    final nowMinutes = now.hour * 60 + now.minute;
+    final earlierEndMinutes = math.max(30, nowMinutes - 30);
+    final earlierStartMinutes = math.max(0, earlierEndMinutes - 30);
+    final laterStartMinutes = math.min((24 * 60) - 1, nowMinutes + 60);
+    final laterEndMinutes = math.min(24 * 60, laterStartMinutes + 30);
+    final expectedGapLabel =
+        '${_formatFullTimeForTest(earlierEndMinutes)} - ${_formatFullTimeForTest(nowMinutes)} • ${_formatCompactDurationForTest(nowMinutes - earlierEndMinutes)}';
+    final futureStartMinutes = _roundUpToNextFiveMinutesForTest(nowMinutes);
+    final expectedFutureText =
+        'Use ${_formatCompactDurationForTest(math.max(0, laterStartMinutes - futureStartMinutes))} from here onward';
 
     final app = AppProvider();
     app.dayPlans = [
@@ -1149,11 +1189,19 @@ void main() {
         date: dateKey,
         blocks: [
           _block(
+            id: 'earlier_block',
+            date: dateKey,
+            start: _formatMinutesForTest(earlierStartMinutes),
+            end: _formatMinutesForTest(earlierEndMinutes),
+            duration: earlierEndMinutes - earlierStartMinutes,
+            title: 'Earlier Block',
+          ),
+          _block(
             id: 'later_block',
             date: dateKey,
-            start: _formatMinutesForTest(blockStartMinutes),
-            end: _formatMinutesForTest(blockEndMinutes),
-            duration: blockEndMinutes - blockStartMinutes,
+            start: _formatMinutesForTest(laterStartMinutes),
+            end: _formatMinutesForTest(laterEndMinutes),
+            duration: laterEndMinutes - laterStartMinutes,
             title: 'Later Block',
           ),
         ],
@@ -1164,13 +1212,19 @@ void main() {
       _TimelineHarness(
         app: app,
         initialDate: today,
+        onAddTask: ({int? startMinutes, bool isEvent = false}) async {},
       ),
     );
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text(expectedGapLabel),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
 
-    expect(find.text('What did you do here?'), findsOneWidget);
     expect(find.text(expectedGapLabel), findsOneWidget);
-    expect(find.text('Add Log'), findsOneWidget);
+    expect(_findRichTextContaining(expectedFutureText), findsOneWidget);
   });
 
   testWidgets('planned block shows play control before starting',
@@ -1717,6 +1771,18 @@ String _formatCompactDurationForTest(int minutes) {
   return '${remainingMinutes}m';
 }
 
+int _roundUpToNextFiveMinutesForTest(int minutes) {
+  final remainder = minutes % 5;
+  if (remainder == 0) return minutes;
+  return math.min(24 * 60, minutes + (5 - remainder));
+}
+
+Finder _findRichTextContaining(String text) {
+  return find.byWidgetPredicate(
+    (widget) => widget is RichText && widget.text.toPlainText().contains(text),
+  );
+}
+
 Routine _buildRoutineFixture() {
   return Routine(
     id: 'morning_routine',
@@ -1818,10 +1884,12 @@ Future<void> _settleTestUi(WidgetTester tester) async {
 class _TimelineHarness extends StatefulWidget {
   final AppProvider app;
   final DateTime initialDate;
+  final TimelineAddTaskCallback? onAddTask;
 
   const _TimelineHarness({
     required this.app,
     required this.initialDate,
+    this.onAddTask,
   });
 
   @override
@@ -1857,6 +1925,7 @@ class _TimelineHarnessState extends State<_TimelineHarness> {
                   dateKey: dateKey,
                   blocks: blocks,
                   reminders: const [],
+                  onAddTask: widget.onAddTask,
                   onOpenDate: (date) {
                     setState(
                       () => _selectedDate =

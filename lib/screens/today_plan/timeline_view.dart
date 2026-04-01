@@ -172,7 +172,7 @@ double _gapSlotHeight(
 }) {
   final scaledHeight = _scaledTimelineHeight(minutes);
   final contentMinHeight = hasPastSection && hasFutureSection
-      ? 168.0
+      ? 210.0
       : (hasPastSection || hasFutureSection ? 108.0 : _kGapRowMinHeight);
   return math.max(
     _kGapRowMinHeight,
@@ -1455,6 +1455,8 @@ class _TimelineViewState extends State<TimelineView> {
             child: _GapSlot(
               startMinutes: item.gapStartMinutes!,
               endMinutes: item.gapEndMinutes!,
+              pastEndMinutes: gapState.logEndMinutes,
+              futureStartMinutes: gapState.taskStartMinutes,
               onTap: () => _onGapTap(item),
               onAddTask: !gapState.canAddTask
                   ? null
@@ -3284,6 +3286,8 @@ class _GapSlot extends StatelessWidget {
 class _GapSlot extends StatelessWidget {
   final int startMinutes;
   final int endMinutes;
+  final int pastEndMinutes;
+  final int futureStartMinutes;
   final VoidCallback onTap;
   final VoidCallback? onAddTask;
   final VoidCallback? onAddLog;
@@ -3295,6 +3299,8 @@ class _GapSlot extends StatelessWidget {
   const _GapSlot({
     required this.startMinutes,
     required this.endMinutes,
+    required this.pastEndMinutes,
+    required this.futureStartMinutes,
     required this.onTap,
     this.onAddTask,
     this.onAddLog,
@@ -3314,6 +3320,12 @@ class _GapSlot extends StatelessWidget {
     final gapMinutes = endMinutes - startMinutes;
     final hasPastSection = showPastPrompt;
     final hasFutureSection = onAddTask != null;
+    final visiblePastEndMinutes =
+        pastEndMinutes.clamp(startMinutes, endMinutes);
+    final visibleFutureStartMinutes =
+        futureStartMinutes.clamp(startMinutes, endMinutes);
+    final visiblePastDurationMinutes =
+        math.max(0, visiblePastEndMinutes - startMinutes);
     final gapHeight = _gapSlotHeight(
       gapMinutes,
       hasPastSection: hasPastSection,
@@ -3329,9 +3341,11 @@ class _GapSlot extends StatelessWidget {
     final startLabel = _to12hShort(_minutesToHHMM(startMinutes));
     final durationLabel = _formatGapDurationCompact(gapMinutes);
     final gapRangeLabel =
-        '${_to12h(_minutesToHHMM(startMinutes))} - ${_to12h(_minutesToHHMM(endMinutes))} • $durationLabel';
+        '${_to12h(_minutesToHHMM(startMinutes))} - ${_to12h(_minutesToHHMM(visiblePastEndMinutes))} • ${_formatGapDurationCompact(visiblePastDurationMinutes)}';
     final futureLabel = _formatGapDurationCompact(
-      futureDurationMinutes > 0 ? futureDurationMinutes : gapMinutes,
+      futureDurationMinutes > 0
+          ? futureDurationMinutes
+          : math.max(0, endMinutes - visibleFutureStartMinutes),
     );
     final double? nowIndicatorTop = nowLineOffset == null
         ? null
