@@ -1,7 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
-
 import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
@@ -299,7 +297,7 @@ class BackupService {
     if (isoString == null) return 'Unknown date';
     final dt = DateTime.tryParse(isoString);
     if (dt == null) return isoString;
-    return DateFormat('MMM d, yyyy – h:mm a').format(dt.toLocal());
+    return DateFormat('MMM d, yyyy - h:mm a').format(dt.toLocal());
   }
 
   static Future<void> restoreFromBackupData(Map<String, dynamic> data) async {
@@ -444,3 +442,4 @@ class BackupService {
     return filePath;
   }
 }
+

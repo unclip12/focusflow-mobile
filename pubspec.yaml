@@ -38,11 +38,14 @@ dependencies:
   media_kit_video: ^1.2.4
   media_kit_libs_video: ^1.0.4
   url_launcher: ^6.3.1
+  audioplayers: ^6.1.0
+  flutter_tts: ^4.0.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  sqflite_common_ffi: ^2.3.4+4
 
 flutter:
   uses-material-design: true
@@ -50,4 +53,5 @@ flutter:
   # FA 2025 seed JSON asset
   assets:
     - assets/data/
+    - assets/audio/
 

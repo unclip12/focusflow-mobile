@@ -198,6 +198,59 @@ class SettingsProvider extends ChangeNotifier {
     await _persist();
   }
 
+  TimerReminderConfig get timerReminders => _settings.notifications.timerReminders;
+
+  Future<void> updateTimerReminders(TimerReminderConfig config) async {
+    _settings = _settings.copyWith(
+      notifications: _settings.notifications.copyWith(timerReminders: config),
+    );
+    await _persist();
+  }
+
+  Future<void> setPlayCueSounds(bool value) async {
+    await updateTimerReminders(
+      timerReminders.copyWith(playCueSounds: value),
+    );
+  }
+
+  Future<void> setSpeakReminders(bool value) async {
+    await updateTimerReminders(
+      timerReminders.copyWith(speakReminders: value),
+    );
+  }
+
+  Future<void> addTaskReminderRule(TaskReminderRule rule) async {
+    await updateTimerReminders(
+      timerReminders.copyWith(
+        taskReminderRules: <TaskReminderRule>[
+          ...timerReminders.taskReminderRules,
+          rule,
+        ],
+      ),
+    );
+  }
+
+  Future<void> removeTaskReminderRule(String ruleId) async {
+    await updateTimerReminders(
+      timerReminders.copyWith(
+        taskReminderRules: timerReminders.taskReminderRules
+            .where((rule) => rule.id != ruleId)
+            .toList(),
+      ),
+    );
+  }
+
+  Future<void> updateTaskReminderRule(TaskReminderRule rule) async {
+    await updateTimerReminders(
+      timerReminders.copyWith(
+        taskReminderRules: timerReminders.taskReminderRules.map((existing) {
+          if (existing.id != rule.id) return existing;
+          return rule;
+        }).toList(),
+      ),
+    );
+  }
+
   Future<void> updateQuietHours(QuietHoursConfig config) async {
     _settings = _settings.copyWith(quietHours: config);
     await _persist();

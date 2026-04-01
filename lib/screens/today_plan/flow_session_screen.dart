@@ -12,9 +12,11 @@ import 'package:intl/intl.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/models/daily_flow.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
+import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/services/notification_service.dart';
+import 'package:focusflow_mobile/services/timer_reminder_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'add_task_sheet.dart';
@@ -45,6 +47,8 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
   Timer? _quoteTimer;
   late String _currentQuote;
   final _rng = Random();
+
+  String get _cueSessionKey => 'flow:${widget.dateKey}';
 
   void _setStateIfMounted(VoidCallback fn) {
     if (!mounted) return;
@@ -88,6 +92,7 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
           _activityElapsed++;
           _totalElapsed++;
         });
+        unawaited(_processFlowCue());
       }
     });
     _quoteTimer = Timer.periodic(const Duration(seconds: 30), (_) {
@@ -137,6 +142,7 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
     _tickTimer?.cancel();
     _quoteTimer?.cancel();
     _resumePulseTimer?.cancel();
+    TimerReminderService.instance.clearSession(_cueSessionKey);
     WakelockPlus.disable();
     super.dispose();
   }
@@ -232,6 +238,7 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
     final app = context.read<AppProvider>();
     app.resumeFlow(widget.dateKey);
     _setStateIfMounted(() => _localPaused = false);
+    unawaited(_processFlowCue());
   }
 
   void _showStopDialog() {
@@ -355,6 +362,41 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
     }
 
     return null;
+  }
+
+  Future<void> _processFlowCue() async {
+    if (!mounted || _localPaused) {
+      return;
+    }
+
+    final app = context.read<AppProvider>();
+    final settings = context.read<SettingsProvider>();
+    final flow = app.getDailyFlow(widget.dateKey);
+    final currentActivity = flow?.nextPendingActivity;
+    final currentBlock = _blockForCurrentActivity(app, currentActivity);
+    if (currentActivity == null ||
+        currentBlock == null ||
+        currentBlock.plannedDurationMinutes <= 0) {
+      return;
+    }
+
+    final nextBlock = _nextBlockAfterCurrent(app, currentBlock);
+    await TimerReminderService.instance.processActiveTimerCue(
+      config: settings.timerReminders,
+      context: ActiveTimerCueContext(
+        sessionKey: _cueSessionKey,
+        taskKey: currentActivity.id,
+        currentLabel: currentActivity.label,
+        nextLabel: nextBlock?.title,
+        totalDurationSeconds: currentBlock.plannedDurationMinutes * 60,
+        elapsedSeconds: _activityElapsed,
+        isPaused: _localPaused,
+        intent: NotificationIntent.todayPlanBlock(
+          dateKey: widget.dateKey,
+          blockId: currentBlock.id,
+        ),
+      ),
+    );
   }
 
   Block? _blockForCurrentActivity(AppProvider app, FlowActivity? activity) {

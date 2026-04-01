@@ -5,6 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:focusflow_mobile/models/routine.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
+import 'package:focusflow_mobile/services/notification_service.dart';
+import 'package:focusflow_mobile/services/timer_reminder_service.dart';
+import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:provider/provider.dart';
 
 class RoutineRunnerScreen extends StatefulWidget {
@@ -89,6 +92,7 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen>
     unawaited(_ensureRoutineRun());
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || _completedLog != null || _isSaving) return;
+      unawaited(_processRoutineCue());
       setState(() {});
     });
   }
@@ -97,6 +101,8 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
+    TimerReminderService.instance
+        .clearSession('routine:${widget.routine.id}:${widget.dateKey}');
     super.dispose();
   }
 
@@ -115,6 +121,48 @@ class _RoutineRunnerScreenState extends State<RoutineRunnerScreen>
         );
     if (!mounted) return;
     setState(() => _isLoading = false);
+    unawaited(_processRoutineCue());
+  }
+
+  Future<void> _processRoutineCue() async {
+    if (!mounted || _isLoading || _completedLog != null || _isSaving) {
+      return;
+    }
+
+    final app = context.read<AppProvider>();
+    final settings = context.read<SettingsProvider>();
+    final routine = app.getRoutineById(widget.routine.id) ?? widget.routine;
+    final run = app.getActiveRoutineRunForRoutine(routine.id, widget.dateKey);
+    if (run == null || routine.steps.isEmpty) {
+      return;
+    }
+
+    final stepIndex = run.currentStepIndex.clamp(0, routine.steps.length - 1);
+    final step = routine.steps[stepIndex];
+    final estimatedMinutes = step.estimatedMinutes;
+    if (estimatedMinutes == null || estimatedMinutes <= 0) {
+      return;
+    }
+
+    final nextLabel = stepIndex + 1 < routine.steps.length
+        ? routine.steps[stepIndex + 1].title
+        : null;
+
+    await TimerReminderService.instance.processActiveTimerCue(
+      config: settings.timerReminders,
+      context: ActiveTimerCueContext(
+        sessionKey: 'routine:${routine.id}:${widget.dateKey}',
+        taskKey: step.id,
+        currentLabel: step.title,
+        nextLabel: nextLabel,
+        totalDurationSeconds: estimatedMinutes * 60,
+        elapsedSeconds: run.currentStepElapsedSecondsAt(),
+        intent: NotificationIntent.todayPlan(
+          dateKey: widget.dateKey,
+          routineId: routine.id,
+        ),
+      ),
+    );
   }
 
   Future<void> _markDone(

@@ -8,11 +8,15 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 import 'package:focusflow_mobile/models/day_plan.dart';
+import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/screens/session/session_complete_sheet.dart';
 import 'package:focusflow_mobile/services/background_timer_service.dart';
+import 'package:focusflow_mobile/services/notification_service.dart';
+import 'package:focusflow_mobile/services/timer_reminder_service.dart';
 
 class SessionScreen extends StatefulWidget {
   final Block block;
@@ -44,6 +48,14 @@ class _SessionScreenState extends State<SessionScreen> {
   }
 
   String get _dayPlanDate => _plan.date;
+  String get _cueSessionKey => 'block:${_block.date}:${_block.id}';
+
+  String? get _nextBlockTitle {
+    final blocks = _plan.blocks ?? const <Block>[];
+    final currentIndex = blocks.indexWhere((block) => block.id == _block.id);
+    if (currentIndex < 0 || currentIndex + 1 >= blocks.length) return null;
+    return blocks[currentIndex + 1].title;
+  }
 
   @override
   void initState() {
@@ -61,6 +73,7 @@ class _SessionScreenState extends State<SessionScreen> {
         _startedAt = DateTime.now().subtract(Duration(seconds: elapsed));
       });
     }
+    await _processCue();
     _startTimers();
   }
 
@@ -68,6 +81,7 @@ class _SessionScreenState extends State<SessionScreen> {
     _tickTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!_isPaused) {
         setState(() => _elapsedSeconds++);
+        unawaited(_processCue());
       }
     });
 
@@ -86,6 +100,7 @@ class _SessionScreenState extends State<SessionScreen> {
   void dispose() {
     _tickTimer?.cancel();
     _quoteTimer?.cancel();
+    TimerReminderService.instance.clearSession(_cueSessionKey);
     super.dispose();
   }
 
@@ -105,6 +120,7 @@ class _SessionScreenState extends State<SessionScreen> {
     _tickTimer?.cancel();
     _quoteTimer?.cancel();
     BackgroundTimerService.stop();
+    TimerReminderService.instance.clearSession(_cueSessionKey);
 
     showSessionCompleteSheet(
       context,
@@ -126,6 +142,29 @@ class _SessionScreenState extends State<SessionScreen> {
       return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
     }
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _processCue() async {
+    if (_isPaused || _block.plannedDurationMinutes <= 0 || !mounted) {
+      return;
+    }
+
+    final settings = context.read<SettingsProvider>();
+    await TimerReminderService.instance.processActiveTimerCue(
+      config: settings.timerReminders,
+      context: ActiveTimerCueContext(
+        sessionKey: _cueSessionKey,
+        taskKey: _block.id,
+        currentLabel: _block.title,
+        nextLabel: _nextBlockTitle,
+        totalDurationSeconds: _block.plannedDurationMinutes * 60,
+        elapsedSeconds: _elapsedSeconds,
+        intent: NotificationIntent.todayPlanBlock(
+          dateKey: _dayPlanDate,
+          blockId: _block.id,
+        ),
+      ),
+    );
   }
 
   @override

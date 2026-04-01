@@ -4,6 +4,113 @@
 
 import 'package:focusflow_mobile/utils/constants.dart';
 
+class TaskReminderAnchor {
+  TaskReminderAnchor._();
+
+  static const String beforeStart = 'beforeStart';
+  static const String atStart = 'atStart';
+  static const String beforeEnd = 'beforeEnd';
+  static const String atEnd = 'atEnd';
+
+  static const List<String> values = <String>[
+    beforeStart,
+    atStart,
+    beforeEnd,
+    atEnd,
+  ];
+}
+
+class TaskReminderRule {
+  final String id;
+  final String anchor;
+  final int offsetMinutes;
+  final bool enabled;
+
+  const TaskReminderRule({
+    required this.id,
+    required this.anchor,
+    required this.offsetMinutes,
+    this.enabled = true,
+  });
+
+  factory TaskReminderRule.fromJson(Map<String, dynamic> j) => TaskReminderRule(
+        id: j['id']?.toString() ?? '',
+        anchor: TaskReminderAnchor.values.contains(j['anchor'])
+            ? j['anchor'] as String
+            : TaskReminderAnchor.beforeStart,
+        offsetMinutes: j['offsetMinutes'] as int? ?? 0,
+        enabled: j['enabled'] as bool? ?? true,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'anchor': anchor,
+        'offsetMinutes': offsetMinutes,
+        'enabled': enabled,
+      };
+
+  TaskReminderRule copyWith({
+    String? id,
+    String? anchor,
+    int? offsetMinutes,
+    bool? enabled,
+  }) =>
+      TaskReminderRule(
+        id: id ?? this.id,
+        anchor: anchor ?? this.anchor,
+        offsetMinutes: offsetMinutes ?? this.offsetMinutes,
+        enabled: enabled ?? this.enabled,
+      );
+}
+
+class TimerReminderConfig {
+  final bool playCueSounds;
+  final bool speakReminders;
+  final List<TaskReminderRule> taskReminderRules;
+
+  const TimerReminderConfig({
+    required this.playCueSounds,
+    required this.speakReminders,
+    required this.taskReminderRules,
+  });
+
+  factory TimerReminderConfig.defaults() => const TimerReminderConfig(
+        playCueSounds: true,
+        speakReminders: false,
+        taskReminderRules: <TaskReminderRule>[],
+      );
+
+  factory TimerReminderConfig.fromJson(Map<String, dynamic> j) =>
+      TimerReminderConfig(
+        playCueSounds: j['playCueSounds'] as bool? ?? true,
+        speakReminders: j['speakReminders'] as bool? ?? false,
+        taskReminderRules: (j['taskReminderRules'] as List?)
+                ?.whereType<Map>()
+                .map((rule) =>
+                    TaskReminderRule.fromJson(Map<String, dynamic>.from(rule)))
+                .toList() ??
+            const <TaskReminderRule>[],
+      );
+
+  Map<String, dynamic> toJson() => {
+        'playCueSounds': playCueSounds,
+        'speakReminders': speakReminders,
+        'taskReminderRules':
+            taskReminderRules.map((rule) => rule.toJson()).toList(),
+      };
+
+  TimerReminderConfig copyWith({
+    bool? playCueSounds,
+    bool? speakReminders,
+    List<TaskReminderRule>? taskReminderRules,
+  }) =>
+      TimerReminderConfig(
+        playCueSounds: playCueSounds ?? this.playCueSounds,
+        speakReminders: speakReminders ?? this.speakReminders,
+        taskReminderRules: taskReminderRules ?? this.taskReminderRules,
+      );
+}
+
 class MenuItemConfig {
   final String id;
   final bool visible;
@@ -27,11 +134,13 @@ class NotificationConfig {
   final bool enabled;
   final String mode;
   final Map<String, bool> types;
+  final TimerReminderConfig timerReminders;
 
   const NotificationConfig({
     required this.enabled,
     required this.mode,
     required this.types,
+    required this.timerReminders,
   });
 
   factory NotificationConfig.fromJson(Map<String, dynamic> j) =>
@@ -40,22 +149,53 @@ class NotificationConfig {
         mode: j['mode'] ?? 'normal',
         types: j['types'] != null
             ? Map<String, bool>.from(j['types'])
-            : const {'blockTimers': true, 'breaks': true, 'mentorNudges': true, 'dailySummary': true},
+            : const {
+                'blockTimers': true,
+                'breaks': true,
+                'mentorNudges': true,
+                'dailySummary': true,
+              },
+        timerReminders: j['timerReminders'] != null
+            ? TimerReminderConfig.fromJson(
+                Map<String, dynamic>.from(j['timerReminders'] as Map),
+              )
+            : TimerReminderConfig.defaults(),
       );
 
   factory NotificationConfig.defaults() => const NotificationConfig(
         enabled: true,
         mode: 'normal',
-        types: {'blockTimers': true, 'breaks': true, 'mentorNudges': true, 'dailySummary': true},
+        types: {
+          'blockTimers': true,
+          'breaks': true,
+          'mentorNudges': true,
+          'dailySummary': true,
+        },
+        timerReminders: TimerReminderConfig(
+          playCueSounds: true,
+          speakReminders: false,
+          taskReminderRules: <TaskReminderRule>[],
+        ),
       );
 
-  Map<String, dynamic> toJson() => {'enabled': enabled, 'mode': mode, 'types': types};
+  Map<String, dynamic> toJson() => {
+        'enabled': enabled,
+        'mode': mode,
+        'types': types,
+        'timerReminders': timerReminders.toJson(),
+      };
 
-  NotificationConfig copyWith({bool? enabled, String? mode, Map<String, bool>? types}) =>
+  NotificationConfig copyWith({
+    bool? enabled,
+    String? mode,
+    Map<String, bool>? types,
+    TimerReminderConfig? timerReminders,
+  }) =>
       NotificationConfig(
         enabled: enabled ?? this.enabled,
         mode: mode ?? this.mode,
         types: types ?? this.types,
+        timerReminders: timerReminders ?? this.timerReminders,
       );
 }
 

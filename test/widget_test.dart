@@ -1,14 +1,21 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:focusflow_mobile/models/active_study_session.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/models/fa_subtopic.dart';
+import 'package:focusflow_mobile/models/library_note.dart';
+import 'package:focusflow_mobile/models/revision_item.dart';
 import 'package:focusflow_mobile/models/routine.dart';
 import 'package:focusflow_mobile/models/video_lecture.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
@@ -16,11 +23,318 @@ import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/screens/today_plan/routine_runner_screen.dart';
 import 'package:focusflow_mobile/screens/today_plan/study_flow_screen.dart';
 import 'package:focusflow_mobile/screens/today_plan/timeline_view.dart';
+import 'package:focusflow_mobile/services/attachment_storage_service.dart';
+import 'package:focusflow_mobile/services/backup_service.dart';
+import 'package:focusflow_mobile/services/database_service.dart';
+import 'package:focusflow_mobile/services/notification_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart';
 
+const MethodChannel _pathProviderChannel =
+    MethodChannel('plugins.flutter.io/path_provider');
+const MethodChannel _notificationsChannel =
+    MethodChannel('dexterous.com/flutter/local_notifications');
+const MethodChannel _backgroundServiceChannel =
+    MethodChannel(
+      'id.flutter/background_service/android/method',
+      JSONMethodCodec(),
+    );
+
+late Directory _testSandboxDirectory;
+final List<String> _notificationMethodCalls = <String>[];
+bool _backgroundServiceRunning = false;
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() async {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+    FlutterBackgroundServiceAndroid.registerWith();
+
+    _testSandboxDirectory =
+        await Directory.systemTemp.createTemp('focusflow_backup_test_');
+
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      _pathProviderChannel,
+      (call) async {
+        switch (call.method) {
+          case 'getTemporaryDirectory':
+          case 'getApplicationDocumentsDirectory':
+          case 'getApplicationSupportDirectory':
+          case 'getLibraryDirectory':
+          case 'getDownloadsDirectory':
+          case 'getExternalStorageDirectory':
+            return _testSandboxDirectory.path;
+          case 'getExternalCacheDirectories':
+          case 'getExternalStorageDirectories':
+            return <String>[_testSandboxDirectory.path];
+          default:
+            return _testSandboxDirectory.path;
+        }
+      },
+    );
+
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      _notificationsChannel,
+      (call) async {
+        _notificationMethodCalls.add(call.method);
+        switch (call.method) {
+          case 'initialize':
+          case 'cancel':
+          case 'cancelAll':
+          case 'zonedSchedule':
+          case 'show':
+          case 'createNotificationChannel':
+          case 'createNotificationChannelGroup':
+            return true;
+          case 'getNotificationAppLaunchDetails':
+            return <String, dynamic>{'notificationLaunchedApp': false};
+          case 'pendingNotificationRequests':
+          case 'getActiveNotifications':
+            return <Map<String, dynamic>>[];
+          case 'requestNotificationsPermission':
+            return true;
+          default:
+            return null;
+        }
+      },
+    );
+
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      _backgroundServiceChannel,
+      (call) async {
+        switch (call.method) {
+          case 'configure':
+            _backgroundServiceRunning = false;
+            return true;
+          case 'start':
+            _backgroundServiceRunning = true;
+            return true;
+          case 'isServiceRunning':
+            return _backgroundServiceRunning;
+          case 'sendData':
+            final args = (call.arguments as Map?)?.cast<dynamic, dynamic>() ?? {};
+            final method = args['method'];
+            if (method == 'stopService') {
+              _backgroundServiceRunning = false;
+            }
+            return true;
+          default:
+            return true;
+        }
+      },
+    );
+
+    await NotificationService.instance.init();
+  });
+
+  tearDownAll(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(_pathProviderChannel, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(_notificationsChannel, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(_backgroundServiceChannel, null);
+    if (await _testSandboxDirectory.exists()) {
+      await _testSandboxDirectory.delete(recursive: true);
+    }
+  });
+
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    _notificationMethodCalls.clear();
+    _backgroundServiceRunning = false;
+    await _resetDatabase();
+    final focusFlowDir = Directory(p.join(_testSandboxDirectory.path, 'FocusFlow'));
+    if (await focusFlowDir.exists()) {
+      await focusFlowDir.delete(recursive: true);
+    }
+  });
+
+  test('backup roundtrip preserves video lectures and dynamic tables', () async {
+    final db = DatabaseService.instance;
+    final sqlDb = await db.database;
+
+    await db.insertRawRow(DatabaseService.tVideoLectures, {
+      'id': 7,
+      'subject': 'ENT',
+      'title': 'ENT Day-1 Mission 200+',
+      'duration_minutes': 312,
+      'watched_minutes': 312,
+      'watched': 1,
+      'order_index': 1,
+    });
+
+    await sqlDb.execute('''
+      CREATE TABLE IF NOT EXISTS custom_backup_probe (
+        id TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    ''');
+    await sqlDb.insert(
+      'custom_backup_probe',
+      {'id': 'probe-1', 'value': 'ok'},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    final backupData = await BackupService.buildBackupData();
+    final tables = Map<String, dynamic>.from(backupData['tables'] as Map);
+
+    expect(tables.containsKey(DatabaseService.tVideoLectures), isTrue);
+    expect(tables.containsKey('custom_backup_probe'), isTrue);
+
+    await db.clearAllData();
+    expect(await db.getRawTableRows(DatabaseService.tVideoLectures), isEmpty);
+    expect(await sqlDb.query('custom_backup_probe'), isEmpty);
+
+    await BackupService.restoreFromBackupData(backupData);
+
+    final restoredVideoRows =
+        await db.getRawTableRows(DatabaseService.tVideoLectures);
+    expect(restoredVideoRows, hasLength(1));
+    expect(restoredVideoRows.single['watched'], 1);
+    expect(restoredVideoRows.single['watched_minutes'], 312);
+
+    final restoredProbeRows = await sqlDb.query('custom_backup_probe');
+    expect(restoredProbeRows, hasLength(1));
+    expect(restoredProbeRows.single['value'], 'ok');
+  });
+
+  test(
+      'restore preserves bundled note attachments and resyncs notifications',
+      () async {
+    final sourceAttachment =
+        File(p.join(_testSandboxDirectory.path, 'source_attachment.txt'));
+    await sourceAttachment.writeAsString('focusflow attachment');
+
+    final note = LibraryNote(
+      id: 'note-1',
+      itemId: 'video-7',
+      itemType: 'VIDEO',
+      noteText: 'ENT note',
+      attachmentPaths: [
+        sourceAttachment.path,
+        'https://example.com/ent',
+      ],
+      createdAt: DateTime.now().toIso8601String(),
+    );
+    final normalizedPaths = await AttachmentStorageService
+        .normalizeAttachmentPaths(note.attachmentPaths);
+    await DatabaseService.instance.upsertLibraryNote(
+      note.copyWith(attachmentPaths: normalizedPaths).toJson(),
+    );
+
+    final savedNoteRows = await DatabaseService.instance.getLibraryNotes('video-7');
+    final savedNote = LibraryNote.fromJson(savedNoteRows.single);
+    final managedAttachmentPath = savedNote.attachmentPaths.firstWhere(
+      (path) => !AttachmentStorageService.isWebLink(path),
+    );
+    expect(managedAttachmentPath, isNot(sourceAttachment.path));
+    expect(File(managedAttachmentPath).existsSync(), isTrue);
+
+    await DatabaseService.instance.insertRawRow(DatabaseService.tVideoLectures, {
+      'id': 7,
+      'subject': 'ENT',
+      'title': 'ENT Day-1 Mission 200+',
+      'duration_minutes': 312,
+      'watched_minutes': 312,
+      'watched': 1,
+      'order_index': 1,
+    });
+    await DatabaseService.instance.upsertRoutine(
+      _buildRoutineFixture()
+          .copyWith(reminderTime: '09:15', recurrence: 'daily')
+          .toJson(),
+    );
+    await DatabaseService.instance.upsertRevisionItem(
+      RevisionItem(
+        id: 'rev-1',
+        type: 'VIDEO',
+        source: 'VIDEO',
+        pageNumber: '7',
+        title: 'ENT Day-1 Mission 200+',
+        parentTitle: 'ENT',
+        nextRevisionAt: DateTime.now()
+            .add(const Duration(hours: 2))
+            .toIso8601String(),
+        currentRevisionIndex: 0,
+      ).toJson(),
+    );
+
+    final backupData = await BackupService.buildBackupData();
+    final backupFile =
+        File(p.join(_testSandboxDirectory.path, 'focusflow_roundtrip.ffbackup'));
+    await backupFile.writeAsBytes(await BackupService.buildBackupFileBytes(backupData));
+    final decodedBackup = await BackupService.readBackupFile(backupFile.path);
+
+    final attachmentsDir = await AttachmentStorageService.getAttachmentsDirectory();
+    if (await attachmentsDir.exists()) {
+      await attachmentsDir.delete(recursive: true);
+    }
+
+    final restoringApp = AppProvider();
+    await restoringApp.restoreFromBackup(decodedBackup);
+
+    final restoredVideoRows = await DatabaseService.instance
+        .getRawTableRows(DatabaseService.tVideoLectures);
+    expect(restoredVideoRows, hasLength(1));
+    expect(restoredVideoRows.single['watched'], 1);
+    expect(restoredVideoRows.single['watched_minutes'], 312);
+
+    final restoredNoteRows =
+        await DatabaseService.instance.getLibraryNotes('video-7');
+    final restoredNote = LibraryNote.fromJson(restoredNoteRows.single);
+    final restoredAttachmentPath = restoredNote.attachmentPaths.firstWhere(
+      (path) => !AttachmentStorageService.isWebLink(path),
+    );
+    expect(restoredAttachmentPath, isNot(managedAttachmentPath));
+    expect(File(restoredAttachmentPath).existsSync(), isTrue);
+    expect(restoredNote.attachmentPaths, contains('https://example.com/ent'));
+
+    expect(_notificationMethodCalls, contains('cancelAll'));
+    expect(
+      _notificationMethodCalls.where((method) => method == 'zonedSchedule').length,
+      greaterThanOrEqualTo(2),
+    );
+  });
+
+  test('legacy json backups remain readable', () async {
+    final legacyBackup = <String, dynamic>{
+      'backup_schema_version': 1,
+      'app_version': '1.0.0',
+      'exported_at': DateTime.now().toIso8601String(),
+      'db_version': DatabaseService.dbVersion,
+      'tables': {
+        DatabaseService.tVideoLectures: [
+          {
+            'id': 7,
+            'subject': 'ENT',
+            'title': 'ENT Day-1 Mission 200+',
+            'duration_minutes': 312,
+            'watched_minutes': 120,
+            'watched': 0,
+            'order_index': 1,
+          },
+        ],
+      },
+      'shared_preferences': {
+        'backup_auto': true,
+      },
+    };
+
+    final legacyFile =
+        File(p.join(_testSandboxDirectory.path, 'legacy_backup.json'));
+    await legacyFile.writeAsString(jsonEncode(legacyBackup));
+
+    final decodedBackup = await BackupService.readBackupFile(legacyFile.path);
+    expect(BackupService.validateBackupData(decodedBackup), isNull);
+    final tables = Map<String, dynamic>.from(decodedBackup['tables'] as Map);
+    expect(tables[DatabaseService.tVideoLectures], isA<List>());
+  });
 
   testWidgets('planned insertion recommends the next free start time',
       (tester) async {
@@ -1141,6 +1455,20 @@ Routine _buildRoutineFixture() {
     ],
     createdAt: '2026-03-31T00:00:00.000',
   );
+}
+
+Future<void> _resetDatabase() async {
+  await DatabaseService.instance.close();
+  final dbPath = await getDatabasesPath();
+  final dbFilePath = p.join(dbPath, 'focusflow.db');
+  await deleteDatabase(dbFilePath);
+
+  for (final suffix in ['-wal', '-shm']) {
+    final sidecar = File('$dbFilePath$suffix');
+    if (await sidecar.exists()) {
+      await sidecar.delete();
+    }
+  }
 }
 
 _TestStudyFlowAppProvider _buildStudyFlowAppProvider({

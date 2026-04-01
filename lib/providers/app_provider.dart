@@ -12,11 +12,13 @@ import 'package:focusflow_mobile/services/backup_service.dart';
 import 'package:focusflow_mobile/services/notification_service.dart';
 import 'package:focusflow_mobile/services/database_service.dart';
 import 'package:focusflow_mobile/services/srs_service.dart';
+import 'package:focusflow_mobile/services/attachment_storage_service.dart';
 import 'package:focusflow_mobile/services/background_timer_service.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:focusflow_mobile/models/app_settings.dart';
 import 'package:focusflow_mobile/models/knowledge_base.dart';
 import 'package:focusflow_mobile/models/active_study_session.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
@@ -355,6 +357,7 @@ class AppProvider extends ChangeNotifier {
     _restoreActiveStudySession(prefs);
     await _syncActiveStudySessionBackgroundTimer();
     await _refreshRoutineReminderState();
+    await _refreshPlannedTaskReminderState();
 
     // ── Seed sample notifications (in-memory only) ────────────────
     final now = DateTime.now();
@@ -945,10 +948,33 @@ class AppProvider extends ChangeNotifier {
     } else {
       dayPlans.add(plan);
     }
+    await _syncPlannedTaskRemindersForPlan(plan);
     if (notify) {
       notifyListeners();
     }
     unawaited(_triggerBackup());
+  }
+
+  Future<void> _syncPlannedTaskRemindersForPlan(DayPlan plan) async {
+    final settingsJson = await _db.getSettings();
+    final settings = settingsJson == null
+        ? AppSettings.defaults()
+        : AppSettings.fromJson(settingsJson);
+    await NotificationService.instance.syncPlannedTaskReminders(
+      plans: dayPlans,
+      config: settings.notifications.timerReminders,
+    );
+  }
+
+  Future<void> _refreshPlannedTaskReminderState() async {
+    final settingsJson = await _db.getSettings();
+    final settings = settingsJson == null
+        ? AppSettings.defaults()
+        : AppSettings.fromJson(settingsJson);
+    await NotificationService.instance.syncPlannedTaskReminders(
+      plans: dayPlans,
+      config: settings.notifications.timerReminders,
+    );
   }
 
   Future<void> upsertDayPlan(DayPlan plan) async {
@@ -5688,6 +5714,23 @@ class AppProvider extends ChangeNotifier {
     // 3. Reload all in-memory state from the freshly-restored DB
     _loaded = false;
     await loadAll();
+    await _resyncNotificationStateAfterRestore();
+  }
+
+  Future<void> _resyncNotificationStateAfterRestore() async {
+    final ns = NotificationService.instance;
+    await ns.cancelAll();
+    await _refreshRoutineReminderState();
+    await _refreshPlannedTaskReminderState();
+
+    final revisionCount = revisionItems.where((r) {
+      final dt = DateTime.tryParse(r.nextRevisionAt);
+      if (dt == null) return false;
+      return dt.isBefore(DateTime.now().add(const Duration(days: 1)));
+    }).length;
+
+    await ns.scheduleMorningSummary(dueCount: revisionCount);
+    await ns.scheduleDailyRevisionReminder(revisionCount: revisionCount);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -5858,13 +5901,18 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> saveLibraryNote(LibraryNote note) async {
-    await DatabaseService.instance.upsertLibraryNote(note.toJson());
+    final normalizedPaths = await AttachmentStorageService
+        .normalizeAttachmentPaths(note.attachmentPaths);
+    final normalizedNote = note.copyWith(attachmentPaths: normalizedPaths);
+    await DatabaseService.instance.upsertLibraryNote(normalizedNote.toJson());
     notifyListeners();
+    unawaited(_triggerBackup());
   }
 
   Future<void> deleteLibraryNote(String id) async {
     await DatabaseService.instance.deleteLibraryNote(id);
     notifyListeners();
+    unawaited(_triggerBackup());
   }
 
   // ═════════════════════════════════════════════════════════════════

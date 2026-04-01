@@ -35,7 +35,7 @@ void main() async {
   await settingsProvider.loadSettings();
 
   // Schedule persistent daily notifications after data is ready
-  _scheduleStartupNotifications(appProvider);
+  _scheduleStartupNotifications(appProvider, settingsProvider);
 
   // ── UI is up immediately ──────────────────────────────────────
   // All heavy work (DB init, seeding FA/Sketchy/Pathoma/UWorld)
@@ -52,7 +52,10 @@ void main() async {
 }
 
 /// Schedule all recurring daily notifications (fire-and-forget).
-void _scheduleStartupNotifications(AppProvider app) {
+void _scheduleStartupNotifications(
+  AppProvider app,
+  SettingsProvider settings,
+) {
   final ns = NotificationService.instance;
   final revisionCount = app.revisionItems
       .where((r) {
@@ -69,5 +72,10 @@ void _scheduleStartupNotifications(AppProvider app) {
   if (revisionCount > 0) {
     ns.scheduleDailyRevisionReminder(revisionCount: revisionCount);
   }
+
+  ns.syncPlannedTaskReminders(
+    plans: app.dayPlans,
+    config: settings.timerReminders,
+  );
 }
 

@@ -16,7 +16,9 @@ import 'package:focusflow_mobile/models/uworld_topic.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
+import 'package:focusflow_mobile/services/notification_service.dart';
 import 'package:focusflow_mobile/services/srs_service.dart';
+import 'package:focusflow_mobile/services/timer_reminder_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 
 class StudyTask {
@@ -467,6 +469,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
+    TimerReminderService.instance.clearSession(_cueSessionKey);
     super.dispose();
   }
 
@@ -512,6 +515,73 @@ class _StudyFlowScreenState extends State<StudyFlowScreen>
       _totalElapsed = app.activeStudySessionElapsedSeconds;
       _pageElapsed = app.activeStudySessionTaskElapsedSeconds();
     });
+  }
+
+  String get _cueSessionKey =>
+      'study:${widget.dateKey}:${widget.blockId ?? widget.sessionTitle ?? 'adhoc'}';
+
+  String? get _nextQueuedTaskLabel {
+    final nextIndex = _currentTaskIndex + 1;
+    if (nextIndex < 0 || nextIndex >= _queue.length) return null;
+    final nextTask = _queue[nextIndex];
+    return nextTask.label.isNotEmpty ? nextTask.label : nextTask.detail;
+  }
+
+  int? _activeCueDurationSeconds(AppProvider app) {
+    if (_hasQueuedTasks) {
+      final task = _currentTask;
+      if (task == null) return null;
+      final minutes = task.estimatedDurationMinutes;
+      return minutes > 0 ? minutes * 60 : null;
+    }
+    return _plannedSessionDurationSeconds(app);
+  }
+
+  int _activeCueElapsedSeconds() => _hasQueuedTasks ? _pageElapsed : _totalElapsed;
+
+  NotificationIntent _activeCueIntent() {
+    if (widget.blockId != null) {
+      return NotificationIntent.todayPlanBlock(
+        dateKey: widget.dateKey,
+        blockId: widget.blockId!,
+      );
+    }
+    return NotificationIntent.todayPlan(dateKey: widget.dateKey);
+  }
+
+  Future<void> _processStudyCue() async {
+    if (!mounted || !_isStudying || _timersPaused) {
+      return;
+    }
+
+    final app = context.read<AppProvider>();
+    final settings = context.read<SettingsProvider>();
+    final durationSeconds = _activeCueDurationSeconds(app);
+    if (durationSeconds == null || durationSeconds <= 0) {
+      return;
+    }
+
+    final currentLabel = _hasQueuedTasks
+        ? (_currentTask?.label ?? _currentTask?.detail ?? _persistedTitle)
+        : _persistedTitle;
+
+    final taskKey = _hasQueuedTasks
+        ? (_currentTask?.id ?? 'adhoc')
+        : (widget.blockId ?? 'session');
+
+    await TimerReminderService.instance.processActiveTimerCue(
+      config: settings.timerReminders,
+      context: ActiveTimerCueContext(
+        sessionKey: _cueSessionKey,
+        taskKey: taskKey,
+        currentLabel: currentLabel,
+        nextLabel: _hasQueuedTasks ? _nextQueuedTaskLabel : null,
+        totalDurationSeconds: durationSeconds,
+        elapsedSeconds: _activeCueElapsedSeconds(),
+        isPaused: _timersPaused,
+        intent: _activeCueIntent(),
+      ),
+    );
   }
 
   Future<void> _persistActiveSessionProgress({
@@ -635,6 +705,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen>
         );
     _startCurrentQueuedTaskIfNeeded();
     await _refreshElapsedFromProvider();
+    await _processStudyCue();
     _ensureTimerRunning();
     _triggerQueuedFaRevisionGateIfNeeded();
   }
@@ -652,8 +723,13 @@ class _StudyFlowScreenState extends State<StudyFlowScreen>
       if (!mounted || !_isStudying || _timersPaused) {
         return;
       }
-      unawaited(_refreshElapsedFromProvider());
+      unawaited(_handleStudyTimerTick());
     });
+  }
+
+  Future<void> _handleStudyTimerTick() async {
+    await _refreshElapsedFromProvider();
+    await _processStudyCue();
   }
 
   void _triggerQueuedFaRevisionGateIfNeeded() {
@@ -1074,6 +1150,7 @@ class _StudyFlowScreenState extends State<StudyFlowScreen>
   void _closeSessionUi() {
     _timer?.cancel();
     _timer = null;
+    TimerReminderService.instance.clearSession(_cueSessionKey);
     _isStudying = false;
     _userPaused = false;
     _revisionGatePaused = false;

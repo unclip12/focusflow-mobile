@@ -21,10 +21,10 @@ import 'buying_tab.dart';
 import 'block_editor_sheet.dart';
 import 'day_session_screen.dart';
 import 'routine_editor_sheet.dart';
+import 'routine_runner_screen.dart';
 import 'routines_tab.dart';
 import 'study_flow_screen.dart';
 import 'study_session_picker.dart';
-import 'study_session_screen.dart';
 import 'todo_tab.dart';
 import 'track_now_screen.dart';
 import 'package:focusflow_mobile/screens/today_plan/timeline_view.dart';
@@ -261,7 +261,10 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
         return;
       }
 
-      if (request.blockId == null) return;
+      if (request.blockId == null) {
+        await _openRoutineLaunchIfNeeded(app, request);
+        return;
+      }
 
       final plan = app.getDayPlan(_dateKey);
       Block? block;
@@ -273,18 +276,121 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
       }
       if (block == null) return;
 
-      if (block.type == BlockType.studySession) {
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => StudySessionScreen(block: block!),
-          ),
-        );
-      }
+      await _openBlockLaunch(app, plan, block);
     } finally {
       NotificationService.instance.clearTodayPlanLaunchRequest(request);
       if (identical(_processingNotificationLaunch, request)) {
         _processingNotificationLaunch = null;
       }
+    }
+  }
+
+  bool _opensStudyLaunch(Block block) {
+    final title = block.title.toLowerCase();
+    return title.contains('study') ||
+        title.contains('revision') ||
+        title.contains('anki') ||
+        title.contains('qbank') ||
+        title.contains('lecture');
+  }
+
+  Future<void> _openRoutineLaunchIfNeeded(
+    AppProvider app,
+    TodayPlanLaunchRequest request,
+  ) async {
+    final routineId = request.routineId;
+    if (routineId == null) return;
+
+    final activeRun = app.getActiveRoutineRunForRoutine(routineId, _dateKey);
+    if (activeRun == null) return;
+
+    final routine = app.getRoutineById(routineId);
+    if (routine == null) return;
+
+    await RoutineRunnerScreen.open(
+      context,
+      routine: routine,
+      dateKey: _dateKey,
+      sourceBlockId: activeRun.sourceBlockId,
+    );
+  }
+
+  Future<void> _openBlockLaunch(
+    AppProvider app,
+    DayPlan? plan,
+    Block block,
+  ) async {
+    final sourceDateKey = block.date.isNotEmpty ? block.date : _dateKey;
+
+    if (app.isRoutineBlock(block)) {
+      final routine = app.getRoutineForBlock(block);
+      if (routine != null) {
+        await RoutineRunnerScreen.open(
+          context,
+          routine: routine,
+          dateKey: sourceDateKey,
+          sourceBlockId: block.id,
+        );
+      }
+      return;
+    }
+
+    if (_opensStudyLaunch(block)) {
+      final activeSession = app.getActiveStudySession();
+      if (activeSession != null &&
+          activeSession.kind == ActiveStudySessionKind.studyFlow &&
+          activeSession.dateKey == sourceDateKey &&
+          activeSession.blockId == block.id) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => StudyFlowScreen(
+              dateKey: sourceDateKey,
+              blockId: block.id,
+              sessionTitle: block.title,
+              autoAdvanceFlow: true,
+            ),
+          ),
+        );
+        return;
+      }
+
+      final plannedSession = PlannedStudySessionPayload.fromBlock(block);
+      if (plannedSession != null && plannedSession.tasks.isNotEmpty) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => StudyFlowScreen(
+              dateKey: sourceDateKey,
+              queuedTasks: plannedSession.tasks,
+              blockId: block.id,
+              sessionTitle: block.title,
+              autoAdvanceFlow: true,
+            ),
+          ),
+        );
+        return;
+      }
+
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => StudySessionPicker(
+          dateKey: sourceDateKey,
+          targetBlockId: block.id,
+          boundPlannedStartTime: block.plannedStartTime,
+          boundPlannedEndTime: block.plannedEndTime,
+        ),
+      );
+      return;
+    }
+
+    if (plan != null) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SessionScreen(block: block, plan: plan),
+        ),
+      );
     }
   }
 

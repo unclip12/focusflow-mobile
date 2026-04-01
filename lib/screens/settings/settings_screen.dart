@@ -5,6 +5,8 @@
 //                enableDrag: false, useSafeArea: true on sheets.
 // =============================================================
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -12,9 +14,11 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
 
+import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/models/app_settings.dart';
-import 'package:focusflow_mobile/services/backup_service.dart';
+import '../../services/backup_service.dart';
+import 'package:focusflow_mobile/services/notification_service.dart';
 import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/widgets/app_scaffold.dart';
@@ -506,6 +510,130 @@ class SettingsScreen extends StatelessWidget {
           // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           // MENU CONFIGURATION
           // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+          _GlassSectionHeader(title: 'Timer Reminders'),
+          const SizedBox(height: 8),
+          LiquidGlassCard(
+            child: Column(
+              children: [
+                _GlassListTile(
+                  title: 'Cue Sounds',
+                  subtitle: 'Play a sound for 20%, 5-minute, and 1-minute warnings',
+                  trailing: Switch.adaptive(
+                    value: sp.timerReminders.playCueSounds,
+                    activeTrackColor: cs.primary,
+                    onChanged: (value) {
+                      sp.setPlayCueSounds(value);
+                      unawaited(_syncPlannedTaskReminders(context));
+                    },
+                  ),
+                ),
+                Divider(
+                  height: 1,
+                  color: DashboardColors.glassBorder(
+                    Theme.of(context).brightness == Brightness.dark,
+                  ),
+                ),
+                _GlassListTile(
+                  title: 'Spoken Reminders',
+                  subtitle: 'Speak timer warnings aloud after the cue sound',
+                  trailing: Switch.adaptive(
+                    value: sp.timerReminders.speakReminders,
+                    activeTrackColor: cs.primary,
+                    onChanged: (value) {
+                      sp.setSpeakReminders(value);
+                      unawaited(_syncPlannedTaskReminders(context));
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          LiquidGlassCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Global Task Reminder Rules',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => _openTaskReminderRuleEditor(context),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('Add'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'These rules apply to timed tasks across Today\'s Plan. Fixed active timer warnings still run automatically.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: cs.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                if (sp.timerReminders.taskReminderRules.isEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: cs.surface.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: cs.onSurface.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    child: Text(
+                      'No extra reminder rules yet. Add reminders for before start, at start, before end, or at end.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurface.withValues(alpha: 0.65),
+                      ),
+                    ),
+                  )
+                else
+                  Column(
+                    children: sp.timerReminders.taskReminderRules
+                        .map(
+                          (rule) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _TaskReminderRuleTile(
+                              rule: rule,
+                              summary: _taskReminderRuleSummary(rule),
+                              onTap: () => _openTaskReminderRuleEditor(
+                                context,
+                                existing: rule,
+                              ),
+                              onToggle: (value) {
+                                context
+                                    .read<SettingsProvider>()
+                                    .updateTaskReminderRule(
+                                      rule.copyWith(enabled: value),
+                                    );
+                                unawaited(_syncPlannedTaskReminders(context));
+                              },
+                              onDelete: () {
+                                context
+                                    .read<SettingsProvider>()
+                                    .removeTaskReminderRule(rule.id);
+                                unawaited(_syncPlannedTaskReminders(context));
+                              },
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
           _GlassSectionHeader(title: 'Menu'),
           const SizedBox(height: 8),
           _MenuReorderSection(sp: sp),
@@ -700,6 +828,55 @@ class SettingsScreen extends StatelessWidget {
   }
 
   // ── G10 helpers ─────────────────────────────────────────────────
+
+  Future<void> _openTaskReminderRuleEditor(
+    BuildContext context, {
+    TaskReminderRule? existing,
+  }) async {
+    final result = await showModalBottomSheet<TaskReminderRule>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _TaskReminderRuleEditorSheet(existing: existing),
+    );
+    if (result == null || !context.mounted) return;
+
+    final settings = context.read<SettingsProvider>();
+    if (existing == null) {
+      await settings.addTaskReminderRule(result);
+    } else {
+      await settings.updateTaskReminderRule(result);
+    }
+    await _syncPlannedTaskReminders(context);
+  }
+
+  String _taskReminderRuleSummary(TaskReminderRule rule) {
+    final minuteLabel =
+        rule.offsetMinutes == 1 ? '1 min' : '${rule.offsetMinutes} min';
+    switch (rule.anchor) {
+      case TaskReminderAnchor.beforeStart:
+        return '$minuteLabel before task start';
+      case TaskReminderAnchor.atStart:
+        return 'At task start';
+      case TaskReminderAnchor.beforeEnd:
+        return '$minuteLabel before task end';
+      case TaskReminderAnchor.atEnd:
+        return 'At task end';
+      default:
+        return '$minuteLabel reminder';
+    }
+  }
+
+  Future<void> _syncPlannedTaskReminders(BuildContext context) async {
+    final app = context.read<AppProvider>();
+    final settings = context.read<SettingsProvider>();
+    await NotificationService.instance.syncPlannedTaskReminders(
+      plans: app.dayPlans,
+      config: settings.timerReminders,
+    );
+  }
 
   String _formatDateLabel(String yyyyMMdd) {
     final dt = DateTime.tryParse(yyyyMMdd);
@@ -963,6 +1140,262 @@ class _SettingsTile extends StatelessWidget {
           ),
           if (trailing != null) trailing!,
         ],
+      ),
+    );
+  }
+}
+
+class _TaskReminderRuleTile extends StatelessWidget {
+  final TaskReminderRule rule;
+  final String summary;
+  final VoidCallback onTap;
+  final ValueChanged<bool> onToggle;
+  final VoidCallback onDelete;
+
+  const _TaskReminderRuleTile({
+    required this.rule,
+    required this.summary,
+    required this.onTap,
+    required this.onToggle,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surface.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cs.onSurface.withValues(alpha: 0.08)),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      summary,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      rule.enabled ? 'Enabled' : 'Disabled',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: rule.enabled,
+                onChanged: onToggle,
+              ),
+              IconButton(
+                onPressed: onDelete,
+                icon: Icon(Icons.delete_outline_rounded, color: cs.error),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskReminderRuleEditorSheet extends StatefulWidget {
+  final TaskReminderRule? existing;
+
+  const _TaskReminderRuleEditorSheet({this.existing});
+
+  @override
+  State<_TaskReminderRuleEditorSheet> createState() =>
+      _TaskReminderRuleEditorSheetState();
+}
+
+class _TaskReminderRuleEditorSheetState
+    extends State<_TaskReminderRuleEditorSheet> {
+  static const List<int> _minuteOptions = <int>[
+    1,
+    2,
+    5,
+    10,
+    15,
+    20,
+    30,
+    45,
+    60,
+  ];
+
+  late String _anchor;
+  late int _offsetMinutes;
+  late bool _enabled;
+
+  bool get _usesOffset =>
+      _anchor == TaskReminderAnchor.beforeStart ||
+      _anchor == TaskReminderAnchor.beforeEnd;
+
+  @override
+  void initState() {
+    super.initState();
+    final existing = widget.existing;
+    _anchor = existing?.anchor ?? TaskReminderAnchor.beforeStart;
+    _offsetMinutes = existing?.offsetMinutes ?? 5;
+    _enabled = existing?.enabled ?? true;
+  }
+
+  String _anchorLabel(String value) {
+    switch (value) {
+      case TaskReminderAnchor.beforeStart:
+        return 'Before task start';
+      case TaskReminderAnchor.atStart:
+        return 'At task start';
+      case TaskReminderAnchor.beforeEnd:
+        return 'Before task end';
+      case TaskReminderAnchor.atEnd:
+        return 'At task end';
+      default:
+        return value;
+    }
+  }
+
+  void _save() {
+    final existing = widget.existing;
+    final rule = TaskReminderRule(
+      id: existing?.id ?? 'timer-rule-${DateTime.now().microsecondsSinceEpoch}',
+      anchor: _anchor,
+      offsetMinutes: _usesOffset ? _offsetMinutes : 0,
+      enabled: _enabled,
+    );
+    Navigator.of(context).pop(rule);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Material(
+      color: Colors.transparent,
+      child: AnimatedPadding(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: Container(
+          decoration: BoxDecoration(
+            color: cs.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: cs.onSurface.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                widget.existing == null ? 'Add Reminder Rule' : 'Edit Reminder Rule',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _anchor,
+                decoration: const InputDecoration(
+                  labelText: 'When should this fire?',
+                ),
+                items: TaskReminderAnchor.values
+                    .map(
+                      (anchor) => DropdownMenuItem<String>(
+                        value: anchor,
+                        child: Text(_anchorLabel(anchor)),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => _anchor = value);
+                },
+              ),
+              const SizedBox(height: 16),
+              if (_usesOffset)
+                DropdownButtonFormField<int>(
+                  value: _minuteOptions.contains(_offsetMinutes)
+                      ? _offsetMinutes
+                      : _minuteOptions.first,
+                  decoration: const InputDecoration(
+                    labelText: 'Minutes',
+                  ),
+                  items: _minuteOptions
+                      .map(
+                        (minutes) => DropdownMenuItem<int>(
+                          value: minutes,
+                          child: Text(
+                            minutes == 1 ? '1 minute' : '$minutes minutes',
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _offsetMinutes = value);
+                  },
+                )
+              else
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'This reminder fires exactly at the task boundary.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: cs.onSurface.withValues(alpha: 0.68),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Enabled'),
+                value: _enabled,
+                onChanged: (value) => setState(() => _enabled = value),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _save,
+                  child: const Text('Save Rule'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
