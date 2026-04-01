@@ -11,6 +11,7 @@ import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/screens/library/add_note_sheet.dart';
 import 'package:focusflow_mobile/screens/library/edit_metadata_sheet.dart';
 import 'package:focusflow_mobile/screens/library/attachment_helper.dart';
+import 'package:focusflow_mobile/screens/library/library_notes_section.dart';
 import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'package:focusflow_mobile/utils/show_app_bottom_sheet.dart';
 
@@ -167,7 +168,7 @@ class _LibraryItemDetailSheetState extends State<LibraryItemDetailSheet>
                 scrollController: null, // will use its own
                 isDark: isDark,
               ),
-              _NotesTab(
+              LibraryNotesSection(
                 itemId: _itemId,
                 itemType: widget.itemType,
                 app: widget.app,

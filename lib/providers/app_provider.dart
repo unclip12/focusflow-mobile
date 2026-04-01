@@ -50,6 +50,7 @@ import 'package:focusflow_mobile/models/default_routine_order.dart';
 import 'package:focusflow_mobile/models/daily_flow.dart';
 import 'package:focusflow_mobile/models/activity_log.dart';
 import 'package:focusflow_mobile/models/day_session.dart';
+import 'package:focusflow_mobile/models/reminder.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart' as du;
 import 'package:focusflow_mobile/services/timeline_scheduler.dart';
@@ -230,6 +231,8 @@ class AppProvider extends ChangeNotifier {
   ActiveRoutineRun? _activeRoutineRun;
   List<BuyingItem> buyingItems = [];
   List<TodoItem> todoItems = [];
+  List<Reminder> reminders = [];
+  List<ReminderOccurrenceState> reminderOccurrenceStates = [];
   List<DefaultActivity> defaultActivities = [];
   List<DailyFlow> dailyFlows = [];
   List<VideoLecture> videoLectures = [];
@@ -319,6 +322,11 @@ class AppProvider extends ChangeNotifier {
         .toList();
     todoItems =
         (await _db.getAllTodoItems()).map((j) => TodoItem.fromJson(j)).toList();
+    reminders =
+        (await _db.getAllReminders()).map((j) => Reminder.fromJson(j)).toList();
+    reminderOccurrenceStates = (await _db.getAllReminderOccurrences())
+        .map((j) => ReminderOccurrenceState.fromJson(j))
+        .toList();
     defaultActivities = (await _db.getAllDefaultActivities())
         .map((j) => DefaultActivity.fromJson(j))
         .toList();
@@ -358,6 +366,7 @@ class AppProvider extends ChangeNotifier {
     await _syncActiveStudySessionBackgroundTimer();
     await _refreshRoutineReminderState();
     await _refreshPlannedTaskReminderState();
+    await _refreshReminderNotificationState();
 
     // ── Seed sample notifications (in-memory only) ────────────────
     final now = DateTime.now();
@@ -534,7 +543,8 @@ class AppProvider extends ChangeNotifier {
     if (session == null) return 0;
 
     var elapsed = session.currentTaskElapsedSeconds;
-    final runStartedAt = DateTime.tryParse(session.currentTaskRunStartedAt ?? '');
+    final runStartedAt =
+        DateTime.tryParse(session.currentTaskRunStartedAt ?? '');
     if (runStartedAt != null && !session.isPaused) {
       elapsed += (now ?? DateTime.now()).difference(runStartedAt).inSeconds;
     }
@@ -723,7 +733,8 @@ class AppProvider extends ChangeNotifier {
 
     final pausedAt = DateTime.now();
     var currentTaskElapsedSeconds = session.currentTaskElapsedSeconds;
-    final runStartedAt = DateTime.tryParse(session.currentTaskRunStartedAt ?? '');
+    final runStartedAt =
+        DateTime.tryParse(session.currentTaskRunStartedAt ?? '');
     if (runStartedAt != null) {
       currentTaskElapsedSeconds += pausedAt.difference(runStartedAt).inSeconds;
     }
@@ -753,8 +764,7 @@ class AppProvider extends ChangeNotifier {
     if (session == null || !session.isPaused) return;
 
     final resumedAt = DateTime.now();
-    final shouldTrackTaskRun =
-        session.kind == ActiveStudySessionKind.studyFlow;
+    final shouldTrackTaskRun = session.kind == ActiveStudySessionKind.studyFlow;
     final updated = session.copyWith(
       isPaused: false,
       currentTaskRunStartedAt:
@@ -768,7 +778,8 @@ class AppProvider extends ChangeNotifier {
     );
     _activeStudySession = updated;
     await _persistActiveStudySession();
-    await _syncActiveStudySessionToBlock(updated, status: BlockStatus.inProgress);
+    await _syncActiveStudySessionToBlock(updated,
+        status: BlockStatus.inProgress);
     await _syncActiveStudySessionBackgroundTimer();
     notifyListeners();
   }
@@ -791,7 +802,8 @@ class AppProvider extends ChangeNotifier {
     if (session == null) return 0;
 
     final end = completedAt ?? DateTime.now();
-    final runStartedAt = DateTime.tryParse(session.currentTaskRunStartedAt ?? '');
+    final runStartedAt =
+        DateTime.tryParse(session.currentTaskRunStartedAt ?? '');
     final finalizedSegments = session.isPaused
         ? session.segments
         : _closeLastOpenSegment(session.segments, end);
@@ -811,8 +823,7 @@ class AppProvider extends ChangeNotifier {
 
     final blockId = finalizedSession.blockId;
     if (blockId != null && blockId.isNotEmpty) {
-      final startedAt =
-          DateTime.tryParse(finalizedSession.startedAt) ?? end;
+      final startedAt = DateTime.tryParse(finalizedSession.startedAt) ?? end;
       await completeDayPlanBlock(
         finalizedSession.dateKey,
         blockId,
@@ -977,6 +988,18 @@ class AppProvider extends ChangeNotifier {
     );
   }
 
+  Future<void> _refreshReminderNotificationState() async {
+    final settingsJson = await _db.getSettings();
+    final settings = settingsJson == null
+        ? AppSettings.defaults()
+        : AppSettings.fromJson(settingsJson);
+    await NotificationService.instance.syncReminderNotifications(
+      reminders: reminders,
+      occurrenceStates: reminderOccurrenceStates,
+      config: settings.notifications.reminderNotifications,
+    );
+  }
+
   Future<void> upsertDayPlan(DayPlan plan) async {
     await _saveDayPlan(plan);
   }
@@ -999,8 +1022,8 @@ class AppProvider extends ChangeNotifier {
   List<Block> _sortedReindexedBlocks(List<Block> blocks) {
     final sortedBlocks = List<Block>.from(blocks)
       ..sort((a, b) {
-        final startCompare =
-            _toMinutes(a.plannedStartTime).compareTo(_toMinutes(b.plannedStartTime));
+        final startCompare = _toMinutes(a.plannedStartTime)
+            .compareTo(_toMinutes(b.plannedStartTime));
         if (startCompare != 0) return startCompare;
         final indexCompare = a.index.compareTo(b.index);
         if (indexCompare != 0) return indexCompare;
@@ -1012,7 +1035,8 @@ class AppProvider extends ChangeNotifier {
     ];
   }
 
-  DayPlan _dayPlanWithUpdatedBlocks(DayPlan? plan, String date, List<Block> blocks) {
+  DayPlan _dayPlanWithUpdatedBlocks(
+      DayPlan? plan, String date, List<Block> blocks) {
     final normalizedBlocks = _sortedReindexedBlocks(blocks);
     final basePlan = plan ??
         DayPlan(
@@ -1164,7 +1188,8 @@ class AppProvider extends ChangeNotifier {
       return const PlannedInsertValidationResult(isValid: true);
     }
 
-    final conflictingTitles = conflicts.take(2).map((block) => block.title).toSet();
+    final conflictingTitles =
+        conflicts.take(2).map((block) => block.title).toSet();
     final conflictLabel = conflictingTitles.join(' and ');
     return PlannedInsertValidationResult(
       isValid: false,
@@ -1182,7 +1207,8 @@ class AppProvider extends ChangeNotifier {
     List<Block> editedExistingBlocks = const [],
   }) async {
     final normalizedRequested = _sortedReindexedBlocks(requestedBlocks);
-    final existingIdsToReplace = editedExistingBlocks.map((block) => block.id).toSet();
+    final existingIdsToReplace =
+        editedExistingBlocks.map((block) => block.id).toSet();
 
     switch (resolution) {
       case PlannedInsertResolutionChoice.keepOverlap:
@@ -1253,7 +1279,8 @@ class AppProvider extends ChangeNotifier {
       date,
       excludedBlockIds: requestedBlocks.map((block) => block.id).toSet(),
     );
-    final placedIntervals = List<({int start, int end})>.from(blockingIntervals);
+    final placedIntervals =
+        List<({int start, int end})>.from(blockingIntervals);
     final placedBlocks = <Block>[];
     final sortedRequested = _sortedReindexedBlocks(requestedBlocks);
     var cursor = sortedRequested.isEmpty
@@ -1262,7 +1289,8 @@ class AppProvider extends ChangeNotifier {
 
     for (final block in sortedRequested) {
       if (block.plannedDurationMinutes <= 0) {
-        final zeroDurationStart = math.max(cursor, _toMinutes(block.plannedStartTime));
+        final zeroDurationStart =
+            math.max(cursor, _toMinutes(block.plannedStartTime));
         final normalizedBlock = block.copyWith(
           plannedStartTime: _fromMinutes(zeroDurationStart),
           plannedEndTime: _fromMinutes(zeroDurationStart),
@@ -1356,7 +1384,8 @@ class AppProvider extends ChangeNotifier {
     var candidateStart = requestedStart;
 
     while (true) {
-      final shiftedBlocks = _shiftBlocksToStart(requestedBlocks, candidateStart);
+      final shiftedBlocks =
+          _shiftBlocksToStart(requestedBlocks, candidateStart);
       final overlap = _firstConflictingBlock(
         requestedBlocks: shiftedBlocks,
         existingBlocks: blockingBlocks,
@@ -1401,7 +1430,8 @@ class AppProvider extends ChangeNotifier {
         }
         final existingStart = _toMinutes(existing.plannedStartTime);
         final existingEnd = _toMinutes(existing.plannedEndTime);
-        if (_rangesOverlap(requestStart, requestEnd, existingStart, existingEnd)) {
+        if (_rangesOverlap(
+            requestStart, requestEnd, existingStart, existingEnd)) {
           conflicts.add(existing);
           if (includeCandidatePairConflicts) {
             conflicts.add(requested);
@@ -1433,7 +1463,8 @@ class AppProvider extends ChangeNotifier {
     final excluded = excludedBlockIds.toSet();
     return (getDayPlan(date)?.blocks ?? const <Block>[])
         .where((block) =>
-            !excluded.contains(block.id) && _isPlannedInsertionBlockingBlock(block))
+            !excluded.contains(block.id) &&
+            _isPlannedInsertionBlockingBlock(block))
         .toList()
       ..sort((a, b) => _toMinutes(a.plannedStartTime).compareTo(
             _toMinutes(b.plannedStartTime),
@@ -1455,13 +1486,16 @@ class AppProvider extends ChangeNotifier {
     return _plannedInsertionBlockingBlocks(
       date,
       excludedBlockIds: excludedBlockIds,
-    ).map((block) => (
-          start: _toMinutes(block.plannedStartTime),
-          end: _toMinutes(block.plannedEndTime),
-        )).toList();
+    )
+        .map((block) => (
+              start: _toMinutes(block.plannedStartTime),
+              end: _toMinutes(block.plannedEndTime),
+            ))
+        .toList();
   }
 
-  int _advancePastBlockedIntervals(List<({int start, int end})> intervals, int cursor) {
+  int _advancePastBlockedIntervals(
+      List<({int start, int end})> intervals, int cursor) {
     var updatedCursor = cursor;
     var changed = true;
     while (changed) {
@@ -1574,7 +1608,8 @@ class AppProvider extends ChangeNotifier {
     if (targetBlock.status != BlockStatus.inProgress) return;
 
     final updatedBlocks = List<Block>.from(blocks);
-    updatedBlocks[targetIndex] = targetBlock.copyWith(status: BlockStatus.paused);
+    updatedBlocks[targetIndex] =
+        targetBlock.copyWith(status: BlockStatus.paused);
     await _saveDayPlan(
       _dayPlanWithUpdatedBlocks(plan, date, updatedBlocks),
       notify: false,
@@ -1599,13 +1634,15 @@ class AppProvider extends ChangeNotifier {
     final targetBlock = blocks[targetIndex];
     final existingStart = DateTime.tryParse(targetBlock.actualStartTime ?? '');
     final resolvedStart = existingStart ?? now;
-    final resolvedMinutes =
-        now.isAfter(resolvedStart) ? now.difference(resolvedStart).inMinutes : 0;
+    final resolvedMinutes = now.isAfter(resolvedStart)
+        ? now.difference(resolvedStart).inMinutes
+        : 0;
 
     final updatedBlocks = List<Block>.from(blocks);
     updatedBlocks[targetIndex] = targetBlock.copyWith(
       status: BlockStatus.done,
-      actualStartTime: targetBlock.actualStartTime ?? resolvedStart.toIso8601String(),
+      actualStartTime:
+          targetBlock.actualStartTime ?? resolvedStart.toIso8601String(),
       actualEndTime: now.toIso8601String(),
       actualDurationMinutes: resolvedMinutes,
       completionStatus: 'COMPLETED',
@@ -1670,7 +1707,8 @@ class AppProvider extends ChangeNotifier {
       index: 0,
       date: date,
       plannedStartTime: _fromMinutes((startedAt.hour * 60) + startedAt.minute),
-      plannedEndTime: _fromMinutes((completedAt.hour * 60) + completedAt.minute),
+      plannedEndTime:
+          _fromMinutes((completedAt.hour * 60) + completedAt.minute),
       type: BlockType.other,
       title: title,
       colorHex: colorHex,
@@ -1695,17 +1733,15 @@ class AppProvider extends ChangeNotifier {
     final endMinutes = (completedAt.hour * 60) + completedAt.minute;
     if (endMinutes <= startMinutes) return const [];
 
-    return (getDayPlan(date)?.blocks ?? const <Block>[])
-        .where((block) {
-          if (block.isEvent || block.type == BlockType.breakBlock) return false;
-          if (block.isAdHocTrack == true) return false;
-          final blockStart = _toMinutes(block.plannedStartTime);
-          final blockEnd = blockStart + block.plannedDurationMinutes;
-          return _rangesOverlap(startMinutes, endMinutes, blockStart, blockEnd);
-        })
-        .toList()
-      ..sort((a, b) =>
-          _toMinutes(a.plannedStartTime).compareTo(_toMinutes(b.plannedStartTime)));
+    return (getDayPlan(date)?.blocks ?? const <Block>[]).where((block) {
+      if (block.isEvent || block.type == BlockType.breakBlock) return false;
+      if (block.isAdHocTrack == true) return false;
+      final blockStart = _toMinutes(block.plannedStartTime);
+      final blockEnd = blockStart + block.plannedDurationMinutes;
+      return _rangesOverlap(startMinutes, endMinutes, blockStart, blockEnd);
+    }).toList()
+      ..sort((a, b) => _toMinutes(a.plannedStartTime)
+          .compareTo(_toMinutes(b.plannedStartTime)));
   }
 
   bool trackNowPushNeedsCascade(
@@ -1726,11 +1762,13 @@ class AppProvider extends ChangeNotifier {
         : 0;
     if (shiftMinutes <= 0) return false;
 
-    final shiftedStart = _toMinutes(firstConflict.plannedStartTime) + shiftMinutes;
+    final shiftedStart =
+        _toMinutes(firstConflict.plannedStartTime) + shiftMinutes;
     final shiftedEnd = shiftedStart + firstConflict.plannedDurationMinutes;
     for (final block in (getDayPlan(date)?.blocks ?? const <Block>[])) {
       if (block.id == firstConflict.id || block.isAdHocTrack == true) continue;
-      if (block.status == BlockStatus.done || block.status == BlockStatus.skipped) {
+      if (block.status == BlockStatus.done ||
+          block.status == BlockStatus.skipped) {
         continue;
       }
       final blockStart = _toMinutes(block.plannedStartTime);
@@ -1760,7 +1798,8 @@ class AppProvider extends ChangeNotifier {
 
     final updatedBlocks = List<Block>.from(existingBlocks)..add(trackedBlock);
 
-    if (conflictingBlocks.isEmpty || resolution == TrackNowConflictChoice.overlap) {
+    if (conflictingBlocks.isEmpty ||
+        resolution == TrackNowConflictChoice.overlap) {
       await _saveDayPlan(
         _dayPlanWithUpdatedBlocks(plan, date, updatedBlocks),
         notify: false,
@@ -1821,7 +1860,9 @@ class AppProvider extends ChangeNotifier {
               plannedEndTime: _fromMinutes(trackedEnd + afterDuration),
               plannedDurationMinutes: afterDuration,
               remainingDurationMinutes: afterDuration,
-              splitGroupId: beforeDuration > 0 ? (block.splitGroupId ?? block.id) : block.splitGroupId,
+              splitGroupId: beforeDuration > 0
+                  ? (block.splitGroupId ?? block.id)
+                  : block.splitGroupId,
               splitPartIndex: beforeDuration > 0 ? 2 : block.splitPartIndex,
               splitTotalParts: beforeDuration > 0 ? 2 : block.splitTotalParts,
             ),
@@ -1862,8 +1903,8 @@ class AppProvider extends ChangeNotifier {
 
     if (cascadePush) {
       final actualStart = DateTime.parse(trackedBlock.actualStartTime!);
-      final anchorStart =
-          _toMinutes(firstConflict.plannedStartTime) + trackedBlock.plannedDurationMinutes;
+      final anchorStart = _toMinutes(firstConflict.plannedStartTime) +
+          trackedBlock.plannedDurationMinutes;
       final anchor = DateTime(
         actualStart.year,
         actualStart.month,
@@ -2432,7 +2473,8 @@ class AppProvider extends ChangeNotifier {
 
     for (final plan in dayPlans) {
       for (final block in plan.blocks ?? const <Block>[]) {
-        if (_isRecurringGeneratedBlock(block) || block.recurrenceType == 'none') {
+        if (_isRecurringGeneratedBlock(block) ||
+            block.recurrenceType == 'none') {
           continue;
         }
         final templateDate = _parseBlockDate(block.date);
@@ -2457,9 +2499,10 @@ class AppProvider extends ChangeNotifier {
       }
     }
 
-    final reconciledBlocks = [...staticBlocks, ...generatedBlocks]..sort((a, b) {
-        final startCompare =
-            _toMinutes(a.plannedStartTime).compareTo(_toMinutes(b.plannedStartTime));
+    final reconciledBlocks = [...staticBlocks, ...generatedBlocks]
+      ..sort((a, b) {
+        final startCompare = _toMinutes(a.plannedStartTime)
+            .compareTo(_toMinutes(b.plannedStartTime));
         if (startCompare != 0) {
           return startCompare;
         }
@@ -2723,10 +2766,10 @@ class AppProvider extends ChangeNotifier {
       final isSameRoutineRun =
           existing.routineId == routine.id && existing.dateKey == dateKey;
       if (isSameRoutineRun) {
-        final needsSourceBlockUpdate =
-            (existing.sourceBlockId == null || existing.sourceBlockId!.isEmpty) &&
-                sourceBlockId != null &&
-                sourceBlockId.isNotEmpty;
+        final needsSourceBlockUpdate = (existing.sourceBlockId == null ||
+                existing.sourceBlockId!.isEmpty) &&
+            sourceBlockId != null &&
+            sourceBlockId.isNotEmpty;
         if (needsSourceBlockUpdate) {
           _activeRoutineRun = existing.copyWith(sourceBlockId: sourceBlockId);
           await _persistActiveRoutineRun();
@@ -3038,6 +3081,208 @@ class AppProvider extends ChangeNotifier {
 
   List<TodoItem> getTodosByCategory(String date, String category) =>
       todoItems.where((i) => i.date == date && i.category == category).toList();
+
+  Reminder? getReminderById(String id) {
+    try {
+      return reminders.firstWhere((reminder) => reminder.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  ReminderOccurrenceState? getReminderOccurrenceState(
+    String reminderId,
+    String occurrenceKey,
+  ) {
+    try {
+      return reminderOccurrenceStates.firstWhere(
+        (state) =>
+            state.reminderId == reminderId &&
+            state.occurrenceKey == occurrenceKey,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<ReminderOccurrence> getReminderOccurrencesForDate(String date) {
+    final targetDate = parseReminderDate(date);
+    if (targetDate == null) return const <ReminderOccurrence>[];
+
+    final now = DateTime.now();
+    final todayDate = reminderDateOnly(now);
+    final occurrences = <ReminderOccurrence>[];
+
+    for (final reminder in reminders) {
+      if (reminder.archived) continue;
+      final occurrence = _resolveReminderOccurrenceForDate(
+        reminder,
+        targetDate: targetDate,
+        todayDate: todayDate,
+      );
+      if (occurrence != null) {
+        occurrences.add(occurrence);
+      }
+    }
+
+    occurrences.sort((a, b) {
+      if (a.completed != b.completed) {
+        return a.completed ? 1 : -1;
+      }
+      if (a.isAllDay != b.isAllDay) {
+        return a.isAllDay ? -1 : 1;
+      }
+      final aTime = a.time ?? '99:99';
+      final bTime = b.time ?? '99:99';
+      final timeCompare = aTime.compareTo(bTime);
+      if (timeCompare != 0) return timeCompare;
+      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+    });
+
+    return occurrences;
+  }
+
+  List<ReminderOccurrence> getTimelineReminderOccurrencesForDate(String date) =>
+      getReminderOccurrencesForDate(date)
+          .where((occurrence) => occurrence.isTimed)
+          .toList();
+
+  Future<void> upsertReminder(Reminder reminder) async {
+    await _db.upsertReminder(reminder.toJson());
+    final idx = reminders.indexWhere((item) => item.id == reminder.id);
+    if (idx >= 0) {
+      reminders[idx] = reminder;
+    } else {
+      reminders.add(reminder);
+    }
+    await _refreshReminderNotificationState();
+    notifyListeners();
+    unawaited(_triggerBackup());
+  }
+
+  Future<void> deleteReminder(String id) async {
+    await _db.deleteReminder(id);
+    await _db.deleteReminderOccurrencesByReminder(id);
+    reminders.removeWhere((reminder) => reminder.id == id);
+    reminderOccurrenceStates
+        .removeWhere((occurrence) => occurrence.reminderId == id);
+    await _refreshReminderNotificationState();
+    notifyListeners();
+    unawaited(_triggerBackup());
+  }
+
+  Future<void> setReminderOccurrenceCompleted({
+    required String reminderId,
+    required String occurrenceKey,
+    required bool completed,
+  }) async {
+    final existing = getReminderOccurrenceState(reminderId, occurrenceKey);
+    final stateId = '${reminderId}_$occurrenceKey';
+    if (!completed) {
+      if (existing != null) {
+        await _db.deleteReminderOccurrence(existing.id);
+        reminderOccurrenceStates
+            .removeWhere((state) => state.id == existing.id);
+        await _refreshReminderNotificationState();
+        notifyListeners();
+        unawaited(_triggerBackup());
+      }
+      return;
+    }
+
+    final state = ReminderOccurrenceState(
+      id: stateId,
+      reminderId: reminderId,
+      occurrenceKey: occurrenceKey,
+      completed: true,
+      completedAt: DateTime.now().toIso8601String(),
+    );
+    await _db.upsertReminderOccurrence(state.toJson());
+    final idx =
+        reminderOccurrenceStates.indexWhere((item) => item.id == stateId);
+    if (idx >= 0) {
+      reminderOccurrenceStates[idx] = state;
+    } else {
+      reminderOccurrenceStates.add(state);
+    }
+    await _refreshReminderNotificationState();
+    notifyListeners();
+    unawaited(_triggerBackup());
+  }
+
+  ReminderOccurrence? _resolveReminderOccurrenceForDate(
+    Reminder reminder, {
+    required DateTime targetDate,
+    required DateTime todayDate,
+  }) {
+    if (targetDate.isBefore(todayDate)) {
+      if (!reminder.occursOn(targetDate)) return null;
+      return _buildReminderOccurrence(
+        reminder,
+        scheduledDate: targetDate,
+        effectiveDate: targetDate,
+      );
+    }
+
+    if (isSameReminderDate(targetDate, todayDate)) {
+      final scheduledDate = reminder.latestOccurrenceOnOrBefore(todayDate);
+      if (scheduledDate == null) return null;
+
+      final state = getReminderOccurrenceState(
+        reminder.id,
+        reminderOccurrenceKey(scheduledDate),
+      );
+      if (state?.completed == true) {
+        if (!isSameReminderDate(scheduledDate, todayDate) ||
+            !reminder.occursOn(todayDate)) {
+          return null;
+        }
+      }
+
+      return _buildReminderOccurrence(
+        reminder,
+        scheduledDate: scheduledDate,
+        effectiveDate: todayDate,
+      );
+    }
+
+    final latestDueToday = reminder.latestOccurrenceOnOrBefore(todayDate);
+    if (latestDueToday != null) {
+      final latestDueState = getReminderOccurrenceState(
+        reminder.id,
+        reminderOccurrenceKey(latestDueToday),
+      );
+      if (latestDueState?.completed != true &&
+          !latestDueToday.isAfter(todayDate)) {
+        return null;
+      }
+    }
+
+    if (!reminder.occursOn(targetDate)) return null;
+    return _buildReminderOccurrence(
+      reminder,
+      scheduledDate: targetDate,
+      effectiveDate: targetDate,
+    );
+  }
+
+  ReminderOccurrence _buildReminderOccurrence(
+    Reminder reminder, {
+    required DateTime scheduledDate,
+    required DateTime effectiveDate,
+  }) {
+    final occurrenceKey = reminderOccurrenceKey(scheduledDate);
+    final state = getReminderOccurrenceState(reminder.id, occurrenceKey);
+    return ReminderOccurrence(
+      reminder: reminder,
+      occurrenceKey: occurrenceKey,
+      effectiveDate: reminderOccurrenceKey(effectiveDate),
+      completed: state?.completed ?? false,
+      completedAt: state?.completedAt,
+      isOverdue:
+          scheduledDate.isBefore(effectiveDate) && !(state?.completed ?? false),
+    );
+  }
 
   // ═══════════════════════════════════════════════════════════════
   // DEFAULT ROUTINE ORDER (V6)
@@ -5329,8 +5574,8 @@ class AppProvider extends ChangeNotifier {
       pageNumber: '',
       title: lecture.title,
       parentTitle: lecture.subject,
-      nextRevisionAt:
-          nextDate ?? DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
+      nextRevisionAt: nextDate ??
+          DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
       currentRevisionIndex: 0,
       lastStudiedAt: now,
       totalSteps: SrsService.totalSteps(mode),
@@ -5722,6 +5967,7 @@ class AppProvider extends ChangeNotifier {
     await ns.cancelAll();
     await _refreshRoutineReminderState();
     await _refreshPlannedTaskReminderState();
+    await _refreshReminderNotificationState();
 
     final revisionCount = revisionItems.where((r) {
       final dt = DateTime.tryParse(r.nextRevisionAt);
@@ -5759,6 +6005,15 @@ class AppProvider extends ChangeNotifier {
     sketchyMicroVideos.clear();
     sketchyPharmVideos.clear();
     pathomaChapters.clear();
+    routines.clear();
+    routineLogs.clear();
+    buyingItems.clear();
+    todoItems.clear();
+    reminders.clear();
+    reminderOccurrenceStates.clear();
+    defaultActivities.clear();
+    dailyFlows.clear();
+    videoLectures.clear();
     mentorMemory = null;
     aiSettings = null;
     userProfile = null;
@@ -5901,9 +6156,9 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> saveLibraryNote(LibraryNote note) async {
-    final normalizedPaths = await AttachmentStorageService
-        .normalizeAttachmentPaths(note.attachmentPaths);
-    final normalizedNote = note.copyWith(attachmentPaths: normalizedPaths);
+    final normalizedAttachments =
+        await AttachmentStorageService.normalizeAttachments(note.attachments);
+    final normalizedNote = note.copyWith(attachments: normalizedAttachments);
     await DatabaseService.instance.upsertLibraryNote(normalizedNote.toJson());
     notifyListeners();
     unawaited(_triggerBackup());
@@ -6025,8 +6280,8 @@ class AppProvider extends ChangeNotifier {
               (block.description ?? '').toLowerCase().contains('retroactive'));
     }).toList()
       ..sort((a, b) {
-        final startCompare =
-            _toMinutes(a.plannedStartTime).compareTo(_toMinutes(b.plannedStartTime));
+        final startCompare = _toMinutes(a.plannedStartTime)
+            .compareTo(_toMinutes(b.plannedStartTime));
         if (startCompare != 0) return startCompare;
         return a.index.compareTo(b.index);
       });
@@ -6162,7 +6417,9 @@ class AppProvider extends ChangeNotifier {
   }
 
   bool _isLockedBlock(Block block) {
-    return block.isEvent || block.id.startsWith('prayer_') || block.isAdHocTrack == true;
+    return block.isEvent ||
+        block.id.startsWith('prayer_') ||
+        block.isAdHocTrack == true;
   }
 
   bool _blockStartsBeforeAnchor(Block block, DateTime anchor) {

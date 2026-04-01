@@ -111,6 +111,44 @@ class TimerReminderConfig {
       );
 }
 
+class ReminderNotificationConfig {
+  final bool enabled;
+  final List<int> defaultAlertOffsets;
+
+  const ReminderNotificationConfig({
+    required this.enabled,
+    required this.defaultAlertOffsets,
+  });
+
+  factory ReminderNotificationConfig.defaults() =>
+      const ReminderNotificationConfig(
+        enabled: true,
+        defaultAlertOffsets: <int>[0],
+      );
+
+  factory ReminderNotificationConfig.fromJson(Map<String, dynamic> j) =>
+      ReminderNotificationConfig(
+        enabled: j['enabled'] as bool? ?? true,
+        defaultAlertOffsets:
+            (j['defaultAlertOffsets'] as List?)?.whereType<int>().toList() ??
+                const <int>[0],
+      );
+
+  Map<String, dynamic> toJson() => {
+        'enabled': enabled,
+        'defaultAlertOffsets': defaultAlertOffsets,
+      };
+
+  ReminderNotificationConfig copyWith({
+    bool? enabled,
+    List<int>? defaultAlertOffsets,
+  }) =>
+      ReminderNotificationConfig(
+        enabled: enabled ?? this.enabled,
+        defaultAlertOffsets: defaultAlertOffsets ?? this.defaultAlertOffsets,
+      );
+}
+
 class MenuItemConfig {
   final String id;
   final bool visible;
@@ -135,12 +173,14 @@ class NotificationConfig {
   final String mode;
   final Map<String, bool> types;
   final TimerReminderConfig timerReminders;
+  final ReminderNotificationConfig reminderNotifications;
 
   const NotificationConfig({
     required this.enabled,
     required this.mode,
     required this.types,
     required this.timerReminders,
+    required this.reminderNotifications,
   });
 
   factory NotificationConfig.fromJson(Map<String, dynamic> j) =>
@@ -160,6 +200,11 @@ class NotificationConfig {
                 Map<String, dynamic>.from(j['timerReminders'] as Map),
               )
             : TimerReminderConfig.defaults(),
+        reminderNotifications: j['reminderNotifications'] != null
+            ? ReminderNotificationConfig.fromJson(
+                Map<String, dynamic>.from(j['reminderNotifications'] as Map),
+              )
+            : ReminderNotificationConfig.defaults(),
       );
 
   factory NotificationConfig.defaults() => const NotificationConfig(
@@ -176,6 +221,10 @@ class NotificationConfig {
           speakReminders: false,
           taskReminderRules: <TaskReminderRule>[],
         ),
+        reminderNotifications: ReminderNotificationConfig(
+          enabled: true,
+          defaultAlertOffsets: <int>[0],
+        ),
       );
 
   Map<String, dynamic> toJson() => {
@@ -183,6 +232,7 @@ class NotificationConfig {
         'mode': mode,
         'types': types,
         'timerReminders': timerReminders.toJson(),
+        'reminderNotifications': reminderNotifications.toJson(),
       };
 
   NotificationConfig copyWith({
@@ -190,12 +240,15 @@ class NotificationConfig {
     String? mode,
     Map<String, bool>? types,
     TimerReminderConfig? timerReminders,
+    ReminderNotificationConfig? reminderNotifications,
   }) =>
       NotificationConfig(
         enabled: enabled ?? this.enabled,
         mode: mode ?? this.mode,
         types: types ?? this.types,
         timerReminders: timerReminders ?? this.timerReminders,
+        reminderNotifications:
+            reminderNotifications ?? this.reminderNotifications,
       );
 }
 
@@ -204,7 +257,8 @@ class QuietHoursConfig {
   final String start;
   final String end;
 
-  const QuietHoursConfig({required this.enabled, required this.start, required this.end});
+  const QuietHoursConfig(
+      {required this.enabled, required this.start, required this.end});
 
   factory QuietHoursConfig.fromJson(Map<String, dynamic> j) => QuietHoursConfig(
         enabled: j['enabled'] ?? false,
@@ -215,9 +269,11 @@ class QuietHoursConfig {
   factory QuietHoursConfig.defaults() =>
       const QuietHoursConfig(enabled: false, start: '22:00', end: '07:00');
 
-  Map<String, dynamic> toJson() => {'enabled': enabled, 'start': start, 'end': end};
+  Map<String, dynamic> toJson() =>
+      {'enabled': enabled, 'start': start, 'end': end};
 
-  QuietHoursConfig copyWith({bool? enabled, String? start, String? end}) => QuietHoursConfig(
+  QuietHoursConfig copyWith({bool? enabled, String? start, String? end}) =>
+      QuietHoursConfig(
         enabled: enabled ?? this.enabled,
         start: start ?? this.start,
         end: end ?? this.end,
@@ -250,8 +306,9 @@ class AppSettings {
   final int? ankiBatchSize;
 
   // Streak system
-  final int? dayStartHour;      // hour (0-23) when study day starts (default 5 = 5 AM)
-  final bool? streakAutoCredit;  // auto-deduct credits on missed target
+  final int?
+      dayStartHour; // hour (0-23) when study day starts (default 5 = 5 AM)
+  final bool? streakAutoCredit; // auto-deduct credits on missed target
 
   // Study plan start date — auto-set on first FA page read, editable in settings
   final String? studyPlanStartDate; // ISO8601 date (yyyy-MM-dd)
@@ -362,7 +419,8 @@ class AppSettings {
         if (ankiBatchSize != null) 'ankiBatchSize': ankiBatchSize,
         if (dayStartHour != null) 'dayStartHour': dayStartHour,
         if (streakAutoCredit != null) 'streakAutoCredit': streakAutoCredit,
-        if (studyPlanStartDate != null) 'studyPlanStartDate': studyPlanStartDate,
+        if (studyPlanStartDate != null)
+          'studyPlanStartDate': studyPlanStartDate,
       };
 
   AppSettings copyWith({

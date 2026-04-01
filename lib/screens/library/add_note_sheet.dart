@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
+
 import 'package:focusflow_mobile/models/library_note.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/screens/library/attachment_helper.dart';
@@ -26,29 +27,43 @@ class AddNoteSheet extends StatefulWidget {
 
 class _AddNoteSheetState extends State<AddNoteSheet> {
   final _textCtrl = TextEditingController();
-  final _linkCtrl = TextEditingController();
+  final _linkNameCtrl = TextEditingController();
+  final _linkUrlCtrl = TextEditingController();
   final _tagCtrl = TextEditingController();
   final List<String> _tags = [];
-  final List<String> _attachments = [];
+  final List<_AttachmentDraft> _attachments = [];
 
   final ImagePicker _picker = ImagePicker();
 
   @override
   void dispose() {
     _textCtrl.dispose();
-    _linkCtrl.dispose();
+    _linkNameCtrl.dispose();
+    _linkUrlCtrl.dispose();
     _tagCtrl.dispose();
+    for (final attachment in _attachments) {
+      attachment.dispose();
+    }
     super.dispose();
   }
 
   void _addLink() {
-    final normalizedLink = AttachmentHelper.normalizeLink(_linkCtrl.text);
-    if (normalizedLink != null && !_attachments.contains(normalizedLink)) {
-      setState(() {
-        _attachments.add(normalizedLink);
-        _linkCtrl.clear();
-      });
+    final normalizedLink = AttachmentHelper.normalizeLink(_linkUrlCtrl.text);
+    if (normalizedLink == null ||
+        _attachments.any((attachment) => attachment.source == normalizedLink)) {
+      return;
     }
+
+    setState(() {
+      _attachments.add(
+        _AttachmentDraft.fromSource(
+          normalizedLink,
+          initialName: _linkNameCtrl.text.trim(),
+        ),
+      );
+      _linkNameCtrl.clear();
+      _linkUrlCtrl.clear();
+    });
   }
 
   void _addTag() {
@@ -62,24 +77,37 @@ class _AddNoteSheetState extends State<AddNoteSheet> {
   }
 
   Future<void> _pickImage() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    final image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
-      setState(() {
-        _attachments.add(image.path);
-      });
+      _addAttachmentPath(image.path);
     }
   }
 
   Future<void> _pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles();
-    if (result != null && result.files.single.path != null) {
-      setState(() {
-        _attachments.add(result.files.single.path!);
-      });
+    final result = await FilePicker.platform.pickFiles();
+    final path = result?.files.single.path;
+    if (path != null) {
+      _addAttachmentPath(path);
     }
   }
 
-  void _saveNote() {
+  void _addAttachmentPath(String path) {
+    if (_attachments.any((attachment) => attachment.source == path)) {
+      return;
+    }
+    setState(() {
+      _attachments.add(_AttachmentDraft.fromSource(path));
+    });
+  }
+
+  void _removeAttachment(_AttachmentDraft attachment) {
+    attachment.dispose();
+    setState(() {
+      _attachments.remove(attachment);
+    });
+  }
+
+  Future<void> _saveNote() async {
     final text = _textCtrl.text.trim();
     if (text.isEmpty && _attachments.isEmpty) return;
 
@@ -88,12 +116,15 @@ class _AddNoteSheetState extends State<AddNoteSheet> {
       itemId: widget.itemId,
       itemType: widget.itemType,
       noteText: text,
-      tags: List.from(_tags),
-      attachmentPaths: List.from(_attachments),
+      tags: List<String>.from(_tags),
+      attachments: _attachments
+          .map((attachment) => attachment.toAttachment())
+          .toList(growable: false),
       createdAt: DateTime.now().toIso8601String(),
     );
 
-    widget.app.saveLibraryNote(note);
+    await widget.app.saveLibraryNote(note);
+    if (!mounted) return;
     Navigator.pop(context, true);
   }
 
@@ -140,11 +171,33 @@ class _AddNoteSheetState extends State<AddNoteSheet> {
             ),
           ),
           const SizedBox(height: 16),
+          Text(
+            'Add link',
+            style: TextStyle(
+              color: cs.onSurface,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _linkNameCtrl,
+            textInputAction: TextInputAction.next,
+            decoration: InputDecoration(
+              hintText: 'Link name',
+              isDense: true,
+              prefixIcon: const Icon(Icons.edit_rounded),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
                 child: TextField(
-                  controller: _linkCtrl,
+                  controller: _linkUrlCtrl,
                   keyboardType: TextInputType.url,
                   textInputAction: TextInputAction.done,
                   decoration: InputDecoration(
@@ -165,27 +218,7 @@ class _AddNoteSheetState extends State<AddNoteSheet> {
               ),
             ],
           ),
-          if (_attachments.any(AttachmentHelper.isWebLink)) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children:
-                  _attachments.where(AttachmentHelper.isWebLink).map((link) {
-                return InputChip(
-                  avatar: const Icon(Icons.link_rounded, size: 16),
-                  label: Text(link),
-                  onPressed: () =>
-                      AttachmentHelper.openAttachment(context, link),
-                  onDeleted: () {
-                    setState(() => _attachments.remove(link));
-                  },
-                );
-              }).toList(),
-            ),
-          ],
           const SizedBox(height: 16),
-          // Tags
           Row(
             children: [
               Expanded(
@@ -195,7 +228,8 @@ class _AddNoteSheetState extends State<AddNoteSheet> {
                     hintText: 'Add a tag...',
                     isDense: true,
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onSubmitted: (_) => _addTag(),
                 ),
@@ -223,7 +257,6 @@ class _AddNoteSheetState extends State<AddNoteSheet> {
             ),
           ],
           const SizedBox(height: 16),
-          // Attachments
           Row(
             children: [
               OutlinedButton.icon(
@@ -239,27 +272,95 @@ class _AddNoteSheetState extends State<AddNoteSheet> {
               ),
             ],
           ),
-          if (_attachments
-              .any((path) => !AttachmentHelper.isWebLink(path))) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _attachments
-                  .where((path) => !AttachmentHelper.isWebLink(path))
-                  .map((path) {
-                final filename = path.split('/').last.split('\\').last;
-                return GestureDetector(
-                  onTap: () => AttachmentHelper.openAttachment(context, path),
-                  child: Chip(
-                    avatar: Icon(AttachmentHelper.getIcon(path), size: 16),
-                    label: Text(filename),
-                    onDeleted: () {
-                      setState(() => _attachments.remove(path));
-                    },
+          if (_attachments.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              'Attachments',
+              style: TextStyle(
+                color: cs.onSurface,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _attachments.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final attachment = _attachments[index];
+                final previewAttachment = attachment.toAttachment();
+                return DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: cs.outlineVariant.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 34,
+                              height: 34,
+                              decoration: BoxDecoration(
+                                color: cs.primary.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                AttachmentHelper.getAttachmentIcon(
+                                  previewAttachment,
+                                ),
+                                size: 18,
+                                color: cs.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: TextField(
+                                controller: attachment.nameController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Display name',
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () =>
+                                  AttachmentHelper.openNoteAttachment(
+                                context,
+                                previewAttachment,
+                              ),
+                              icon: const Icon(Icons.open_in_new_rounded),
+                              tooltip: 'Preview',
+                            ),
+                            IconButton(
+                              onPressed: () => _removeAttachment(attachment),
+                              icon: const Icon(Icons.close_rounded),
+                              tooltip: 'Remove',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        SelectableText(
+                          attachment.source,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
-              }).toList(),
+              },
             ),
           ],
           const SizedBox(height: 24),
@@ -270,7 +371,8 @@ class _AddNoteSheetState extends State<AddNoteSheet> {
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               child: const Text('Save Note'),
             ),
@@ -278,5 +380,46 @@ class _AddNoteSheetState extends State<AddNoteSheet> {
         ],
       ),
     );
+  }
+}
+
+class _AttachmentDraft {
+  final String source;
+  final String kind;
+  final TextEditingController nameController;
+
+  _AttachmentDraft({
+    required this.source,
+    required this.kind,
+    required this.nameController,
+  });
+
+  factory _AttachmentDraft.fromSource(
+    String source, {
+    String initialName = '',
+  }) {
+    final fallbackName = LibraryNoteAttachment.deriveDisplayName(source);
+    return _AttachmentDraft(
+      source: source,
+      kind: LibraryNoteAttachment.detectKind(source),
+      nameController: TextEditingController(
+        text: initialName.trim().isEmpty ? fallbackName : initialName.trim(),
+      ),
+    );
+  }
+
+  LibraryNoteAttachment toAttachment() {
+    final displayName = nameController.text.trim();
+    return LibraryNoteAttachment(
+      source: source,
+      displayName: displayName.isEmpty
+          ? LibraryNoteAttachment.deriveDisplayName(source)
+          : displayName,
+      kind: kind,
+    );
+  }
+
+  void dispose() {
+    nameController.dispose();
   }
 }

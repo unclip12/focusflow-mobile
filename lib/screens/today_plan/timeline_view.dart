@@ -14,12 +14,14 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:focusflow_mobile/models/active_study_session.dart';
+import 'package:focusflow_mobile/models/reminder.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart';
+import 'package:intl/intl.dart';
 import 'block_detail_modal.dart';
 import 'block_editor_sheet.dart';
 import 'free_gap_panel.dart';
@@ -286,16 +288,23 @@ int _resolvedBlockDurationMinutes(Block block) {
 // -- Widget ----------------------------------------------------
 class TimelineView extends StatefulWidget {
   final List<Block> blocks;
+  final List<ReminderOccurrence> reminders;
   final String dateKey;
   final TimelineAddTaskCallback? onAddTask;
   final ValueChanged<DateTime>? onOpenDate;
+  final Future<void> Function(ReminderOccurrence occurrence)? onReminderTap;
+  final Future<void> Function(ReminderOccurrence occurrence, bool completed)?
+      onReminderToggle;
 
   const TimelineView({
     super.key,
     required this.blocks,
+    required this.reminders,
     required this.dateKey,
     this.onAddTask,
     this.onOpenDate,
+    this.onReminderTap,
+    this.onReminderToggle,
   });
 
   @override
@@ -745,9 +754,66 @@ class _TimelineViewState extends State<TimelineView> {
   // Build list of timeline items (blocks + gaps)
   List<_TimelineItem> _buildTimelineItems(_TimelineBounds bounds) {
     final sortedSlices = _displaySlicesForSelectedDate();
+    final sortedReminders = widget.reminders
+        .where((occurrence) => occurrence.isTimed)
+        .toList()
+      ..sort((left, right) {
+        final leftMinutes = _minutesFromTimeValue(left.time) ?? 0;
+        final rightMinutes = _minutesFromTimeValue(right.time) ?? 0;
+        final timeCompare = leftMinutes.compareTo(rightMinutes);
+        if (timeCompare != 0) return timeCompare;
+        final completionCompare =
+            left.completed == right.completed ? 0 : (left.completed ? 1 : -1);
+        if (completionCompare != 0) return completionCompare;
+        return left.title.toLowerCase().compareTo(right.title.toLowerCase());
+      });
     final items = <_TimelineItem>[];
     var cursor = bounds.startMinutes;
-    for (final slice in sortedSlices) {
+    var sliceIndex = 0;
+    var reminderIndex = 0;
+
+    while (sliceIndex < sortedSlices.length ||
+        reminderIndex < sortedReminders.length) {
+      final nextSlice =
+          sliceIndex < sortedSlices.length ? sortedSlices[sliceIndex] : null;
+      final nextReminder = reminderIndex < sortedReminders.length
+          ? sortedReminders[reminderIndex]
+          : null;
+      final nextBlockStart =
+          nextSlice?.visibleStartMinutes ?? bounds.endMinutes + 1;
+      final nextReminderStart =
+          _minutesFromTimeValue(nextReminder?.time) ?? bounds.endMinutes + 1;
+      final shouldTakeReminder = nextReminder != null &&
+          (nextSlice == null || nextReminderStart <= nextBlockStart);
+
+      if (shouldTakeReminder) {
+        if (nextReminderStart > cursor && (nextReminderStart - cursor) >= 5) {
+          items.add(
+            _TimelineItem.gap(
+              gapStartMinutes: cursor,
+              gapEndMinutes: nextReminderStart,
+            ),
+          );
+        }
+
+        items.add(
+          _TimelineItem.reminder(
+            nextReminder,
+            reminderMinutes: nextReminderStart,
+          ),
+        );
+        if (nextReminderStart > cursor) {
+          cursor = nextReminderStart;
+        }
+        reminderIndex++;
+        continue;
+      }
+
+      if (nextSlice == null) {
+        break;
+      }
+
+      final slice = nextSlice;
       final blockStart = slice.visibleStartMinutes;
       final blockEnd = slice.visibleEndMinutes;
       if (blockStart > cursor && (blockStart - cursor) >= 5) {
@@ -764,6 +830,7 @@ class _TimelineViewState extends State<TimelineView> {
       }
       items.add(_TimelineItem.block(slice));
       cursor = math.max(cursor, blockEnd);
+      sliceIndex++;
     }
     if (bounds.endMinutes > cursor && (bounds.endMinutes - cursor) >= 5) {
       items.add(
@@ -1420,26 +1487,45 @@ class _TimelineViewState extends State<TimelineView> {
             ),
           );
         }
+        if (item.isReminder) {
+          final occurrence = item.reminderOccurrence!;
+          return KeyedSubtree(
+            key: ValueKey(
+              'reminder_${occurrence.reminderId}_${occurrence.occurrenceKey}',
+            ),
+            child: _ReminderTimelineRow(
+              occurrence: occurrence,
+              reminderMinutes: item.reminderMinutes ?? 0,
+              onTap: widget.onReminderTap == null
+                  ? null
+                  : () => widget.onReminderTap!(occurrence),
+              onToggle: widget.onReminderToggle == null
+                  ? null
+                  : (completed) =>
+                      widget.onReminderToggle!(occurrence, completed),
+            ),
+          );
+        }
         final block = item.block!;
         final slice = item.slice!;
 
         return KeyedSubtree(
           key: ValueKey('block_${block.id}_${slice.relation.name}'),
-            child: _BlockCard(
-              slice: slice,
-              leading: const SizedBox(width: 22),
-              onTap: () => _onBlockTap(block),
-              onLongPress: () => _onBlockLongPress(block),
-              onStatusTap: _isLockedBlock(block) ||
-                      block.status == BlockStatus.done ||
-                      slice.relation == _TimelineBlockRelation.carryIn ||
-                      (slice.relation == _TimelineBlockRelation.sameDay &&
-                          !block.isEvent &&
-                          !block.id.startsWith('prayer_') &&
-                          block.type != BlockType.breakBlock &&
-                          block.isAdHocTrack != true)
-                  ? null
-                  : () => _markBlockDone(block),
+          child: _BlockCard(
+            slice: slice,
+            leading: const SizedBox(width: 22),
+            onTap: () => _onBlockTap(block),
+            onLongPress: () => _onBlockLongPress(block),
+            onStatusTap: _isLockedBlock(block) ||
+                    block.status == BlockStatus.done ||
+                    slice.relation == _TimelineBlockRelation.carryIn ||
+                    (slice.relation == _TimelineBlockRelation.sameDay &&
+                        !block.isEvent &&
+                        !block.id.startsWith('prayer_') &&
+                        block.type != BlockType.breakBlock &&
+                        block.isAdHocTrack != true)
+                ? null
+                : () => _markBlockDone(block),
             onAdjacentDateTap:
                 slice.adjacentDate == null || widget.onOpenDate == null
                     ? null
@@ -1464,10 +1550,197 @@ class _TimelineViewState extends State<TimelineView> {
   }
 }
 
+class _ReminderTimelineRow extends StatelessWidget {
+  final ReminderOccurrence occurrence;
+  final int reminderMinutes;
+  final Future<void> Function()? onTap;
+  final Future<void> Function(bool completed)? onToggle;
+
+  const _ReminderTimelineRow({
+    required this.occurrence,
+    required this.reminderMinutes,
+    this.onTap,
+    this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+    final accent = occurrence.isOverdue
+        ? const Color(0xFFD97706)
+        : const Color(0xFF6366F1);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: SizedBox(
+        height: 72,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(width: _kTimelineLeadingWidth),
+            SizedBox(
+              width: _kTimelineTimeWidth,
+              child: Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Text(
+                    _to12hShort(_minutesToHHMM(reminderMinutes)),
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: accent,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: _kTimelineTimeToPillGap),
+            SizedBox(
+              width: _kTimelinePillWidth,
+              child: Center(
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: accent,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: accent.withValues(alpha: 0.24),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: _kTimelineContentGap),
+            Expanded(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: onTap == null ? null : () => unawaited(onTap!()),
+                  child: Ink(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: occurrence.completed
+                          ? accent.withValues(alpha: 0.08)
+                          : theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.42),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: accent.withValues(
+                          alpha: occurrence.completed ? 0.16 : 0.28,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                occurrence.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: onSurface.withValues(
+                                    alpha: occurrence.completed ? 0.45 : 1,
+                                  ),
+                                  decoration: occurrence.completed
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      occurrence.isOverdue
+                                          ? 'Reminder carried from ${DateFormat('d MMM').format(DateTime.parse(occurrence.occurrenceKey))}'
+                                          : 'Reminder',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color:
+                                            onSurface.withValues(alpha: 0.56),
+                                      ),
+                                    ),
+                                  ),
+                                  if (occurrence.isOverdue) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: accent.withValues(alpha: 0.12),
+                                        borderRadius:
+                                            BorderRadius.circular(999),
+                                      ),
+                                      child: Text(
+                                        'Overdue',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                          color: accent,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Checkbox(
+                          value: occurrence.completed,
+                          activeColor: accent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          onChanged: onToggle == null
+                              ? null
+                              : (value) => unawaited(
+                                    onToggle!(value ?? !occurrence.completed),
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // -- Timeline Item --------------------------------------------------
 class _TimelineItem {
   final Block? block;
   final _TimelineBlockSlice? slice;
+  final ReminderOccurrence? reminderOccurrence;
+  final int? reminderMinutes;
   final int? gapStartMinutes;
   final int? gapEndMinutes;
   final bool isGap;
@@ -1477,6 +1750,8 @@ class _TimelineItem {
   const _TimelineItem._(
       {this.block,
       this.slice,
+      this.reminderOccurrence,
+      this.reminderMinutes,
       this.gapStartMinutes,
       this.gapEndMinutes,
       this.warningText,
@@ -1490,12 +1765,23 @@ class _TimelineItem {
           gapStartMinutes: gapStartMinutes,
           gapEndMinutes: gapEndMinutes,
           isGap: true);
+  factory _TimelineItem.reminder(
+    ReminderOccurrence occurrence, {
+    required int reminderMinutes,
+  }) =>
+      _TimelineItem._(
+        reminderOccurrence: occurrence,
+        reminderMinutes: reminderMinutes,
+        isGap: false,
+      );
   const _TimelineItem.warning(String message)
       : this._(
           isGap: false,
           isWarning: true,
           warningText: message,
         );
+
+  bool get isReminder => reminderOccurrence != null;
 }
 
 class _TimelineBounds {

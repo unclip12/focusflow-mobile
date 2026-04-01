@@ -25,7 +25,8 @@ class SettingsProvider extends ChangeNotifier {
     return cleaned.isEmpty ? List<String>.from(kDefaultPinnedTabs) : cleaned;
   }
 
-  List<MenuItemConfig> _sanitizeMenuConfiguration(List<MenuItemConfig>? config) {
+  List<MenuItemConfig> _sanitizeMenuConfiguration(
+      List<MenuItemConfig>? config) {
     final existing = {
       for (final item in (config ?? <MenuItemConfig>[])) item.id: item,
     };
@@ -62,14 +63,14 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   // ── G10: Exam dates, daily routine ─────────────────────────────
-  String get fmgeDate      => _settings.fmgeDate      ?? '2026-06-28';
-  String get step1Date     => _settings.step1Date     ?? '2026-06-15';
-  String get wakeTime      => _settings.wakeTime      ?? '06:00';
-  String get sleepTime     => _settings.sleepTime     ?? '23:00';
-  int    get dailyFAGoal   => _settings.dailyFAGoal   ?? 10;
-  int    get ankiBatchSize => _settings.ankiBatchSize ?? 50;
-  int    get dayStartHour  => _settings.dayStartHour  ?? 5;
-  bool   get streakAutoCredit => _settings.streakAutoCredit ?? false;
+  String get fmgeDate => _settings.fmgeDate ?? '2026-06-28';
+  String get step1Date => _settings.step1Date ?? '2026-06-15';
+  String get wakeTime => _settings.wakeTime ?? '06:00';
+  String get sleepTime => _settings.sleepTime ?? '23:00';
+  int get dailyFAGoal => _settings.dailyFAGoal ?? 10;
+  int get ankiBatchSize => _settings.ankiBatchSize ?? 50;
+  int get dayStartHour => _settings.dayStartHour ?? 5;
+  bool get streakAutoCredit => _settings.streakAutoCredit ?? false;
 
   Future<void> setFmgeDate(String date) async {
     _settings = _settings.copyWith(fmgeDate: date);
@@ -198,13 +199,43 @@ class SettingsProvider extends ChangeNotifier {
     await _persist();
   }
 
-  TimerReminderConfig get timerReminders => _settings.notifications.timerReminders;
+  TimerReminderConfig get timerReminders =>
+      _settings.notifications.timerReminders;
+  ReminderNotificationConfig get reminderNotifications =>
+      _settings.notifications.reminderNotifications;
 
   Future<void> updateTimerReminders(TimerReminderConfig config) async {
     _settings = _settings.copyWith(
       notifications: _settings.notifications.copyWith(timerReminders: config),
     );
     await _persist();
+  }
+
+  Future<void> updateReminderNotifications(
+    ReminderNotificationConfig config,
+  ) async {
+    _settings = _settings.copyWith(
+      notifications: _settings.notifications.copyWith(
+        reminderNotifications: config,
+      ),
+    );
+    await _persist();
+  }
+
+  Future<void> setReminderNotificationsEnabled(bool value) async {
+    await updateReminderNotifications(
+      reminderNotifications.copyWith(enabled: value),
+    );
+  }
+
+  Future<void> setReminderDefaultAlertOffsets(List<int> offsets) async {
+    final normalized = offsets.toSet().where((value) => value >= 0).toList()
+      ..sort();
+    await updateReminderNotifications(
+      reminderNotifications.copyWith(
+        defaultAlertOffsets: normalized.isEmpty ? const <int>[0] : normalized,
+      ),
+    );
   }
 
   Future<void> setPlayCueSounds(bool value) async {

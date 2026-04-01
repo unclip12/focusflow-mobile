@@ -47,7 +47,9 @@ class _FocusFlowAppState extends State<FocusFlowApp> {
           TodayPlanLaunchRequest(
             dateKey: intent.dateKey,
             activityId: intent.activityId,
+            reminderId: intent.reminderId,
             openDaySession: true,
+            openReminderTab: intent.openReminderTab,
           ),
         );
         appRouter.goNamed(Routes.todaysPlan);
@@ -58,6 +60,8 @@ class _FocusFlowAppState extends State<FocusFlowApp> {
             dateKey: intent.dateKey,
             blockId: intent.blockId,
             activityId: intent.activityId,
+            reminderId: intent.reminderId,
+            openReminderTab: intent.openReminderTab,
           ),
         );
         appRouter.goNamed(Routes.todaysPlan);
@@ -68,6 +72,8 @@ class _FocusFlowAppState extends State<FocusFlowApp> {
             dateKey: intent.dateKey,
             activityId: intent.activityId,
             routineId: intent.routineId,
+            reminderId: intent.reminderId,
+            openReminderTab: intent.openReminderTab,
           ),
         );
         appRouter.goNamed(intent.routeName ?? Routes.todaysPlan);

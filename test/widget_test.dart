@@ -6,12 +6,14 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:focusflow_mobile/models/active_study_session.dart';
+import 'package:focusflow_mobile/models/app_settings.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/models/fa_subtopic.dart';
 import 'package:focusflow_mobile/models/library_note.dart';
@@ -20,6 +22,7 @@ import 'package:focusflow_mobile/models/routine.dart';
 import 'package:focusflow_mobile/models/video_lecture.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
+import 'package:focusflow_mobile/screens/settings/settings_screen.dart';
 import 'package:focusflow_mobile/screens/today_plan/routine_runner_screen.dart';
 import 'package:focusflow_mobile/screens/today_plan/study_flow_screen.dart';
 import 'package:focusflow_mobile/screens/today_plan/timeline_view.dart';
@@ -34,11 +37,10 @@ const MethodChannel _pathProviderChannel =
     MethodChannel('plugins.flutter.io/path_provider');
 const MethodChannel _notificationsChannel =
     MethodChannel('dexterous.com/flutter/local_notifications');
-const MethodChannel _backgroundServiceChannel =
-    MethodChannel(
-      'id.flutter/background_service/android/method',
-      JSONMethodCodec(),
-    );
+const MethodChannel _backgroundServiceChannel = MethodChannel(
+  'id.flutter/background_service/android/method',
+  JSONMethodCodec(),
+);
 
 late Directory _testSandboxDirectory;
 final List<String> _notificationMethodCalls = <String>[];
@@ -51,6 +53,7 @@ void main() {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
     FlutterBackgroundServiceAndroid.registerWith();
+    GoogleFonts.config.allowRuntimeFetching = false;
 
     _testSandboxDirectory =
         await Directory.systemTemp.createTemp('focusflow_backup_test_');
@@ -117,7 +120,8 @@ void main() {
           case 'isServiceRunning':
             return _backgroundServiceRunning;
           case 'sendData':
-            final args = (call.arguments as Map?)?.cast<dynamic, dynamic>() ?? {};
+            final args =
+                (call.arguments as Map?)?.cast<dynamic, dynamic>() ?? {};
             final method = args['method'];
             if (method == 'stopService') {
               _backgroundServiceRunning = false;
@@ -149,13 +153,15 @@ void main() {
     _notificationMethodCalls.clear();
     _backgroundServiceRunning = false;
     await _resetDatabase();
-    final focusFlowDir = Directory(p.join(_testSandboxDirectory.path, 'FocusFlow'));
+    final focusFlowDir =
+        Directory(p.join(_testSandboxDirectory.path, 'FocusFlow'));
     if (await focusFlowDir.exists()) {
       await focusFlowDir.delete(recursive: true);
     }
   });
 
-  test('backup roundtrip preserves video lectures and dynamic tables', () async {
+  test('backup roundtrip preserves video lectures and dynamic tables',
+      () async {
     final db = DatabaseService.instance;
     final sqlDb = await db.database;
 
@@ -204,8 +210,75 @@ void main() {
     expect(restoredProbeRows.single['value'], 'ok');
   });
 
-  test(
-      'restore preserves bundled note attachments and resyncs notifications',
+  test('legacy note json upgrades attachment paths into structured attachments',
+      () {
+    final note = LibraryNote.fromJson({
+      'id': 'legacy-note',
+      'itemId': 'video-9',
+      'itemType': 'VIDEO',
+      'noteText': 'Legacy attachment payload',
+      'tags': jsonEncode(['legacy']),
+      'attachmentPaths': jsonEncode([
+        r'C:\attachments\IMG_1001.png',
+        'https://example.com/reference-video',
+      ]),
+      'createdAt': '2026-04-01T00:00:00.000',
+    });
+
+    expect(note.attachments, hasLength(2));
+    expect(note.attachments.first.displayName, 'IMG_1001.png');
+    expect(note.attachments.first.kind, LibraryNoteAttachmentKind.image);
+    expect(note.attachments.last.displayName, 'reference-video');
+    expect(note.attachments.last.kind, LibraryNoteAttachmentKind.link);
+    expect(
+      note.attachmentPaths,
+      [
+        r'C:\attachments\IMG_1001.png',
+        'https://example.com/reference-video',
+      ],
+    );
+  });
+
+  test('structured note json preserves display names through serialization',
+      () {
+    final note = LibraryNote(
+      id: 'note-structured',
+      itemId: 'video-10',
+      itemType: 'VIDEO',
+      noteText: 'Structured attachment payload',
+      attachments: [
+        LibraryNoteAttachment(
+          source: r'C:\attachments\scan.pdf',
+          displayName: 'Pathoma handout',
+          kind: LibraryNoteAttachmentKind.pdf,
+        ),
+        LibraryNoteAttachment(
+          source: 'https://youtube.com/watch?v=abc123',
+          displayName: 'YouTube explanation',
+          kind: LibraryNoteAttachmentKind.link,
+        ),
+      ],
+      createdAt: '2026-04-01T00:00:00.000',
+    );
+
+    final serialized = note.toJson();
+    final decoded = LibraryNote.fromJson(serialized);
+
+    expect(decoded.attachments, hasLength(2));
+    expect(decoded.attachments.first.displayName, 'Pathoma handout');
+    expect(decoded.attachments.first.kind, LibraryNoteAttachmentKind.pdf);
+    expect(decoded.attachments.last.displayName, 'YouTube explanation');
+    expect(decoded.attachments.last.kind, LibraryNoteAttachmentKind.link);
+    expect(
+      decoded.attachmentPaths,
+      [
+        r'C:\attachments\scan.pdf',
+        'https://youtube.com/watch?v=abc123',
+      ],
+    );
+  });
+
+  test('restore preserves bundled note attachments and resyncs notifications',
       () async {
     final sourceAttachment =
         File(p.join(_testSandboxDirectory.path, 'source_attachment.txt'));
@@ -216,27 +289,39 @@ void main() {
       itemId: 'video-7',
       itemType: 'VIDEO',
       noteText: 'ENT note',
-      attachmentPaths: [
-        sourceAttachment.path,
-        'https://example.com/ent',
+      attachments: [
+        LibraryNoteAttachment(
+          source: sourceAttachment.path,
+          displayName: 'ENT source file',
+          kind: LibraryNoteAttachmentKind.unknown,
+        ),
+        LibraryNoteAttachment(
+          source: 'https://example.com/ent',
+          displayName: 'ENT reference link',
+          kind: LibraryNoteAttachmentKind.link,
+        ),
       ],
       createdAt: DateTime.now().toIso8601String(),
     );
-    final normalizedPaths = await AttachmentStorageService
-        .normalizeAttachmentPaths(note.attachmentPaths);
+    final normalizedAttachments =
+        await AttachmentStorageService.normalizeAttachments(note.attachments);
     await DatabaseService.instance.upsertLibraryNote(
-      note.copyWith(attachmentPaths: normalizedPaths).toJson(),
+      note.copyWith(attachments: normalizedAttachments).toJson(),
     );
 
-    final savedNoteRows = await DatabaseService.instance.getLibraryNotes('video-7');
+    final savedNoteRows =
+        await DatabaseService.instance.getLibraryNotes('video-7');
     final savedNote = LibraryNote.fromJson(savedNoteRows.single);
-    final managedAttachmentPath = savedNote.attachmentPaths.firstWhere(
-      (path) => !AttachmentStorageService.isWebLink(path),
+    final managedAttachment = savedNote.attachments.firstWhere(
+      (attachment) => !AttachmentStorageService.isWebLink(attachment.source),
     );
+    final managedAttachmentPath = managedAttachment.source;
     expect(managedAttachmentPath, isNot(sourceAttachment.path));
     expect(File(managedAttachmentPath).existsSync(), isTrue);
+    expect(managedAttachment.displayName, 'ENT source file');
 
-    await DatabaseService.instance.insertRawRow(DatabaseService.tVideoLectures, {
+    await DatabaseService.instance
+        .insertRawRow(DatabaseService.tVideoLectures, {
       'id': 7,
       'subject': 'ENT',
       'title': 'ENT Day-1 Mission 200+',
@@ -258,20 +343,21 @@ void main() {
         pageNumber: '7',
         title: 'ENT Day-1 Mission 200+',
         parentTitle: 'ENT',
-        nextRevisionAt: DateTime.now()
-            .add(const Duration(hours: 2))
-            .toIso8601String(),
+        nextRevisionAt:
+            DateTime.now().add(const Duration(hours: 2)).toIso8601String(),
         currentRevisionIndex: 0,
       ).toJson(),
     );
 
     final backupData = await BackupService.buildBackupData();
-    final backupFile =
-        File(p.join(_testSandboxDirectory.path, 'focusflow_roundtrip.ffbackup'));
-    await backupFile.writeAsBytes(await BackupService.buildBackupFileBytes(backupData));
+    final backupFile = File(
+        p.join(_testSandboxDirectory.path, 'focusflow_roundtrip.ffbackup'));
+    await backupFile
+        .writeAsBytes(await BackupService.buildBackupFileBytes(backupData));
     final decodedBackup = await BackupService.readBackupFile(backupFile.path);
 
-    final attachmentsDir = await AttachmentStorageService.getAttachmentsDirectory();
+    final attachmentsDir =
+        await AttachmentStorageService.getAttachmentsDirectory();
     if (await attachmentsDir.exists()) {
       await attachmentsDir.delete(recursive: true);
     }
@@ -288,16 +374,27 @@ void main() {
     final restoredNoteRows =
         await DatabaseService.instance.getLibraryNotes('video-7');
     final restoredNote = LibraryNote.fromJson(restoredNoteRows.single);
-    final restoredAttachmentPath = restoredNote.attachmentPaths.firstWhere(
-      (path) => !AttachmentStorageService.isWebLink(path),
+    final restoredAttachment = restoredNote.attachments.firstWhere(
+      (attachment) => !AttachmentStorageService.isWebLink(attachment.source),
     );
+    final restoredAttachmentPath = restoredAttachment.source;
     expect(restoredAttachmentPath, isNot(managedAttachmentPath));
     expect(File(restoredAttachmentPath).existsSync(), isTrue);
-    expect(restoredNote.attachmentPaths, contains('https://example.com/ent'));
+    expect(restoredAttachment.displayName, 'ENT source file');
+    expect(
+      restoredNote.attachments.any(
+        (attachment) =>
+            attachment.source == 'https://example.com/ent' &&
+            attachment.displayName == 'ENT reference link',
+      ),
+      isTrue,
+    );
 
     expect(_notificationMethodCalls, contains('cancelAll'));
     expect(
-      _notificationMethodCalls.where((method) => method == 'zonedSchedule').length,
+      _notificationMethodCalls
+          .where((method) => method == 'zonedSchedule')
+          .length,
       greaterThanOrEqualTo(2),
     );
   });
@@ -336,6 +433,186 @@ void main() {
     expect(tables[DatabaseService.tVideoLectures], isA<List>());
   });
 
+  testWidgets('settings reminder editor saves preset minute rules',
+      (tester) async {
+    final app = AppProvider();
+    final settings = SettingsProvider();
+
+    await tester.pumpWidget(
+      _SettingsScreenHarness(
+        app: app,
+        settings: settings,
+      ),
+    );
+    await _settleTestUi(tester);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey<String>('task_reminder_add_button')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester
+        .tap(find.byKey(const ValueKey<String>('task_reminder_add_button')));
+    await _settleTestUi(tester);
+
+    expect(find.byKey(const ValueKey<String>('task_reminder_editor_panel')),
+        findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('task_reminder_minutes_5')),
+    );
+    await _settleTestUi(tester);
+    await tester.tap(find.text('10 minutes').last);
+    await _settleTestUi(tester);
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('task_reminder_save_button')),
+    );
+    await _settleTestUi(tester);
+
+    expect(find.text('10 min before task start'), findsOneWidget);
+    expect(settings.timerReminders.taskReminderRules, hasLength(1));
+    expect(settings.timerReminders.taskReminderRules.single.offsetMinutes, 10);
+  });
+
+  testWidgets('settings reminder editor accepts custom minute rules',
+      (tester) async {
+    final app = AppProvider();
+    final settings = SettingsProvider();
+
+    await tester.pumpWidget(
+      _SettingsScreenHarness(
+        app: app,
+        settings: settings,
+      ),
+    );
+    await _settleTestUi(tester);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey<String>('task_reminder_add_button')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester
+        .tap(find.byKey(const ValueKey<String>('task_reminder_add_button')));
+    await _settleTestUi(tester);
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('task_reminder_minutes_5')),
+    );
+    await _settleTestUi(tester);
+    await tester.tap(find.text('Custom').last);
+    await _settleTestUi(tester);
+
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('task_reminder_custom_minutes_field')),
+      '17',
+    );
+    await tester.pump();
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('task_reminder_save_button')),
+    );
+    await _settleTestUi(tester);
+
+    expect(find.text('17 min before task start'), findsOneWidget);
+    expect(settings.timerReminders.taskReminderRules, hasLength(1));
+    expect(settings.timerReminders.taskReminderRules.single.offsetMinutes, 17);
+  });
+
+  testWidgets('settings reminder editor preloads custom minutes when editing',
+      (tester) async {
+    final app = AppProvider();
+    final settings = SettingsProvider();
+    await settings.addTaskReminderRule(
+      const TaskReminderRule(
+        id: 'custom-rule',
+        anchor: TaskReminderAnchor.beforeStart,
+        offsetMinutes: 17,
+        enabled: true,
+      ),
+    );
+
+    await tester.pumpWidget(
+      _SettingsScreenHarness(
+        app: app,
+        settings: settings,
+      ),
+    );
+    await _settleTestUi(tester);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey<String>('task_reminder_rule_custom-rule')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey<String>('task_reminder_rule_custom-rule')),
+    );
+    await _settleTestUi(tester);
+
+    expect(
+      find.byKey(const ValueKey<String>('task_reminder_minutes_custom')),
+      findsOneWidget,
+    );
+    final customField = tester.widget<TextFormField>(
+      find.byKey(const ValueKey<String>('task_reminder_custom_minutes_field')),
+    );
+    expect(customField.controller?.text, '17');
+  });
+
+  testWidgets('settings reminder editor saves at-start rules with zero offset',
+      (tester) async {
+    final app = AppProvider();
+    final settings = SettingsProvider();
+
+    await tester.pumpWidget(
+      _SettingsScreenHarness(
+        app: app,
+        settings: settings,
+      ),
+    );
+    await _settleTestUi(tester);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey<String>('task_reminder_add_button')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester
+        .tap(find.byKey(const ValueKey<String>('task_reminder_add_button')));
+    await _settleTestUi(tester);
+
+    await tester.tap(
+      find.byKey(
+        const ValueKey<String>('task_reminder_anchor_beforeStart'),
+      ),
+    );
+    await _settleTestUi(tester);
+    await tester.tap(find.text('At task start').last);
+    await _settleTestUi(tester);
+
+    expect(find.byKey(const ValueKey<String>('task_reminder_minutes_5')),
+        findsNothing);
+    expect(
+      find.byKey(const ValueKey<String>('task_reminder_custom_minutes_field')),
+      findsNothing,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('task_reminder_save_button')),
+    );
+    await _settleTestUi(tester);
+
+    expect(find.text('At task start'), findsOneWidget);
+    expect(settings.timerReminders.taskReminderRules, hasLength(1));
+    expect(
+      settings.timerReminders.taskReminderRules.single.anchor,
+      TaskReminderAnchor.atStart,
+    );
+    expect(settings.timerReminders.taskReminderRules.single.offsetMinutes, 0);
+  });
+
   testWidgets('planned insertion recommends the next free start time',
       (tester) async {
     final app = AppProvider();
@@ -370,10 +647,12 @@ void main() {
     );
 
     expect(analysis.recommendedStartMinutes, 70);
-    expect(analysis.conflictingBlocks.map((block) => block.id), contains('morning'));
+    expect(analysis.conflictingBlocks.map((block) => block.id),
+        contains('morning'));
   });
 
-  testWidgets('planned insertion allows exact boundary handoff', (tester) async {
+  testWidgets('planned insertion allows exact boundary handoff',
+      (tester) async {
     final app = AppProvider();
     app.dayPlans = [
       _buildDayPlan(
@@ -409,7 +688,8 @@ void main() {
     expect(analysis.recommendedStartMinutes, 70);
   });
 
-  testWidgets('long insertion analysis recommends the next contiguous free slot',
+  testWidgets(
+      'long insertion analysis recommends the next contiguous free slot',
       (tester) async {
     final app = AppProvider();
     app.dayPlans = [
@@ -494,7 +774,8 @@ void main() {
     expect(analysis.recommendedStartMinutes, 195);
   });
 
-  testWidgets('manual move validation rejects conflicts and accepts clear timings',
+  testWidgets(
+      'manual move validation rejects conflicts and accepts clear timings',
       (tester) async {
     final app = AppProvider();
     app.dayPlans = [
@@ -702,8 +983,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('selected_date_2026-03-30')),
-        findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('selected_date_2026-03-30')), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('block_sleep_carryOut')),
@@ -721,8 +1002,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('selected_date_2026-03-31')),
-        findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('selected_date_2026-03-31')), findsOneWidget);
     expect(find.byKey(const ValueKey('block_sleep_carryIn')), findsOneWidget);
     expect(find.text('10:00 PM - 4:00 AM (previous day)'), findsOneWidget);
   });
@@ -845,7 +1126,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('block_study_block_sameDay')), findsOneWidget);
+    expect(find.byKey(const ValueKey('block_study_block_sameDay')),
+        findsOneWidget);
     expect(find.text('Tasks are overlapping'), findsOneWidget);
   });
 
@@ -855,9 +1137,8 @@ void main() {
     final today = DateTime(now.year, now.month, now.day);
     final dateKey = AppDateUtils.formatDate(today);
     final nowMinutes = now.hour * 60 + now.minute;
-    final blockStartMinutes = nowMinutes < 10
-        ? 10
-        : math.min(nowMinutes + 30, (24 * 60) - 31);
+    final blockStartMinutes =
+        nowMinutes < 10 ? 10 : math.min(nowMinutes + 30, (24 * 60) - 31);
     final blockEndMinutes = blockStartMinutes + 30;
     final expectedGapLabel =
         '12:00 AM - ${_formatFullTimeForTest(blockStartMinutes)} • ${_formatCompactDurationForTest(blockStartMinutes)}';
@@ -1005,7 +1286,8 @@ void main() {
     expect(find.text('Play'), findsOneWidget);
   });
 
-  testWidgets('done block shows planned and actual time ranges when they differ',
+  testWidgets(
+      'done block shows planned and actual time ranges when they differ',
       (tester) async {
     final app = AppProvider();
     app.dayPlans = [
@@ -1077,7 +1359,8 @@ void main() {
       now: startedAt.add(const Duration(seconds: 30)),
     );
 
-    final activeRun = app.getActiveRoutineRunForRoutine(routine.id, '2026-03-31');
+    final activeRun =
+        app.getActiveRoutineRunForRoutine(routine.id, '2026-03-31');
     expect(activeRun, isNotNull);
     expect(activeRun!.currentStepIndex, 1);
     expect(activeRun.entries.length, 1);
@@ -1168,7 +1451,8 @@ void main() {
     expect(find.text('00:40'), findsWidgets);
   });
 
-  testWidgets('cancelling a routine clears active state and restart begins fresh',
+  testWidgets(
+      'cancelling a routine clears active state and restart begins fresh',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     final app = AppProvider();
@@ -1526,6 +1810,11 @@ _TestStudyFlowAppProvider _buildStudyFlowAppProvider({
   );
 }
 
+Future<void> _settleTestUi(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 250));
+}
+
 class _TimelineHarness extends StatefulWidget {
   final AppProvider app;
   final DateTime initialDate;
@@ -1567,6 +1856,7 @@ class _TimelineHarnessState extends State<_TimelineHarness> {
                 child: TimelineView(
                   dateKey: dateKey,
                   blocks: blocks,
+                  reminders: const [],
                   onOpenDate: (date) {
                     setState(
                       () => _selectedDate =
@@ -1636,6 +1926,29 @@ class _StudyFlowHarness extends StatelessWidget {
           blockId: blockId,
           sessionTitle: sessionTitle,
         ),
+      ),
+    );
+  }
+}
+
+class _SettingsScreenHarness extends StatelessWidget {
+  final AppProvider app;
+  final SettingsProvider settings;
+
+  const _SettingsScreenHarness({
+    required this.app,
+    required this.settings,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AppProvider>.value(value: app),
+        ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+      ],
+      child: const MaterialApp(
+        home: SettingsScreen(),
       ),
     );
   }
@@ -1720,7 +2033,8 @@ class _TestStudyFlowAppProvider extends AppProvider {
 
   @override
   Future<void> markSubtopicRead(int subtopicId) async {
-    final index = faSubtopics.indexWhere((subtopic) => subtopic.id == subtopicId);
+    final index =
+        faSubtopics.indexWhere((subtopic) => subtopic.id == subtopicId);
     if (index < 0) {
       return;
     }

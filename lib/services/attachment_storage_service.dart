@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:focusflow_mobile/models/library_note.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -29,17 +30,82 @@ class AttachmentStorageService {
   static Future<List<String>> normalizeAttachmentPaths(
     List<String> paths,
   ) async {
-    final normalized = <String>[];
-    for (final path in paths) {
-      final nextPath = await normalizeAttachmentPath(path);
-      if (nextPath != null && nextPath.isNotEmpty) {
-        normalized.add(nextPath);
+    final normalizedAttachments = await normalizeAttachments(
+      paths.map(LibraryNoteAttachment.fromLegacySource).toList(),
+    );
+    return normalizedAttachments
+        .map((attachment) => attachment.source)
+        .toList(growable: false);
+  }
+
+  static Future<List<LibraryNoteAttachment>> normalizeAttachments(
+    List<LibraryNoteAttachment> attachments,
+  ) async {
+    final normalized = <LibraryNoteAttachment>[];
+    for (final attachment in attachments) {
+      final nextAttachment = await normalizeAttachment(attachment);
+      if (nextAttachment != null && nextAttachment.source.isNotEmpty) {
+        normalized.add(nextAttachment);
       }
     }
     return normalized;
   }
 
   static Future<String?> normalizeAttachmentPath(String path) async {
+    final normalized = await normalizeAttachment(
+      LibraryNoteAttachment.fromLegacySource(path),
+    );
+    return normalized?.source;
+  }
+
+  static Future<LibraryNoteAttachment?> normalizeAttachment(
+    LibraryNoteAttachment attachment,
+  ) async {
+    final trimmed = attachment.source.trim();
+    if (trimmed.isEmpty) return null;
+    if (isWebLink(trimmed)) {
+      return attachment.copyWith(
+        source: trimmed,
+        displayName: attachment.displayName,
+        kind: LibraryNoteAttachment.detectKind(trimmed),
+      );
+    }
+
+    final source = File(trimmed);
+    if (!await source.exists()) {
+      return attachment.copyWith(
+        source: trimmed,
+        displayName: attachment.displayName,
+        kind: LibraryNoteAttachment.detectKind(trimmed),
+      );
+    }
+
+    final attachmentsDir = await getAttachmentsDirectory();
+    final normalizedSource = p.normalize(source.absolute.path);
+    final normalizedRoot = p.normalize(attachmentsDir.absolute.path);
+    if (_isWithinDirectory(normalizedSource, normalizedRoot)) {
+      return attachment.copyWith(
+        source: normalizedSource,
+        displayName: attachment.displayName,
+        kind: LibraryNoteAttachment.detectKind(normalizedSource),
+      );
+    }
+
+    final fileName = _buildManagedFileName(trimmed);
+    final destination = await _nextAvailableFile(
+      attachmentsDir,
+      preferredName: fileName,
+    );
+    await source.copy(destination.path);
+    final normalizedPath = p.normalize(destination.path);
+    return attachment.copyWith(
+      source: normalizedPath,
+      displayName: attachment.displayName,
+      kind: LibraryNoteAttachment.detectKind(normalizedPath),
+    );
+  }
+
+  static Future<String?> normalizeAttachmentPathLegacy(String path) async {
     final trimmed = path.trim();
     if (trimmed.isEmpty) return null;
     if (isWebLink(trimmed)) return trimmed;

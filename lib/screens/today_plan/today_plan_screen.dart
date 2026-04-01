@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:focusflow_mobile/models/active_study_session.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
+import 'package:focusflow_mobile/models/reminder.dart';
 import 'package:focusflow_mobile/models/routine.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/screens/session/session_screen.dart';
@@ -20,6 +21,7 @@ import 'package:provider/provider.dart';
 import 'buying_tab.dart';
 import 'block_editor_sheet.dart';
 import 'day_session_screen.dart';
+import 'reminder_tab.dart';
 import 'routine_editor_sheet.dart';
 import 'routine_runner_screen.dart';
 import 'routines_tab.dart';
@@ -45,15 +47,20 @@ class TodayPlanScreen extends StatefulWidget {
 
 class _TodayPlanScreenState extends State<TodayPlanScreen>
     with SingleTickerProviderStateMixin {
+  static const int _timelineTabIndex = 0;
   static const int _routinesTabIndex = 1;
+  static const int _moreTabIndex = 2;
+  static const int _moreReminderSubTabIndex = 0;
 
   late DateTime _selectedDate;
   late DateTime _lastCalendarDate;
   String? _completedBlockId;
+  String? _highlightedReminderId;
   late TabController _tabCtrl;
   bool _didProcessExpiredRoutineQueue = false;
   bool _didAutoOpenActiveStudySession = false;
   TodayPlanLaunchRequest? _processingNotificationLaunch;
+  int _selectedMoreSubTabIndex = _moreReminderSubTabIndex;
 
   late final StreamSubscription<DateTime> _clockTimer;
 
@@ -240,7 +247,24 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
         });
       }
 
-      _tabCtrl.animateTo(request.opensRoutinesTab ? _routinesTabIndex : 0);
+      final opensReminderTab =
+          request.openReminderTab || request.reminderId != null;
+      if (opensReminderTab) {
+        _setStateIfMounted(() {
+          _selectedMoreSubTabIndex = _moreReminderSubTabIndex;
+          _highlightedReminderId = request.reminderId;
+        });
+      } else if (_highlightedReminderId != null) {
+        _setStateIfMounted(() => _highlightedReminderId = null);
+      }
+
+      _tabCtrl.animateTo(
+        opensReminderTab
+            ? _moreTabIndex
+            : (request.opensRoutinesTab
+                ? _routinesTabIndex
+                : _timelineTabIndex),
+      );
       await _refreshSelectedDateBlocks();
       await Future<void>.delayed(const Duration(milliseconds: 80));
       if (!mounted) return;
@@ -258,6 +282,10 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
             ),
           );
         }
+        return;
+      }
+
+      if (opensReminderTab) {
         return;
       }
 
@@ -442,14 +470,20 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
 
   void _prevDay() {
     _setStateIfMounted(
-      () => _selectedDate = _selectedDate.subtract(const Duration(days: 1)),
+      () {
+        _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+        _highlightedReminderId = null;
+      },
     );
     unawaited(_refreshSelectedDateBlocks());
   }
 
   void _nextDay() {
     _setStateIfMounted(
-      () => _selectedDate = _selectedDate.add(const Duration(days: 1)),
+      () {
+        _selectedDate = _selectedDate.add(const Duration(days: 1));
+        _highlightedReminderId = null;
+      },
     );
     unawaited(_refreshSelectedDateBlocks());
   }
@@ -462,16 +496,55 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
       lastDate: DateTime(2027),
     );
     if (picked != null) {
-      _setStateIfMounted(() => _selectedDate = picked);
+      _setStateIfMounted(() {
+        _selectedDate = picked;
+        _highlightedReminderId = null;
+      });
       await _refreshSelectedDateBlocks();
     }
   }
 
   Future<void> _openTimelineDate(DateTime date) async {
     _setStateIfMounted(
-      () => _selectedDate = DateTime(date.year, date.month, date.day),
+      () {
+        _selectedDate = DateTime(date.year, date.month, date.day);
+        _highlightedReminderId = null;
+      },
     );
     await _refreshSelectedDateBlocks();
+  }
+
+  Future<void> _openReminderFromTimeline(ReminderOccurrence occurrence) async {
+    _setStateIfMounted(() {
+      _selectedMoreSubTabIndex = _moreReminderSubTabIndex;
+      _highlightedReminderId = occurrence.reminderId;
+    });
+    await showReminderEditorSheet(
+      context,
+      dateKey: _dateKey,
+      existing: occurrence.reminder,
+    );
+  }
+
+  Future<void> _toggleReminderFromTimeline(
+    ReminderOccurrence occurrence,
+    bool completed,
+  ) {
+    return context.read<AppProvider>().setReminderOccurrenceCompleted(
+          reminderId: occurrence.reminderId,
+          occurrenceKey: occurrence.occurrenceKey,
+          completed: completed,
+        );
+  }
+
+  void _handleMoreSubTabChanged(int index) {
+    if (_selectedMoreSubTabIndex == index) return;
+    _setStateIfMounted(() {
+      _selectedMoreSubTabIndex = index;
+      if (index != _moreReminderSubTabIndex) {
+        _highlightedReminderId = null;
+      }
+    });
   }
 
   Future<void> _tryOpenActiveStudySession() async {
@@ -744,6 +817,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     final displayBlocks = List<Block>.from(visibleBlocks);
     displayBlocks
         .sort((a, b) => a.plannedStartTime.compareTo(b.plannedStartTime));
+    final timelineReminders =
+        app.getTimelineReminderOccurrencesForDate(_dateKey);
 
     return AppScaffold(
       screenName: "Today's Plan",
@@ -778,9 +853,17 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                       },
                       dateKey: _dateKey,
                       blocks: displayBlocks,
+                      reminders: timelineReminders,
+                      onReminderTap: _openReminderFromTimeline,
+                      onReminderToggle: _toggleReminderFromTimeline,
                     ),
                     RoutinesTab(dateKey: _dateKey),
-                    _MoreTabView(dateKey: _dateKey),
+                    _MoreTabView(
+                      dateKey: _dateKey,
+                      selectedTabIndex: _selectedMoreSubTabIndex,
+                      highlightedReminderId: _highlightedReminderId,
+                      onTabChanged: _handleMoreSubTabChanged,
+                    ),
                   ],
                 ),
               ),
@@ -813,6 +896,10 @@ class _TodayTimelineTab extends StatelessWidget {
   final ValueChanged<DateTime> onSelectDate;
   final String dateKey;
   final List<Block> blocks;
+  final List<ReminderOccurrence> reminders;
+  final Future<void> Function(ReminderOccurrence occurrence) onReminderTap;
+  final Future<void> Function(ReminderOccurrence occurrence, bool completed)
+      onReminderToggle;
 
   const _TodayTimelineTab({
     required this.date,
@@ -829,6 +916,9 @@ class _TodayTimelineTab extends StatelessWidget {
     required this.onSelectDate,
     required this.dateKey,
     required this.blocks,
+    required this.reminders,
+    required this.onReminderTap,
+    required this.onReminderToggle,
   });
 
   @override
@@ -859,8 +949,11 @@ class _TodayTimelineTab extends StatelessWidget {
         child: TimelineView(
           dateKey: dateKey,
           blocks: blocks,
+          reminders: reminders,
           onAddTask: onAddTask,
           onOpenDate: onSelectDate,
+          onReminderTap: onReminderTap,
+          onReminderToggle: onReminderToggle,
         ),
       ),
     );
@@ -869,7 +962,16 @@ class _TodayTimelineTab extends StatelessWidget {
 
 class _MoreTabView extends StatefulWidget {
   final String dateKey;
-  const _MoreTabView({required this.dateKey});
+  final int selectedTabIndex;
+  final String? highlightedReminderId;
+  final ValueChanged<int>? onTabChanged;
+
+  const _MoreTabView({
+    required this.dateKey,
+    required this.selectedTabIndex,
+    this.highlightedReminderId,
+    this.onTabChanged,
+  });
 
   @override
   State<_MoreTabView> createState() => _MoreTabViewState();
@@ -882,11 +984,30 @@ class _MoreTabViewState extends State<_MoreTabView>
   @override
   void initState() {
     super.initState();
-    _subTabCtrl = TabController(length: 2, vsync: this);
+    _subTabCtrl = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.selectedTabIndex,
+    );
+    _subTabCtrl.addListener(_handleSubTabChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant _MoreTabView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_subTabCtrl.index != widget.selectedTabIndex) {
+      _subTabCtrl.animateTo(widget.selectedTabIndex);
+    }
+  }
+
+  void _handleSubTabChanged() {
+    if (_subTabCtrl.indexIsChanging) return;
+    widget.onTabChanged?.call(_subTabCtrl.index);
   }
 
   @override
   void dispose() {
+    _subTabCtrl.removeListener(_handleSubTabChanged);
     _subTabCtrl.dispose();
     super.dispose();
   }
@@ -921,6 +1042,7 @@ class _MoreTabViewState extends State<_MoreTabView>
                 border: Border.all(color: accentSoft.withValues(alpha: 0.22)),
               ),
               tabs: const [
+                Tab(text: 'Reminder'),
                 Tab(text: 'To-Do'),
                 Tab(text: 'Buying'),
               ],
@@ -931,6 +1053,10 @@ class _MoreTabViewState extends State<_MoreTabView>
           child: TabBarView(
             controller: _subTabCtrl,
             children: [
+              ReminderTab(
+                dateKey: widget.dateKey,
+                highlightedReminderId: widget.highlightedReminderId,
+              ),
               TodoTab(dateKey: widget.dateKey),
               BuyingTab(dateKey: widget.dateKey),
             ],

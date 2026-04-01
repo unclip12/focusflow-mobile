@@ -8,11 +8,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-
 
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
@@ -23,789 +23,900 @@ import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/widgets/app_scaffold.dart';
 import 'package:focusflow_mobile/widgets/liquid_glass_card.dart';
+import 'package:focusflow_mobile/widgets/main_shell.dart';
 import 'package:focusflow_mobile/screens/settings/theme_picker_card.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  static const double _taskReminderEditorReservedHeight = 360;
+
+  bool _isTaskReminderEditorOpen = false;
+  TaskReminderRule? _editingTaskReminderRule;
 
   @override
   Widget build(BuildContext context) {
     final sp = context.watch<SettingsProvider>();
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final bottomPadding = MediaQuery.of(context).padding.bottom +
+        kNavBarHeight +
+        24 +
+        (_isTaskReminderEditorOpen ? _taskReminderEditorReservedHeight : 0);
+    final reminderPanelBottom =
+        MediaQuery.of(context).padding.bottom + kNavBarHeight + 12;
 
     return AppScaffold(
       screenName: 'Settings',
-      body: ListView(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          8,
-          16,
-          MediaQuery.of(context).padding.bottom + 72 + 24,
-        ),
+      body: Stack(
         children: [
-          // ═══════════════════════════════════════════════════════
-          // EXAM DATES
-          // ═══════════════════════════════════════════════════════
-          _GlassSectionHeader(title: 'Exam Dates'),
-          const SizedBox(height: 8),
-          LiquidGlassCard(
-            child: Column(
-              children: [
-                _GlassListTile(
-                  title: 'FMGE',
-                  subtitle: _formatDateLabel(sp.fmgeDate),
-                  trailing: Icon(Icons.edit_calendar_rounded,
-                      color: DashboardColors.primaryLight, size: 20),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: DateTime.tryParse(sp.fmgeDate) ??
-                          DateTime(2026, 6, 28),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime(2028),
-                    );
-                    if (picked != null) {
-                      sp.setFmgeDate(DateFormat('yyyy-MM-dd').format(picked));
-                    }
-                  },
-                ),
-                Divider(
-                    height: 1,
-                    color: DashboardColors.glassBorder(
-                        Theme.of(context).brightness == Brightness.dark)),
-                _GlassListTile(
-                  title: 'USMLE Step 1',
-                  subtitle: _formatDateLabel(sp.step1Date),
-                  trailing: Icon(Icons.edit_calendar_rounded,
-                      color: DashboardColors.primaryLight, size: 20),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: DateTime.tryParse(sp.step1Date) ??
-                          DateTime(2026, 6, 15),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime(2028),
-                    );
-                    if (picked != null) {
-                      sp.setStep1Date(DateFormat('yyyy-MM-dd').format(picked));
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // ═══════════════════════════════════════════════════════
-          // DAILY GOALS
-          // ═══════════════════════════════════════════════════════
-          _GlassSectionHeader(title: 'Daily Goals'),
-          const SizedBox(height: 8),
-          LiquidGlassCard(
-            child: Column(
-              children: [
-                _GlassListTile(
-                  title: 'FA Pages / Day',
-                  trailing: _GlassChip(label: '${sp.dailyFAGoal} pages'),
-                  onTap: () => _showSliderDialog(
-                    context: context,
-                    title: 'FA Pages / Day',
-                    currentValue: sp.dailyFAGoal.toDouble(),
-                    min: 5,
-                    max: 60,
-                    divisions: 11,
-                    suffix: 'pages',
-                    onConfirm: (val) => sp.setDailyFAGoal(val.round()),
-                  ),
-                ),
-                Divider(
-                    height: 1,
-                    color: DashboardColors.glassBorder(
-                        Theme.of(context).brightness == Brightness.dark)),
-                _GlassListTile(
-                  title: 'Anki Cards / Day',
-                  trailing: _GlassChip(label: '${sp.ankiBatchSize} cards'),
-                  onTap: () => _showSliderDialog(
-                    context: context,
-                    title: 'Anki Cards / Day',
-                    currentValue: sp.ankiBatchSize.toDouble(),
-                    min: 10,
-                    max: 200,
-                    divisions: 19,
-                    suffix: 'cards',
-                    onConfirm: (val) => sp.setAnkiBatchSize(val.round()),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // ═══════════════════════════════════════════════════════
-          // DAILY SCHEDULE
-          // ═══════════════════════════════════════════════════════
-          _GlassSectionHeader(title: 'Daily Schedule'),
-          const SizedBox(height: 8),
-          LiquidGlassCard(
-            child: Column(
-              children: [
-                _GlassListTile(
-                  title: 'Wake Time',
-                  subtitle: _formatTimeLabel(sp.wakeTime),
-                  trailing: const Icon(Icons.wb_sunny_rounded,
-                      color: Colors.amber, size: 20),
-                  onTap: () async {
-                    final parts = sp.wakeTime.split(':');
-                    final initial = TimeOfDay(
-                      hour: int.tryParse(parts[0]) ?? 6,
-                      minute:
-                          int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0,
-                    );
-                    final picked = await showTimePicker(
-                        context: context, initialTime: initial);
-                    if (picked != null) {
-                      sp.setWakeTime(
-                          '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}');
-                    }
-                  },
-                ),
-                Divider(
-                    height: 1,
-                    color: DashboardColors.glassBorder(
-                        Theme.of(context).brightness == Brightness.dark)),
-                _GlassListTile(
-                  title: 'Sleep Time',
-                  subtitle: _formatTimeLabel(sp.sleepTime),
-                  trailing: const Icon(Icons.bedtime_rounded,
-                      color: Colors.indigo, size: 20),
-                  onTap: () async {
-                    final parts = sp.sleepTime.split(':');
-                    final initial = TimeOfDay(
-                      hour: int.tryParse(parts[0]) ?? 23,
-                      minute:
-                          int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0,
-                    );
-                    final picked = await showTimePicker(
-                        context: context, initialTime: initial);
-                    if (picked != null) {
-                      sp.setSleepTime(
-                          '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}');
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // ═══════════════════════════════════════════════════════
-          // STREAK & DAY BOUNDARY
-          // ═══════════════════════════════════════════════════════
-          _GlassSectionHeader(title: 'Streak & Day Boundary'),
-          const SizedBox(height: 8),
-          LiquidGlassCard(
-            child: Column(
-              children: [
-                _GlassListTile(
-                  icon: Icons.schedule_rounded,
-                  iconColor: DashboardColors.primary,
-                  title: 'Day Start Time',
-                  subtitle:
-                      '${sp.dayStartHour == 0 ? 12 : sp.dayStartHour > 12 ? sp.dayStartHour - 12 : sp.dayStartHour}:00 ${sp.dayStartHour < 12 ? 'AM' : 'PM'}',
-                  trailing: Icon(Icons.chevron_right_rounded,
-                      color: DashboardColors.textSecondary, size: 20),
-                  onTap: () => _showSliderDialog(
-                    context: context,
-                    title: 'Day Start Hour',
-                    currentValue: sp.dayStartHour.toDouble(),
-                    min: 0,
-                    max: 12,
-                    divisions: 12,
-                    suffix: 'AM',
-                    onConfirm: (val) => sp.setDayStartHour(val.round()),
-                  ),
-                ),
-                Divider(
-                    height: 1,
-                    color: DashboardColors.glassBorder(
-                        Theme.of(context).brightness == Brightness.dark)),
-                _GlassListTile(
-                  icon: Icons.auto_awesome_rounded,
-                  iconColor: Colors.amber,
-                  title: 'Auto Use Credits',
-                  subtitle: 'Auto-redeem credit points to save streak',
-                  trailing: Switch.adaptive(
-                    value: sp.streakAutoCredit,
-                    onChanged: (v) => sp.setStreakAutoCredit(v),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          // BOTTOM NAV PINS
-          _GlassSectionHeader(title: 'Navigation'),
-          const SizedBox(height: 8),
-          LiquidGlassCard(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          ListView(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPadding),
+            children: [
+              // ═══════════════════════════════════════════════════════
+              // EXAM DATES
+              // ═══════════════════════════════════════════════════════
+              _GlassSectionHeader(title: 'Exam Dates'),
+              const SizedBox(height: 8),
+              LiquidGlassCard(
+                child: Column(
                   children: [
-                    Text('Pinned Tabs',
+                    _GlassListTile(
+                      title: 'FMGE',
+                      subtitle: _formatDateLabel(sp.fmgeDate),
+                      trailing: Icon(Icons.edit_calendar_rounded,
+                          color: DashboardColors.primaryLight, size: 20),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: DateTime.tryParse(sp.fmgeDate) ??
+                              DateTime(2026, 6, 28),
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime(2028),
+                        );
+                        if (picked != null) {
+                          sp.setFmgeDate(
+                              DateFormat('yyyy-MM-dd').format(picked));
+                        }
+                      },
+                    ),
+                    Divider(
+                        height: 1,
+                        color: DashboardColors.glassBorder(
+                            Theme.of(context).brightness == Brightness.dark)),
+                    _GlassListTile(
+                      title: 'USMLE Step 1',
+                      subtitle: _formatDateLabel(sp.step1Date),
+                      trailing: Icon(Icons.edit_calendar_rounded,
+                          color: DashboardColors.primaryLight, size: 20),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: DateTime.tryParse(sp.step1Date) ??
+                              DateTime(2026, 6, 15),
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime(2028),
+                        );
+                        if (picked != null) {
+                          sp.setStep1Date(
+                              DateFormat('yyyy-MM-dd').format(picked));
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // ═══════════════════════════════════════════════════════
+              // DAILY GOALS
+              // ═══════════════════════════════════════════════════════
+              _GlassSectionHeader(title: 'Daily Goals'),
+              const SizedBox(height: 8),
+              LiquidGlassCard(
+                child: Column(
+                  children: [
+                    _GlassListTile(
+                      title: 'FA Pages / Day',
+                      trailing: _GlassChip(label: '${sp.dailyFAGoal} pages'),
+                      onTap: () => _showSliderDialog(
+                        context: context,
+                        title: 'FA Pages / Day',
+                        currentValue: sp.dailyFAGoal.toDouble(),
+                        min: 5,
+                        max: 60,
+                        divisions: 11,
+                        suffix: 'pages',
+                        onConfirm: (val) => sp.setDailyFAGoal(val.round()),
+                      ),
+                    ),
+                    Divider(
+                        height: 1,
+                        color: DashboardColors.glassBorder(
+                            Theme.of(context).brightness == Brightness.dark)),
+                    _GlassListTile(
+                      title: 'Anki Cards / Day',
+                      trailing: _GlassChip(label: '${sp.ankiBatchSize} cards'),
+                      onTap: () => _showSliderDialog(
+                        context: context,
+                        title: 'Anki Cards / Day',
+                        currentValue: sp.ankiBatchSize.toDouble(),
+                        min: 10,
+                        max: 200,
+                        divisions: 19,
+                        suffix: 'cards',
+                        onConfirm: (val) => sp.setAnkiBatchSize(val.round()),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // ═══════════════════════════════════════════════════════
+              // DAILY SCHEDULE
+              // ═══════════════════════════════════════════════════════
+              _GlassSectionHeader(title: 'Daily Schedule'),
+              const SizedBox(height: 8),
+              LiquidGlassCard(
+                child: Column(
+                  children: [
+                    _GlassListTile(
+                      title: 'Wake Time',
+                      subtitle: _formatTimeLabel(sp.wakeTime),
+                      trailing: const Icon(Icons.wb_sunny_rounded,
+                          color: Colors.amber, size: 20),
+                      onTap: () async {
+                        final parts = sp.wakeTime.split(':');
+                        final initial = TimeOfDay(
+                          hour: int.tryParse(parts[0]) ?? 6,
+                          minute:
+                              int.tryParse(parts.length > 1 ? parts[1] : '0') ??
+                                  0,
+                        );
+                        final picked = await showTimePicker(
+                            context: context, initialTime: initial);
+                        if (picked != null) {
+                          sp.setWakeTime(
+                              '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}');
+                        }
+                      },
+                    ),
+                    Divider(
+                        height: 1,
+                        color: DashboardColors.glassBorder(
+                            Theme.of(context).brightness == Brightness.dark)),
+                    _GlassListTile(
+                      title: 'Sleep Time',
+                      subtitle: _formatTimeLabel(sp.sleepTime),
+                      trailing: const Icon(Icons.bedtime_rounded,
+                          color: Colors.indigo, size: 20),
+                      onTap: () async {
+                        final parts = sp.sleepTime.split(':');
+                        final initial = TimeOfDay(
+                          hour: int.tryParse(parts[0]) ?? 23,
+                          minute:
+                              int.tryParse(parts.length > 1 ? parts[1] : '0') ??
+                                  0,
+                        );
+                        final picked = await showTimePicker(
+                            context: context, initialTime: initial);
+                        if (picked != null) {
+                          sp.setSleepTime(
+                              '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}');
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // ═══════════════════════════════════════════════════════
+              // STREAK & DAY BOUNDARY
+              // ═══════════════════════════════════════════════════════
+              _GlassSectionHeader(title: 'Streak & Day Boundary'),
+              const SizedBox(height: 8),
+              LiquidGlassCard(
+                child: Column(
+                  children: [
+                    _GlassListTile(
+                      icon: Icons.schedule_rounded,
+                      iconColor: DashboardColors.primary,
+                      title: 'Day Start Time',
+                      subtitle:
+                          '${sp.dayStartHour == 0 ? 12 : sp.dayStartHour > 12 ? sp.dayStartHour - 12 : sp.dayStartHour}:00 ${sp.dayStartHour < 12 ? 'AM' : 'PM'}',
+                      trailing: Icon(Icons.chevron_right_rounded,
+                          color: DashboardColors.textSecondary, size: 20),
+                      onTap: () => _showSliderDialog(
+                        context: context,
+                        title: 'Day Start Hour',
+                        currentValue: sp.dayStartHour.toDouble(),
+                        min: 0,
+                        max: 12,
+                        divisions: 12,
+                        suffix: 'AM',
+                        onConfirm: (val) => sp.setDayStartHour(val.round()),
+                      ),
+                    ),
+                    Divider(
+                        height: 1,
+                        color: DashboardColors.glassBorder(
+                            Theme.of(context).brightness == Brightness.dark)),
+                    _GlassListTile(
+                      icon: Icons.auto_awesome_rounded,
+                      iconColor: Colors.amber,
+                      title: 'Auto Use Credits',
+                      subtitle: 'Auto-redeem credit points to save streak',
+                      trailing: Switch.adaptive(
+                        value: sp.streakAutoCredit,
+                        onChanged: (v) => sp.setStreakAutoCredit(v),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              // BOTTOM NAV PINS
+              _GlassSectionHeader(title: 'Navigation'),
+              const SizedBox(height: 8),
+              LiquidGlassCard(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text('Pinned Tabs',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: DashboardColors.textPrimary(
+                                  Theme.of(context).brightness ==
+                                      Brightness.dark),
+                            )),
+                        const Spacer(),
+                        Text('Max 4 tabs',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: DashboardColors.textSecondary,
+                            )),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: sp.pinnedTabs.map((id) {
+                        final label = kPinnableScreenLabels[id] ?? id;
+                        return FilterChip(
+                          label: Text(label),
+                          selected: true,
+                          onSelected: (_) {
+                            if (sp.pinnedTabs.length > 1) {
+                              final updated =
+                                  sp.pinnedTabs.where((t) => t != id).toList();
+                              sp.setPinnedTabs(updated);
+                            }
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add tab'),
+                      onPressed: sp.pinnedTabs.length >= 4
+                          ? null
+                          : () {
+                              final unpinned = kPinnableScreenLabels.entries
+                                  .where((e) => !sp.pinnedTabs.contains(e.key))
+                                  .toList();
+                              showModalBottomSheet(
+                                context: context,
+                                enableDrag: false,
+                                useSafeArea: true,
+                                builder: (_) => ListView(
+                                  shrinkWrap: true,
+                                  padding: EdgeInsets.only(
+                                    bottom:
+                                        MediaQuery.of(context).padding.bottom +
+                                            20,
+                                  ),
+                                  children: unpinned.map((e) {
+                                    return ListTile(
+                                      title: Text(e.value),
+                                      onTap: () {
+                                        sp.setPinnedTabs(
+                                            [...sp.pinnedTabs, e.key]);
+                                        Navigator.pop(context);
+                                      },
+                                    );
+                                  }).toList(),
+                                ),
+                              );
+                            },
+                    ),
+                    const SizedBox(height: 8),
+                    Text('Tap a chip to unpin · Changes apply on restart',
                         style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: DashboardColors.textPrimary(
-                              Theme.of(context).brightness == Brightness.dark),
-                        )),
-                    const Spacer(),
-                    Text('Max 4 tabs',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
+                          fontSize: 10,
                           color: DashboardColors.textSecondary,
                         )),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: sp.pinnedTabs.map((id) {
-                    final label = kPinnableScreenLabels[id] ?? id;
-                    return FilterChip(
-                      label: Text(label),
-                      selected: true,
-                      onSelected: (_) {
-                        if (sp.pinnedTabs.length > 1) {
-                          final updated =
-                              sp.pinnedTabs.where((t) => t != id).toList();
-                          sp.setPinnedTabs(updated);
-                        }
-                      },
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add tab'),
-                  onPressed: sp.pinnedTabs.length >= 4
-                      ? null
-                      : () {
-                          final unpinned = kPinnableScreenLabels.entries
-                              .where((e) => !sp.pinnedTabs.contains(e.key))
-                              .toList();
-                          showModalBottomSheet(
-                            context: context,
-                            enableDrag: false,
-                            useSafeArea: true,
-                            builder: (_) => ListView(
-                              shrinkWrap: true,
-                              padding: EdgeInsets.only(
-                                bottom:
-                                    MediaQuery.of(context).padding.bottom + 20,
-                              ),
-                              children: unpinned.map((e) {
-                                return ListTile(
-                                  title: Text(e.value),
-                                  onTap: () {
-                                    sp.setPinnedTabs([...sp.pinnedTabs, e.key]);
-                                    Navigator.pop(context);
-                                  },
-                                );
-                              }).toList(),
-                            ),
-                          );
-                        },
-                ),
-                const SizedBox(height: 8),
-                Text('Tap a chip to unpin · Changes apply on restart',
-                    style: GoogleFonts.inter(
-                      fontSize: 10,
-                      color: DashboardColors.textSecondary,
-                    )),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
+              ),
+              const SizedBox(height: 20),
 
-          // =============================================================
-          // APPEARANCE
-          // =============================================================
-          _GlassSectionHeader(title: 'Appearance'),
-          const SizedBox(height: 8),
+              // =============================================================
+              // APPEARANCE
+              // =============================================================
+              _GlassSectionHeader(title: 'Appearance'),
+              const SizedBox(height: 8),
 
-          // â”€â”€ Theme picker (horizontal scroll) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-          LiquidGlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Theme',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: cs.onSurface.withValues(alpha: 0.6),
-                      fontWeight: FontWeight.w600,
-                    )),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 100,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: kThemePresets.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (_, i) {
-                      final preset = kThemePresets[i];
-                      return ThemePickerCard(
-                        preset: preset,
-                        selected: sp.currentTheme == preset.id,
-                        onTap: () => sp.changeTheme(preset.id),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          // â”€â”€ Dark mode toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-          _SettingsTile(
-            icon: Icons.dark_mode_rounded,
-            title: 'Dark Mode',
-            trailing: Switch.adaptive(
-              value: sp.isDarkMode,
-              activeTrackColor: cs.primary,
-              onChanged: (_) => sp.toggleDarkMode(),
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          // â”€â”€ Font size slider â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-          LiquidGlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+              // â”€â”€ Theme picker (horizontal scroll) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              LiquidGlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.text_fields_rounded,
-                        size: 18, color: cs.primary),
-                    const SizedBox(width: 8),
-                    Text('Font Size',
-                        style: theme.textTheme.bodyMedium?.copyWith(
+                    Text('Theme',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: cs.onSurface.withValues(alpha: 0.6),
                           fontWeight: FontWeight.w600,
                         )),
-                    const Spacer(),
-                    Text(
-                      sp.fontSize[0].toUpperCase() + sp.fontSize.substring(1),
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: cs.primary,
-                        fontWeight: FontWeight.w600,
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 100,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: kThemePresets.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (_, i) {
+                          final preset = kThemePresets[i];
+                          return ThemePickerCard(
+                            preset: preset,
+                            selected: sp.currentTheme == preset.id,
+                            onTap: () => sp.changeTheme(preset.id),
+                          );
+                        },
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: kFontSizes.map((size) {
-                    final selected = sp.fontSize == size;
-                    return Expanded(
-                      child: GestureDetector(
-                        onTap: () => sp.changeFontSize(size),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          margin: const EdgeInsets.symmetric(horizontal: 3),
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? cs.primary.withValues(alpha: 0.15)
-                                : cs.onSurface.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: selected
-                                  ? cs.primary.withValues(alpha: 0.4)
-                                  : cs.onSurface.withValues(alpha: 0.08),
-                            ),
+              ),
+              const SizedBox(height: 8),
+
+              // â”€â”€ Dark mode toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              _SettingsTile(
+                icon: Icons.dark_mode_rounded,
+                title: 'Dark Mode',
+                trailing: Switch.adaptive(
+                  value: sp.isDarkMode,
+                  activeTrackColor: cs.primary,
+                  onChanged: (_) => sp.toggleDarkMode(),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // â”€â”€ Font size slider â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              LiquidGlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.text_fields_rounded,
+                            size: 18, color: cs.primary),
+                        const SizedBox(width: 8),
+                        Text('Font Size',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            )),
+                        const Spacer(),
+                        Text(
+                          sp.fontSize[0].toUpperCase() +
+                              sp.fontSize.substring(1),
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: cs.primary,
+                            fontWeight: FontWeight.w600,
                           ),
-                          child: Center(
-                            child: Text(
-                              size[0].toUpperCase() + size.substring(1),
-                              style: theme.textTheme.labelSmall?.copyWith(
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: kFontSizes.map((size) {
+                        final selected = sp.fontSize == size;
+                        return Expanded(
+                          child: GestureDetector(
+                            onTap: () => sp.changeFontSize(size),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              margin: const EdgeInsets.symmetric(horizontal: 3),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
                                 color: selected
-                                    ? cs.primary
-                                    : cs.onSurface.withValues(alpha: 0.5),
-                                fontWeight: selected
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
+                                    ? cs.primary.withValues(alpha: 0.15)
+                                    : cs.onSurface.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: selected
+                                      ? cs.primary.withValues(alpha: 0.4)
+                                      : cs.onSurface.withValues(alpha: 0.08),
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  size[0].toUpperCase() + size.substring(1),
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: selected
+                                        ? cs.primary
+                                        : cs.onSurface.withValues(alpha: 0.5),
+                                    fontWeight: selected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          // NOTIFICATIONS
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          _GlassSectionHeader(title: 'Notifications'),
-          const SizedBox(height: 8),
-
-          _SettingsTile(
-            icon: Icons.do_not_disturb_on_rounded,
-            title: 'Quiet Hours',
-            subtitle: sp.settings.quietHours.enabled
-                ? '${sp.settings.quietHours.start} â€“ ${sp.settings.quietHours.end}'
-                : 'Disabled',
-            trailing: Switch.adaptive(
-              value: sp.settings.quietHours.enabled,
-              activeTrackColor: cs.primary,
-              onChanged: (_) {
-                sp.updateQuietHours(sp.settings.quietHours
-                    .copyWith(enabled: !sp.settings.quietHours.enabled));
-              },
-            ),
-          ),
-          // â”€â”€ Time pickers (shown when quiet hours enabled) â”€â”€â”€â”€â”€â”€â”€
-          if (sp.settings.quietHours.enabled) ...[
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: _TimeTile(
-                    label: 'Start',
-                    time: sp.settings.quietHours.start,
-                    onTap: () => _pickTime(
-                      context,
-                      sp.settings.quietHours.start,
-                      (t) => sp.updateQuietHours(
-                          sp.settings.quietHours.copyWith(start: t)),
+                        );
+                      }).toList(),
                     ),
-                  ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _TimeTile(
-                    label: 'End',
-                    time: sp.settings.quietHours.end,
-                    onTap: () => _pickTime(
-                      context,
-                      sp.settings.quietHours.end,
-                      (t) => sp.updateQuietHours(
-                          sp.settings.quietHours.copyWith(end: t)),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-          const SizedBox(height: 20),
+              ),
+              const SizedBox(height: 20),
 
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          // MENU CONFIGURATION
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          _GlassSectionHeader(title: 'Timer Reminders'),
-          const SizedBox(height: 8),
-          LiquidGlassCard(
-            child: Column(
-              children: [
-                _GlassListTile(
-                  title: 'Cue Sounds',
-                  subtitle: 'Play a sound for 20%, 5-minute, and 1-minute warnings',
-                  trailing: Switch.adaptive(
-                    value: sp.timerReminders.playCueSounds,
-                    activeTrackColor: cs.primary,
-                    onChanged: (value) {
-                      sp.setPlayCueSounds(value);
-                      unawaited(_syncPlannedTaskReminders(context));
-                    },
-                  ),
+              // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+              // NOTIFICATIONS
+              // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+              _GlassSectionHeader(title: 'Notifications'),
+              const SizedBox(height: 8),
+
+              _SettingsTile(
+                icon: Icons.do_not_disturb_on_rounded,
+                title: 'Quiet Hours',
+                subtitle: sp.settings.quietHours.enabled
+                    ? '${sp.settings.quietHours.start} â€“ ${sp.settings.quietHours.end}'
+                    : 'Disabled',
+                trailing: Switch.adaptive(
+                  value: sp.settings.quietHours.enabled,
+                  activeTrackColor: cs.primary,
+                  onChanged: (_) {
+                    sp.updateQuietHours(sp.settings.quietHours
+                        .copyWith(enabled: !sp.settings.quietHours.enabled));
+                  },
                 ),
-                Divider(
-                  height: 1,
-                  color: DashboardColors.glassBorder(
-                    Theme.of(context).brightness == Brightness.dark,
-                  ),
-                ),
-                _GlassListTile(
-                  title: 'Spoken Reminders',
-                  subtitle: 'Speak timer warnings aloud after the cue sound',
-                  trailing: Switch.adaptive(
-                    value: sp.timerReminders.speakReminders,
-                    activeTrackColor: cs.primary,
-                    onChanged: (value) {
-                      sp.setSpeakReminders(value);
-                      unawaited(_syncPlannedTaskReminders(context));
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          LiquidGlassCard(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+              ),
+              // â”€â”€ Time pickers (shown when quiet hours enabled) â”€â”€â”€â”€â”€â”€â”€
+              if (sp.settings.quietHours.enabled) ...[
+                const SizedBox(height: 6),
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        'Global Task Reminder Rules',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
+                      child: _TimeTile(
+                        label: 'Start',
+                        time: sp.settings.quietHours.start,
+                        onTap: () => _pickTime(
+                          context,
+                          sp.settings.quietHours.start,
+                          (t) => sp.updateQuietHours(
+                              sp.settings.quietHours.copyWith(start: t)),
                         ),
                       ),
                     ),
-                    OutlinedButton.icon(
-                      onPressed: () => _openTaskReminderRuleEditor(context),
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('Add'),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _TimeTile(
+                        label: 'End',
+                        time: sp.settings.quietHours.end,
+                        onTap: () => _pickTime(
+                          context,
+                          sp.settings.quietHours.end,
+                          (t) => sp.updateQuietHours(
+                              sp.settings.quietHours.copyWith(end: t)),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  'These rules apply to timed tasks across Today\'s Plan. Fixed active timer warnings still run automatically.',
+              ],
+              const SizedBox(height: 20),
+
+              // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+              // MENU CONFIGURATION
+              // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+              _GlassSectionHeader(title: 'Reminder Notifications'),
+              const SizedBox(height: 8),
+              LiquidGlassCard(
+                child: Column(
+                  children: [
+                    _GlassListTile(
+                      title: 'Reminder Alerts',
+                      subtitle: sp.reminderNotifications.enabled
+                          ? 'Enabled for timed reminders'
+                          : 'Disabled',
+                      trailing: Switch.adaptive(
+                        value: sp.reminderNotifications.enabled,
+                        activeTrackColor: cs.primary,
+                        onChanged: (value) async {
+                          await sp.setReminderNotificationsEnabled(value);
+                          if (!context.mounted) return;
+                          await _syncReminderNotifications(context);
+                        },
+                      ),
+                    ),
+                    Divider(
+                      height: 1,
+                      color: DashboardColors.glassBorder(
+                        Theme.of(context).brightness == Brightness.dark,
+                      ),
+                    ),
+                    _GlassListTile(
+                      title: 'Default Alert Times',
+                      subtitle: _formatReminderAlertOffsets(
+                        sp.reminderNotifications.defaultAlertOffsets,
+                      ),
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: DashboardColors.textSecondary,
+                        size: 20,
+                      ),
+                      onTap: () => _editReminderDefaultAlerts(context),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              LiquidGlassCard(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'These defaults are used by reminders that keep global alert settings. All-day reminders stay in the list and only timed reminders schedule notifications.',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: cs.onSurface.withValues(alpha: 0.6),
+                    color: cs.onSurface.withValues(alpha: 0.65),
                   ),
                 ),
-                const SizedBox(height: 14),
-                if (sp.timerReminders.taskReminderRules.isEmpty)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: cs.surface.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: cs.onSurface.withValues(alpha: 0.08),
+              ),
+              const SizedBox(height: 20),
+
+              _GlassSectionHeader(title: 'Timer Reminders'),
+              const SizedBox(height: 8),
+              LiquidGlassCard(
+                child: Column(
+                  children: [
+                    _GlassListTile(
+                      title: 'Cue Sounds',
+                      subtitle:
+                          'Play a sound for 20%, 5-minute, and 1-minute warnings',
+                      trailing: Switch.adaptive(
+                        value: sp.timerReminders.playCueSounds,
+                        activeTrackColor: cs.primary,
+                        onChanged: (value) {
+                          sp.setPlayCueSounds(value);
+                          unawaited(_syncPlannedTaskReminders(context));
+                        },
                       ),
                     ),
-                    child: Text(
-                      'No extra reminder rules yet. Add reminders for before start, at start, before end, or at end.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: cs.onSurface.withValues(alpha: 0.65),
+                    Divider(
+                      height: 1,
+                      color: DashboardColors.glassBorder(
+                        Theme.of(context).brightness == Brightness.dark,
                       ),
                     ),
-                  )
-                else
-                  Column(
-                    children: sp.timerReminders.taskReminderRules
-                        .map(
-                          (rule) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _TaskReminderRuleTile(
-                              rule: rule,
-                              summary: _taskReminderRuleSummary(rule),
-                              onTap: () => _openTaskReminderRuleEditor(
-                                context,
-                                existing: rule,
-                              ),
-                              onToggle: (value) {
-                                context
-                                    .read<SettingsProvider>()
-                                    .updateTaskReminderRule(
-                                      rule.copyWith(enabled: value),
-                                    );
-                                unawaited(_syncPlannedTaskReminders(context));
-                              },
-                              onDelete: () {
-                                context
-                                    .read<SettingsProvider>()
-                                    .removeTaskReminderRule(rule.id);
-                                unawaited(_syncPlannedTaskReminders(context));
-                              },
+                    _GlassListTile(
+                      title: 'Spoken Reminders',
+                      subtitle:
+                          'Speak timer warnings aloud after the cue sound',
+                      trailing: Switch.adaptive(
+                        value: sp.timerReminders.speakReminders,
+                        activeTrackColor: cs.primary,
+                        onChanged: (value) {
+                          sp.setSpeakReminders(value);
+                          unawaited(_syncPlannedTaskReminders(context));
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              LiquidGlassCard(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Global Task Reminder Rules',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                        )
-                        .toList(),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          _GlassSectionHeader(title: 'Menu'),
-          const SizedBox(height: 8),
-          _MenuReorderSection(sp: sp),
-          const SizedBox(height: 20),
-
-          // ═════════════════════════════════════════════════════════════════════
-          // BACKUP & RESTORE
-          // ═════════════════════════════════════════════════════════════════════
-          _GlassSectionHeader(title: 'Backup & Restore'),
-          const SizedBox(height: 8),
-          LiquidGlassCard(
-            child: Column(
-              children: [
-                // Row 1 — Last Backup
-                _GlassListTile(
-                  icon: Icons.history_rounded,
-                  iconColor: DashboardColors.primary,
-                  title: 'Last Backup',
-                  subtitleWidget: FutureBuilder<DateTime?>(
-                    future: BackupService.lastBackupTime(),
-                    builder: (context, snap) {
-                      if (snap.connectionState == ConnectionState.waiting) {
-                        return Text('Checking…',
-                            style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: DashboardColors.textSecondary));
-                      }
-                      final dt = snap.data;
-                      if (dt == null)
-                        return Text('No backup yet',
-                            style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: DashboardColors.textSecondary));
-                      final now = DateTime.now();
-                      final isToday = dt.year == now.year &&
-                          dt.month == now.month &&
-                          dt.day == now.day;
-                      final formatted = isToday
-                          ? 'Today at ${DateFormat.jm().format(dt)}'
-                          : '${DateFormat('MMM d').format(dt)} at ${DateFormat.jm().format(dt)}';
-                      return Text(formatted,
-                          style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: DashboardColors.textSecondary));
-                    },
-                  ),
-                ),
-                Divider(
-                    height: 1,
-                    color: DashboardColors.glassBorder(
-                        Theme.of(context).brightness == Brightness.dark)),
-                // Row 2 — Open Backup & Restore Screen
-                _GlassListTile(
-                  icon: Icons.backup_rounded,
-                  iconColor: DashboardColors.success,
-                  title: 'Backup & Restore',
-                  subtitle: 'Create backups, restore, or export data',
-                  trailing: Icon(Icons.chevron_right_rounded,
-                      color: DashboardColors.textSecondary, size: 20),
-                  onTap: () => GoRouter.of(context).push('/backup'),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          // ABOUT
-          // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          // ── STUDY PLAN ─────────────────────────────────────────
-          _GlassSectionHeader(title: 'Study Plan'),
-          const SizedBox(height: 8),
-          LiquidGlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.calendar_today_rounded,
-                        size: 18, color: cs.primary),
-                    const SizedBox(width: 8),
-                    Text('Plan Start Date',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        )),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () async {
-                        final current = sp.studyPlanStartDate;
-                        final initial = current != null
-                            ? DateTime.tryParse(current) ?? DateTime.now()
-                            : DateTime.now();
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: initial,
-                          firstDate: DateTime(2025),
-                          lastDate: DateTime(2028),
-                        );
-                        if (picked != null) {
-                          sp.setStudyPlanStartDate(
-                              picked.toIso8601String().substring(0, 10));
-                        }
-                      },
-                      child: Text(
-                        sp.studyPlanStartDate != null
-                            ? _formatDateLabel(sp.studyPlanStartDate!)
-                            : 'Not set (auto)',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: sp.studyPlanStartDate != null
-                              ? cs.primary
-                              : cs.onSurface.withValues(alpha: 0.4),
                         ),
+                        OutlinedButton.icon(
+                          key: const ValueKey<String>(
+                              'task_reminder_add_button'),
+                          onPressed: () => _openTaskReminderRuleEditor(),
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: const Text('Add'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'These rules apply to timed tasks across Today\'s Plan. Fixed active timer warnings still run automatically.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    if (sp.timerReminders.taskReminderRules.isEmpty)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: cs.surface.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: cs.onSurface.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        child: Text(
+                          'No extra reminder rules yet. Add reminders for before start, at start, before end, or at end.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.onSurface.withValues(alpha: 0.65),
+                          ),
+                        ),
+                      )
+                    else
+                      Column(
+                        children: sp.timerReminders.taskReminderRules
+                            .map(
+                              (rule) => Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: _TaskReminderRuleTile(
+                                  rule: rule,
+                                  summary: _taskReminderRuleSummary(rule),
+                                  onTap: () => _openTaskReminderRuleEditor(
+                                      existing: rule),
+                                  onToggle: (value) async {
+                                    await context
+                                        .read<SettingsProvider>()
+                                        .updateTaskReminderRule(
+                                          rule.copyWith(enabled: value),
+                                        );
+                                    if (!context.mounted) return;
+                                    await _syncPlannedTaskReminders(context);
+                                  },
+                                  onDelete: () async {
+                                    await context
+                                        .read<SettingsProvider>()
+                                        .removeTaskReminderRule(rule.id);
+                                    if (!context.mounted) return;
+                                    await _syncPlannedTaskReminders(context);
+                                  },
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              _GlassSectionHeader(title: 'Menu'),
+              const SizedBox(height: 8),
+              _MenuReorderSection(sp: sp),
+              const SizedBox(height: 20),
+
+              // ═════════════════════════════════════════════════════════════════════
+              // BACKUP & RESTORE
+              // ═════════════════════════════════════════════════════════════════════
+              _GlassSectionHeader(title: 'Backup & Restore'),
+              const SizedBox(height: 8),
+              LiquidGlassCard(
+                child: Column(
+                  children: [
+                    // Row 1 — Last Backup
+                    _GlassListTile(
+                      icon: Icons.history_rounded,
+                      iconColor: DashboardColors.primary,
+                      title: 'Last Backup',
+                      subtitleWidget: FutureBuilder<DateTime?>(
+                        future: BackupService.lastBackupTime(),
+                        builder: (context, snap) {
+                          if (snap.connectionState == ConnectionState.waiting) {
+                            return Text('Checking…',
+                                style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: DashboardColors.textSecondary));
+                          }
+                          final dt = snap.data;
+                          if (dt == null)
+                            return Text('No backup yet',
+                                style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: DashboardColors.textSecondary));
+                          final now = DateTime.now();
+                          final isToday = dt.year == now.year &&
+                              dt.month == now.month &&
+                              dt.day == now.day;
+                          final formatted = isToday
+                              ? 'Today at ${DateFormat.jm().format(dt)}'
+                              : '${DateFormat('MMM d').format(dt)} at ${DateFormat.jm().format(dt)}';
+                          return Text(formatted,
+                              style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: DashboardColors.textSecondary));
+                        },
+                      ),
+                    ),
+                    Divider(
+                        height: 1,
+                        color: DashboardColors.glassBorder(
+                            Theme.of(context).brightness == Brightness.dark)),
+                    // Row 2 — Open Backup & Restore Screen
+                    _GlassListTile(
+                      icon: Icons.backup_rounded,
+                      iconColor: DashboardColors.success,
+                      title: 'Backup & Restore',
+                      subtitle: 'Create backups, restore, or export data',
+                      trailing: Icon(Icons.chevron_right_rounded,
+                          color: DashboardColors.textSecondary, size: 20),
+                      onTap: () => GoRouter.of(context).push('/backup'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+              // ABOUT
+              // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+              // ── STUDY PLAN ─────────────────────────────────────────
+              _GlassSectionHeader(title: 'Study Plan'),
+              const SizedBox(height: 8),
+              LiquidGlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.calendar_today_rounded,
+                            size: 18, color: cs.primary),
+                        const SizedBox(width: 8),
+                        Text('Plan Start Date',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            )),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: () async {
+                            final current = sp.studyPlanStartDate;
+                            final initial = current != null
+                                ? DateTime.tryParse(current) ?? DateTime.now()
+                                : DateTime.now();
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: initial,
+                              firstDate: DateTime(2025),
+                              lastDate: DateTime(2028),
+                            );
+                            if (picked != null) {
+                              sp.setStudyPlanStartDate(
+                                  picked.toIso8601String().substring(0, 10));
+                            }
+                          },
+                          child: Text(
+                            sp.studyPlanStartDate != null
+                                ? _formatDateLabel(sp.studyPlanStartDate!)
+                                : 'Not set (auto)',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: sp.studyPlanStartDate != null
+                                  ? cs.primary
+                                  : cs.onSurface.withValues(alpha: 0.4),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Auto-set on first study. SRS: Aggressive — 10 revisions / 30 days per page',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: cs.onSurface.withValues(alpha: 0.35),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Auto-set on first study. SRS: Aggressive — 10 revisions / 30 days per page',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: cs.onSurface.withValues(alpha: 0.35),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
+              ),
+              const SizedBox(height: 20),
 
-          _GlassSectionHeader(title: 'About'),
-          const SizedBox(height: 8),
-          LiquidGlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _DetailRow('App', 'FocusFlow'),
-                _DetailRow('Version', 'v1.5.0'),
-                _DetailRow('Build Date', '2026-02-28'),
-                const Divider(height: 16),
-                Text(
-                  "What's New in v1.5.0",
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: cs.primary,
+              _GlassSectionHeader(title: 'About'),
+              const SizedBox(height: 8),
+              LiquidGlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _DetailRow('App', 'FocusFlow'),
+                    _DetailRow('Version', 'v1.5.0'),
+                    _DetailRow('Build Date', '2026-02-28'),
+                    const Divider(height: 16),
+                    Text(
+                      "What's New in v1.5.0",
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: cs.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    _ChangelogItem('Revision Hub connected to all resources'),
+                    _ChangelogItem(
+                        'Sketchy/Pathoma/UWorld → revision tracking'),
+                    _ChangelogItem('UWorld wrong-question auto-revision'),
+                    _ChangelogItem('SRS scheduling (strict: 12 steps)'),
+                    _ChangelogItem('Source filter chips in Revision Hub'),
+                    _ChangelogItem('Version system in Settings'),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Previous: v1.4.0 — Streak credits & day boundary',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: cs.onSurface.withValues(alpha: 0.35),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Built with ❤️ for FMGE prep',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: cs.onSurface.withValues(alpha: 0.3),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: reminderPanelBottom,
+            child: IgnorePointer(
+              ignoring: !_isTaskReminderEditorOpen,
+              child: AnimatedSlide(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                offset: _isTaskReminderEditorOpen
+                    ? Offset.zero
+                    : const Offset(0, 1),
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
+                  opacity: _isTaskReminderEditorOpen ? 1 : 0,
+                  child: _TaskReminderRuleEditorPanel(
+                    key: ValueKey<String>(
+                      'task-reminder-editor-${_editingTaskReminderRule?.id ?? 'new'}',
+                    ),
+                    existing: _editingTaskReminderRule,
+                    bottomInset: MediaQuery.of(context).viewInsets.bottom,
+                    onClose: _closeTaskReminderRuleEditor,
+                    onSave: _saveTaskReminderRule,
                   ),
                 ),
-                const SizedBox(height: 6),
-                _ChangelogItem('Revision Hub connected to all resources'),
-                _ChangelogItem('Sketchy/Pathoma/UWorld → revision tracking'),
-                _ChangelogItem('UWorld wrong-question auto-revision'),
-                _ChangelogItem('SRS scheduling (strict: 12 steps)'),
-                _ChangelogItem('Source filter chips in Revision Hub'),
-                _ChangelogItem('Version system in Settings'),
-                const SizedBox(height: 8),
-                Text(
-                  'Previous: v1.4.0 — Streak credits & day boundary',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: cs.onSurface.withValues(alpha: 0.35),
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Built with ❤️ for FMGE prep',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: cs.onSurface.withValues(alpha: 0.3),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-          const SizedBox(height: 24),
         ],
       ),
     );
@@ -829,26 +940,33 @@ class SettingsScreen extends StatelessWidget {
 
   // ── G10 helpers ─────────────────────────────────────────────────
 
-  Future<void> _openTaskReminderRuleEditor(
-    BuildContext context, {
-    TaskReminderRule? existing,
-  }) async {
-    final result = await showModalBottomSheet<TaskReminderRule>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      enableDrag: false,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _TaskReminderRuleEditorSheet(existing: existing),
-    );
-    if (result == null || !context.mounted) return;
+  void _openTaskReminderRuleEditor({TaskReminderRule? existing}) {
+    setState(() {
+      _editingTaskReminderRule = existing;
+      _isTaskReminderEditorOpen = true;
+    });
+  }
 
+  void _closeTaskReminderRuleEditor() {
+    if (!_isTaskReminderEditorOpen && _editingTaskReminderRule == null) {
+      return;
+    }
+    setState(() {
+      _isTaskReminderEditorOpen = false;
+      _editingTaskReminderRule = null;
+    });
+  }
+
+  Future<void> _saveTaskReminderRule(TaskReminderRule rule) async {
+    final existing = _editingTaskReminderRule;
     final settings = context.read<SettingsProvider>();
     if (existing == null) {
-      await settings.addTaskReminderRule(result);
+      await settings.addTaskReminderRule(rule);
     } else {
-      await settings.updateTaskReminderRule(result);
+      await settings.updateTaskReminderRule(rule);
     }
+    if (!mounted) return;
+    _closeTaskReminderRuleEditor();
     await _syncPlannedTaskReminders(context);
   }
 
@@ -876,6 +994,110 @@ class SettingsScreen extends StatelessWidget {
       plans: app.dayPlans,
       config: settings.timerReminders,
     );
+  }
+
+  Future<void> _syncReminderNotifications(BuildContext context) async {
+    final app = context.read<AppProvider>();
+    final settings = context.read<SettingsProvider>();
+    await NotificationService.instance.syncReminderNotifications(
+      reminders: app.reminders,
+      occurrenceStates: app.reminderOccurrenceStates,
+      config: settings.reminderNotifications,
+    );
+  }
+
+  String _formatReminderAlertOffsets(List<int> offsets) {
+    if (offsets.isEmpty) return 'No alerts selected';
+    final normalized = offsets.toSet().toList()..sort();
+    return normalized
+        .map((offset) => offset == 0 ? 'At time' : '$offset min before')
+        .join(' • ');
+  }
+
+  Future<void> _editReminderDefaultAlerts(BuildContext context) async {
+    final settings = context.read<SettingsProvider>();
+    final selected = settings.reminderNotifications.defaultAlertOffsets.toSet();
+    final customController = TextEditingController();
+    const presetOffsets = <int>[0, 5, 10, 15, 30, 45, 60];
+
+    final result = await showDialog<List<int>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Reminder Alert Times'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: presetOffsets.map((offset) {
+                    final label =
+                        offset == 0 ? 'At time' : '$offset min before';
+                    return FilterChip(
+                      label: Text(label),
+                      selected: selected.contains(offset),
+                      onSelected: (isSelected) {
+                        setDialogState(() {
+                          if (isSelected) {
+                            selected.add(offset);
+                          } else {
+                            selected.remove(offset);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: customController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: const InputDecoration(
+                    labelText: 'Custom minutes before',
+                    helperText: 'Leave empty if presets are enough',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: () {
+                    final minutes = int.tryParse(customController.text.trim());
+                    if (minutes == null || minutes < 0) return;
+                    setDialogState(() {
+                      selected.add(minutes);
+                      customController.clear();
+                    });
+                  },
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add custom alert'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(selected.toList()..sort()),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    customController.dispose();
+    if (result == null || !context.mounted) return;
+
+    await settings.setReminderDefaultAlertOffsets(result);
+    if (!context.mounted) return;
+    await _syncReminderNotifications(context);
   }
 
   String _formatDateLabel(String yyyyMMdd) {
@@ -1166,6 +1388,7 @@ class _TaskReminderRuleTile extends StatelessWidget {
     final cs = theme.colorScheme;
 
     return Container(
+      key: ValueKey<String>('task_reminder_rule_${rule.id}'),
       decoration: BoxDecoration(
         color: cs.surface.withValues(alpha: 0.28),
         borderRadius: BorderRadius.circular(14),
@@ -1214,18 +1437,27 @@ class _TaskReminderRuleTile extends StatelessWidget {
   }
 }
 
-class _TaskReminderRuleEditorSheet extends StatefulWidget {
+class _TaskReminderRuleEditorPanel extends StatefulWidget {
   final TaskReminderRule? existing;
+  final double bottomInset;
+  final VoidCallback onClose;
+  final Future<void> Function(TaskReminderRule rule) onSave;
 
-  const _TaskReminderRuleEditorSheet({this.existing});
+  const _TaskReminderRuleEditorPanel({
+    super.key,
+    this.existing,
+    required this.bottomInset,
+    required this.onClose,
+    required this.onSave,
+  });
 
   @override
-  State<_TaskReminderRuleEditorSheet> createState() =>
-      _TaskReminderRuleEditorSheetState();
+  State<_TaskReminderRuleEditorPanel> createState() =>
+      _TaskReminderRuleEditorPanelState();
 }
 
-class _TaskReminderRuleEditorSheetState
-    extends State<_TaskReminderRuleEditorSheet> {
+class _TaskReminderRuleEditorPanelState
+    extends State<_TaskReminderRuleEditorPanel> {
   static const List<int> _minuteOptions = <int>[
     1,
     2,
@@ -1237,10 +1469,15 @@ class _TaskReminderRuleEditorSheetState
     45,
     60,
   ];
+  static const String _customMinuteOption = 'custom';
 
   late String _anchor;
   late int _offsetMinutes;
   late bool _enabled;
+  late bool _useCustomMinutes;
+  late TextEditingController _customMinutesController;
+  String? _customMinutesError;
+  bool _isSaving = false;
 
   bool get _usesOffset =>
       _anchor == TaskReminderAnchor.beforeStart ||
@@ -1253,6 +1490,16 @@ class _TaskReminderRuleEditorSheetState
     _anchor = existing?.anchor ?? TaskReminderAnchor.beforeStart;
     _offsetMinutes = existing?.offsetMinutes ?? 5;
     _enabled = existing?.enabled ?? true;
+    _useCustomMinutes = _usesOffset && !_minuteOptions.contains(_offsetMinutes);
+    _customMinutesController = TextEditingController(
+      text: _useCustomMinutes ? _offsetMinutes.toString() : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _customMinutesController.dispose();
+    super.dispose();
   }
 
   String _anchorLabel(String value) {
@@ -1270,130 +1517,253 @@ class _TaskReminderRuleEditorSheetState
     }
   }
 
-  void _save() {
+  int? _validateCustomMinutes() {
+    final rawValue = _customMinutesController.text.trim();
+    final minutes = int.tryParse(rawValue);
+    if (rawValue.isEmpty || minutes == null || minutes <= 0) {
+      return null;
+    }
+    return minutes;
+  }
+
+  Future<void> _save() async {
+    int reminderOffset = 0;
+    if (_usesOffset) {
+      if (_useCustomMinutes) {
+        final validatedMinutes = _validateCustomMinutes();
+        if (validatedMinutes == null) {
+          setState(() {
+            _customMinutesError = 'Enter a positive number of minutes';
+          });
+          return;
+        }
+        reminderOffset = validatedMinutes;
+      } else {
+        reminderOffset = _offsetMinutes;
+      }
+    }
+
     final existing = widget.existing;
     final rule = TaskReminderRule(
       id: existing?.id ?? 'timer-rule-${DateTime.now().microsecondsSinceEpoch}',
       anchor: _anchor,
-      offsetMinutes: _usesOffset ? _offsetMinutes : 0,
+      offsetMinutes: reminderOffset,
       enabled: _enabled,
     );
-    Navigator.of(context).pop(rule);
+
+    setState(() => _isSaving = true);
+    try {
+      await widget.onSave(rule);
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final minuteDropdownValue =
+        _useCustomMinutes ? _customMinuteOption : _offsetMinutes.toString();
 
     return Material(
+      key: const ValueKey<String>('task_reminder_editor_panel'),
       color: Colors.transparent,
       child: AnimatedPadding(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        padding: EdgeInsets.only(bottom: bottomInset),
-        child: Container(
+        padding: EdgeInsets.only(bottom: widget.bottomInset),
+        child: DecoratedBox(
           decoration: BoxDecoration(
-            color: cs.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            color: cs.surface.withValues(alpha: 0.98),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: cs.onSurface.withValues(alpha: 0.08)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.10),
+                blurRadius: 28,
+                offset: const Offset(0, 18),
+              ),
+            ],
           ),
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: cs.onSurface.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(999),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: cs.onSurface.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                widget.existing == null ? 'Add Reminder Rule' : 'Edit Reminder Rule',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _anchor,
-                decoration: const InputDecoration(
-                  labelText: 'When should this fire?',
-                ),
-                items: TaskReminderAnchor.values
-                    .map(
-                      (anchor) => DropdownMenuItem<String>(
-                        value: anchor,
-                        child: Text(_anchorLabel(anchor)),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.existing == null
+                            ? 'Add Reminder Rule'
+                            : 'Edit Reminder Rule',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() => _anchor = value);
-                },
-              ),
-              const SizedBox(height: 16),
-              if (_usesOffset)
-                DropdownButtonFormField<int>(
-                  value: _minuteOptions.contains(_offsetMinutes)
-                      ? _offsetMinutes
-                      : _minuteOptions.first,
+                    ),
+                    IconButton(
+                      key: const ValueKey<String>(
+                        'task_reminder_editor_close_button',
+                      ),
+                      onPressed: _isSaving ? null : widget.onClose,
+                      icon: const Icon(Icons.close_rounded),
+                      tooltip: 'Close',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  key: ValueKey<String>('task_reminder_anchor_$_anchor'),
+                  initialValue: _anchor,
                   decoration: const InputDecoration(
-                    labelText: 'Minutes',
+                    labelText: 'When should this fire?',
                   ),
-                  items: _minuteOptions
+                  items: TaskReminderAnchor.values
                       .map(
-                        (minutes) => DropdownMenuItem<int>(
-                          value: minutes,
+                        (anchor) => DropdownMenuItem<String>(
+                          value: anchor,
+                          child: Text(_anchorLabel(anchor)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: _isSaving
+                      ? null
+                      : (value) {
+                          if (value == null) return;
+                          setState(() {
+                            _anchor = value;
+                            _customMinutesError = null;
+                          });
+                        },
+                ),
+                const SizedBox(height: 16),
+                if (_usesOffset) ...[
+                  DropdownButtonFormField<String>(
+                    key: ValueKey<String>(
+                      'task_reminder_minutes_$minuteDropdownValue',
+                    ),
+                    initialValue: minuteDropdownValue,
+                    decoration: const InputDecoration(
+                      labelText: 'Minutes',
+                    ),
+                    items: [
+                      ..._minuteOptions.map(
+                        (minutes) => DropdownMenuItem<String>(
+                          value: minutes.toString(),
                           child: Text(
                             minutes == 1 ? '1 minute' : '$minutes minutes',
                           ),
                         ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setState(() => _offsetMinutes = value);
-                  },
-                )
-              else
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
-                    borderRadius: BorderRadius.circular(12),
+                      ),
+                      const DropdownMenuItem<String>(
+                        value: _customMinuteOption,
+                        child: Text('Custom'),
+                      ),
+                    ],
+                    onChanged: _isSaving
+                        ? null
+                        : (value) {
+                            if (value == null) return;
+                            setState(() {
+                              _useCustomMinutes = value == _customMinuteOption;
+                              if (_useCustomMinutes) {
+                                final currentText =
+                                    _customMinutesController.text.trim();
+                                if (currentText.isEmpty) {
+                                  _customMinutesController.text =
+                                      _offsetMinutes.toString();
+                                }
+                              } else {
+                                _offsetMinutes = int.parse(value);
+                              }
+                              _customMinutesError = null;
+                            });
+                          },
                   ),
-                  child: Text(
-                    'This reminder fires exactly at the task boundary.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: cs.onSurface.withValues(alpha: 0.68),
+                  if (_useCustomMinutes) ...[
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      key: const ValueKey<String>(
+                        'task_reminder_custom_minutes_field',
+                      ),
+                      controller: _customMinutesController,
+                      enabled: !_isSaving,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: InputDecoration(
+                        labelText: 'Custom minutes',
+                        helperText: 'Enter any positive whole number',
+                        errorText: _customMinutesError,
+                      ),
+                      onChanged: (_) {
+                        if (_customMinutesError == null) return;
+                        setState(() => _customMinutesError = null);
+                      },
+                    ),
+                  ],
+                ] else
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'This reminder fires exactly at the task boundary.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurface.withValues(alpha: 0.68),
+                      ),
                     ),
                   ),
+                const SizedBox(height: 12),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Enabled'),
+                  value: _enabled,
+                  onChanged: _isSaving
+                      ? null
+                      : (value) => setState(() => _enabled = value),
                 ),
-              const SizedBox(height: 12),
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Enabled'),
-                value: _enabled,
-                onChanged: (value) => setState(() => _enabled = value),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _save,
-                  child: const Text('Save Rule'),
-                ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _isSaving ? null : widget.onClose,
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        key: const ValueKey<String>(
+                          'task_reminder_save_button',
+                        ),
+                        onPressed: _isSaving ? null : _save,
+                        child: Text(_isSaving ? 'Saving...' : 'Save Rule'),
+                      ),
+                    ),
+                  ],
+                )
+              ],
+            ),
           ),
         ),
       ),

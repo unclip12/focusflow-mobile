@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/screens/library/add_note_sheet.dart';
 import 'package:focusflow_mobile/screens/library/attachment_helper.dart';
 import 'package:focusflow_mobile/screens/library/edit_metadata_sheet.dart';
+import 'package:focusflow_mobile/screens/library/library_notes_section.dart';
 import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'package:focusflow_mobile/utils/show_app_bottom_sheet.dart';
 
@@ -162,7 +163,7 @@ class _FAPageDetailSheetState extends State<FAPageDetailSheet>
                     scrollController: scrollController,
                     isDark: isDark,
                   ),
-                  _NotesTab(
+                  LibraryNotesSection(
                     itemId: 'fa:${page.pageNum}',
                     itemType: 'fa',
                     app: widget.app,

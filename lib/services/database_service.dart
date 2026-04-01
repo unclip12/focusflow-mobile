@@ -19,7 +19,7 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._();
 
   static const _dbName = 'focusflow.db';
-  static const _dbVersion = 11;
+  static const _dbVersion = 12;
 
   Database? _database;
 
@@ -76,6 +76,8 @@ class DatabaseService {
   static const tLibraryNotes = 'library_notes';
   static const tActivityLogs = 'activity_logs';
   static const tVideoLectures = 'video_lectures';
+  static const tReminders = 'reminders';
+  static const tReminderOccurrences = 'reminder_occurrences';
 
   Future<void> _onCreate(Database db, int version) async {
     // Knowledge Base — pageNumber is the primary key
@@ -104,8 +106,7 @@ class DatabaseService {
         date TEXT
       )
     ''');
-    await db.execute(
-        'CREATE INDEX idx_study_plan_date ON $tStudyPlan(date)');
+    await db.execute('CREATE INDEX idx_study_plan_date ON $tStudyPlan(date)');
 
     // FMGE Entries
     await db.execute('''
@@ -126,8 +127,7 @@ class DatabaseService {
         source TEXT
       )
     ''');
-    await db.execute(
-        'CREATE INDEX idx_time_logs_date ON $tTimeLogs(date)');
+    await db.execute('CREATE INDEX idx_time_logs_date ON $tTimeLogs(date)');
 
     // Daily Tracker — keyed by date
     await db.execute('''
@@ -145,8 +145,8 @@ class DatabaseService {
         date TEXT
       )
     ''');
-    await db.execute(
-        'CREATE INDEX idx_study_entries_date ON $tStudyEntries(date)');
+    await db
+        .execute('CREATE INDEX idx_study_entries_date ON $tStudyEntries(date)');
 
     // Study Materials
     await db.execute('''
@@ -209,8 +209,7 @@ class DatabaseService {
         type TEXT
       )
     ''');
-    await db.execute(
-        'CREATE INDEX idx_history_ts ON $tHistory(timestamp)');
+    await db.execute('CREATE INDEX idx_history_ts ON $tHistory(timestamp)');
 
     // Revision Settings — singleton row
     await db.execute('''
@@ -263,6 +262,7 @@ class DatabaseService {
 
     // ── V11 tables (Video Lectures) ───────────────────────────
     await _createV11Tables(db);
+    await _createV12Tables(db);
   }
 
   /// Create G5 tracker tables — called from both _onCreate and _onUpgrade.
@@ -364,7 +364,7 @@ class DatabaseService {
       )
     ''');
     await db.execute(
-      'CREATE INDEX IF NOT EXISTS idx_fa_subtopics_page ON $tFaSubtopics(pageNum)');
+        'CREATE INDEX IF NOT EXISTS idx_fa_subtopics_page ON $tFaSubtopics(pageNum)');
   }
 
   // ── APK Update Safety ──────────────────────────────────────────
@@ -407,6 +407,9 @@ class DatabaseService {
     if (oldVersion < 11) {
       await _createV11Tables(db);
     }
+    if (oldVersion < 12) {
+      await _createV12Tables(db);
+    }
     // Streak data table — always ensure it exists
     await db.execute('''
       CREATE TABLE IF NOT EXISTS $tStreakData (
@@ -428,7 +431,7 @@ class DatabaseService {
       )
     ''');
     await db.execute(
-      'CREATE INDEX IF NOT EXISTS idx_lib_notes_item ON $tLibraryNotes(itemId)');
+        'CREATE INDEX IF NOT EXISTS idx_lib_notes_item ON $tLibraryNotes(itemId)');
   }
 
   /// Create V9 tables (Activity Logs).
@@ -445,16 +448,20 @@ class DatabaseService {
       )
     ''');
     await db.execute(
-      'CREATE INDEX IF NOT EXISTS idx_activity_logs_item ON $tActivityLogs(item_id)');
+        'CREATE INDEX IF NOT EXISTS idx_activity_logs_item ON $tActivityLogs(item_id)');
     await db.execute(
-      'CREATE INDEX IF NOT EXISTS idx_activity_logs_ts ON $tActivityLogs(timestamp)');
+        'CREATE INDEX IF NOT EXISTS idx_activity_logs_ts ON $tActivityLogs(timestamp)');
     await db.execute(
-      'CREATE INDEX IF NOT EXISTS idx_activity_logs_type ON $tActivityLogs(item_type)');
+        'CREATE INDEX IF NOT EXISTS idx_activity_logs_type ON $tActivityLogs(item_type)');
   }
 
   /// Migrate V10 — add customTitle + userDescription to Sketchy/Pathoma tables.
   Future<void> _migrateV10(Database db) async {
-    for (final table in [tSketchyMicroVideos, tSketchyPharmVideos, tPathomaChapters]) {
+    for (final table in [
+      tSketchyMicroVideos,
+      tSketchyPharmVideos,
+      tPathomaChapters
+    ]) {
       try {
         await db.execute('ALTER TABLE $table ADD COLUMN customTitle TEXT');
       } catch (_) {}
@@ -538,7 +545,8 @@ class DatabaseService {
     String primaryKeyValue,
   ) async {
     final db = await database;
-    return db.delete(table, where: '$primaryKey = ?', whereArgs: [primaryKeyValue]);
+    return db
+        .delete(table, where: '$primaryKey = ?', whereArgs: [primaryKeyValue]);
   }
 
   /// Delete all rows from a table.
@@ -711,18 +719,19 @@ class DatabaseService {
   Future<Map<String, dynamic>?> getDayPlan(String date) =>
       getById(tDayPlans, 'date', date);
 
-  Future<List<Map<String, dynamic>>> getAllDayPlans() =>
-      getAll(tDayPlans);
+  Future<List<Map<String, dynamic>>> getAllDayPlans() => getAll(tDayPlans);
 
-  Future<int> deleteDayPlan(String date) =>
-      deleteById(tDayPlans, 'date', date);
+  Future<int> deleteDayPlan(String date) => deleteById(tDayPlans, 'date', date);
 
   // ═══════════════════════════════════════════════════════════════
   // STUDY PLAN
   // ═══════════════════════════════════════════════════════════════
 
   Future<void> upsertStudyPlanItem(Map<String, dynamic> json) => upsert(
-        tStudyPlan, 'id', json['id'] ?? '', json,
+        tStudyPlan,
+        'id',
+        json['id'] ?? '',
+        json,
         indexColumns: {'date': json['date']},
       );
 
@@ -740,7 +749,10 @@ class DatabaseService {
   // ═══════════════════════════════════════════════════════════════
 
   Future<void> upsertFMGEEntry(Map<String, dynamic> json) => upsert(
-        tFmgeEntries, 'id', json['id'] ?? '', json,
+        tFmgeEntries,
+        'id',
+        json['id'] ?? '',
+        json,
         indexColumns: {'subject': json['subject']},
       );
 
@@ -750,15 +762,17 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getAllFMGEEntries() =>
       getAll(tFmgeEntries);
 
-  Future<int> deleteFMGEEntry(String id) =>
-      deleteById(tFmgeEntries, 'id', id);
+  Future<int> deleteFMGEEntry(String id) => deleteById(tFmgeEntries, 'id', id);
 
   // ═══════════════════════════════════════════════════════════════
   // TIME LOGS
   // ═══════════════════════════════════════════════════════════════
 
   Future<void> upsertTimeLog(Map<String, dynamic> json) => upsert(
-        tTimeLogs, 'id', json['id'] ?? '', json,
+        tTimeLogs,
+        'id',
+        json['id'] ?? '',
+        json,
         indexColumns: {
           'date': json['date'],
           'category': json['category'],
@@ -769,11 +783,9 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getTimeLogsByDate(String date) =>
       getWhere(tTimeLogs, 'date', date);
 
-  Future<List<Map<String, dynamic>>> getAllTimeLogs() =>
-      getAll(tTimeLogs);
+  Future<List<Map<String, dynamic>>> getAllTimeLogs() => getAll(tTimeLogs);
 
-  Future<int> deleteTimeLog(String id) =>
-      deleteById(tTimeLogs, 'id', id);
+  Future<int> deleteTimeLog(String id) => deleteById(tTimeLogs, 'id', id);
 
   // ═══════════════════════════════════════════════════════════════
   // DAILY TRACKER — date is primary key
@@ -796,7 +808,10 @@ class DatabaseService {
   // ═══════════════════════════════════════════════════════════════
 
   Future<void> upsertStudyEntry(Map<String, dynamic> json) => upsert(
-        tStudyEntries, 'id', json['id'] ?? '', json,
+        tStudyEntries,
+        'id',
+        json['id'] ?? '',
+        json,
         indexColumns: {'date': json['date']},
       );
 
@@ -814,7 +829,10 @@ class DatabaseService {
   // ═══════════════════════════════════════════════════════════════
 
   Future<void> upsertStudyMaterial(Map<String, dynamic> json) => upsert(
-        tStudyMaterials, 'id', json['id'] ?? '', json,
+        tStudyMaterials,
+        'id',
+        json['id'] ?? '',
+        json,
         indexColumns: {'source': json['source']},
       );
 
@@ -829,14 +847,16 @@ class DatabaseService {
   // ═══════════════════════════════════════════════════════════════
 
   Future<void> insertMentorMessage(Map<String, dynamic> json) => upsert(
-        tMentorMessages, 'id', json['id'] ?? '', json,
+        tMentorMessages,
+        'id',
+        json['id'] ?? '',
+        json,
         indexColumns: {'timestamp': json['timestamp']},
       );
 
   Future<List<Map<String, dynamic>>> getAllMentorMessages() async {
     final db = await database;
-    final rows =
-        await db.query(tMentorMessages, orderBy: 'timestamp ASC');
+    final rows = await db.query(tMentorMessages, orderBy: 'timestamp ASC');
     return rows
         .map((r) =>
             jsonDecode(r['data'] as String? ?? '{}') as Map<String, dynamic>)
@@ -867,20 +887,17 @@ class DatabaseService {
   // AI Settings
   Future<void> saveAISettings(Map<String, dynamic> json) =>
       _upsertSingleton(tAiSettings, json);
-  Future<Map<String, dynamic>?> getAISettings() =>
-      _getSingleton(tAiSettings);
+  Future<Map<String, dynamic>?> getAISettings() => _getSingleton(tAiSettings);
 
   // User Profile
   Future<void> saveUserProfile(Map<String, dynamic> json) =>
       _upsertSingleton(tUserProfile, json);
-  Future<Map<String, dynamic>?> getUserProfile() =>
-      _getSingleton(tUserProfile);
+  Future<Map<String, dynamic>?> getUserProfile() => _getSingleton(tUserProfile);
 
   // App Settings
   Future<void> saveSettings(Map<String, dynamic> json) =>
       _upsertSingleton(tSettings, json);
-  Future<Map<String, dynamic>?> getSettings() =>
-      _getSingleton(tSettings);
+  Future<Map<String, dynamic>?> getSettings() => _getSingleton(tSettings);
 
   // Revision Settings
   Future<void> saveRevisionSettings(Map<String, dynamic> json) =>
@@ -891,15 +908,17 @@ class DatabaseService {
   // Streak Data
   Future<void> saveStreakData(Map<String, dynamic> json) =>
       _upsertSingleton(tStreakData, json);
-  Future<Map<String, dynamic>?> getStreakData() =>
-      _getSingleton(tStreakData);
+  Future<Map<String, dynamic>?> getStreakData() => _getSingleton(tStreakData);
 
   // ═══════════════════════════════════════════════════════════════
   // HISTORY
   // ═══════════════════════════════════════════════════════════════
 
   Future<void> insertHistoryRecord(Map<String, dynamic> json) => upsert(
-        tHistory, 'id', json['id'] ?? '', json,
+        tHistory,
+        'id',
+        json['id'] ?? '',
+        json,
         indexColumns: {
           'timestamp': json['timestamp'],
           'type': json['type'],
@@ -915,8 +934,7 @@ class DatabaseService {
         .toList();
   }
 
-  Future<int> deleteHistoryRecord(String id) =>
-      deleteById(tHistory, 'id', id);
+  Future<int> deleteHistoryRecord(String id) => deleteById(tHistory, 'id', id);
 
   Future<int> deleteAllHistory() => deleteAll(tHistory);
 
@@ -925,7 +943,10 @@ class DatabaseService {
   // ═══════════════════════════════════════════════════════════════
 
   Future<void> upsertRevisionItem(Map<String, dynamic> json) => upsert(
-        tRevisionItems, 'id', json['id'] ?? '', json,
+        tRevisionItems,
+        'id',
+        json['id'] ?? '',
+        json,
         indexColumns: {'pageNumber': json['pageNumber']},
       );
 
@@ -942,12 +963,16 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getAllFAPages() => getAll(tFaPages);
 
   Future<void> upsertFAPage(Map<String, dynamic> json) => upsert(
-        tFaPages, 'pageNum', json['pageNum']?.toString() ?? '', json,
+        tFaPages,
+        'pageNum',
+        json['pageNum']?.toString() ?? '',
+        json,
       );
 
   Future<void> updateFAPage(Map<String, dynamic> json) async {
     final db = await database;
-    await db.update(tFaPages, json, where: 'pageNum = ?', whereArgs: [json['pageNum']]);
+    await db.update(tFaPages, json,
+        where: 'pageNum = ?', whereArgs: [json['pageNum']]);
   }
 
   Future<int> deleteFAPage(int pageNum) =>
@@ -961,7 +986,10 @@ class DatabaseService {
       getAll(tSketchyItems);
 
   Future<void> upsertSketchyItem(Map<String, dynamic> json) => upsert(
-        tSketchyItems, 'id', json['id'] ?? '', json,
+        tSketchyItems,
+        'id',
+        json['id'] ?? '',
+        json,
       );
 
   Future<int> deleteSketchyItem(String id) =>
@@ -975,7 +1003,10 @@ class DatabaseService {
       getAll(tPathomaItems);
 
   Future<void> upsertPathomaItem(Map<String, dynamic> json) => upsert(
-        tPathomaItems, 'id', json['id'] ?? '', json,
+        tPathomaItems,
+        'id',
+        json['id'] ?? '',
+        json,
       );
 
   Future<int> deletePathomaItem(String id) =>
@@ -989,7 +1020,10 @@ class DatabaseService {
       getAll(tUworldSessions);
 
   Future<void> insertUWorldSession(Map<String, dynamic> json) => upsert(
-        tUworldSessions, 'id', json['id'] ?? '', json,
+        tUworldSessions,
+        'id',
+        json['id'] ?? '',
+        json,
       );
 
   Future<int> deleteUWorldSession(String id) =>
@@ -1026,7 +1060,8 @@ class DatabaseService {
 
   Future<void> updateSketchyMicroVideo(Map<String, dynamic> json) async {
     final db = await database;
-    await db.update(tSketchyMicroVideos, json, where: 'id = ?', whereArgs: [json['id']]);
+    await db.update(tSketchyMicroVideos, json,
+        where: 'id = ?', whereArgs: [json['id']]);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1060,7 +1095,8 @@ class DatabaseService {
 
   Future<void> updateSketchyPharmVideo(Map<String, dynamic> json) async {
     final db = await database;
-    await db.update(tSketchyPharmVideos, json, where: 'id = ?', whereArgs: [json['id']]);
+    await db.update(tSketchyPharmVideos, json,
+        where: 'id = ?', whereArgs: [json['id']]);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1094,7 +1130,8 @@ class DatabaseService {
 
   Future<void> updatePathomaChapter(Map<String, dynamic> json) async {
     final db = await database;
-    await db.update(tPathomaChapters, json, where: 'id = ?', whereArgs: [json['id']]);
+    await db.update(tPathomaChapters, json,
+        where: 'id = ?', whereArgs: [json['id']]);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1148,7 +1185,8 @@ class DatabaseService {
 
   Future<void> updateUWorldTopic(Map<String, dynamic> json) async {
     final db = await database;
-    await db.update('uworld_topics', json, where: 'id = ?', whereArgs: [json['id']]);
+    await db.update('uworld_topics', json,
+        where: 'id = ?', whereArgs: [json['id']]);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1337,13 +1375,15 @@ class DatabaseService {
 
   Future<List<Map<String, dynamic>>> getAllRoutines() => getAll(tRoutines);
 
-  Future<int> deleteRoutine(String id) =>
-      deleteById(tRoutines, 'id', id);
+  Future<int> deleteRoutine(String id) => deleteById(tRoutines, 'id', id);
 
   // ── ROUTINE LOGS ──────────────────────────────────────────────
 
   Future<void> upsertRoutineLog(Map<String, dynamic> json) => upsert(
-        tRoutineLogs, 'id', json['id'] ?? '', json,
+        tRoutineLogs,
+        'id',
+        json['id'] ?? '',
+        json,
         indexColumns: {'routineId': json['routineId'], 'date': json['date']},
       );
 
@@ -1353,13 +1393,15 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getAllRoutineLogs() =>
       getAll(tRoutineLogs);
 
-  Future<int> deleteRoutineLog(String id) =>
-      deleteById(tRoutineLogs, 'id', id);
+  Future<int> deleteRoutineLog(String id) => deleteById(tRoutineLogs, 'id', id);
 
   // ── BUYING ITEMS ──────────────────────────────────────────────
 
   Future<void> upsertBuyingItem(Map<String, dynamic> json) => upsert(
-        tBuyingItems, 'id', json['id'] ?? '', json,
+        tBuyingItems,
+        'id',
+        json['id'] ?? '',
+        json,
         indexColumns: {'date': json['date']},
       );
 
@@ -1369,24 +1411,66 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getAllBuyingItems() =>
       getAll(tBuyingItems);
 
-  Future<int> deleteBuyingItem(String id) =>
-      deleteById(tBuyingItems, 'id', id);
+  Future<int> deleteBuyingItem(String id) => deleteById(tBuyingItems, 'id', id);
 
   // ── TODO ITEMS ────────────────────────────────────────────────
 
   Future<void> upsertTodoItem(Map<String, dynamic> json) => upsert(
-        tTodoItems, 'id', json['id'] ?? '', json,
+        tTodoItems,
+        'id',
+        json['id'] ?? '',
+        json,
         indexColumns: {'date': json['date'], 'category': json['category']},
       );
 
   Future<List<Map<String, dynamic>>> getTodoItemsByDate(String date) =>
       getWhere(tTodoItems, 'date', date);
 
-  Future<List<Map<String, dynamic>>> getAllTodoItems() =>
-      getAll(tTodoItems);
+  Future<List<Map<String, dynamic>>> getAllTodoItems() => getAll(tTodoItems);
 
-  Future<int> deleteTodoItem(String id) =>
-      deleteById(tTodoItems, 'id', id);
+  Future<int> deleteTodoItem(String id) => deleteById(tTodoItems, 'id', id);
+
+  Future<void> upsertReminder(Map<String, dynamic> json) => upsert(
+        tReminders,
+        'id',
+        json['id'] ?? '',
+        json,
+        indexColumns: {
+          'baseDate': json['baseDate'],
+          'archived': (json['archived'] as bool? ?? false) ? 1 : 0,
+        },
+      );
+
+  Future<List<Map<String, dynamic>>> getAllReminders() => getAll(tReminders);
+
+  Future<int> deleteReminder(String id) => deleteById(tReminders, 'id', id);
+
+  Future<void> upsertReminderOccurrence(Map<String, dynamic> json) => upsert(
+        tReminderOccurrences,
+        'id',
+        json['id'] ?? '',
+        json,
+        indexColumns: {
+          'reminderId': json['reminderId'],
+          'occurrenceKey': json['occurrenceKey'],
+          'completed': (json['completed'] as bool? ?? false) ? 1 : 0,
+        },
+      );
+
+  Future<List<Map<String, dynamic>>> getAllReminderOccurrences() =>
+      getAll(tReminderOccurrences);
+
+  Future<int> deleteReminderOccurrence(String id) =>
+      deleteById(tReminderOccurrences, 'id', id);
+
+  Future<int> deleteReminderOccurrencesByReminder(String reminderId) async {
+    final db = await database;
+    return db.delete(
+      tReminderOccurrences,
+      where: 'reminderId = ?',
+      whereArgs: [reminderId],
+    );
+  }
 
   // ── DEFAULT ROUTINE ORDER ─────────────────────────────────────
 
@@ -1399,8 +1483,7 @@ class DatabaseService {
   Future<int> deleteDefaultActivity(String id) =>
       deleteById(tDefaultRoutineOrder, 'id', id);
 
-  Future<int> deleteAllDefaultActivities() =>
-      deleteAll(tDefaultRoutineOrder);
+  Future<int> deleteAllDefaultActivities() => deleteAll(tDefaultRoutineOrder);
 
   // ── DAILY FLOWS (V7) ──────────────────────────────────────────
 
@@ -1410,11 +1493,41 @@ class DatabaseService {
   Future<Map<String, dynamic>?> getDailyFlow(String date) =>
       getById(tDailyFlows, 'date', date);
 
-  Future<List<Map<String, dynamic>>> getAllDailyFlows() =>
-      getAll(tDailyFlows);
+  Future<List<Map<String, dynamic>>> getAllDailyFlows() => getAll(tDailyFlows);
 
   Future<int> deleteDailyFlow(String date) =>
       deleteById(tDailyFlows, 'date', date);
+
+  /// Create V12 tables — Reminders.
+  Future<void> _createV12Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tReminders (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        baseDate TEXT,
+        archived INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_reminders_base_date ON $tReminders(baseDate)',
+    );
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tReminderOccurrences (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        reminderId TEXT,
+        occurrenceKey TEXT,
+        completed INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_reminder_occurrences_reminder ON $tReminderOccurrences(reminderId)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_reminder_occurrences_key ON $tReminderOccurrences(occurrenceKey)',
+    );
+  }
 
   // ═══════════════════════════════════════════════════════════════
   // VIDEO LECTURES (V11)
@@ -1436,7 +1549,7 @@ class DatabaseService {
       )
     ''');
     await db.execute(
-      'CREATE INDEX IF NOT EXISTS idx_video_lectures_subject ON $tVideoLectures(subject)');
+        'CREATE INDEX IF NOT EXISTS idx_video_lectures_subject ON $tVideoLectures(subject)');
   }
 
   Future<void> seedVideoLectures(List<VideoLecture> lectures) async {
@@ -1472,7 +1585,8 @@ class DatabaseService {
 
   Future<void> updateVideoLectureMetadata(Map<String, dynamic> json) async {
     final db = await database;
-    await db.update(tVideoLectures, json, where: 'id = ?', whereArgs: [json['id']]);
+    await db
+        .update(tVideoLectures, json, where: 'id = ?', whereArgs: [json['id']]);
   }
 
   // ═══════════════════════════════════════════════════════════════

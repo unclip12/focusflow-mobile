@@ -11,6 +11,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:focusflow_mobile/app_router.dart';
 import 'package:focusflow_mobile/models/app_settings.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
+import 'package:focusflow_mobile/models/reminder.dart';
 import 'package:focusflow_mobile/models/routine.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
@@ -33,6 +34,7 @@ class NotificationIntentSource {
   NotificationIntentSource._();
 
   static const String plannedTaskReminder = 'planned_task_reminder';
+  static const String reminder = 'reminder';
 }
 
 class NotificationIntent {
@@ -42,7 +44,9 @@ class NotificationIntent {
   final String? blockId;
   final String? activityId;
   final String? routineId;
+  final String? reminderId;
   final String? source;
+  final bool openReminderTab;
 
   const NotificationIntent({
     required this.targetType,
@@ -51,7 +55,9 @@ class NotificationIntent {
     this.blockId,
     this.activityId,
     this.routineId,
+    this.reminderId,
     this.source,
+    this.openReminderTab = false,
   });
 
   factory NotificationIntent.route(String routeName) {
@@ -65,6 +71,9 @@ class NotificationIntent {
     String? dateKey,
     String? activityId,
     String? routineId,
+    String? reminderId,
+    bool openReminderTab = false,
+    String? source,
   }) {
     return NotificationIntent(
       targetType: NotificationIntentTarget.todayPlan,
@@ -72,6 +81,9 @@ class NotificationIntent {
       dateKey: dateKey,
       activityId: activityId,
       routineId: routineId,
+      reminderId: reminderId,
+      source: source,
+      openReminderTab: openReminderTab,
     );
   }
 
@@ -105,7 +117,9 @@ class NotificationIntent {
       if (blockId != null) 'blockId': blockId,
       if (activityId != null) 'activityId': activityId,
       if (routineId != null) 'routineId': routineId,
+      if (reminderId != null) 'reminderId': reminderId,
       if (source != null) 'source': source,
+      if (openReminderTab) 'openReminderTab': openReminderTab,
     };
   }
 
@@ -113,14 +127,16 @@ class NotificationIntent {
 
   factory NotificationIntent.fromJson(Map<String, dynamic> json) {
     return NotificationIntent(
-      targetType: json['targetType'] as String? ??
-          NotificationIntentTarget.route,
+      targetType:
+          json['targetType'] as String? ?? NotificationIntentTarget.route,
       routeName: json['routeName'] as String?,
       dateKey: json['dateKey'] as String?,
       blockId: json['blockId'] as String?,
       activityId: json['activityId'] as String?,
       routineId: json['routineId'] as String?,
+      reminderId: json['reminderId'] as String?,
       source: json['source'] as String?,
+      openReminderTab: json['openReminderTab'] as bool? ?? false,
     );
   }
 
@@ -142,14 +158,18 @@ class TodayPlanLaunchRequest {
   final String? blockId;
   final String? activityId;
   final String? routineId;
+  final String? reminderId;
   final bool openDaySession;
+  final bool openReminderTab;
 
   const TodayPlanLaunchRequest({
     this.dateKey,
     this.blockId,
     this.activityId,
     this.routineId,
+    this.reminderId,
     this.openDaySession = false,
+    this.openReminderTab = false,
   });
 
   bool get opensRoutinesTab => routineId != null;
@@ -183,6 +203,7 @@ class NotificationService {
   static const String _chStudySession = 'study_session';
   static const String _chRoutineReminder = 'routine_reminder';
   static const String _chTaskReminder = 'task_reminder';
+  static const String _chReminder = 'reminder';
 
   // ── Android channels ──────────────────────────────────────────
   static const _timerChannel = AndroidNotificationChannel(
@@ -241,6 +262,14 @@ class NotificationService {
     playSound: true,
   );
 
+  static const _reminderChannel = AndroidNotificationChannel(
+    _chReminder,
+    'Reminders',
+    description: 'Alerts for standalone reminders',
+    importance: Importance.high,
+    playSound: true,
+  );
+
   /// Initialise the plugin and create all Android channels.
   Future<void> init() async {
     if (_initialised) return;
@@ -282,6 +311,7 @@ class NotificationService {
     await androidPlugin?.createNotificationChannel(_studySessionChannel);
     await androidPlugin?.createNotificationChannel(_routineReminderChannel);
     await androidPlugin?.createNotificationChannel(_taskReminderChannel);
+    await androidPlugin?.createNotificationChannel(_reminderChannel);
 
     _initialised = true;
   }
@@ -425,6 +455,23 @@ class NotificationService {
         _chTaskReminder,
         'Task Reminders',
         channelDescription: 'Alerts for scheduled task reminder rules',
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: '@mipmap/ic_launcher',
+      ),
+      iOS: DarwinNotificationDetails(
+        presentAlert: true,
+        presentSound: true,
+      ),
+    );
+  }
+
+  NotificationDetails _reminderDetails() {
+    return const NotificationDetails(
+      android: AndroidNotificationDetails(
+        _chReminder,
+        'Reminders',
+        channelDescription: 'Alerts for standalone reminders',
         importance: Importance.high,
         priority: Priority.high,
         icon: '@mipmap/ic_launcher',
@@ -704,7 +751,8 @@ class NotificationService {
   }) async {
     await _cancelPendingBySource(NotificationIntentSource.plannedTaskReminder);
 
-    final rules = config.taskReminderRules.where((rule) => rule.enabled).toList();
+    final rules =
+        config.taskReminderRules.where((rule) => rule.enabled).toList();
     if (rules.isEmpty) return;
 
     final now = DateTime.now();
@@ -743,6 +791,77 @@ class NotificationService {
               dateKey: block.date,
               blockId: block.id,
               source: NotificationIntentSource.plannedTaskReminder,
+            ).toPayload(),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> syncReminderNotifications({
+    required Iterable<Reminder> reminders,
+    required Iterable<ReminderOccurrenceState> occurrenceStates,
+    required ReminderNotificationConfig config,
+  }) async {
+    await _cancelPendingBySource(NotificationIntentSource.reminder);
+
+    if (!config.enabled) return;
+
+    final now = DateTime.now();
+    final horizonEnd = _today().add(const Duration(days: 365));
+    final stateMap = <String, ReminderOccurrenceState>{
+      for (final state in occurrenceStates) state.id: state,
+    };
+
+    for (final reminder in reminders) {
+      if (reminder.archived || reminder.isAllDay) continue;
+      final reminderTime = _parseRoutineTime(reminder.time);
+      if (reminderTime == null) continue;
+
+      final offsets = (reminder.useDefaultAlerts
+              ? config.defaultAlertOffsets
+              : reminder.customAlertOffsets)
+          .where((offset) => offset >= 0)
+          .toSet()
+          .toList()
+        ..sort();
+      if (offsets.isEmpty) continue;
+
+      for (DateTime cursor = _today();
+          !cursor.isAfter(horizonEnd);
+          cursor = cursor.add(const Duration(days: 1))) {
+        if (!reminder.occursOn(cursor)) continue;
+
+        final occurrenceKey = reminderOccurrenceKey(cursor);
+        final state = stateMap['${reminder.id}_$occurrenceKey'];
+        if (state?.completed == true) continue;
+
+        final dueTime = DateTime(
+          cursor.year,
+          cursor.month,
+          cursor.day,
+          reminderTime.hour,
+          reminderTime.minute,
+        );
+
+        for (final offset in offsets) {
+          final scheduled = dueTime.subtract(Duration(minutes: offset));
+          if (!scheduled.isAfter(now)) continue;
+
+          await _plugin.zonedSchedule(
+            _reminderNotificationId(reminder.id, occurrenceKey, offset),
+            _reminderNotificationTitle(reminder, offset),
+            _reminderNotificationBody(reminder, offset),
+            tz.TZDateTime.from(scheduled, tz.local),
+            _reminderDetails(),
+            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+            payload: NotificationIntent.todayPlan(
+              dateKey: occurrenceKey,
+              reminderId: reminder.id,
+              openReminderTab: true,
+              source: NotificationIntentSource.reminder,
             ).toPayload(),
           );
         }
@@ -901,7 +1020,17 @@ class NotificationService {
   }
 
   int _plannedTaskReminderId(Block block, TaskReminderRule rule) {
-    final seed = '${block.date}|${block.id}|${rule.anchor}|${rule.offsetMinutes}';
+    final seed =
+        '${block.date}|${block.id}|${rule.anchor}|${rule.offsetMinutes}';
+    return seed.hashCode & 0x7fffffff;
+  }
+
+  int _reminderNotificationId(
+    String reminderId,
+    String occurrenceKey,
+    int offsetMinutes,
+  ) {
+    final seed = '$reminderId|$occurrenceKey|$offsetMinutes';
     return seed.hashCode & 0x7fffffff;
   }
 
@@ -918,6 +1047,26 @@ class NotificationService {
       default:
         return block.title;
     }
+  }
+
+  String _reminderNotificationTitle(Reminder reminder, int offsetMinutes) {
+    if (offsetMinutes <= 0) {
+      return reminder.title;
+    }
+    final minuteLabel =
+        offsetMinutes == 1 ? '1 minute' : '$offsetMinutes minutes';
+    return '${reminder.title} in $minuteLabel';
+  }
+
+  String _reminderNotificationBody(Reminder reminder, int offsetMinutes) {
+    if (offsetMinutes <= 0) {
+      return reminder.notes?.trim().isNotEmpty == true
+          ? reminder.notes!.trim()
+          : 'Reminder due now';
+    }
+    final minuteLabel =
+        offsetMinutes == 1 ? '1 minute' : '$offsetMinutes minutes';
+    return '${reminder.title} is due in $minuteLabel';
   }
 
   String _plannedTaskReminderBody(Block block, TaskReminderRule rule) {

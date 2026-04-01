@@ -57,13 +57,11 @@ void _scheduleStartupNotifications(
   SettingsProvider settings,
 ) {
   final ns = NotificationService.instance;
-  final revisionCount = app.revisionItems
-      .where((r) {
-        final dt = DateTime.tryParse(r.nextRevisionAt);
-        if (dt == null) return false;
-        return dt.isBefore(DateTime.now().add(const Duration(days: 1)));
-      })
-      .length;
+  final revisionCount = app.revisionItems.where((r) {
+    final dt = DateTime.tryParse(r.nextRevisionAt);
+    if (dt == null) return false;
+    return dt.isBefore(DateTime.now().add(const Duration(days: 1)));
+  }).length;
 
   // Daily 8 AM morning summary
   ns.scheduleMorningSummary(dueCount: revisionCount);
@@ -77,5 +75,9 @@ void _scheduleStartupNotifications(
     plans: app.dayPlans,
     config: settings.timerReminders,
   );
+  ns.syncReminderNotifications(
+    reminders: app.reminders,
+    occurrenceStates: app.reminderOccurrenceStates,
+    config: settings.reminderNotifications,
+  );
 }
-

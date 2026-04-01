@@ -122,8 +122,8 @@ class BackupService {
         final decoded = jsonDecode(data);
         if (decoded is! Map) continue;
         final note = LibraryNote.fromJson(Map<String, dynamic>.from(decoded));
-        for (final attachmentPath in note.attachmentPaths) {
-          final trimmedPath = attachmentPath.trim();
+        for (final attachment in note.attachments) {
+          final trimmedPath = attachment.source.trim();
           if (trimmedPath.isEmpty ||
               AttachmentStorageService.isWebLink(trimmedPath) ||
               !seenPaths.add(trimmedPath)) {
@@ -346,7 +346,8 @@ class BackupService {
     for (final asset in _attachmentAssetsFromData(data)) {
       final bytes = attachmentBytes[asset.archivePath];
       if (bytes == null) continue;
-      final restoredPath = await AttachmentStorageService.writeRestoredAttachment(
+      final restoredPath =
+          await AttachmentStorageService.writeRestoredAttachment(
         originalPath: asset.originalPath,
         suggestedFileName: asset.fileName,
         bytes: bytes,
@@ -375,10 +376,14 @@ class BackupService {
       final decodedData = jsonDecode(encodedData);
       if (decodedData is! Map) return row;
       final note = LibraryNote.fromJson(Map<String, dynamic>.from(decodedData));
-      final restoredPaths = note.attachmentPaths
-          .map((path) => attachmentPathMap[path] ?? path)
+      final restoredAttachments = note.attachments
+          .map(
+            (attachment) => attachment.copyWith(
+              source: attachmentPathMap[attachment.source] ?? attachment.source,
+            ),
+          )
           .toList();
-      final restoredNote = note.copyWith(attachmentPaths: restoredPaths);
+      final restoredNote = note.copyWith(attachments: restoredAttachments);
       row['data'] = jsonEncode(restoredNote.toJson());
     } catch (_) {
       // Preserve the row as-is if it cannot be rewritten.
@@ -442,4 +447,3 @@ class BackupService {
     return filePath;
   }
 }
-
