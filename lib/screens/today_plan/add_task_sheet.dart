@@ -1454,7 +1454,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       required List<String> items, required void Function(String?) onChanged}) {
     final safeValue = (value != null && items.contains(value)) ? value : null;
     return DropdownButtonFormField<String>(
-      value: safeValue,
+      initialValue: safeValue,
       decoration: InputDecoration(
         labelText: label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

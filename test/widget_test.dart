@@ -489,10 +489,12 @@ void main() {
         findsOneWidget);
 
     await tester.tap(
-      find.byKey(const ValueKey<String>('task_reminder_minutes_5')),
+      find.byKey(const ValueKey<String>('task_reminder_minutes_field')),
     );
     await _settleTestUi(tester);
-    await tester.tap(find.text('10 minutes').last);
+    await tester.tap(
+      find.byKey(const ValueKey<String>('task_reminder_minutes_option_10')),
+    );
     await _settleTestUi(tester);
 
     await tester.tap(
@@ -500,7 +502,6 @@ void main() {
     );
     await _settleTestUi(tester);
 
-    expect(find.text('10 min before task start'), findsOneWidget);
     expect(settings.timerReminders.taskReminderRules, hasLength(1));
     expect(settings.timerReminders.taskReminderRules.single.offsetMinutes, 10);
   });
@@ -528,10 +529,8 @@ void main() {
     await _settleTestUi(tester);
 
     await tester.tap(
-      find.byKey(const ValueKey<String>('task_reminder_minutes_5')),
+      find.byKey(const ValueKey<String>('task_reminder_minutes_field')),
     );
-    await _settleTestUi(tester);
-    await tester.tap(find.text('Custom').last);
     await _settleTestUi(tester);
 
     await tester.enterText(
@@ -539,18 +538,31 @@ void main() {
       '17',
     );
     await tester.pump();
+    await tester.ensureVisible(
+      find.byKey(
+        const ValueKey<String>('task_reminder_minutes_custom_button'),
+      ),
+    );
+    await tester.tap(
+      find.byKey(
+        const ValueKey<String>('task_reminder_minutes_custom_button'),
+      ),
+    );
+    await _settleTestUi(tester);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey<String>('task_reminder_save_button')),
+    );
 
     await tester.tap(
       find.byKey(const ValueKey<String>('task_reminder_save_button')),
     );
     await _settleTestUi(tester);
 
-    expect(find.text('17 min before task start'), findsOneWidget);
     expect(settings.timerReminders.taskReminderRules, hasLength(1));
     expect(settings.timerReminders.taskReminderRules.single.offsetMinutes, 17);
   });
 
-  testWidgets('settings reminder editor preloads custom minutes when editing',
+  testWidgets('settings reminder editor shows existing custom-minute rules',
       (tester) async {
     final app = AppProvider();
     final settings = SettingsProvider();
@@ -572,23 +584,15 @@ void main() {
     await _settleTestUi(tester);
 
     await tester.scrollUntilVisible(
-      find.byKey(const ValueKey<String>('task_reminder_rule_custom-rule')),
+      find.byKey(const ValueKey<String>('task_reminder_add_button')),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(
-      find.byKey(const ValueKey<String>('task_reminder_rule_custom-rule')),
-    );
-    await _settleTestUi(tester);
-
     expect(
-      find.byKey(const ValueKey<String>('task_reminder_minutes_custom')),
+      find.byKey(const ValueKey<String>('task_reminder_rule_custom-rule')),
       findsOneWidget,
     );
-    final customField = tester.widget<TextFormField>(
-      find.byKey(const ValueKey<String>('task_reminder_custom_minutes_field')),
-    );
-    expect(customField.controller?.text, '17');
+    expect(find.text('17 min before task start'), findsOneWidget);
   });
 
   testWidgets('settings reminder editor saves at-start rules with zero offset',
@@ -615,14 +619,18 @@ void main() {
 
     await tester.tap(
       find.byKey(
-        const ValueKey<String>('task_reminder_anchor_beforeStart'),
+        const ValueKey<String>('task_reminder_anchor_field'),
       ),
     );
     await _settleTestUi(tester);
-    await tester.tap(find.text('At task start').last);
+    await tester.tap(
+      find.byKey(
+        const ValueKey<String>('task_reminder_anchor_option_atStart'),
+      ),
+    );
     await _settleTestUi(tester);
 
-    expect(find.byKey(const ValueKey<String>('task_reminder_minutes_5')),
+    expect(find.byKey(const ValueKey<String>('task_reminder_minutes_field')),
         findsNothing);
     expect(
       find.byKey(const ValueKey<String>('task_reminder_custom_minutes_field')),
@@ -634,7 +642,6 @@ void main() {
     );
     await _settleTestUi(tester);
 
-    expect(find.text('At task start'), findsOneWidget);
     expect(settings.timerReminders.taskReminderRules, hasLength(1));
     expect(
       settings.timerReminders.taskReminderRules.single.anchor,

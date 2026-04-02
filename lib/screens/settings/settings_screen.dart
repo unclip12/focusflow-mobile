@@ -9,7 +9,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -25,6 +24,23 @@ import 'package:focusflow_mobile/utils/show_app_bottom_sheet.dart';
 import 'package:focusflow_mobile/widgets/app_scaffold.dart';
 import 'package:focusflow_mobile/widgets/liquid_glass_card.dart';
 import 'package:focusflow_mobile/screens/settings/theme_picker_card.dart';
+
+const String _kInterFontFamily = 'Inter';
+
+TextStyle _interTextStyle({
+  double? fontSize,
+  FontWeight? fontWeight,
+  Color? color,
+  double? letterSpacing,
+}) {
+  return TextStyle(
+    fontFamily: _kInterFontFamily,
+    fontSize: fontSize,
+    fontWeight: fontWeight,
+    color: color,
+    letterSpacing: letterSpacing,
+  );
+}
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -261,7 +277,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Row(
                   children: [
                     Text('Pinned Tabs',
-                        style: GoogleFonts.inter(
+                        style: _interTextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                           color: DashboardColors.textPrimary(
@@ -269,7 +285,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         )),
                     const Spacer(),
                     Text('Max 4 tabs',
-                        style: GoogleFonts.inter(
+                        style: _interTextStyle(
                           fontSize: 11,
                           color: DashboardColors.textSecondary,
                         )),
@@ -304,7 +320,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text('Tap a chip to unpin · Changes apply on restart',
-                    style: GoogleFonts.inter(
+                    style: _interTextStyle(
                       fontSize: 10,
                       color: DashboardColors.textSecondary,
                     )),
@@ -693,14 +709,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     builder: (context, snap) {
                       if (snap.connectionState == ConnectionState.waiting) {
                         return Text('Checking…',
-                            style: GoogleFonts.inter(
+                            style: _interTextStyle(
                                 fontSize: 12,
                                 color: DashboardColors.textSecondary));
                       }
                       final dt = snap.data;
                       if (dt == null)
                         return Text('No backup yet',
-                            style: GoogleFonts.inter(
+                            style: _interTextStyle(
                                 fontSize: 12,
                                 color: DashboardColors.textSecondary));
                       final now = DateTime.now();
@@ -711,7 +727,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ? 'Today at ${DateFormat.jm().format(dt)}'
                           : '${DateFormat('MMM d').format(dt)} at ${DateFormat.jm().format(dt)}';
                       return Text(formatted,
-                          style: GoogleFonts.inter(
+                          style: _interTextStyle(
                               fontSize: 12,
                               color: DashboardColors.textSecondary));
                     },
@@ -1284,7 +1300,7 @@ class _GlassSectionHeader extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             title.toUpperCase(),
-            style: GoogleFonts.inter(
+            style: _interTextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.2,
@@ -1345,7 +1361,7 @@ class _GlassListTile extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: GoogleFonts.inter(
+                    style: _interTextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                       color: DashboardColors.textPrimary(isDark),
@@ -1354,7 +1370,7 @@ class _GlassListTile extends StatelessWidget {
                   if (subtitle != null)
                     Text(
                       subtitle!,
-                      style: GoogleFonts.inter(
+                      style: _interTextStyle(
                         fontSize: 12,
                         color: DashboardColors.textSecondary,
                       ),
@@ -1390,7 +1406,7 @@ class _GlassChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: GoogleFonts.inter(
+        style: _interTextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
           color: DashboardColors.primaryLight,
@@ -1626,6 +1642,7 @@ class _TaskReminderRuleEditorPanelState
             const SizedBox(height: 16),
             ...TaskReminderAnchor.values.map(
               (anchor) => _BottomSheetOptionTile(
+                key: ValueKey<String>('task_reminder_anchor_option_$anchor'),
                 label: _anchorLabel(anchor),
                 selected: anchor == _anchor,
                 onTap: () => Navigator.of(sheetContext).pop(anchor),
@@ -1688,6 +1705,9 @@ class _TaskReminderRuleEditorPanelState
               const SizedBox(height: 16),
               ..._minuteOptions.map(
                 (minutes) => _BottomSheetOptionTile(
+                  key: ValueKey<String>(
+                    'task_reminder_minutes_option_$minutes',
+                  ),
                   label: _minuteLabel(minutes),
                   selected: !_useCustomMinutes && _offsetMinutes == minutes,
                   onTap: () => Navigator.of(sheetContext).pop(
@@ -1721,6 +1741,9 @@ class _TaskReminderRuleEditorPanelState
               Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton.icon(
+                  key: const ValueKey<String>(
+                    'task_reminder_minutes_custom_button',
+                  ),
                   onPressed: () {
                     final minutes = int.tryParse(customController.text.trim());
                     if (minutes == null || minutes <= 0) {
@@ -1746,7 +1769,6 @@ class _TaskReminderRuleEditorPanelState
       ),
     );
 
-    customController.dispose();
     if (selected == null || !mounted) return;
     setState(() {
       _offsetMinutes = selected.minutes;
@@ -1816,6 +1838,7 @@ class _TaskReminderRuleEditorPanelState
           ),
           const SizedBox(height: 16),
           _BottomSheetSelectionField(
+            key: const ValueKey<String>('task_reminder_anchor_field'),
             label: 'When should this fire?',
             value: _anchorLabel(_anchor),
             enabled: !_isSaving,
@@ -1824,6 +1847,7 @@ class _TaskReminderRuleEditorPanelState
           const SizedBox(height: 16),
           if (_usesOffset) ...[
             _BottomSheetSelectionField(
+              key: const ValueKey<String>('task_reminder_minutes_field'),
               label: 'Minutes',
               value: _useCustomMinutes
                   ? '${_minuteLabel(_offsetMinutes)} (custom)'
@@ -1921,6 +1945,7 @@ class _BottomSheetOptionTile extends StatelessWidget {
   final VoidCallback onTap;
 
   const _BottomSheetOptionTile({
+    super.key,
     required this.label,
     this.subtitle,
     this.selected = false,
@@ -1997,6 +2022,7 @@ class _BottomSheetSelectionField extends StatelessWidget {
   final VoidCallback onTap;
 
   const _BottomSheetSelectionField({
+    super.key,
     required this.label,
     required this.value,
     required this.enabled,
