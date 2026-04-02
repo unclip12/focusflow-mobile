@@ -1258,6 +1258,162 @@ void main() {
     expect(_findRichTextContaining(expectedFutureText), findsOneWidget);
   });
 
+  testWidgets('gap after extended actual end starts at the actual end time',
+      (tester) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dateKey = AppDateUtils.formatDate(today);
+    final nowMinutes = now.hour * 60 + now.minute;
+    if (nowMinutes < 40) {
+      expect(nowMinutes, lessThan(40));
+      return;
+    }
+
+    final plannedStartMinutes = nowMinutes - 40;
+    final plannedEndMinutes = nowMinutes - 30;
+    final actualEndMinutes = nowMinutes - 10;
+    final expectedGapLabel =
+        '${_formatFullTimeForTest(actualEndMinutes)} - ${_formatFullTimeForTest(nowMinutes)} • ${_formatCompactDurationForTest(nowMinutes - actualEndMinutes)}';
+    final unexpectedGapLabel =
+        '${_formatFullTimeForTest(plannedEndMinutes)} - ${_formatFullTimeForTest(nowMinutes)} • ${_formatCompactDurationForTest(nowMinutes - plannedEndMinutes)}';
+
+    final app = AppProvider();
+    app.dayPlans = [
+      _buildDayPlan(
+        date: dateKey,
+        blocks: [
+          Block(
+            id: 'actual_end_extension',
+            index: 0,
+            date: dateKey,
+            plannedStartTime: _formatMinutesForTest(plannedStartMinutes),
+            plannedEndTime: _formatMinutesForTest(plannedEndMinutes),
+            type: BlockType.studySession,
+            title: 'Extended Actual End',
+            plannedDurationMinutes: plannedEndMinutes - plannedStartMinutes,
+            actualStartTime: DateTime(
+              today.year,
+              today.month,
+              today.day,
+              plannedStartMinutes ~/ 60,
+              plannedStartMinutes % 60,
+            ).toIso8601String(),
+            actualEndTime: DateTime(
+              today.year,
+              today.month,
+              today.day,
+              actualEndMinutes ~/ 60,
+              actualEndMinutes % 60,
+            ).toIso8601String(),
+            actualDurationMinutes: actualEndMinutes - plannedStartMinutes,
+            status: BlockStatus.done,
+            completionStatus: 'COMPLETED',
+          ),
+        ],
+      ),
+    ];
+
+    await tester.pumpWidget(
+      _TimelineHarness(
+        app: app,
+        initialDate: today,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text(expectedGapLabel),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(expectedGapLabel), findsOneWidget);
+    expect(find.text(unexpectedGapLabel), findsNothing);
+  });
+
+  testWidgets('gap before early actual start ends at the actual start time',
+      (tester) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dateKey = AppDateUtils.formatDate(today);
+    final nowMinutes = now.hour * 60 + now.minute;
+    if (nowMinutes < 50) {
+      expect(nowMinutes, lessThan(50));
+      return;
+    }
+
+    final previousStartMinutes = nowMinutes - 50;
+    final previousEndMinutes = nowMinutes - 40;
+    final actualStartMinutes = nowMinutes - 30;
+    final plannedStartMinutes = nowMinutes - 20;
+    final plannedEndMinutes = nowMinutes - 10;
+    final expectedGapLabel =
+        '${_formatFullTimeForTest(previousEndMinutes)} - ${_formatFullTimeForTest(actualStartMinutes)} • ${_formatCompactDurationForTest(actualStartMinutes - previousEndMinutes)}';
+    final unexpectedGapLabel =
+        '${_formatFullTimeForTest(previousEndMinutes)} - ${_formatFullTimeForTest(plannedStartMinutes)} • ${_formatCompactDurationForTest(plannedStartMinutes - previousEndMinutes)}';
+
+    final app = AppProvider();
+    app.dayPlans = [
+      _buildDayPlan(
+        date: dateKey,
+        blocks: [
+          _block(
+            id: 'preceding_block',
+            date: dateKey,
+            start: _formatMinutesForTest(previousStartMinutes),
+            end: _formatMinutesForTest(previousEndMinutes),
+            duration: previousEndMinutes - previousStartMinutes,
+            title: 'Preceding Block',
+          ),
+          Block(
+            id: 'early_actual_start',
+            index: 1,
+            date: dateKey,
+            plannedStartTime: _formatMinutesForTest(plannedStartMinutes),
+            plannedEndTime: _formatMinutesForTest(plannedEndMinutes),
+            type: BlockType.studySession,
+            title: 'Early Actual Start',
+            plannedDurationMinutes: plannedEndMinutes - plannedStartMinutes,
+            actualStartTime: DateTime(
+              today.year,
+              today.month,
+              today.day,
+              actualStartMinutes ~/ 60,
+              actualStartMinutes % 60,
+            ).toIso8601String(),
+            actualEndTime: DateTime(
+              today.year,
+              today.month,
+              today.day,
+              plannedEndMinutes ~/ 60,
+              plannedEndMinutes % 60,
+            ).toIso8601String(),
+            actualDurationMinutes: plannedEndMinutes - actualStartMinutes,
+            status: BlockStatus.done,
+            completionStatus: 'COMPLETED',
+          ),
+        ],
+      ),
+    ];
+
+    await tester.pumpWidget(
+      _TimelineHarness(
+        app: app,
+        initialDate: today,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text(expectedGapLabel),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(expectedGapLabel), findsOneWidget);
+    expect(find.text(unexpectedGapLabel), findsNothing);
+  });
+
   testWidgets('planned block shows play control before starting',
       (tester) async {
     final app = AppProvider();

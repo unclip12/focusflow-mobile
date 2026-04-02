@@ -173,7 +173,7 @@ double _gapSlotHeight(
   final scaledHeight = _scaledTimelineHeight(minutes);
   final contentMinHeight = hasPastSection && hasFutureSection
       ? 210.0
-      : (hasPastSection || hasFutureSection ? 108.0 : _kGapRowMinHeight);
+      : (hasPastSection || hasFutureSection ? 132.0 : _kGapRowMinHeight);
   return math.max(
     _kGapRowMinHeight,
     math.max(scaledHeight, contentMinHeight),
@@ -283,6 +283,53 @@ int _resolvedBlockDurationMinutes(Block block) {
   final endMinutes = _minutesFromTimeValue(block.plannedEndTime) ?? 0;
   final rawDuration = endMinutes - startMinutes;
   return rawDuration > 0 ? rawDuration : 0;
+}
+
+DateTime _dateAtStartOfDay(DateTime date) =>
+    DateTime(date.year, date.month, date.day);
+
+DateTime _dateTimeFromTimeValue(String? raw, DateTime fallbackDate) {
+  final parsedDateTime = raw == null ? null : DateTime.tryParse(raw.trim());
+  if (parsedDateTime != null) return parsedDateTime;
+
+  final minutes = _minutesFromTimeValue(raw) ?? 0;
+  return _dateAtStartOfDay(fallbackDate).add(Duration(minutes: minutes));
+}
+
+class _TimelineOccupiedRange {
+  final DateTime start;
+  final DateTime end;
+
+  const _TimelineOccupiedRange({
+    required this.start,
+    required this.end,
+  });
+}
+
+_TimelineOccupiedRange _resolveTimelineOccupiedRange(Block block) {
+  final blockDate = AppDateUtils.parseDate(block.date) ?? DateTime.now();
+  final dayStart = _dateAtStartOfDay(blockDate);
+  final plannedStartMinutes = _minutesFromTimeValue(block.plannedStartTime) ?? 0;
+  final plannedStart = dayStart.add(Duration(minutes: plannedStartMinutes));
+  final plannedEnd = plannedStart.add(
+    Duration(minutes: _resolvedBlockDurationMinutes(block)),
+  );
+
+  final actualStart =
+      _dateTimeFromTimeValue(block.actualStartTime, blockDate);
+  final resolvedStart =
+      _normalizeTimeValue(block.actualStartTime) == null ? plannedStart : actualStart;
+
+  final actualEnd = _normalizeTimeValue(block.actualEndTime) == null
+      ? plannedEnd
+      : _dateTimeFromTimeValue(block.actualEndTime, blockDate);
+  final resolvedEnd = actualEnd.isAfter(resolvedStart) ? actualEnd : plannedEnd;
+
+  if (!resolvedEnd.isAfter(resolvedStart)) {
+    return _TimelineOccupiedRange(start: plannedStart, end: plannedEnd);
+  }
+
+  return _TimelineOccupiedRange(start: resolvedStart, end: resolvedEnd);
 }
 
 // -- Widget ----------------------------------------------------
@@ -458,14 +505,23 @@ class _TimelineViewState extends State<TimelineView> {
     Block block,
     DateTime displayDate,
   ) {
-    final startMinutes = _toMinutes(block.plannedStartTime).clamp(0, 1439);
-    final durationMinutes = _blockDurationMinutes(block);
-    final visibleEndMinutes = math.min(24 * 60, startMinutes + durationMinutes);
-    if (visibleEndMinutes <= startMinutes) return null;
+    final occupiedRange = _resolveTimelineOccupiedRange(block);
+    final dayStart = _dateAtStartOfDay(displayDate);
+    final dayEnd = dayStart.add(const Duration(days: 1));
+    final visibleStart = occupiedRange.start.isBefore(dayStart)
+        ? dayStart
+        : occupiedRange.start;
+    final visibleEnd =
+        occupiedRange.end.isAfter(dayEnd) ? dayEnd : occupiedRange.end;
+    if (!visibleEnd.isAfter(visibleStart)) return null;
 
-    final relation = startMinutes + durationMinutes > 24 * 60
-        ? _TimelineBlockRelation.carryOut
-        : _TimelineBlockRelation.sameDay;
+    final startMinutes = visibleStart.difference(dayStart).inMinutes;
+    final visibleEndMinutes = visibleEnd.difference(dayStart).inMinutes;
+    final relation = occupiedRange.start.isBefore(dayStart)
+        ? _TimelineBlockRelation.carryIn
+        : (occupiedRange.end.isAfter(dayEnd)
+            ? _TimelineBlockRelation.carryOut
+            : _TimelineBlockRelation.sameDay);
 
     return _TimelineBlockSlice(
       block: block,
@@ -480,11 +536,16 @@ class _TimelineViewState extends State<TimelineView> {
     Block block,
     DateTime displayDate,
   ) {
-    final startMinutes = _toMinutes(block.plannedStartTime);
-    final durationMinutes = _blockDurationMinutes(block);
-    final overflowMinutes = (startMinutes + durationMinutes) - (24 * 60);
-    final visibleEndMinutes = overflowMinutes.clamp(0, 24 * 60);
-    if (visibleEndMinutes <= 0) return null;
+    final occupiedRange = _resolveTimelineOccupiedRange(block);
+    final dayStart = _dateAtStartOfDay(displayDate);
+    final dayEnd = dayStart.add(const Duration(days: 1));
+    if (!occupiedRange.start.isBefore(dayStart)) return null;
+
+    final visibleEnd =
+        occupiedRange.end.isAfter(dayEnd) ? dayEnd : occupiedRange.end;
+    if (!visibleEnd.isAfter(dayStart)) return null;
+
+    final visibleEndMinutes = visibleEnd.difference(dayStart).inMinutes;
 
     return _TimelineBlockSlice(
       block: block,
@@ -2646,7 +2707,8 @@ class _BlockCard extends StatelessWidget {
     final timeLabelColor =
         theme.textTheme.bodySmall?.color ?? theme.colorScheme.onSurfaceVariant;
     final accent = _baseBlockColor(block);
-    final plannedDuration = slice.visibleDurationMinutes;
+    final occupiedDuration = slice.visibleDurationMinutes;
+    final plannedDuration = _resolvedBlockDurationMinutes(block);
     final isDone = block.status == BlockStatus.done;
     final isSplit = block.splitTotalParts != null && block.splitTotalParts! > 1;
     final neutralPillColor = theme.colorScheme.surface.withValues(alpha: 0.78);
@@ -2664,14 +2726,14 @@ class _BlockCard extends StatelessWidget {
         (actualStartTime != block.plannedStartTime ||
             actualEndTime != block.plannedEndTime);
     final showDualTrack = isDone && hasDifferentActualRange;
-    final isCompactCard = plannedDuration <= 90 && !showDualTrack;
+    final isCompactCard = occupiedDuration <= 90 && !showDualTrack;
     final actualDuration = actualEndTime == null ||
             slice.relation != _TimelineBlockRelation.sameDay
-        ? plannedDuration
+        ? occupiedDuration
         : _durationFromTimeRange(
             actualStartTime,
             actualEndTime,
-            fallbackMinutes: plannedDuration,
+            fallbackMinutes: occupiedDuration,
           );
     final plannedTrackHeight =
         math.max(18.0, _scaledTimelineHeight(plannedDuration));
@@ -2679,10 +2741,13 @@ class _BlockCard extends StatelessWidget {
         math.max(18.0, _scaledTimelineHeight(actualDuration));
     final dualTrackHeight =
         math.max(plannedTrackHeight, actualTrackHeight) + 22;
-    final baseCardMinHeight = showDualTrack ? 0.0 : 84.0;
+    final baseCardMinHeight = showDualTrack ? 68.0 : 84.0;
     final cardHeight = showDualTrack
-        ? math.max(_timelinePillHeight(plannedDuration), dualTrackHeight)
-        : math.max(_timelinePillHeight(plannedDuration), baseCardMinHeight);
+        ? math.max(
+            math.max(_timelinePillHeight(occupiedDuration), dualTrackHeight),
+            64.0,
+          )
+        : math.max(_timelinePillHeight(occupiedDuration), baseCardMinHeight);
     final double? nowIndicatorTop = nowLineOffset == null
         ? null
         : (nowLineOffset! - (_kNowOverlayHeight / 2))
@@ -2746,8 +2811,7 @@ class _BlockCard extends StatelessWidget {
                           labelColor: onSurface.withValues(alpha: 0.52),
                           actualLabelColor: onSurfaceVariant,
                           checkIconColor: onSurface,
-                          plannedLabel: _to12hShort(_minutesToHHMM(
-                              slice.visibleEndMinutes % (24 * 60))),
+                          plannedLabel: _to12hShort(block.plannedEndTime),
                           actualLabel: _to12hShort(actualEndTime),
                           plannedHeight: plannedTrackHeight,
                           actualHeight: actualTrackHeight,
