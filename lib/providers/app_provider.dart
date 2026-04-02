@@ -1724,6 +1724,69 @@ class AppProvider extends ChangeNotifier {
     );
   }
 
+  Future<void> saveManualLogBlock({
+    required String date,
+    required String title,
+    required String startTime,
+    required String endTime,
+    String? notes,
+    String? colorHex,
+    String? blockId,
+  }) async {
+    final parsedDate = DateTime.tryParse(date) ?? DateTime.now();
+    final startMinutes = _toMinutes(startTime);
+    final endMinutes = _toMinutes(endTime);
+
+    final startedAt = DateTime(
+      parsedDate.year,
+      parsedDate.month,
+      parsedDate.day,
+      startMinutes ~/ 60,
+      startMinutes % 60,
+    );
+    var completedAt = DateTime(
+      parsedDate.year,
+      parsedDate.month,
+      parsedDate.day,
+      endMinutes ~/ 60,
+      endMinutes % 60,
+    );
+    if (!completedAt.isAfter(startedAt)) {
+      completedAt = completedAt.add(const Duration(days: 1));
+    }
+
+    final adHocBlock = createAdHocTrackedBlock(
+      date: date,
+      title: title,
+      startedAt: startedAt,
+      completedAt: completedAt,
+      notes: notes,
+      colorHex: colorHex,
+    ).copyWith(
+      id: blockId,
+      description: notes,
+      actualNotes: notes,
+    );
+
+    final plan = getDayPlan(date);
+    final updatedBlocks = List<Block>.from(plan?.blocks ?? const <Block>[]);
+    final existingIndex = blockId == null
+        ? -1
+        : updatedBlocks.indexWhere((block) => block.id == blockId);
+    if (existingIndex >= 0) {
+      updatedBlocks[existingIndex] = adHocBlock;
+    } else {
+      updatedBlocks.add(adHocBlock);
+    }
+
+    await _saveDayPlan(
+      _dayPlanWithUpdatedBlocks(plan, date, updatedBlocks),
+      notify: false,
+    );
+    await syncFlowActivitiesFromDayPlan(date, notify: false);
+    notifyListeners();
+  }
+
   List<Block> getTrackNowConflictingBlocks(
     String date, {
     required DateTime startedAt,
@@ -6200,8 +6263,9 @@ class AppProvider extends ChangeNotifier {
       return;
     }
 
-    final updatedAttachments = List<LibraryNoteAttachment>.from(note.attachments)
-      ..removeAt(attachmentIndex);
+    final updatedAttachments =
+        List<LibraryNoteAttachment>.from(note.attachments)
+          ..removeAt(attachmentIndex);
 
     final shouldDeleteNote = deleteEmptyNote &&
         updatedAttachments.isEmpty &&

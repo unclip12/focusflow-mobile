@@ -8,6 +8,8 @@ import 'package:focusflow_mobile/utils/constants.dart';
 import 'alert_repeat_sheet.dart';
 import 'time_picker_sheet.dart';
 
+enum BlockEditorMode { planned, log }
+
 class BlockEditorUpdate {
   final String dateKey;
   final String title;
@@ -21,6 +23,7 @@ class BlockEditorUpdate {
   final List<int> recurrenceDays;
   final bool isEvent;
   final BlockType type;
+  final bool saveAsLog;
 
   const BlockEditorUpdate({
     required this.dateKey,
@@ -35,17 +38,20 @@ class BlockEditorUpdate {
     required this.recurrenceDays,
     required this.isEvent,
     required this.type,
+    required this.saveAsLog,
   });
 }
 
 class BlockEditorSheet extends StatefulWidget {
   final Block block;
+  final BlockEditorMode mode;
   final Future<void> Function(BlockEditorUpdate update) onSave;
   final VoidCallback onDelete;
 
   const BlockEditorSheet({
     super.key,
     required this.block,
+    this.mode = BlockEditorMode.planned,
     required this.onSave,
     required this.onDelete,
   });
@@ -115,6 +121,10 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
   bool _userChangedEmoji = false;
   bool _userChangedColor = false;
   Color _headerColor = _defaultHeaderColor;
+
+  bool get _isLogMode => widget.mode == BlockEditorMode.log;
+  bool get _isExistingBlock =>
+      !widget.block.id.startsWith('draft_') && widget.block.id.isNotEmpty;
 
   @override
   void initState() {
@@ -573,6 +583,7 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
           recurrenceDays: List<int>.from(_recurrenceDays)..sort(),
           isEvent: _isEvent,
           type: _selectedType,
+          saveAsLog: _isLogMode,
         ),
       );
       if (mounted) Navigator.of(context).pop();
@@ -602,6 +613,11 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
     final durationLabel = _formatDuration(_durationMinutes);
     final dateLabel = DateFormat('EEE, MMM d, yyyy').format(_selectedDate);
     final relativeLabel = _relativeDateLabel(_selectedDate);
+    final titleHint = _isLogMode ? 'What did you do?' : 'Task title';
+    final saveLabel = _isLogMode ? 'Save Log' : 'Save Changes';
+    final deleteLabel = _isLogMode
+        ? (_isExistingBlock ? 'Delete Log' : 'Discard Log')
+        : 'Delete Block';
     final scaffoldBackgroundColor = Theme.of(context).scaffoldBackgroundColor;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final bottomPadding = MediaQuery.of(context).padding.bottom + 20;
@@ -640,7 +656,8 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                                   onTap: () => Navigator.of(context).pop(),
                                 ),
                                 const Spacer(),
-                                _StatusRing(status: widget.block.status),
+                                if (!_isLogMode)
+                                  _StatusRing(status: widget.block.status),
                               ],
                             ),
                             const SizedBox(height: 10),
@@ -733,9 +750,9 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                                       fontWeight: FontWeight.w800,
                                     ),
                                     cursorColor: Colors.white,
-                                    decoration: const InputDecoration(
-                                      hintText: 'Task title',
-                                      hintStyle: TextStyle(
+                                    decoration: InputDecoration(
+                                      hintText: titleHint,
+                                      hintStyle: const TextStyle(
                                         color: Colors.white54,
                                         fontSize: 22,
                                         fontWeight: FontWeight.w700,
@@ -758,33 +775,35 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                           _Card(
                             children: [
                               _ActionRow(
-                                icon: Icons.calendar_today_rounded,
-                                iconColor: _accentColor,
-                                title: dateLabel,
-                                trailing: relativeLabel,
-                                onTap: _pickDate,
-                              ),
-                              _ActionRow(
                                 icon: Icons.access_time_filled_rounded,
                                 iconColor: _accentColor,
                                 title: timeLabel,
                                 trailing: durationLabel,
                                 onTap: _pickTime,
                               ),
-                              _ActionRow(
-                                icon: Icons.notifications_rounded,
-                                iconColor: const Color(0xFFB78A88),
-                                title: 'Alert',
-                                trailing: _alertRowSummary(),
-                                onTap: _openAlertRepeatSheet,
-                              ),
-                              _ActionRow(
-                                icon: Icons.repeat_rounded,
-                                iconColor: const Color(0xFFB78A88),
-                                title: 'Repeat',
-                                trailing: _repeatRowSummary(),
-                                onTap: _openAlertRepeatSheet,
-                              ),
+                              if (!_isLogMode) ...[
+                                _ActionRow(
+                                  icon: Icons.calendar_today_rounded,
+                                  iconColor: _accentColor,
+                                  title: dateLabel,
+                                  trailing: relativeLabel,
+                                  onTap: _pickDate,
+                                ),
+                                _ActionRow(
+                                  icon: Icons.notifications_rounded,
+                                  iconColor: const Color(0xFFB78A88),
+                                  title: 'Alert',
+                                  trailing: _alertRowSummary(),
+                                  onTap: _openAlertRepeatSheet,
+                                ),
+                                _ActionRow(
+                                  icon: Icons.repeat_rounded,
+                                  iconColor: const Color(0xFFB78A88),
+                                  title: 'Repeat',
+                                  trailing: _repeatRowSummary(),
+                                  onTap: _openAlertRepeatSheet,
+                                ),
+                              ],
                             ],
                           ),
                           const SizedBox(height: 12),
@@ -792,129 +811,57 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                             children: [
                               Padding(
                                 padding:
-                                    const EdgeInsets.fromLTRB(16, 14, 16, 12),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.event_rounded,
-                                      color: secondaryText,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        'Fixed Event',
-                                        style: TextStyle(
-                                          color: titleColor,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
-                                    Switch(
-                                      value: _isEvent,
-                                      onChanged: (value) =>
-                                          setState(() => _isEvent = value),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 16),
-                                child: Divider(
-                                  height: 1,
-                                  color: dividerColor,
-                                ),
-                              ),
-                              Padding(
-                                padding:
-                                    const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.category_outlined,
-                                      color: secondaryText,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      'Block Type',
-                                      style: TextStyle(
-                                        color: titleColor,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 12),
-                                      decoration: BoxDecoration(
-                                        color: dropdownFillColor,
-                                        borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(
-                                          color: dividerColor,
-                                        ),
-                                      ),
-                                      child: DropdownButtonHideUnderline(
-                                        child: DropdownButton<BlockType>(
-                                          value: _selectedType,
-                                          dropdownColor: cardColor,
-                                          iconEnabledColor: secondaryText,
-                                          style: TextStyle(
-                                            color: titleColor,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                          onChanged: (value) {
-                                            if (value != null)
-                                              setState(
-                                                  () => _selectedType = value);
-                                          },
-                                          items: BlockType.values
-                                              .map((type) =>
-                                                  DropdownMenuItem<BlockType>(
-                                                    value: type,
-                                                    child:
-                                                        Text(_typeLabel(type)),
-                                                  ))
-                                              .toList(growable: false),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 16),
-                                child: Divider(
-                                  height: 1,
-                                  color: dividerColor,
-                                ),
-                              ),
-                              Padding(
-                                padding:
                                     const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                                child: Row(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Icon(
-                                      Icons.radio_button_unchecked_rounded,
-                                      color: secondaryText,
-                                    ),
-                                    const SizedBox(width: 12),
                                     Text(
-                                      'Status',
+                                      _isLogMode ? 'Notes' : 'Description',
                                       style: TextStyle(
                                         color: titleColor,
                                         fontSize: 16,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
-                                    const Spacer(),
-                                    Text(
-                                      _statusLabel(widget.block.status),
+                                    const SizedBox(height: 12),
+                                    TextField(
+                                      controller: _notesController,
+                                      minLines: 3,
+                                      maxLines: 5,
+                                      scrollPadding:
+                                          const EdgeInsets.only(bottom: 24),
                                       style: TextStyle(
-                                        color: secondaryText,
-                                        fontWeight: FontWeight.w600,
+                                        color: titleColor,
+                                        fontSize: 14,
+                                      ),
+                                      decoration: InputDecoration(
+                                        hintText: _isLogMode
+                                            ? 'Optional notes about this log'
+                                            : 'Optional details',
+                                        filled: true,
+                                        fillColor: dropdownFillColor,
+                                        border: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                          borderSide: BorderSide(
+                                            color: dividerColor,
+                                          ),
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                          borderSide: BorderSide(
+                                            color: dividerColor,
+                                          ),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                          borderSide: BorderSide(
+                                            color: _accentColor.withValues(
+                                                alpha: 0.5),
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -922,12 +869,158 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                               ),
                             ],
                           ),
+                          if (!_isLogMode) ...[
+                            const SizedBox(height: 12),
+                            _Card(
+                              children: [
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.event_rounded,
+                                        color: secondaryText,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          'Fixed Event',
+                                          style: TextStyle(
+                                            color: titleColor,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                      Switch(
+                                        value: _isEvent,
+                                        onChanged: (value) =>
+                                            setState(() => _isEvent = value),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
+                                  child: Divider(
+                                    height: 1,
+                                    color: dividerColor,
+                                  ),
+                                ),
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.category_outlined,
+                                        color: secondaryText,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'Block Type',
+                                        style: TextStyle(
+                                          color: titleColor,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: dropdownFillColor,
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                          border: Border.all(
+                                            color: dividerColor,
+                                          ),
+                                        ),
+                                        child: DropdownButtonHideUnderline(
+                                          child: DropdownButton<BlockType>(
+                                            value: _selectedType,
+                                            dropdownColor: cardColor,
+                                            iconEnabledColor: secondaryText,
+                                            style: TextStyle(
+                                              color: titleColor,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                            onChanged: (value) {
+                                              if (value != null) {
+                                                setState(
+                                                  () => _selectedType = value,
+                                                );
+                                              }
+                                            },
+                                            items: BlockType.values
+                                                .map(
+                                                  (type) => DropdownMenuItem<
+                                                      BlockType>(
+                                                    value: type,
+                                                    child: Text(
+                                                      _typeLabel(type),
+                                                    ),
+                                                  ),
+                                                )
+                                                .toList(growable: false),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
+                                  child: Divider(
+                                    height: 1,
+                                    color: dividerColor,
+                                  ),
+                                ),
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.radio_button_unchecked_rounded,
+                                        color: secondaryText,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'Status',
+                                        style: TextStyle(
+                                          color: titleColor,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      Text(
+                                        _statusLabel(widget.block.status),
+                                        style: TextStyle(
+                                          color: secondaryText,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                           const SizedBox(height: 18),
                           TextButton(
                             onPressed: widget.onDelete,
-                            child: const Text(
-                              'Delete Block',
-                              style: TextStyle(
+                            child: Text(
+                              deleteLabel,
+                              style: const TextStyle(
                                 color: _accentColor,
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
@@ -953,7 +1046,8 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                               ),
                               onPressed: _isSaving ? null : _save,
                               child: Text(
-                                  _isSaving ? 'Saving...' : 'Save Changes'),
+                                _isSaving ? 'Saving...' : saveLabel,
+                              ),
                             ),
                           ),
                         ],

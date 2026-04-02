@@ -309,16 +309,17 @@ class _TimelineOccupiedRange {
 _TimelineOccupiedRange _resolveTimelineOccupiedRange(Block block) {
   final blockDate = AppDateUtils.parseDate(block.date) ?? DateTime.now();
   final dayStart = _dateAtStartOfDay(blockDate);
-  final plannedStartMinutes = _minutesFromTimeValue(block.plannedStartTime) ?? 0;
+  final plannedStartMinutes =
+      _minutesFromTimeValue(block.plannedStartTime) ?? 0;
   final plannedStart = dayStart.add(Duration(minutes: plannedStartMinutes));
   final plannedEnd = plannedStart.add(
     Duration(minutes: _resolvedBlockDurationMinutes(block)),
   );
 
-  final actualStart =
-      _dateTimeFromTimeValue(block.actualStartTime, blockDate);
-  final resolvedStart =
-      _normalizeTimeValue(block.actualStartTime) == null ? plannedStart : actualStart;
+  final actualStart = _dateTimeFromTimeValue(block.actualStartTime, blockDate);
+  final resolvedStart = _normalizeTimeValue(block.actualStartTime) == null
+      ? plannedStart
+      : actualStart;
 
   final actualEnd = _normalizeTimeValue(block.actualEndTime) == null
       ? plannedEnd
@@ -474,6 +475,23 @@ class _TimelineViewState extends State<TimelineView> {
         selectedDate.day == _currentTime.day;
   }
 
+  bool get _isViewingPast {
+    final selectedDate = _selectedDate;
+    if (selectedDate == null) return false;
+
+    final currentDay = DateTime(
+      _currentTime.year,
+      _currentTime.month,
+      _currentTime.day,
+    );
+    final selectedDay = DateTime(
+      selectedDate.year,
+      selectedDate.month,
+      selectedDate.day,
+    );
+    return selectedDay.isBefore(currentDay);
+  }
+
   DateTime? get _selectedDate => AppDateUtils.parseDate(widget.dateKey);
 
   DateTime? get _previousDate =>
@@ -508,9 +526,8 @@ class _TimelineViewState extends State<TimelineView> {
     final occupiedRange = _resolveTimelineOccupiedRange(block);
     final dayStart = _dateAtStartOfDay(displayDate);
     final dayEnd = dayStart.add(const Duration(days: 1));
-    final visibleStart = occupiedRange.start.isBefore(dayStart)
-        ? dayStart
-        : occupiedRange.start;
+    final visibleStart =
+        occupiedRange.start.isBefore(dayStart) ? dayStart : occupiedRange.start;
     final visibleEnd =
         occupiedRange.end.isAfter(dayEnd) ? dayEnd : occupiedRange.end;
     if (!visibleEnd.isAfter(visibleStart)) return null;
@@ -690,6 +707,17 @@ class _TimelineViewState extends State<TimelineView> {
 
   Future<void> _saveNewBlock(BlockEditorUpdate update, String blockId) async {
     final app = context.read<AppProvider>();
+    if (update.saveAsLog) {
+      await app.saveManualLogBlock(
+        date: update.dateKey,
+        title: update.title,
+        startTime: update.plannedStartTime,
+        endTime: update.plannedEndTime,
+        notes: update.description,
+        blockId: blockId,
+      );
+      return;
+    }
     final existingPlan = app.getDayPlan(update.dateKey);
     final existingBlocks = List<Block>.from(existingPlan?.blocks ?? const []);
     final newBlock = Block(
@@ -763,6 +791,7 @@ class _TimelineViewState extends State<TimelineView> {
       backgroundColor: Colors.transparent,
       builder: (_) => BlockEditorSheet(
         block: draftBlock,
+        mode: BlockEditorMode.log,
         onSave: (update) => _saveNewBlock(update, draftBlock.id),
         onDelete: () => Navigator.of(context).pop(),
       ),
@@ -775,14 +804,15 @@ class _TimelineViewState extends State<TimelineView> {
     required int dayStartMinutes,
   }) {
     final logStartMinutes = math.max(gapStartMinutes, dayStartMinutes);
-    final logEndMinutes = math.min(gapEndMinutes, _currentMinutesOfDay);
+    final logEndMinutes = _isViewingToday
+        ? math.min(gapEndMinutes, _currentMinutesOfDay)
+        : gapEndMinutes;
     if (logEndMinutes <= logStartMinutes) return Future.value();
 
     final retroDraft = _buildDraftBlock(
       startMinutes: logStartMinutes,
       endMinutes: logEndMinutes,
-      title: 'Retroactive Log',
-      description: 'Retroactive log entry',
+      title: 'New Log',
     );
 
     return _showNewBlockEditor(retroDraft);
@@ -794,21 +824,25 @@ class _TimelineViewState extends State<TimelineView> {
     required int dayStartMinutes,
   }) {
     final logStartMinutes = math.max(gapStartMinutes, dayStartMinutes);
-    final logEndMinutes = math.min(gapEndMinutes, _currentMinutesOfDay);
+    final logEndMinutes = _isViewingToday
+        ? math.min(gapEndMinutes, _currentMinutesOfDay)
+        : gapEndMinutes;
     final futureStartMinutes = math.max(
         gapStartMinutes, _roundUpToNextFiveMinutes(_currentMinutesOfDay));
+    final canAddTask = widget.onAddTask != null &&
+        !_isViewingPast &&
+        (!_isViewingToday || futureStartMinutes < gapEndMinutes);
+    final futureMinutes = _isViewingToday
+        ? math.max(0, gapEndMinutes - futureStartMinutes)
+        : (_isViewingFuture ? math.max(0, gapEndMinutes - gapStartMinutes) : 0);
 
     return _GapActionState(
-      canAddLog: _isViewingToday && logEndMinutes > logStartMinutes,
-      canAddTask: widget.onAddTask != null &&
-          (!_isViewingToday || futureStartMinutes < gapEndMinutes),
+      canAddLog: !_isViewingFuture && logEndMinutes > logStartMinutes,
+      canAddTask: canAddTask,
       taskStartMinutes: _isViewingToday ? futureStartMinutes : gapStartMinutes,
       logStartMinutes: logStartMinutes,
       logEndMinutes: logEndMinutes,
-      futureMinutes: math.max(
-          0,
-          gapEndMinutes -
-              (_isViewingToday ? futureStartMinutes : gapStartMinutes)),
+      futureMinutes: futureMinutes,
     );
   }
 
@@ -906,6 +940,16 @@ class _TimelineViewState extends State<TimelineView> {
 
   // -- Gap tap ----------------------------------------------
   void _onGapTap(_TimelineItem gap) {
+    if (_isViewingPast) {
+      unawaited(
+        _openAddLogEditor(
+          gapStartMinutes: gap.gapStartMinutes!,
+          gapEndMinutes: gap.gapEndMinutes!,
+          dayStartMinutes: gap.gapStartMinutes!,
+        ),
+      );
+      return;
+    }
     final startH = gap.gapStartMinutes! ~/ 60;
     final startM = gap.gapStartMinutes! % 60;
     final endH = gap.gapEndMinutes! ~/ 60;
@@ -1246,6 +1290,9 @@ class _TimelineViewState extends State<TimelineView> {
       backgroundColor: Colors.transparent,
       builder: (_) => BlockEditorSheet(
         block: block,
+        mode: block.isAdHocTrack == true
+            ? BlockEditorMode.log
+            : BlockEditorMode.planned,
         onSave: (update) => _saveBlockEdit(block, update),
         onDelete: () {
           Navigator.of(context).pop();
@@ -1291,6 +1338,18 @@ class _TimelineViewState extends State<TimelineView> {
 
   Future<void> _saveBlockEdit(Block block, BlockEditorUpdate update) async {
     final app = context.read<AppProvider>();
+    if (update.saveAsLog) {
+      await app.saveManualLogBlock(
+        date: update.dateKey,
+        title: update.title.isNotEmpty ? update.title : block.title,
+        startTime: update.plannedStartTime,
+        endTime: update.plannedEndTime,
+        notes: update.description,
+        blockId: block.id,
+        colorHex: block.colorHex,
+      );
+      return;
+    }
     final sourceDateKey = block.date.isNotEmpty ? block.date : widget.dateKey;
     final sourcePlan = app.getDayPlan(sourceDateKey);
     if (sourcePlan == null) return;
@@ -2719,13 +2778,14 @@ class _BlockCard extends StatelessWidget {
         : onSurface.withValues(alpha: 0.2);
     final startLabel = slice.startLabel;
     final rangeLabel = slice.rangeLabel;
+    final isAdHocBlock = block.isAdHocTrack == true;
     final actualStartTime =
         _normalizeTimeValue(block.actualStartTime) ?? block.plannedStartTime;
     final actualEndTime = _normalizeTimeValue(block.actualEndTime);
     final hasDifferentActualRange = actualEndTime != null &&
         (actualStartTime != block.plannedStartTime ||
             actualEndTime != block.plannedEndTime);
-    final showDualTrack = isDone && hasDifferentActualRange;
+    final showDualTrack = !isAdHocBlock && isDone && hasDifferentActualRange;
     final isCompactCard = occupiedDuration <= 90 && !showDualTrack;
     final actualDuration = actualEndTime == null ||
             slice.relation != _TimelineBlockRelation.sameDay
@@ -2757,6 +2817,8 @@ class _BlockCard extends StatelessWidget {
         'Planned: $rangeLabel • ${_formatDurationMetaLabel(plannedDuration)}';
     final actualDurationLabelMinutes =
         block.actualDurationMinutes ?? actualDuration;
+    final singleRangeDurationMinutes =
+        isAdHocBlock ? actualDurationLabelMinutes : plannedDuration;
     final actualMetaLabel = actualEndTime == null
         ? null
         : 'Actual: ${_to12h(actualStartTime)} - ${_to12h(actualEndTime)} • ${_formatDurationMetaLabel(actualDurationLabelMinutes)}';
@@ -2844,7 +2906,7 @@ class _BlockCard extends StatelessWidget {
                             maxLines: isCompactCard ? 1 : 2,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          if (block.isAdHocTrack == true) ...[
+                          if (isAdHocBlock) ...[
                             const SizedBox(height: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -2907,7 +2969,7 @@ class _BlockCard extends StatelessWidget {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    '$rangeLabel • ${_formatDurationMetaLabel(plannedDuration)}',
+                                    '$rangeLabel • ${_formatDurationMetaLabel(singleRangeDurationMinutes)}',
                                     style: TextStyle(
                                       fontSize: isCompactCard ? 11 : 13,
                                       fontWeight: FontWeight.w600,

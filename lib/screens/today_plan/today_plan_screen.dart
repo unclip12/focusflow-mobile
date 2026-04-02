@@ -459,6 +459,8 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
   String get _dateKey => AppDateUtils.formatDate(_selectedDate);
   bool get _isToday =>
       AppDateUtils.isSameDay(_selectedDate, _calendarDate(DateTime.now()));
+  bool get _isPastDate =>
+      _calendarDate(_selectedDate).isBefore(_calendarDate(DateTime.now()));
 
   Future<void> _refreshSelectedDateBlocks() async {
     final app = context.read<AppProvider>();
@@ -658,22 +660,25 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
 
   Block _buildDraftBlock({
     int? startMinutes,
+    int? endMinutes,
     bool isEvent = false,
     BlockType type = BlockType.other,
     String? title,
+    String? description,
   }) {
     final initialStart = startMinutes ?? _defaultStartMinutes();
     const defaultDurationMinutes = 60;
+    final initialEnd = endMinutes ?? (initialStart + defaultDurationMinutes);
     return Block(
       id: 'draft_${DateTime.now().microsecondsSinceEpoch}',
       index: 0,
       date: _dateKey,
       plannedStartTime: _formatMinutesOfDay(initialStart),
-      plannedEndTime:
-          _formatMinutesOfDay(initialStart + defaultDurationMinutes),
+      plannedEndTime: _formatMinutesOfDay(initialEnd),
       type: type,
       title: title ?? (isEvent ? 'New Event' : 'New Task'),
-      plannedDurationMinutes: defaultDurationMinutes,
+      description: description,
+      plannedDurationMinutes: initialEnd - initialStart,
       isEvent: isEvent,
       status: BlockStatus.notStarted,
     );
@@ -681,6 +686,17 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
 
   Future<void> _saveNewBlock(BlockEditorUpdate update, String blockId) async {
     final app = context.read<AppProvider>();
+    if (update.saveAsLog) {
+      await app.saveManualLogBlock(
+        date: update.dateKey,
+        title: update.title,
+        startTime: update.plannedStartTime,
+        endTime: update.plannedEndTime,
+        notes: update.description,
+        blockId: blockId,
+      );
+      return;
+    }
     final newBlock = Block(
       id: blockId,
       index: 0,
@@ -709,11 +725,16 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
 
   Future<void> _showNewBlockEditor({
     int? startMinutes,
+    int? endMinutes,
     bool isEvent = false,
+    BlockEditorMode mode = BlockEditorMode.planned,
   }) async {
     final draftBlock = _buildDraftBlock(
       startMinutes: startMinutes,
+      endMinutes: endMinutes,
       isEvent: isEvent,
+      title: mode == BlockEditorMode.log ? 'New Log' : null,
+      description: mode == BlockEditorMode.log ? '' : null,
     );
     await showModalBottomSheet<void>(
       context: context,
@@ -722,6 +743,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
       backgroundColor: Colors.transparent,
       builder: (_) => BlockEditorSheet(
         block: draftBlock,
+        mode: mode,
         onSave: (update) => _saveNewBlock(update, draftBlock.id),
         onDelete: () => Navigator.of(context).pop(),
       ),
@@ -735,6 +757,17 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     return _showNewBlockEditor(
       startMinutes: startMinutes,
       isEvent: isEvent,
+    );
+  }
+
+  Future<void> _openAddLogSheet({
+    int? startMinutes,
+    int? endMinutes,
+  }) {
+    return _showNewBlockEditor(
+      startMinutes: startMinutes,
+      endMinutes: endMinutes,
+      mode: BlockEditorMode.log,
     );
   }
 
@@ -847,7 +880,11 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                       onStartDay: _openDaySession,
                       onStudySession: _openStudySession,
                       onTrackNow: _openTrackNow,
-                      onAddTask: _openAddTaskSheet,
+                      onQuickAdd: _isPastDate
+                          ? ({int? startMinutes, bool isEvent = false}) =>
+                              _openAddLogSheet(startMinutes: startMinutes)
+                          : _openAddTaskSheet,
+                      quickAddLabel: _isPastDate ? 'Add Log' : 'Add Task',
                       onSelectDate: (selected) {
                         unawaited(_openTimelineDate(selected));
                       },
@@ -892,7 +929,8 @@ class _TodayTimelineTab extends StatelessWidget {
   final VoidCallback onStartDay;
   final VoidCallback onStudySession;
   final VoidCallback onTrackNow;
-  final TimelineAddTaskCallback onAddTask;
+  final TimelineAddTaskCallback onQuickAdd;
+  final String quickAddLabel;
   final ValueChanged<DateTime> onSelectDate;
   final String dateKey;
   final List<Block> blocks;
@@ -912,7 +950,8 @@ class _TodayTimelineTab extends StatelessWidget {
     required this.onStartDay,
     required this.onStudySession,
     required this.onTrackNow,
-    required this.onAddTask,
+    required this.onQuickAdd,
+    required this.quickAddLabel,
     required this.onSelectDate,
     required this.dateKey,
     required this.blocks,
@@ -938,7 +977,8 @@ class _TodayTimelineTab extends StatelessWidget {
               onStartDay: onStartDay,
               onStudySession: onStudySession,
               onTrackNow: onTrackNow,
-              onAddTask: () => onAddTask(),
+              onQuickAdd: () => onQuickAdd(),
+              quickAddLabel: quickAddLabel,
               onSelectDate: onSelectDate,
             ),
           ),
@@ -950,7 +990,7 @@ class _TodayTimelineTab extends StatelessWidget {
           dateKey: dateKey,
           blocks: blocks,
           reminders: reminders,
-          onAddTask: onAddTask,
+          onAddTask: onQuickAdd,
           onOpenDate: onSelectDate,
           onReminderTap: onReminderTap,
           onReminderToggle: onReminderToggle,
@@ -1224,7 +1264,8 @@ class _CompactHeader extends StatelessWidget {
   final VoidCallback onStartDay;
   final VoidCallback onStudySession;
   final VoidCallback onTrackNow;
-  final VoidCallback onAddTask;
+  final VoidCallback onQuickAdd;
+  final String quickAddLabel;
   final ValueChanged<DateTime> onSelectDate;
 
   const _CompactHeader({
@@ -1238,7 +1279,8 @@ class _CompactHeader extends StatelessWidget {
     required this.onStartDay,
     required this.onStudySession,
     required this.onTrackNow,
-    required this.onAddTask,
+    required this.onQuickAdd,
+    required this.quickAddLabel,
     required this.onSelectDate,
   });
 
@@ -1377,8 +1419,8 @@ class _CompactHeader extends StatelessWidget {
                 Expanded(
                   child: _QuickActionCard(
                     emoji: '➕',
-                    label: 'Add Task',
-                    onTap: onAddTask,
+                    label: quickAddLabel,
+                    onTap: onQuickAdd,
                   ),
                 ),
               ],

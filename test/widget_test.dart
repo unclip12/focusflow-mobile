@@ -390,8 +390,7 @@ void main() {
     expect(restoredVideoRows.single['watched'], 1);
     expect(restoredVideoRows.single['watched_minutes'], 312);
 
-    final restoredRoutineRows =
-        await DatabaseService.instance.getAllRoutines();
+    final restoredRoutineRows = await DatabaseService.instance.getAllRoutines();
     expect(restoredRoutineRows, hasLength(1));
     final restoredRoutine = Routine.fromJson(restoredRoutineRows.single);
     expect(restoredRoutine.steps.first.emoji, '🪥');
@@ -1092,7 +1091,9 @@ void main() {
 
     expect(find.text('Developing App'), findsOneWidget);
     expect(find.text('Tracked'), findsOneWidget);
-    expect(find.text('6:40 AM - 6:50 AM'), findsOneWidget);
+    expect(find.textContaining('6:40 AM - 6:50 AM'), findsOneWidget);
+    expect(find.textContaining('Planned:'), findsNothing);
+    expect(find.textContaining('Actual:'), findsNothing);
   });
 
   testWidgets('overlapping planned and tracked blocks both render',
@@ -1196,6 +1197,66 @@ void main() {
     expect(find.text('Add Log'), findsOneWidget);
     expect(_findRichTextContaining(expectedFutureText), findsOneWidget);
     expect(find.text('Add Task'), findsOneWidget);
+  });
+
+  testWidgets('past full-day gap shows log prompt without task CTA',
+      (tester) async {
+    final now = DateTime.now();
+    final yesterday = DateTime(now.year, now.month, now.day)
+        .subtract(const Duration(days: 1));
+    final dateKey = AppDateUtils.formatDate(yesterday);
+
+    final app = AppProvider();
+    app.dayPlans = [
+      _buildDayPlan(
+        date: dateKey,
+        blocks: const [],
+      ),
+    ];
+
+    await tester.pumpWidget(
+      _TimelineHarness(
+        app: app,
+        initialDate: yesterday,
+        onAddTask: ({int? startMinutes, bool isEvent = false}) async {},
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('What did you do here?'), findsOneWidget);
+    expect(find.text('Add Log'), findsOneWidget);
+    expect(find.text('Add Task'), findsNothing);
+    expect(_findRichTextContaining('wisely...'), findsNothing);
+  });
+
+  testWidgets('future full-day gap shows planning CTA without log prompt',
+      (tester) async {
+    final now = DateTime.now();
+    final tomorrow =
+        DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+    final dateKey = AppDateUtils.formatDate(tomorrow);
+
+    final app = AppProvider();
+    app.dayPlans = [
+      _buildDayPlan(
+        date: dateKey,
+        blocks: const [],
+      ),
+    ];
+
+    await tester.pumpWidget(
+      _TimelineHarness(
+        app: app,
+        initialDate: tomorrow,
+        onAddTask: ({int? startMinutes, bool isEvent = false}) async {},
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('What did you do here?'), findsNothing);
+    expect(find.text('Add Log'), findsNothing);
+    expect(find.text('Add Task'), findsOneWidget);
+    expect(_findRichTextContaining('wisely...'), findsOneWidget);
   });
 
   testWidgets('gap crossing now splits past log label from future task CTA',
@@ -1578,8 +1639,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Planned: 12:00 PM - 1:00 PM'), findsOneWidget);
-    expect(find.text('Actual: 11:30 AM - 12:50 PM'), findsOneWidget);
+    expect(find.textContaining('Planned: 12:00 PM - 1:00 PM'), findsOneWidget);
+    expect(find.textContaining('Actual: 11:30 AM - 12:50 PM'), findsOneWidget);
   });
 
   testWidgets('routine run progress is persisted to shared preferences',
@@ -1701,7 +1762,9 @@ void main() {
     expect(find.text('01:10'), findsWidgets);
     expect(find.text('00:50'), findsOneWidget);
     expect(
-      tester.widget<CheckboxListTile>(find.byType(CheckboxListTile).first).value,
+      tester
+          .widget<CheckboxListTile>(find.byType(CheckboxListTile).first)
+          .value,
       isTrue,
     );
 
@@ -1721,7 +1784,9 @@ void main() {
     expect(find.text('01:10'), findsWidgets);
     expect(find.text('00:50'), findsOneWidget);
     expect(
-      tester.widget<CheckboxListTile>(find.byType(CheckboxListTile).first).value,
+      tester
+          .widget<CheckboxListTile>(find.byType(CheckboxListTile).first)
+          .value,
       isTrue,
     );
   });
@@ -1800,7 +1865,9 @@ void main() {
     expect(find.text('Brush Teeth'), findsOneWidget);
     expect(find.text('00:00'), findsWidgets);
     expect(
-      tester.widget<CheckboxListTile>(find.byType(CheckboxListTile).first).value,
+      tester
+          .widget<CheckboxListTile>(find.byType(CheckboxListTile).first)
+          .value,
       isFalse,
     );
   });
@@ -2049,8 +2116,7 @@ Finder _findRichTextContaining(String text) {
 
 Finder _findTextFieldWithLabel(String label) {
   return find.byWidgetPredicate(
-    (widget) =>
-        widget is TextField && widget.decoration?.labelText == label,
+    (widget) => widget is TextField && widget.decoration?.labelText == label,
   );
 }
 
