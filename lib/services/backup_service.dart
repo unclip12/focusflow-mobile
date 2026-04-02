@@ -41,10 +41,35 @@ class _BackupAttachmentAsset {
 }
 
 class BackupService {
+  static const _kActiveRoutineRun = 'active_routine_run';
+  static const _kActiveStudySession = 'active_study_session';
+  static const _kBackupAuto = 'backup_auto';
+  static const _kBackupFrequency = 'backup_frequency';
+  static const _kBackupHistory = 'backup_history';
+  static const _kFaSeededKey = 'fa_2025_seeded_v3';
+  static const _kFaViewMode = 'faViewMode';
+  static const _kGeneralTaskNames = 'general_task_names';
   static const _kLastBackupPath = 'last_backup_path';
   static const _kLastBackupTime = 'last_backup_time';
+  static const _kLastActiveTab = 'lastActiveTab';
   static const _manifestFileName = 'manifest.json';
   static const _attachmentsRoot = 'attachments';
+  static const Set<String> _durablePreferenceKeys = {
+    _kFaViewMode,
+    _kGeneralTaskNames,
+    _kFaSeededKey,
+    _kBackupAuto,
+    _kBackupFrequency,
+  };
+  static const Set<String> _appOwnedPreferenceKeys = {
+    ..._durablePreferenceKeys,
+    _kActiveRoutineRun,
+    _kActiveStudySession,
+    _kLastActiveTab,
+    _kBackupHistory,
+    _kLastBackupPath,
+    _kLastBackupTime,
+  };
 
   static const int backupSchemaVersion = 2;
   static const String appVersion = '2.0.0';
@@ -57,14 +82,14 @@ class BackupService {
 
   static Future<DateTime?> lastBackupTime() async {
     final prefs = await SharedPreferences.getInstance();
-    final ts = prefs.getString(_kLastBackupTime);
+    final ts = await readStringPreferenceSafely(prefs, _kLastBackupTime);
     if (ts == null) return null;
     return DateTime.tryParse(ts);
   }
 
   static Future<String?> getLastBackupPath() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_kLastBackupPath);
+    return readStringPreferenceSafely(prefs, _kLastBackupPath);
   }
 
   static Future<Map<String, dynamic>> buildBackupData() async {
@@ -92,15 +117,52 @@ class BackupService {
   static Future<Map<String, dynamic>> _collectSharedPreferences() async {
     final prefs = await SharedPreferences.getInstance();
     final values = <String, dynamic>{};
-    for (final key in prefs.getKeys()) {
-      final value = prefs.get(key);
+    for (final key in _durablePreferenceKeys) {
+      final value = _readPreferenceValue(prefs, key);
+      if (value == null) continue;
       if (value is List<String>) {
         values[key] = {'_type': 'StringList', '_value': value};
-      } else {
+      } else if (value is bool ||
+          value is int ||
+          value is double ||
+          value is String) {
         values[key] = value;
       }
     }
     return values;
+  }
+
+  static Object? _readPreferenceValue(SharedPreferences prefs, String key) {
+    try {
+      return prefs.get(key);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<String?> readStringPreferenceSafely(
+    SharedPreferences prefs,
+    String key,
+  ) async {
+    final value = _readPreferenceValue(prefs, key);
+    if (value == null) return null;
+    if (value is String) return value;
+    await prefs.remove(key);
+    return null;
+  }
+
+  static Future<List<String>?> readStringListPreferenceSafely(
+    SharedPreferences prefs,
+    String key,
+  ) async {
+    final value = _readPreferenceValue(prefs, key);
+    if (value == null) return null;
+    if (value is List<String>) return value;
+    if (value is List && value.every((item) => item is String)) {
+      return value.cast<String>();
+    }
+    await prefs.remove(key);
+    return null;
   }
 
   static Future<List<_BackupAttachmentAsset>> _collectAttachmentAssets(
@@ -396,11 +458,15 @@ class BackupService {
     Map<String, dynamic> data,
   ) async {
     final spMap = data['shared_preferences'] as Map<String, dynamic>?;
+    final prefs = await SharedPreferences.getInstance();
+    for (final key in _appOwnedPreferenceKeys) {
+      await prefs.remove(key);
+    }
     if (spMap == null) return;
 
-    final prefs = await SharedPreferences.getInstance();
     for (final entry in spMap.entries) {
       final key = entry.key;
+      if (!_durablePreferenceKeys.contains(key)) continue;
       final value = entry.value;
       try {
         if (value is bool) {
@@ -414,11 +480,13 @@ class BackupService {
         } else if (value is Map &&
             value['_type'] == 'StringList' &&
             value['_value'] is List) {
+          final rawList = value['_value'] as List;
+          if (rawList.any((item) => item is! String)) continue;
           await prefs.setStringList(
             key,
-            (value['_value'] as List).cast<String>(),
+            rawList.cast<String>(),
           );
-        } else if (value is List) {
+        } else if (value is List && value.every((item) => item is String)) {
           await prefs.setStringList(key, value.cast<String>());
         }
       } catch (_) {

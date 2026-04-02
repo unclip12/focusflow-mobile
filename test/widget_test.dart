@@ -213,6 +213,50 @@ void main() {
     expect(restoredProbeRows.single['value'], 'ok');
   });
 
+  test('restore clears transient prefs and skips malformed stable prefs',
+      () async {
+    SharedPreferences.setMockInitialValues({
+      'general_task_names': <String>['stale'],
+      'active_routine_run': '{"stale":true}',
+      'lastActiveTab': 'revision',
+      'backup_history': <String>['old-entry'],
+    });
+
+    final app = AppProvider();
+    final backupData = <String, dynamic>{
+      'backup_schema_version': BackupService.backupSchemaVersion,
+      'app_version': BackupService.appVersion,
+      'exported_at': DateTime.now().toIso8601String(),
+      'db_version': DatabaseService.dbVersion,
+      'tables': <String, dynamic>{},
+      'shared_preferences': <String, dynamic>{
+        'faViewMode': 'timeline',
+        'general_task_names': {
+          '_type': 'StringList',
+          '_value': <dynamic>['Task A', 7],
+        },
+        'fa_2025_seeded_v3': true,
+        'backup_auto': true,
+        'backup_frequency': 'Weekly',
+        'active_routine_run': '{"should":"be-cleared"}',
+        'lastActiveTab': 'todays-plan',
+        'backup_history': <String>['should-not-restore'],
+      },
+    };
+
+    await app.restoreFromBackup(backupData);
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('faViewMode'), 'timeline');
+    expect(prefs.getBool('fa_2025_seeded_v3'), isTrue);
+    expect(prefs.getBool('backup_auto'), isTrue);
+    expect(prefs.getString('backup_frequency'), 'Weekly');
+    expect(prefs.getStringList('general_task_names'), isNull);
+    expect(prefs.get('active_routine_run'), isNull);
+    expect(prefs.get('lastActiveTab'), isNull);
+    expect(prefs.get('backup_history'), isNull);
+  });
+
   test('legacy note json upgrades attachment paths into structured attachments',
       () {
     final note = LibraryNote.fromJson({
@@ -461,6 +505,33 @@ void main() {
     expect(BackupService.validateBackupData(decodedBackup), isNull);
     final tables = Map<String, dynamic>.from(decodedBackup['tables'] as Map);
     expect(tables[DatabaseService.tVideoLectures], isA<List>());
+  });
+
+  test('startup guards recover from corrupted startup preferences', () async {
+    SharedPreferences.setMockInitialValues({
+      'general_task_names': Uint8List.fromList(<int>[1, 2, 3]),
+      'faViewMode': Uint8List.fromList(<int>[4, 5, 6]),
+      'active_routine_run': Uint8List.fromList(<int>[7, 8, 9]),
+      'active_study_session': Uint8List.fromList(<int>[10, 11, 12]),
+      'lastActiveTab': Uint8List.fromList(<int>[13, 14, 15]),
+    });
+
+    final app = AppProvider();
+    await app.loadAll();
+
+    expect(app.faViewMode, 'cards');
+    expect(app.hasActiveStudySession, isFalse);
+
+    final prefs = await SharedPreferences.getInstance();
+    final lastTab =
+        await BackupService.readStringPreferenceSafely(prefs, 'lastActiveTab') ??
+            'dashboard';
+    expect(prefs.get('general_task_names'), isNull);
+    expect(prefs.get('faViewMode'), isNull);
+    expect(prefs.get('active_routine_run'), isNull);
+    expect(prefs.get('active_study_session'), isNull);
+    expect(prefs.get('lastActiveTab'), isNull);
+    expect(lastTab, 'dashboard');
   });
 
   testWidgets('settings reminder editor saves preset minute rules',

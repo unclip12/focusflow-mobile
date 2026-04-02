@@ -9,6 +9,7 @@ import 'package:focusflow_mobile/services/uworld_seed.dart';
 import 'package:focusflow_mobile/services/sketchy_micro_seed.dart';
 import 'package:focusflow_mobile/services/sketchy_pharm_seed.dart';
 import 'package:focusflow_mobile/services/pathoma_seed.dart';
+import 'package:focusflow_mobile/services/backup_service.dart';
 import 'package:focusflow_mobile/services/notification_service.dart';
 
 /// SplashScreen — shown on every launch.
@@ -89,7 +90,12 @@ class _SplashScreenState extends State<SplashScreen>
           return;
         }
         final prefs = await SharedPreferences.getInstance();
-        final lastTab = prefs.getString('lastActiveTab') ?? 'dashboard';
+        final lastTab =
+            await BackupService.readStringPreferenceSafely(
+              prefs,
+              'lastActiveTab',
+            ) ??
+            'dashboard';
         if (!mounted) return;
         context.go('/$lastTab');
       }

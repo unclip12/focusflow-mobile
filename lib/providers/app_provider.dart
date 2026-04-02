@@ -358,11 +358,17 @@ class AppProvider extends ChangeNotifier {
     streakData = sdJson != null ? StreakData.fromJson(sdJson) : StreakData();
 
     final prefs = await SharedPreferences.getInstance();
-    final savedNames = prefs.getStringList('general_task_names') ?? [];
+    final savedNames = await BackupService.readStringListPreferenceSafely(
+          prefs,
+          'general_task_names',
+        ) ??
+        [];
     _savedGeneralTaskNames = savedNames;
-    faViewMode = prefs.getString('faViewMode') ?? 'cards';
-    _restoreActiveRoutineRun(prefs);
-    _restoreActiveStudySession(prefs);
+    faViewMode =
+        await BackupService.readStringPreferenceSafely(prefs, 'faViewMode') ??
+            'cards';
+    await _restoreActiveRoutineRun(prefs);
+    await _restoreActiveStudySession(prefs);
     await _syncActiveStudySessionBackgroundTimer();
     await _refreshRoutineReminderState();
     await _refreshPlannedTaskReminderState();
@@ -455,8 +461,11 @@ class AppProvider extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  void _restoreActiveRoutineRun(SharedPreferences prefs) {
-    final rawRun = prefs.getString(_activeRoutineRunPrefsKey);
+  Future<void> _restoreActiveRoutineRun(SharedPreferences prefs) async {
+    final rawRun = await BackupService.readStringPreferenceSafely(
+      prefs,
+      _activeRoutineRunPrefsKey,
+    );
     if (rawRun == null || rawRun.isEmpty) {
       _activeRoutineRun = null;
       return;
@@ -478,6 +487,7 @@ class AppProvider extends ChangeNotifier {
       }
     } catch (_) {
       // Ignore malformed persisted routine state and start clean.
+      await prefs.remove(_activeRoutineRunPrefsKey);
     }
 
     _activeRoutineRun = null;
@@ -493,8 +503,11 @@ class AppProvider extends ChangeNotifier {
     await prefs.setString(_activeRoutineRunPrefsKey, jsonEncode(run.toJson()));
   }
 
-  void _restoreActiveStudySession(SharedPreferences prefs) {
-    final rawSession = prefs.getString(_activeStudySessionPrefsKey);
+  Future<void> _restoreActiveStudySession(SharedPreferences prefs) async {
+    final rawSession = await BackupService.readStringPreferenceSafely(
+      prefs,
+      _activeStudySessionPrefsKey,
+    );
     if (rawSession == null || rawSession.isEmpty) {
       _activeStudySession = null;
       return;
@@ -513,6 +526,7 @@ class AppProvider extends ChangeNotifier {
       }
     } catch (_) {
       // Ignore malformed persisted study session state and start clean.
+      await prefs.remove(_activeStudySessionPrefsKey);
     }
 
     _activeStudySession = null;
