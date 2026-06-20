@@ -49,7 +49,6 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     with SingleTickerProviderStateMixin {
   static const int _timelineTabIndex = 0;
   static const int _routinesTabIndex = 1;
-  static const int _moreTabIndex = 2;
   static const int _moreReminderSubTabIndex = 0;
 
   late DateTime _selectedDate;
@@ -260,7 +259,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
 
       _tabCtrl.animateTo(
         opensReminderTab
-            ? _moreTabIndex
+            ? _timelineTabIndex
             : (request.opensRoutinesTab
                 ? _routinesTabIndex
                 : _timelineTabIndex),
@@ -313,113 +312,96 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     }
   }
 
-  bool _opensStudyLaunch(Block block) {
-    final title = block.title.toLowerCase();
-    return title.contains('study') ||
-        title.contains('revision') ||
-        title.contains('anki') ||
-        title.contains('qbank') ||
-        title.contains('lecture');
+  Future<void> _openBlockLaunch(
+    AppProvider app,
+    DayPlan? plan,
+    Block block,
+  ) async {
+    if (!mounted) return;
+
+    final isRoutineBlock = block.type == BlockType.routine;
+
+    if (isRoutineBlock) {
+      final routineId = block.routineId;
+      if (routineId == null) return;
+      await _openRoutineRun(routineId);
+      return;
+    }
+
+    if (block.type == BlockType.studyFlow) {
+      final session = app.getActiveStudySession();
+      if (session != null) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => StudyFlowScreen(
+              dateKey: session.dateKey,
+              session: session,
+            ),
+          ),
+        );
+      }
+      return;
+    }
   }
 
   Future<void> _openRoutineLaunchIfNeeded(
     AppProvider app,
     TodayPlanLaunchRequest request,
   ) async {
-    final routineId = request.routineId;
-    if (routineId == null) return;
+    if (request.routineId == null || !mounted) return;
+    await _openRoutineRun(request.routineId!);
+  }
 
+  Future<void> _openRoutineRun(String routineId) async {
+    final app = context.read<AppProvider>();
     final activeRun = app.getActiveRoutineRunForRoutine(routineId, _dateKey);
-    if (activeRun == null) return;
-
-    final routine = app.getRoutineById(routineId);
-    if (routine == null) return;
-
-    await RoutineRunnerScreen.open(
-      context,
-      routine: routine,
-      dateKey: _dateKey,
-      sourceBlockId: activeRun.sourceBlockId,
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RoutineRunnerScreen(
+          routineId: routineId,
+          dateKey: _dateKey,
+          existingRun: activeRun,
+        ),
+      ),
     );
   }
 
-  Future<void> _openBlockLaunch(
-    AppProvider app,
-    DayPlan? plan,
-    Block block,
-  ) async {
-    final sourceDateKey = block.date.isNotEmpty ? block.date : _dateKey;
+  Future<void> _openAddLogSheet({int? startMinutes}) async {
+    final sourceDateKey = _dateKey;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => BlockEditorSheet(
+        mode: BlockEditorMode.addLog,
+        date: sourceDateKey,
+        initialStartMinutes: startMinutes,
+      ),
+    );
+  }
 
-    if (app.isRoutineBlock(block)) {
-      final routine = app.getRoutineForBlock(block);
-      if (routine != null) {
-        await RoutineRunnerScreen.open(
-          context,
-          routine: routine,
-          dateKey: sourceDateKey,
-          sourceBlockId: block.id,
-        );
-      }
-      return;
-    }
-
-    if (_opensStudyLaunch(block)) {
-      final activeSession = app.getActiveStudySession();
-      if (activeSession != null &&
-          activeSession.kind == ActiveStudySessionKind.studyFlow &&
-          activeSession.dateKey == sourceDateKey &&
-          activeSession.blockId == block.id) {
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => StudyFlowScreen(
-              dateKey: sourceDateKey,
-              blockId: block.id,
-              sessionTitle: block.title,
-              autoAdvanceFlow: true,
-            ),
-          ),
-        );
-        return;
-      }
-
-      final plannedSession = PlannedStudySessionPayload.fromBlock(block);
-      if (plannedSession != null && plannedSession.tasks.isNotEmpty) {
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => StudyFlowScreen(
-              dateKey: sourceDateKey,
-              queuedTasks: plannedSession.tasks,
-              blockId: block.id,
-              sessionTitle: block.title,
-              autoAdvanceFlow: true,
-            ),
-          ),
-        );
-        return;
-      }
-
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => StudySessionPicker(
-          dateKey: sourceDateKey,
-          targetBlockId: block.id,
-          boundPlannedStartTime: block.plannedStartTime,
-          boundPlannedEndTime: block.plannedEndTime,
-        ),
-      );
-      return;
-    }
-
-    if (plan != null) {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => SessionScreen(block: block, plan: plan),
-        ),
-      );
-    }
+  Future<void> _openAddTaskSheet({
+    int? startMinutes,
+    bool isEvent = false,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => BlockEditorSheet(
+        mode: BlockEditorMode.addTask,
+        date: _dateKey,
+        initialStartMinutes: startMinutes,
+        isEvent: isEvent,
+      ),
+    );
   }
 
   @override
@@ -427,7 +409,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     super.initState();
     _lastCalendarDate = _calendarDate(DateTime.now());
     _selectedDate = _lastCalendarDate;
-    _tabCtrl = TabController(length: 3, vsync: this);
+    _tabCtrl = TabController(length: 2, vsync: this);
     NotificationService.instance.todayPlanLaunchNotifier
         .addListener(_onTodayPlanLaunchChanged);
     _clockTimer =
@@ -578,261 +560,74 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
       MaterialPageRoute(
         builder: (_) => StudyFlowScreen(
           dateKey: session.dateKey,
-          blockId: session.blockId,
-          sessionTitle: session.title,
-          autoAdvanceFlow: true,
-        ),
-      ),
-    );
-  }
-
-  void _openTrackNow() {
-    final app = context.read<AppProvider>();
-    final activeTrackNow = app.getActiveTrackNow(_dateKey);
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => TrackNowScreen(
-          dateKey: _dateKey,
-          existingActivityId: activeTrackNow?.id,
+          session: session,
         ),
       ),
     );
   }
 
   Future<void> _openDaySession() async {
+    HapticsService.lightImpact();
     final app = context.read<AppProvider>();
+    final activeTrackNow = app.getActiveTrackNow(_dateKey);
+    if (activeTrackNow != null) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => TrackNowScreen(
+            dateKey: _dateKey,
+            trackNow: activeTrackNow,
+          ),
+        ),
+      );
+      return;
+    }
     var session = app.getActiveDaySession(_dateKey);
-
     if (session == null) {
       app.startDaySession(_dateKey);
       await app.rescheduleFromNow(_dateKey);
     }
-
     final firstBlockId = app.getFirstActionableBlockId(_dateKey);
     if (firstBlockId != null) {
       app.setCurrentBlock(_dateKey, firstBlockId);
     }
-
     session = app.getActiveDaySession(_dateKey);
-
-    if (!mounted || session == null) return;
-
-    Navigator.of(context).push(
+    if (session == null || !mounted) return;
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => DaySessionScreen(
           dateKey: _dateKey,
-          session: session!,
+          session: session,
         ),
       ),
     );
   }
 
-  void _openStudySession() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => StudySessionPicker(dateKey: _dateKey),
-    );
-  }
-
-  int _defaultStartMinutes() {
-    final now = DateTime.now();
-    final roundedMinutes = ((now.minute + 14) ~/ 15) * 15;
-    final rolledHour = now.hour + (roundedMinutes ~/ 60);
-    final normalizedHour = rolledHour.clamp(0, 23);
-    final normalizedMinute = roundedMinutes % 60;
-    final requestedStart = (normalizedHour * 60) + normalizedMinute;
-    return context.read<AppProvider>().recommendedStartMinutesForInsertion(
-          _dateKey,
-          requestedStartMinutes: requestedStart,
-          durationMinutes: 60,
-        );
-  }
-
-  String _formatMinutesOfDay(int totalMinutes) {
-    final normalized = totalMinutes.clamp(0, 23 * 60 + 59);
-    final hours = normalized ~/ 60;
-    final minutes = normalized % 60;
-    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
-  }
-
-  Block _buildDraftBlock({
-    int? startMinutes,
-    int? endMinutes,
-    bool isEvent = false,
-    BlockType type = BlockType.other,
-    String? title,
-    String? description,
-  }) {
-    final initialStart = startMinutes ?? _defaultStartMinutes();
-    const defaultDurationMinutes = 60;
-    final initialEnd = endMinutes ?? (initialStart + defaultDurationMinutes);
-    return Block(
-      id: 'draft_${DateTime.now().microsecondsSinceEpoch}',
-      index: 0,
-      date: _dateKey,
-      plannedStartTime: _formatMinutesOfDay(initialStart),
-      plannedEndTime: _formatMinutesOfDay(initialEnd),
-      type: type,
-      title: title ?? (isEvent ? 'New Event' : 'New Task'),
-      description: description,
-      plannedDurationMinutes: initialEnd - initialStart,
-      isEvent: isEvent,
-      status: BlockStatus.notStarted,
-    );
-  }
-
-  Future<void> _saveNewBlock(BlockEditorUpdate update, String blockId) async {
-    final app = context.read<AppProvider>();
-    if (update.saveAsLog) {
-      await app.saveManualLogBlock(
-        date: update.dateKey,
-        title: update.title,
-        startTime: update.plannedStartTime,
-        endTime: update.plannedEndTime,
-        notes: update.description,
-        blockId: blockId,
-      );
-      return;
-    }
-    final newBlock = Block(
-      id: blockId,
-      index: 0,
-      date: update.dateKey,
-      plannedStartTime: update.plannedStartTime,
-      plannedEndTime: update.plannedEndTime,
-      type: update.type,
-      title: update.title,
-      description: update.description,
-      plannedDurationMinutes: update.plannedDurationMinutes,
-      alertOffsetMinutes: update.alertOffsetMinutes,
-      alertType: update.alertType,
-      recurrenceType: update.recurrenceType,
-      recurrenceDays: update.recurrenceDays,
-      isEvent: update.isEvent,
-      status: BlockStatus.notStarted,
-    );
-    final inserted = await insertPlannedBlocksWithConflictHandling(
-      context: context,
-      dateKey: update.dateKey,
-      requestedBlocks: [newBlock],
-    );
-    if (!inserted) return;
-    await app.ensureRecurringBlocksForDate(update.dateKey);
-  }
-
-  Future<void> _showNewBlockEditor({
-    int? startMinutes,
-    int? endMinutes,
-    bool isEvent = false,
-    BlockEditorMode mode = BlockEditorMode.planned,
-  }) async {
-    final draftBlock = _buildDraftBlock(
-      startMinutes: startMinutes,
-      endMinutes: endMinutes,
-      isEvent: isEvent,
-      title: mode == BlockEditorMode.log ? 'New Log' : null,
-      description: mode == BlockEditorMode.log ? '' : null,
-    );
+  Future<void> _openStudySession() async {
+    HapticsService.lightImpact();
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => BlockEditorSheet(
-        block: draftBlock,
-        mode: mode,
-        onSave: (update) => _saveNewBlock(update, draftBlock.id),
-        onDelete: () => Navigator.of(context).pop(),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => StudySessionPicker(dateKey: _dateKey),
+    );
+  }
+
+  Future<void> _openTrackNow() async {
+    HapticsService.lightImpact();
+    final app = context.read<AppProvider>();
+    final existing = app.getActiveTrackNow(_dateKey);
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TrackNowScreen(
+          dateKey: _dateKey,
+          trackNow: existing,
+        ),
       ),
     );
-  }
-
-  Future<void> _openAddTaskSheet({
-    int? startMinutes,
-    bool isEvent = false,
-  }) {
-    return _showNewBlockEditor(
-      startMinutes: startMinutes,
-      isEvent: isEvent,
-    );
-  }
-
-  Future<void> _openAddLogSheet({
-    int? startMinutes,
-    int? endMinutes,
-  }) {
-    return _showNewBlockEditor(
-      startMinutes: startMinutes,
-      endMinutes: endMinutes,
-      mode: BlockEditorMode.log,
-    );
-  }
-
-  // ignore: unused_element
-  void _completeBlock(AppProvider app, DayPlan plan, Block block) {
-    HapticsService.heavy();
-    final blocks = List<Block>.from(plan.blocks ?? []);
-    final idx = blocks.indexWhere((b) => b.id == block.id);
-    if (idx >= 0) {
-      blocks[idx] = blocks[idx].copyWith(
-        status: BlockStatus.done,
-        actualEndTime: DateTime.now().toIso8601String(),
-      );
-    }
-    app.upsertDayPlan(plan.copyWith(blocks: blocks));
-    final tasks = block.tasks ?? [];
-    for (final task in tasks) {
-      app.completeStudyTask(task);
-    }
-    if (tasks.isEmpty && block.type == BlockType.revisionFa) {
-      for (final page in block.relatedFaPages ?? []) {
-        app.updateFAPageStatus(page, 'read');
-      }
-    }
-    _setStateIfMounted(() => _completedBlockId = block.id);
-  }
-
-  // ignore: unused_element
-  void _startBlock(AppProvider app, DayPlan plan, Block block) {
-    HapticsService.medium();
-    final now = DateTime.now().toIso8601String();
-    final blocks = List<Block>.from(plan.blocks ?? []);
-    for (int i = 0; i < blocks.length; i++) {
-      if (blocks[i].status == BlockStatus.inProgress &&
-          blocks[i].id != block.id) {
-        blocks[i] = blocks[i].copyWith(status: BlockStatus.paused);
-      }
-    }
-    final idx = blocks.indexWhere((b) => b.id == block.id);
-    if (idx >= 0) {
-      blocks[idx] = blocks[idx].copyWith(
-        status: BlockStatus.inProgress,
-        actualStartTime: blocks[idx].actualStartTime ?? now,
-      );
-    }
-    final updatedPlan = plan.copyWith(blocks: blocks);
-    app.upsertDayPlan(updatedPlan);
-    if (mounted) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => SessionScreen(block: block, plan: updatedPlan),
-        ),
-      );
-    }
-  }
-
-  // ignore: unused_element
-  void _skipBlock(AppProvider app, DayPlan plan, Block block) {
-    HapticsService.medium();
-    final blocks = List<Block>.from(plan.blocks ?? []);
-    final idx = blocks.indexWhere((b) => b.id == block.id);
-    if (idx >= 0) {
-      blocks[idx] = blocks[idx].copyWith(status: BlockStatus.skipped);
-    }
-    app.upsertDayPlan(plan.copyWith(blocks: blocks));
   }
 
   @override
@@ -860,11 +655,11 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
         children: [
           Column(
             children: [
-              // ── Compact Header ─────────────────────────
-              // ── Tab Bar ────────────────────────────────
+              // ── Compact Header ──────────────────────────────────────────
+              // ── Tab Bar ────────────────────────────────────────────
               const SizedBox(height: 8),
-              _ThreeTabBar(controller: _tabCtrl),
-              // ── Tab Views ──────────────────────────────
+              _TwoTabBar(controller: _tabCtrl),
+              // ── Tab Views ──────────────────────────────────────────
               Expanded(
                 child: TabBarView(
                   controller: _tabCtrl,
@@ -893,14 +688,11 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
                       reminders: timelineReminders,
                       onReminderTap: _openReminderFromTimeline,
                       onReminderToggle: _toggleReminderFromTimeline,
+                      selectedMoreSubTabIndex: _selectedMoreSubTabIndex,
+                      highlightedReminderId: _highlightedReminderId,
+                      onMoreSubTabChanged: _handleMoreSubTabChanged,
                     ),
                     RoutinesTab(dateKey: _dateKey),
-                    _MoreTabView(
-                      dateKey: _dateKey,
-                      selectedTabIndex: _selectedMoreSubTabIndex,
-                      highlightedReminderId: _highlightedReminderId,
-                      onTabChanged: _handleMoreSubTabChanged,
-                    ),
                   ],
                 ),
               ),
@@ -917,8 +709,13 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
   }
 }
 
-// ── More Tab: inline Todo + Buying sub-tabs ────────────────────
-class _TodayTimelineTab extends StatelessWidget {
+// ── Sub-tab indices for inline More content ──────────────────────────
+const int _subTabTimeline = -1;
+const int _subTabReminder = 0;
+const int _subTabTodo = 1;
+const int _subTabBuying = 2;
+
+class _TodayTimelineTab extends StatefulWidget {
   final DateTime date;
   final bool isToday;
   final int totalBlocks;
@@ -938,6 +735,9 @@ class _TodayTimelineTab extends StatelessWidget {
   final Future<void> Function(ReminderOccurrence occurrence) onReminderTap;
   final Future<void> Function(ReminderOccurrence occurrence, bool completed)
       onReminderToggle;
+  final int selectedMoreSubTabIndex;
+  final String? highlightedReminderId;
+  final ValueChanged<int> onMoreSubTabChanged;
 
   const _TodayTimelineTab({
     required this.date,
@@ -958,156 +758,91 @@ class _TodayTimelineTab extends StatelessWidget {
     required this.reminders,
     required this.onReminderTap,
     required this.onReminderToggle,
+    required this.selectedMoreSubTabIndex,
+    required this.highlightedReminderId,
+    required this.onMoreSubTabChanged,
   });
 
   @override
+  State<_TodayTimelineTab> createState() => _TodayTimelineTabState();
+}
+
+class _TodayTimelineTabState extends State<_TodayTimelineTab> {
+  // -1 = timeline, 0 = reminder, 1 = todo, 2 = buying
+  int _activeSubTab = _subTabTimeline;
+
+  void _onSubTabTap(int index) {
+    setState(() {
+      // Tap active sub-tab again → return to timeline
+      _activeSubTab = (_activeSubTab == index) ? _subTabTimeline : index;
+    });
+    if (_activeSubTab != _subTabTimeline) {
+      widget.onMoreSubTabChanged(_activeSubTab);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return NestedScrollView(
-      headerSliverBuilder: (context, innerBoxIsScrolled) {
-        return [
-          SliverToBoxAdapter(
-            child: _CompactHeader(
-              date: date,
-              isToday: isToday,
-              totalBlocks: totalBlocks,
-              completedBlocks: completedBlocks,
-              onPrev: onPrev,
-              onNext: onNext,
-              onDateTap: onDateTap,
-              onStartDay: onStartDay,
-              onStudySession: onStudySession,
-              onTrackNow: onTrackNow,
-              onQuickAdd: () => onQuickAdd(),
-              quickAddLabel: quickAddLabel,
-              onSelectDate: onSelectDate,
-            ),
-          ),
-        ];
+    final showTimeline = _activeSubTab == _subTabTimeline;
+
+    return PopScope(
+      canPop: showTimeline,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && !showTimeline) {
+          setState(() => _activeSubTab = _subTabTimeline);
+        }
       },
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-        child: TimelineView(
-          dateKey: dateKey,
-          blocks: blocks,
-          reminders: reminders,
-          onAddTask: onQuickAdd,
-          onOpenDate: onSelectDate,
-          onReminderTap: onReminderTap,
-          onReminderToggle: onReminderToggle,
-        ),
+      child: Column(
+        children: [
+          // ── Compact header (always visible) ────────────────────────
+          _CompactHeader(
+            date: widget.date,
+            isToday: widget.isToday,
+            totalBlocks: widget.totalBlocks,
+            completedBlocks: widget.completedBlocks,
+            onPrev: widget.onPrev,
+            onNext: widget.onNext,
+            onDateTap: widget.onDateTap,
+            onStartDay: widget.onStartDay,
+            onStudySession: widget.onStudySession,
+            onTrackNow: widget.onTrackNow,
+            onQuickAdd: () => widget.onQuickAdd(),
+            quickAddLabel: widget.quickAddLabel,
+            onSelectDate: widget.onSelectDate,
+            activeSubTab: _activeSubTab,
+            onSubTabTap: _onSubTabTap,
+          ),
+          // ── Content area ───────────────────────────────────────────
+          Expanded(
+            child: showTimeline
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                    child: TimelineView(
+                      dateKey: widget.dateKey,
+                      blocks: widget.blocks,
+                      reminders: widget.reminders,
+                      onAddTask: widget.onQuickAdd,
+                      onOpenDate: widget.onSelectDate,
+                      onReminderTap: widget.onReminderTap,
+                      onReminderToggle: widget.onReminderToggle,
+                    ),
+                  )
+                : _activeSubTab == _subTabReminder
+                    ? ReminderTab(
+                        dateKey: widget.dateKey,
+                        highlightedReminderId: widget.highlightedReminderId,
+                      )
+                    : _activeSubTab == _subTabTodo
+                        ? const TodoTab()
+                        : const BuyingTab(),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _MoreTabView extends StatefulWidget {
-  final String dateKey;
-  final int selectedTabIndex;
-  final String? highlightedReminderId;
-  final ValueChanged<int>? onTabChanged;
-
-  const _MoreTabView({
-    required this.dateKey,
-    required this.selectedTabIndex,
-    this.highlightedReminderId,
-    this.onTabChanged,
-  });
-
-  @override
-  State<_MoreTabView> createState() => _MoreTabViewState();
-}
-
-class _MoreTabViewState extends State<_MoreTabView>
-    with SingleTickerProviderStateMixin {
-  late TabController _subTabCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _subTabCtrl = TabController(
-      length: 3,
-      vsync: this,
-      initialIndex: widget.selectedTabIndex,
-    );
-    _subTabCtrl.addListener(_handleSubTabChanged);
-  }
-
-  @override
-  void didUpdateWidget(covariant _MoreTabView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (_subTabCtrl.index != widget.selectedTabIndex) {
-      _subTabCtrl.animateTo(widget.selectedTabIndex);
-    }
-  }
-
-  void _handleSubTabChanged() {
-    if (_subTabCtrl.indexIsChanging) return;
-    widget.onTabChanged?.call(_subTabCtrl.index);
-  }
-
-  @override
-  void dispose() {
-    _subTabCtrl.removeListener(_handleSubTabChanged);
-    _subTabCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final accent = _todayPlanAccent(context);
-    final accentSoft = _todayPlanAccentSoft(context);
-    return Column(
-      children: [
-        // Sub-tab bar
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: LiquidGlassCard(
-            padding: const EdgeInsets.all(4),
-            borderRadius: BorderRadius.circular(18),
-            child: TabBar(
-              controller: _subTabCtrl,
-              dividerColor: Colors.transparent,
-              labelColor: accent,
-              unselectedLabelColor:
-                  theme.colorScheme.onSurface.withValues(alpha: 0.62),
-              indicatorSize: TabBarIndicatorSize.tab,
-              labelStyle:
-                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-              unselectedLabelStyle:
-                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-              indicator: BoxDecoration(
-                color: accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: accentSoft.withValues(alpha: 0.22)),
-              ),
-              tabs: const [
-                Tab(text: 'Reminder'),
-                Tab(text: 'To-Do'),
-                Tab(text: 'Buying'),
-              ],
-            ),
-          ),
-        ),
-        Expanded(
-          child: TabBarView(
-            controller: _subTabCtrl,
-            children: [
-              ReminderTab(
-                dateKey: widget.dateKey,
-                highlightedReminderId: widget.highlightedReminderId,
-              ),
-              TodoTab(dateKey: widget.dateKey),
-              BuyingTab(dateKey: widget.dateKey),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ── Celebration Overlay ────────────────────────────────────────
+// ── Celebration Overlay ─────────────────────────────────────────────
 class _CelebrationOverlay extends StatefulWidget {
   final VoidCallback? onComplete;
   const _CelebrationOverlay({this.onComplete});
@@ -1198,37 +933,37 @@ class _CelebrationOverlayState extends State<_CelebrationOverlay>
                         children: [
                           Icon(Icons.check_circle_rounded,
                               color: cs.onPrimary, size: 24),
-                          const SizedBox(width: 8),
-                          Text('Block Complete! 🎉',
-                              style: TextStyle(
-                                  color: cs.onPrimary,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16)),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Block Complete!',
+                            style: TextStyle(
+                              color: cs.onPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ],
                       ),
                     ),
                   ),
                 ),
               ),
-              ..._particles.map((p) {
+              ...List.generate(_particles.length, (i) {
+                final p = _particles[i];
                 final px = p.x + p.vx * t;
-                final py = p.y + p.vy * t + 0.5 * t * t;
-                final opacity = (1.0 - t).clamp(0.0, 1.0);
-                final particleColor = particleColors[
-                    ((p.size.round() + (p.x * 10).round()) %
-                            particleColors.length)
-                        .abs()];
+                final py = p.y + p.vy * t + 0.5 * 2.0 * t * t;
                 return Positioned(
                   left: px * MediaQuery.of(context).size.width,
-                  top: py * MediaQuery.of(context).size.height + 200,
+                  top: py * MediaQuery.of(context).size.height,
                   child: Opacity(
-                    opacity: opacity,
+                    opacity: (1.0 - t).clamp(0.0, 1.0),
                     child: Container(
                       width: p.size,
                       height: p.size,
                       decoration: BoxDecoration(
-                        color: particleColor,
                         shape: BoxShape.circle,
+                        color:
+                            particleColors[i % particleColors.length],
                       ),
                     ),
                   ),
@@ -1243,16 +978,21 @@ class _CelebrationOverlayState extends State<_CelebrationOverlay>
 }
 
 class _Particle {
-  final double x, y, vx, vy, size;
-  const _Particle(
-      {required this.x,
-      required this.y,
-      required this.vx,
-      required this.vy,
-      required this.size});
+  final double x;
+  final double y;
+  final double vx;
+  final double vy;
+  final double size;
+
+  const _Particle({
+    required this.x,
+    required this.y,
+    required this.vx,
+    required this.vy,
+    required this.size,
+  });
 }
 
-// ── Compact Header ─────────────────────────────────────────────
 class _CompactHeader extends StatelessWidget {
   final DateTime date;
   final bool isToday;
@@ -1267,6 +1007,8 @@ class _CompactHeader extends StatelessWidget {
   final VoidCallback onQuickAdd;
   final String quickAddLabel;
   final ValueChanged<DateTime> onSelectDate;
+  final int activeSubTab;
+  final ValueChanged<int> onSubTabTap;
 
   const _CompactHeader({
     required this.date,
@@ -1282,6 +1024,8 @@ class _CompactHeader extends StatelessWidget {
     required this.onQuickAdd,
     required this.quickAddLabel,
     required this.onSelectDate,
+    required this.activeSubTab,
+    required this.onSubTabTap,
   });
 
   List<DateTime> _buildWeekDates() {
@@ -1456,6 +1200,12 @@ class _CompactHeader extends StatelessWidget {
                   ),
               ],
             ),
+            const SizedBox(height: 10),
+            // ── Inline sub-tab strip ───────────────────────────────
+            _InlineSubTabBar(
+              activeSubTab: activeSubTab,
+              onSubTabTap: onSubTabTap,
+            ),
           ],
         ),
       ),
@@ -1568,9 +1318,9 @@ class _WeekIndicatorDot extends StatelessWidget {
   }
 }
 
-class _ThreeTabBar extends StatelessWidget {
+class _TwoTabBar extends StatelessWidget {
   final TabController controller;
-  const _ThreeTabBar({required this.controller});
+  const _TwoTabBar({required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -1604,10 +1354,94 @@ class _ThreeTabBar extends StatelessWidget {
           tabs: const [
             Tab(text: 'Timeline'),
             Tab(text: 'Routines'),
-            Tab(text: 'More'),
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Inline sub-tab bar (below week strip) ────────────────────────────
+class _InlineSubTabBar extends StatelessWidget {
+  final int activeSubTab;
+  final ValueChanged<int> onSubTabTap;
+
+  const _InlineSubTabBar({
+    required this.activeSubTab,
+    required this.onSubTabTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = _todayPlanAccent(context);
+    final accentSoft = _todayPlanAccentSoft(context);
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+
+    final tabs = [
+      (0, Icons.notifications_rounded, 'Reminder'),
+      (1, Icons.checklist_rounded, 'To-Do'),
+      (2, Icons.shopping_bag_rounded, 'Buying'),
+    ];
+
+    return Row(
+      children: tabs.map((t) {
+        final idx = t.$1;
+        final icon = t.$2;
+        final label = t.$3;
+        final isActive = activeSubTab == idx;
+
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: GestureDetector(
+              onTap: () => onSubTabTap(idx),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+                padding: const EdgeInsets.symmetric(vertical: 7),
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? accent.withValues(alpha: 0.13)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isActive
+                        ? accentSoft.withValues(alpha: 0.28)
+                        : Colors.transparent,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      icon,
+                      size: 14,
+                      color: isActive
+                          ? accent
+                          : onSurface.withValues(alpha: 0.55),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: isActive
+                            ? FontWeight.w700
+                            : FontWeight.w600,
+                        color: isActive
+                            ? accent
+                            : onSurface.withValues(alpha: 0.55),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }
