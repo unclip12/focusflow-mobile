@@ -99,7 +99,7 @@ class BuyingTab extends StatelessWidget {
                     16,
                     4,
                     16,
-                    MediaQuery.of(context).padding.bottom + 72 + 24,
+                    MediaQuery.of(context).padding.bottom + 24,
                   ),
                   itemCount: items.length,
                   itemBuilder: (context, i) {

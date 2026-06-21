@@ -104,7 +104,7 @@ class ReminderTab extends StatelessWidget {
                     16,
                     8,
                     16,
-                    MediaQuery.of(context).padding.bottom + 72 + 24,
+                    MediaQuery.of(context).padding.bottom + 24,
                   ),
                   itemCount: reminders.length,
                   itemBuilder: (context, index) {

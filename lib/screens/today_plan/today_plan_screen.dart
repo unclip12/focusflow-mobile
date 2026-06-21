@@ -49,8 +49,9 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     with SingleTickerProviderStateMixin {
   static const int _timelineTabIndex = 0;
   static const int _routinesTabIndex = 1;
-  static const int _moreTabIndex = 2;
-  static const int _moreReminderSubTabIndex = 0;
+  // Sub-tab indices within the Timeline tab (0 = timeline, 1 = reminder, 2 = todo, 3 = buying)
+  static const int _subTabTimeline = 0;
+  static const int _subTabReminder = 1;
 
   late DateTime _selectedDate;
   late DateTime _lastCalendarDate;
@@ -60,7 +61,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
   bool _didProcessExpiredRoutineQueue = false;
   bool _didAutoOpenActiveStudySession = false;
   TodayPlanLaunchRequest? _processingNotificationLaunch;
-  int _selectedMoreSubTabIndex = _moreReminderSubTabIndex;
+  int _selectedSubTab = _subTabTimeline;
 
   late final StreamSubscription<DateTime> _clockTimer;
 
@@ -251,7 +252,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
           request.openReminderTab || request.reminderId != null;
       if (opensReminderTab) {
         _setStateIfMounted(() {
-          _selectedMoreSubTabIndex = _moreReminderSubTabIndex;
+          _selectedSubTab = _subTabReminder;
           _highlightedReminderId = request.reminderId;
         });
       } else if (_highlightedReminderId != null) {
@@ -259,11 +260,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
       }
 
       _tabCtrl.animateTo(
-        opensReminderTab
-            ? _moreTabIndex
-            : (request.opensRoutinesTab
-                ? _routinesTabIndex
-                : _timelineTabIndex),
+        request.opensRoutinesTab ? _routinesTabIndex : _timelineTabIndex,
       );
       await _refreshSelectedDateBlocks();
       await Future<void>.delayed(const Duration(milliseconds: 80));
@@ -427,7 +424,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     super.initState();
     _lastCalendarDate = _calendarDate(DateTime.now());
     _selectedDate = _lastCalendarDate;
-    _tabCtrl = TabController(length: 3, vsync: this);
+    _tabCtrl = TabController(length: 2, vsync: this);
     NotificationService.instance.todayPlanLaunchNotifier
         .addListener(_onTodayPlanLaunchChanged);
     _clockTimer =
@@ -518,7 +515,7 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
 
   Future<void> _openReminderFromTimeline(ReminderOccurrence occurrence) async {
     _setStateIfMounted(() {
-      _selectedMoreSubTabIndex = _moreReminderSubTabIndex;
+      _selectedSubTab = _subTabReminder;
       _highlightedReminderId = occurrence.reminderId;
     });
     await showReminderEditorSheet(
@@ -539,11 +536,11 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
         );
   }
 
-  void _handleMoreSubTabChanged(int index) {
-    if (_selectedMoreSubTabIndex == index) return;
+  void _handleSubTabChanged(int index) {
+    if (_selectedSubTab == index) return;
     _setStateIfMounted(() {
-      _selectedMoreSubTabIndex = index;
-      if (index != _moreReminderSubTabIndex) {
+      _selectedSubTab = index;
+      if (index != _subTabReminder) {
         _highlightedReminderId = null;
       }
     });
@@ -853,71 +850,77 @@ class _TodayPlanScreenState extends State<TodayPlanScreen>
     final timelineReminders =
         app.getTimelineReminderOccurrencesForDate(_dateKey);
 
-    return AppScaffold(
-      screenName: "Today's Plan",
-      showHeader: false,
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              // ── Compact Header ─────────────────────────
-              // ── Tab Bar ────────────────────────────────
-              const SizedBox(height: 8),
-              _ThreeTabBar(controller: _tabCtrl),
-              // ── Tab Views ──────────────────────────────
-              Expanded(
-                child: TabBarView(
-                  controller: _tabCtrl,
-                  children: [
-                    _TodayTimelineTab(
-                      date: _selectedDate,
-                      isToday: _isToday,
-                      totalBlocks: totalBlocks,
-                      completedBlocks: completedBlocks,
-                      onPrev: _prevDay,
-                      onNext: _nextDay,
-                      onDateTap: _pickDate,
-                      onStartDay: _openDaySession,
-                      onStudySession: _openStudySession,
-                      onTrackNow: _openTrackNow,
-                      onQuickAdd: _isPastDate
-                          ? ({int? startMinutes, bool isEvent = false}) =>
-                              _openAddLogSheet(startMinutes: startMinutes)
-                          : _openAddTaskSheet,
-                      quickAddLabel: _isPastDate ? 'Add Log' : 'Add Task',
-                      onSelectDate: (selected) {
-                        unawaited(_openTimelineDate(selected));
-                      },
-                      dateKey: _dateKey,
-                      blocks: displayBlocks,
-                      reminders: timelineReminders,
-                      onReminderTap: _openReminderFromTimeline,
-                      onReminderToggle: _toggleReminderFromTimeline,
-                    ),
-                    RoutinesTab(dateKey: _dateKey),
-                    _MoreTabView(
-                      dateKey: _dateKey,
-                      selectedTabIndex: _selectedMoreSubTabIndex,
-                      highlightedReminderId: _highlightedReminderId,
-                      onTabChanged: _handleMoreSubTabChanged,
-                    ),
-                  ],
+    return PopScope(
+      // Intercept back button: if a sub-tab is active, return to timeline instead of popping
+      canPop: _selectedSubTab == _subTabTimeline,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          _setStateIfMounted(() {
+            _selectedSubTab = _subTabTimeline;
+            _highlightedReminderId = null;
+          });
+        }
+      },
+      child: AppScaffold(
+        screenName: "Today's Plan",
+        showHeader: false,
+        body: Stack(
+          children: [
+            Column(
+              children: [
+                const SizedBox(height: 8),
+                _TwoTabBar(controller: _tabCtrl),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabCtrl,
+                    children: [
+                      _TodayTimelineTab(
+                        date: _selectedDate,
+                        isToday: _isToday,
+                        totalBlocks: totalBlocks,
+                        completedBlocks: completedBlocks,
+                        onPrev: _prevDay,
+                        onNext: _nextDay,
+                        onDateTap: _pickDate,
+                        onStartDay: _openDaySession,
+                        onStudySession: _openStudySession,
+                        onTrackNow: _openTrackNow,
+                        onQuickAdd: _isPastDate
+                            ? ({int? startMinutes, bool isEvent = false}) =>
+                                _openAddLogSheet(startMinutes: startMinutes)
+                            : _openAddTaskSheet,
+                        quickAddLabel: _isPastDate ? 'Add Log' : 'Add Task',
+                        onSelectDate: (selected) {
+                          unawaited(_openTimelineDate(selected));
+                        },
+                        dateKey: _dateKey,
+                        blocks: displayBlocks,
+                        reminders: timelineReminders,
+                        onReminderTap: _openReminderFromTimeline,
+                        onReminderToggle: _toggleReminderFromTimeline,
+                        selectedSubTab: _selectedSubTab,
+                        highlightedReminderId: _highlightedReminderId,
+                        onSubTabChanged: _handleSubTabChanged,
+                      ),
+                      RoutinesTab(dateKey: _dateKey),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          if (_completedBlockId != null)
-            _CelebrationOverlay(
-              onComplete: () =>
-                  _setStateIfMounted(() => _completedBlockId = null),
+              ],
             ),
-        ],
+            if (_completedBlockId != null)
+              _CelebrationOverlay(
+                onComplete: () =>
+                    _setStateIfMounted(() => _completedBlockId = null),
+              ),
+          ],
+        ),
       ),
     );
   }
 }
 
-// ── More Tab: inline Todo + Buying sub-tabs ────────────────────
+// ── Timeline Tab with inline Reminder/Todo/Buying sub-tabs ─────
 class _TodayTimelineTab extends StatelessWidget {
   final DateTime date;
   final bool isToday;
@@ -938,6 +941,15 @@ class _TodayTimelineTab extends StatelessWidget {
   final Future<void> Function(ReminderOccurrence occurrence) onReminderTap;
   final Future<void> Function(ReminderOccurrence occurrence, bool completed)
       onReminderToggle;
+  final int selectedSubTab;
+  final String? highlightedReminderId;
+  final ValueChanged<int> onSubTabChanged;
+
+  // Sub-tab constants (mirror parent)
+  static const int _subTabTimeline = 0;
+  static const int _subTabReminder = 1;
+  static const int _subTabTodo = 2;
+  static const int _subTabBuying = 3;
 
   const _TodayTimelineTab({
     required this.date,
@@ -958,156 +970,179 @@ class _TodayTimelineTab extends StatelessWidget {
     required this.reminders,
     required this.onReminderTap,
     required this.onReminderToggle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return NestedScrollView(
-      headerSliverBuilder: (context, innerBoxIsScrolled) {
-        return [
-          SliverToBoxAdapter(
-            child: _CompactHeader(
-              date: date,
-              isToday: isToday,
-              totalBlocks: totalBlocks,
-              completedBlocks: completedBlocks,
-              onPrev: onPrev,
-              onNext: onNext,
-              onDateTap: onDateTap,
-              onStartDay: onStartDay,
-              onStudySession: onStudySession,
-              onTrackNow: onTrackNow,
-              onQuickAdd: () => onQuickAdd(),
-              quickAddLabel: quickAddLabel,
-              onSelectDate: onSelectDate,
-            ),
-          ),
-        ];
-      },
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-        child: TimelineView(
-          dateKey: dateKey,
-          blocks: blocks,
-          reminders: reminders,
-          onAddTask: onQuickAdd,
-          onOpenDate: onSelectDate,
-          onReminderTap: onReminderTap,
-          onReminderToggle: onReminderToggle,
-        ),
-      ),
-    );
-  }
-}
-
-class _MoreTabView extends StatefulWidget {
-  final String dateKey;
-  final int selectedTabIndex;
-  final String? highlightedReminderId;
-  final ValueChanged<int>? onTabChanged;
-
-  const _MoreTabView({
-    required this.dateKey,
-    required this.selectedTabIndex,
+    required this.selectedSubTab,
+    required this.onSubTabChanged,
     this.highlightedReminderId,
-    this.onTabChanged,
   });
 
   @override
-  State<_MoreTabView> createState() => _MoreTabViewState();
-}
-
-class _MoreTabViewState extends State<_MoreTabView>
-    with SingleTickerProviderStateMixin {
-  late TabController _subTabCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _subTabCtrl = TabController(
-      length: 3,
-      vsync: this,
-      initialIndex: widget.selectedTabIndex,
-    );
-    _subTabCtrl.addListener(_handleSubTabChanged);
-  }
-
-  @override
-  void didUpdateWidget(covariant _MoreTabView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (_subTabCtrl.index != widget.selectedTabIndex) {
-      _subTabCtrl.animateTo(widget.selectedTabIndex);
-    }
-  }
-
-  void _handleSubTabChanged() {
-    if (_subTabCtrl.indexIsChanging) return;
-    widget.onTabChanged?.call(_subTabCtrl.index);
-  }
-
-  @override
-  void dispose() {
-    _subTabCtrl.removeListener(_handleSubTabChanged);
-    _subTabCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final accent = _todayPlanAccent(context);
-    final accentSoft = _todayPlanAccentSoft(context);
+    final isSubTabActive = selectedSubTab != _subTabTimeline;
+
     return Column(
       children: [
-        // Sub-tab bar
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: LiquidGlassCard(
-            padding: const EdgeInsets.all(4),
-            borderRadius: BorderRadius.circular(18),
-            child: TabBar(
-              controller: _subTabCtrl,
-              dividerColor: Colors.transparent,
-              labelColor: accent,
-              unselectedLabelColor:
-                  theme.colorScheme.onSurface.withValues(alpha: 0.62),
-              indicatorSize: TabBarIndicatorSize.tab,
-              labelStyle:
-                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-              unselectedLabelStyle:
-                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-              indicator: BoxDecoration(
-                color: accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: accentSoft.withValues(alpha: 0.22)),
-              ),
-              tabs: const [
-                Tab(text: 'Reminder'),
-                Tab(text: 'To-Do'),
-                Tab(text: 'Buying'),
-              ],
-            ),
-          ),
+        // ── Header (always visible) ──────────────────────────
+        _CompactHeader(
+          date: date,
+          isToday: isToday,
+          totalBlocks: totalBlocks,
+          completedBlocks: completedBlocks,
+          onPrev: onPrev,
+          onNext: onNext,
+          onDateTap: onDateTap,
+          onStartDay: onStartDay,
+          onStudySession: onStudySession,
+          onTrackNow: onTrackNow,
+          onQuickAdd: () => onQuickAdd(),
+          quickAddLabel: quickAddLabel,
+          onSelectDate: onSelectDate,
         ),
+        // ── Sub-tab pills: Reminder | To-Do | Buying ─────────
+        _SubTabPillRow(
+          selectedIndex: selectedSubTab,
+          onChanged: onSubTabChanged,
+        ),
+        // ── Content: timeline or sub-tab content ─────────────
         Expanded(
-          child: TabBarView(
-            controller: _subTabCtrl,
-            children: [
-              ReminderTab(
-                dateKey: widget.dateKey,
-                highlightedReminderId: widget.highlightedReminderId,
-              ),
-              TodoTab(dateKey: widget.dateKey),
-              BuyingTab(dateKey: widget.dateKey),
-            ],
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            child: isSubTabActive
+                ? KeyedSubtree(
+                    key: ValueKey<int>(selectedSubTab),
+                    child: _buildSubTabContent(context),
+                  )
+                : Padding(
+                    key: const ValueKey<int>(0),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                    child: TimelineView(
+                      dateKey: dateKey,
+                      blocks: blocks,
+                      reminders: reminders,
+                      onAddTask: onQuickAdd,
+                      onOpenDate: onSelectDate,
+                      onReminderTap: onReminderTap,
+                      onReminderToggle: onReminderToggle,
+                    ),
+                  ),
           ),
         ),
       ],
     );
   }
+
+  Widget _buildSubTabContent(BuildContext context) {
+    switch (selectedSubTab) {
+      case _subTabReminder:
+        return ReminderTab(
+          dateKey: dateKey,
+          highlightedReminderId: highlightedReminderId,
+        );
+      case _subTabTodo:
+        return TodoTab(dateKey: dateKey);
+      case _subTabBuying:
+        return BuyingTab(dateKey: dateKey);
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+}
+
+// ── Sub-tab pill row ──────────────────────────────────────────
+class _SubTabPillRow extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onChanged;
+
+  static const _tabs = [
+    (icon: Icons.notifications_none_rounded, label: 'Reminder', index: 1),
+    (icon: Icons.checklist_rounded, label: 'To-Do', index: 2),
+    (icon: Icons.shopping_cart_outlined, label: 'Buying', index: 3),
+  ];
+
+  const _SubTabPillRow({
+    required this.selectedIndex,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final accent = _todayPlanAccent(context);
+    final onSurface = theme.colorScheme.onSurface;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+      child: Row(
+        children: _tabs.map((tab) {
+          final isSelected = selectedIndex == tab.index;
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(
+                right: tab.index < 3 ? 8 : 0,
+              ),
+              child: GestureDetector(
+                onTap: () => onChanged(
+                  isSelected ? 0 : tab.index, // tap again to collapse
+                ),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? accent.withValues(alpha: 0.14)
+                        : theme.colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected
+                          ? accent.withValues(alpha: 0.45)
+                          : onSurface.withValues(alpha: 0.07),
+                      width: isSelected ? 1.2 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        tab.icon,
+                        size: 15,
+                        color: isSelected
+                            ? accent
+                            : onSurface.withValues(alpha: 0.55),
+                      ),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          tab.label,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: isSelected
+                                ? accent
+                                : onSurface.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
 }
 
 // ── Celebration Overlay ────────────────────────────────────────
+
 class _CelebrationOverlay extends StatefulWidget {
   final VoidCallback? onComplete;
   const _CelebrationOverlay({this.onComplete});
@@ -1317,7 +1352,7 @@ class _CompactHeader extends StatelessWidget {
         : DateFormat('EEE, d MMM').format(date);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
       child: LiquidGlassCard(
         borderRadius: BorderRadius.circular(24),
         child: Column(
@@ -1366,7 +1401,7 @@ class _CompactHeader extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             Text(
               '$completedBlocks / $totalBlocks done',
               style: TextStyle(
@@ -1385,7 +1420,7 @@ class _CompactHeader extends StatelessWidget {
                 valueColor: AlwaysStoppedAnimation<Color>(accent),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             Row(
               children: [
                 Expanded(
@@ -1405,7 +1440,7 @@ class _CompactHeader extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             Row(
               children: [
                 Expanded(
@@ -1425,7 +1460,7 @@ class _CompactHeader extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Row(
               children: [
                 for (final weekDate in weekDates)
@@ -1568,9 +1603,9 @@ class _WeekIndicatorDot extends StatelessWidget {
   }
 }
 
-class _ThreeTabBar extends StatelessWidget {
+class _TwoTabBar extends StatelessWidget {
   final TabController controller;
-  const _ThreeTabBar({required this.controller});
+  const _TwoTabBar({required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -1604,13 +1639,13 @@ class _ThreeTabBar extends StatelessWidget {
           tabs: const [
             Tab(text: 'Timeline'),
             Tab(text: 'Routines'),
-            Tab(text: 'More'),
           ],
         ),
       ),
     );
   }
 }
+
 
 class _DateArrowButton extends StatelessWidget {
   final IconData icon;
@@ -1658,10 +1693,10 @@ class _QuickActionCard extends StatelessWidget {
 
     return LiquidGlassCard(
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      borderRadius: BorderRadius.circular(18),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      borderRadius: BorderRadius.circular(16),
       child: SizedBox(
-        height: 58,
+        height: 46,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1670,7 +1705,7 @@ class _QuickActionCard extends StatelessWidget {
               emoji,
               style: const TextStyle(fontSize: 20),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(

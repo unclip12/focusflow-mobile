@@ -1,5 +1,5 @@
 // =============================================================
-// AppProvider — Central state, loads ALL data from SQLite
+// AppProvider â€” Central state, loads ALL data from SQLite
 // One ChangeNotifier holding lists for every data domain.
 // =============================================================
 
@@ -55,7 +55,7 @@ import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart' as du;
 import 'package:focusflow_mobile/services/timeline_scheduler.dart';
 
-// ── AppNotification ───────────────────────────────────────────────
+// â”€â”€ AppNotification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 enum AppNotificationType { reminder, achievement, revisionDue, streak }
 
 enum TrackNowConflictChoice { push, consume, overlap }
@@ -115,7 +115,7 @@ class AppNotification {
   final DateTime createdAt;
   bool isRead;
 
-  /// Optional route name payload — used by NotificationCard to navigate.
+  /// Optional route name payload â€” used by NotificationCard to navigate.
   final String? routeName;
 
   AppNotification({
@@ -129,14 +129,14 @@ class AppNotification {
   });
 }
 
-// ── Habit ─────────────────────────────────────────────────────────
+// â”€â”€ Habit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 enum HabitFrequency { daily, weekdays, custom }
 
 class Habit {
   final String id;
   final String name;
   final HabitFrequency frequency;
-  final List<int>? customDays; // 1=Mon .. 7=Sun — for custom frequency
+  final List<int>? customDays; // 1=Mon .. 7=Sun â€” for custom frequency
   final Color color;
   bool isCompleted;
 
@@ -150,7 +150,7 @@ class Habit {
   });
 }
 
-// ── DateActivity (combined activity item) ─────────────────────────
+// â”€â”€ DateActivity (combined activity item) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class DateActivity {
   final String type; // 'block' | 'timeLog' | 'studyPlan'
   final String title;
@@ -165,7 +165,7 @@ class DateActivity {
   });
 }
 
-// ── Canned mentor replies ─────────────────────────────────────────
+// â”€â”€ Canned mentor replies â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class VideoLectureSyncState {
   final bool watched;
   final int watchedMinutes;
@@ -179,13 +179,13 @@ class VideoLectureSyncState {
 }
 
 const _kMentorAutoReplies = [
-  "Great question! Based on your recent study logs, I'd recommend focusing on Anatomy — you haven't reviewed it in 5 days.",
-  "You're doing amazing! Your streak is strong 🔥. Keep the momentum going with a quick revision session today.",
+  "Great question! Based on your recent study logs, I'd recommend focusing on Anatomy â€” you haven't reviewed it in 5 days.",
+  "You're doing amazing! Your streak is strong ðŸ”¥. Keep the momentum going with a quick revision session today.",
   "Looking at your analytics, your weakest area is Pharmacology. Want me to create a focused study plan for it?",
-  "Here's a tip: try the Pomodoro technique — 25 min study, 5 min break. It works wonders for retention!",
+  "Here's a tip: try the Pomodoro technique â€” 25 min study, 5 min break. It works wonders for retention!",
   "Your block completion rate has been improving! You've gone from 65% to 82% this week. Great progress!",
   "I notice you study best in the morning. Consider scheduling your hardest subjects before noon.",
-  "Don't forget — spaced repetition is key to long-term memory! Review those overdue KB pages today.",
+  "Don't forget â€” spaced repetition is key to long-term memory! Review those overdue KB pages today.",
 ];
 
 class AppProvider extends ChangeNotifier {
@@ -202,7 +202,7 @@ class AppProvider extends ChangeNotifier {
   int _mentorReplyIdx = 0;
   ActiveStudySession? _activeStudySession;
 
-  // ── Data stores ───────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════”€â”€ Data stores â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   List<KnowledgeBaseEntry> knowledgeBase = [];
   List<DayPlan> dayPlans = [];
   List<StudyPlanItem> studyPlan = [];
@@ -245,7 +245,7 @@ class AppProvider extends ChangeNotifier {
   RevisionSettings? revisionSettings;
   StreakData streakData = StreakData();
 
-  // ── Initial load ──────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════”€â”€ Initial load â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<void> loadAll() async {
     knowledgeBase = (await _db.getAllKBEntries())
         .map((j) => KnowledgeBaseEntry.fromJson(j))
@@ -374,13 +374,13 @@ class AppProvider extends ChangeNotifier {
     await _refreshPlannedTaskReminderState();
     await _refreshReminderNotificationState();
 
-    // ── Seed sample notifications (in-memory only) ────────────────
+    // ═══════════════════════════════════════════════════════════════”€â”€ Seed sample notifications (in-memory only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     final now = DateTime.now();
     notifications = [
       AppNotification(
         id: 'n1',
         type: AppNotificationType.streak,
-        title: '7-Day Streak! 🔥',
+        title: '7-Day Streak! ðŸ”¥',
         message: "You've studied 7 days in a row. Keep it up!",
         createdAt: now.subtract(const Duration(hours: 1)),
         routeName: 'dashboard',
@@ -414,7 +414,7 @@ class AppProvider extends ChangeNotifier {
         id: 'n5',
         type: AppNotificationType.revisionDue,
         title: 'FMGE Revision Due',
-        message: 'Anatomy slides 12–24 are due for review.',
+        message: 'Anatomy slides 12â€“24 are due for review.',
         createdAt: now.subtract(const Duration(days: 1, hours: 6)),
         isRead: true,
         routeName: 'fmge',
@@ -430,7 +430,7 @@ class AppProvider extends ChangeNotifier {
       ),
     ];
 
-    // ── Seed sample habits (in-memory only) ───────────────────────
+    // ═══════════════════════════════════════════════════════════════”€â”€ Seed sample habits (in-memory only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     habits = [
       Habit(
           id: 'h1',
@@ -460,7 +460,7 @@ class AppProvider extends ChangeNotifier {
     await _syncActiveStudySessionBackgroundTimer();
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   Future<void> _restoreActiveRoutineRun(SharedPreferences prefs) async {
     final rawRun = await BackupService.readStringPreferenceSafely(
       prefs,
@@ -875,7 +875,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   // KNOWLEDGE BASE
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> upsertKBEntry(KnowledgeBaseEntry entry) async {
     await _db.upsertKBEntry(entry.toJson());
@@ -895,9 +895,9 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // DAY PLANS
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   DayPlan? getDayPlan(String date) {
     try {
@@ -2105,9 +2105,9 @@ class AppProvider extends ChangeNotifier {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // STUDY PLAN
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> upsertStudyPlanItem(StudyPlanItem item) async {
     await _db.upsertStudyPlanItem(item.toJson());
@@ -2126,9 +2126,9 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // FMGE ENTRIES
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> upsertFMGEEntry(FMGEEntry entry) async {
     await _db.upsertFMGEEntry(entry.toJson());
@@ -2147,9 +2147,9 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // TIME LOGS
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> upsertTimeLog(TimeLogEntry entry) async {
     await _db.upsertTimeLog(entry.toJson());
@@ -2195,9 +2195,9 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // DAILY TRACKER
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   DailyTracker? getDailyTracker(String date) {
     try {
@@ -2218,9 +2218,9 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // STUDY ENTRIES
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> upsertStudyEntry(StudyEntry entry) async {
     await _db.upsertStudyEntry(entry.toJson());
@@ -2239,9 +2239,9 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // STUDY MATERIALS
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> upsertStudyMaterial(StudyMaterial material) async {
     await _db.upsertStudyMaterial(material.toJson());
@@ -2260,9 +2260,9 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // MENTOR MESSAGES
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> addMentorMessage(MentorMessage msg) async {
     await _db.insertMentorMessage(msg.toJson());
@@ -2303,9 +2303,9 @@ class AppProvider extends ChangeNotifier {
     await addMentorMessage(mentorMsg);
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // SINGLETONS
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> saveMentorMemory(MentorMemory mem) async {
     mentorMemory = mem;
@@ -2325,7 +2325,7 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Alias for saveUserProfile — screens may call either name.
+  /// Alias for saveUserProfile â€” screens may call either name.
   Future<void> updateUserProfile(UserProfile profile) =>
       saveUserProfile(profile);
 
@@ -2335,9 +2335,9 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // ROUTINES (V6)
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   DateTime _routineDateOnly(DateTime value) =>
       DateTime(value.year, value.month, value.day);
@@ -2776,9 +2776,9 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // ROUTINE LOGS (V6)
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> upsertRoutineLog(RoutineLog log) async {
     await _db.upsertRoutineLog(log.toJson());
@@ -3078,7 +3078,7 @@ class AppProvider extends ChangeNotifier {
     return log;
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   Future<RoutineLog> updateCompletedRoutineActuals({
     required RoutineLog log,
     String? sourceBlockId,
@@ -3131,7 +3131,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   // BUYING ITEMS (V6)
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> upsertBuyingItem(BuyingItem item) async {
     await _db.upsertBuyingItem(item.toJson());
@@ -3150,12 +3150,13 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Returns ALL buying items (global list - not date-filtered)
   List<BuyingItem> getBuyingItemsForDate(String date) =>
-      buyingItems.where((i) => i.date == date).toList();
+      List<BuyingItem>.from(buyingItems);
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // TODO ITEMS (V6)
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> upsertTodoItem(TodoItem item) async {
     await _db.upsertTodoItem(item.toJson());
@@ -3174,11 +3175,12 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Returns ALL todo items (global list - not date-filtered)
   List<TodoItem> getTodoItemsForDate(String date) =>
-      todoItems.where((i) => i.date == date).toList();
+      List<TodoItem>.from(todoItems);
 
   List<TodoItem> getTodosByCategory(String date, String category) =>
-      todoItems.where((i) => i.date == date && i.category == category).toList();
+      todoItems.where((i) => i.category == category).toList();
 
   Reminder? getReminderById(String id) {
     try {
@@ -3382,9 +3384,9 @@ class AppProvider extends ChangeNotifier {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // DEFAULT ROUTINE ORDER (V6)
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> upsertDefaultActivity(DefaultActivity activity) async {
     await _db.upsertDefaultActivity(activity.toJson());
@@ -3414,9 +3416,9 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ═════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // DAILY FLOWS (V7)
-  // ═════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   DailyFlow? getDailyFlow(String date) {
     try {
@@ -3501,23 +3503,23 @@ class AppProvider extends ChangeNotifier {
   String _flowIconForBlockType(BlockType type) {
     switch (type) {
       case BlockType.revisionFa:
-        return '📚';
+        return 'ðŸ“š';
       case BlockType.video:
-        return '🎬';
+        return 'ðŸŽ¬';
       case BlockType.qbank:
-        return '📝';
+        return 'ðŸ“';
       case BlockType.anki:
-        return '🃏';
+        return 'ðŸƒ';
       case BlockType.studySession:
-        return '🎓';
+        return 'ðŸŽ“';
       case BlockType.fmgeRevision:
-        return '📖';
+        return 'ðŸ“–';
       case BlockType.breakBlock:
-        return '☕';
+        return 'â˜•';
       case BlockType.mixed:
-        return '🔄';
+        return 'ðŸ”„';
       case BlockType.other:
-        return '⚡';
+        return 'âš¡';
     }
   }
 
@@ -3792,7 +3794,7 @@ class AppProvider extends ChangeNotifier {
     );
   }
 
-  /// Undo a completed activity — moves it back to NOT_STARTED.
+  /// Undo a completed activity â€” moves it back to NOT_STARTED.
   Future<void> undoFlowActivity(String date, String activityId) async {
     final flow = getDailyFlow(date);
     if (flow == null) return;
@@ -3890,7 +3892,7 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  // ── TRACK NOW (ad-hoc activity tracking) ──────────────────────
+  // ═══════════════════════════════════════════════════════════════”€â”€ TRACK NOW (ad-hoc activity tracking) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// Start tracking a spontaneous activity (e.g. "Cooking").
   /// Creates a new FlowActivity with IN_PROGRESS status.
@@ -4196,33 +4198,33 @@ class AppProvider extends ChangeNotifier {
   static String _categoryIcon(String? category) {
     switch (category?.toLowerCase()) {
       case 'cooking':
-        return '🍳';
+        return 'ðŸ³';
       case 'cleaning':
-        return '🧹';
+        return 'ðŸ§¹';
       case 'exercise':
-        return '💪';
+        return 'ðŸ’ª';
       case 'study':
-        return '📚';
+        return 'ðŸ“š';
       case 'prayer':
-        return '🕌';
+        return 'ðŸ•Œ';
       case 'shopping':
-        return '🛒';
+        return 'ðŸ›’';
       case 'eating':
-        return '🍽️';
+        return 'ðŸ½ï¸';
       case 'rest':
-        return '😴';
+        return 'ðŸ˜´';
       case 'travel':
-        return '🚗';
+        return 'ðŸš—';
       case 'work':
-        return '💼';
+        return 'ðŸ’¼';
       default:
-        return '⏱️';
+        return 'â±ï¸';
     }
   }
 
-  // ═════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // PRAYER ROUTINE SEEDING
-  // ═════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   /// Seed default prayer routines if they don't already exist.
   Future<void> seedPrayerRoutines() async {
@@ -4235,7 +4237,7 @@ class AppProvider extends ChangeNotifier {
       final routine = Routine(
         id: 'prayer_${name.toLowerCase()}',
         name: name,
-        icon: '🕌',
+        icon: 'ðŸ•Œ',
         color: 0xFF059669,
         steps: [
           RoutineStep(
@@ -4296,7 +4298,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   /// Gap-aware: find the first unread FA page in book order.
-  /// Respects gaps — e.g. if 33-34 read, 35 unread, 36-37 read → returns 35.
+  /// Respects gaps â€” e.g. if 33-34 read, 35 unread, 36-37 read â†’ returns 35.
   /// After 35, returns 38 (since 36-37 already read).
   int getNextContinuePage() {
     if (faPages.isEmpty) return 33; // FA 2025 starts at page 33
@@ -4305,7 +4307,7 @@ class AppProvider extends ChangeNotifier {
     for (final p in sorted) {
       if (p.status == 'unread') return p.pageNum;
     }
-    // All pages read — return the page after the last one
+    // All pages read â€” return the page after the last one
     return sorted.last.pageNum + 1;
   }
 
@@ -4325,9 +4327,9 @@ class AppProvider extends ChangeNotifier {
     return result;
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // HISTORY
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> addHistoryRecord(HistoryRecord record) async {
     await _db.insertHistoryRecord(record.toJson());
@@ -4335,9 +4337,9 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // REVISION ITEMS
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> upsertRevisionItem(RevisionItem item) async {
     await _db.upsertRevisionItem(item.toJson());
@@ -4407,7 +4409,7 @@ class AppProvider extends ChangeNotifier {
 
     await upsertRevisionItem(updated);
 
-    // ── Sync back to FAPage if this is an FA page revision ──
+    // ═══════════════════════════════════════════════════════════════”€â”€ Sync back to FAPage if this is an FA page revision â”€â”€
     if (revId.startsWith('fa-page-')) {
       final pageNum = int.tryParse(revId.replaceFirst('fa-page-', ''));
       if (pageNum != null) {
@@ -4479,9 +4481,9 @@ class AppProvider extends ChangeNotifier {
     await upsertKBEntry(updatedKb);
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // STUDY TASK COMPLETION → TRACKER + REVISION HUB
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // STUDY TASK COMPLETION â†’ TRACKER + REVISION HUB
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   /// Called when a block task is completed from Today's Plan.
   /// Updates the relevant tracker and creates/advances revision items.
@@ -4494,7 +4496,7 @@ class AppProvider extends ChangeNotifier {
     switch (task.type) {
       case 'FA':
       case 'REVISION':
-        // FA page task — mark page as read or advance revision
+        // FA page task â€” mark page as read or advance revision
         if (meta.pageNumber != null) {
           final pageNum = meta.pageNumber!;
           final pageIdx = faPages.indexWhere((p) => p.pageNum == pageNum);
@@ -4521,7 +4523,7 @@ class AppProvider extends ChangeNotifier {
               );
               await upsertFAPage(updated);
             } else {
-              // First study — mark as read (creates revision item via existing logic)
+              // First study â€” mark as read (creates revision item via existing logic)
               await updateFAPageStatus(pageNum, 'read');
             }
           }
@@ -4583,9 +4585,9 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // FA PAGES (G5)
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> upsertFAPage(FAPage page) async {
     await _db.upsertFAPage(page.toJson());
@@ -4657,7 +4659,7 @@ class AppProvider extends ChangeNotifier {
               ? 'read'
               : 'anki_done',
       title: updated.title.isNotEmpty
-          ? 'FA p.$pageNum — ${updated.title}'
+          ? 'FA p.$pageNum â€” ${updated.title}'
           : 'FA Page $pageNum',
     );
   }
@@ -4665,13 +4667,13 @@ class AppProvider extends ChangeNotifier {
   /// Bulk-update FA pages in range [from..to] to the given status.
   /// Returns the count of pages actually updated.
   /// PERFORMANCE: All DB writes are batched. notifyListeners() fires only once at the end.
-  /// REVISION FIX: Creates one PAGE-level revision item per page — not per-subtopic.
+  /// REVISION FIX: Creates one PAGE-level revision item per page â€” not per-subtopic.
   Future<int> bulkMarkFAPages(int from, int to, String status) async {
     int count = 0;
     final now = DateTime.now().toIso8601String();
     final mode = revisionSettings?.mode ?? 'strict';
 
-    // ── Step 1: Update FA pages in range ──────────────────────────
+    // ═══════════════════════════════════════════════════════════════”€â”€ Step 1: Update FA pages in range â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     for (int i = 0; i < faPages.length; i++) {
       final p = faPages[i];
       if (p.pageNum >= from && p.pageNum <= to && p.status != status) {
@@ -4684,12 +4686,12 @@ class AppProvider extends ChangeNotifier {
           ankiDoneAt:
               status == 'anki_done' ? (p.ankiDoneAt ?? now) : p.ankiDoneAt,
         );
-        // DB write — no notifyListeners here
+        // DB write â€” no notifyListeners here
         await _db.upsertFAPage(updated.toJson());
         faPages[i] = updated;
         count++;
 
-        // ── Create ONE page-level revision item ───────────────────
+        // ═══════════════════════════════════════════════════════════════”€â”€ Create ONE page-level revision item â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (status == 'read' || status == 'anki_done') {
           final revId = 'fa-page-${p.pageNum}';
           // Remove any stale subtopic revisions for this page
@@ -4741,7 +4743,7 @@ class AppProvider extends ChangeNotifier {
       }
     }
 
-    // ── Step 2: Update subtopics silently (no per-subtopic revisions) ─
+    // ═══════════════════════════════════════════════════════════════”€â”€ Step 2: Update subtopics silently (no per-subtopic revisions) â”€
     for (int i = 0; i < faSubtopics.length; i++) {
       final sub = faSubtopics[i];
       if (sub.pageNum >= from && sub.pageNum <= to && sub.status != status) {
@@ -4775,7 +4777,7 @@ class AppProvider extends ChangeNotifier {
       }
     }
 
-    // ── Step 3: One single rebuild ────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════”€â”€ Step 3: One single rebuild â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     notifyListeners();
     unawaited(_triggerBackup());
     return count;
@@ -4939,9 +4941,9 @@ class AppProvider extends ChangeNotifier {
     unawaited(_triggerBackup());
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // FA SUBTOPICS (v5)
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   /// Get subtopics for a specific page
   List<FASubtopic> getSubtopicsForPage(int pageNum) =>
@@ -5192,9 +5194,9 @@ class AppProvider extends ChangeNotifier {
     await prefs.setStringList('general_task_names', _savedGeneralTaskNames);
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // SKETCHY ITEMS (G5)
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> upsertSketchyItem(SketchyItem item) async {
     await _db.upsertSketchyItem(item.toJson());
@@ -5214,9 +5216,9 @@ class AppProvider extends ChangeNotifier {
     await upsertSketchyItem(sketchyItems[idx].copyWith(status: status));
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // PATHOMA ITEMS (G5)
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> upsertPathomaItem(PathomaItem item) async {
     await _db.upsertPathomaItem(item.toJson());
@@ -5236,9 +5238,9 @@ class AppProvider extends ChangeNotifier {
     await upsertPathomaItem(pathomaItems[idx].copyWith(status: status));
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // SKETCHY MICRO VIDEOS (G6)
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> toggleSketchyMicroWatched(int id, bool watched) async {
     await _db.toggleSketchyMicro(id, watched);
@@ -5265,7 +5267,7 @@ class AppProvider extends ChangeNotifier {
             source: 'SKETCHY_MICRO',
             pageNumber: '',
             title: video.title,
-            parentTitle: '${video.category} › ${video.subcategory}',
+            parentTitle: '${video.category} â€º ${video.subcategory}',
             nextRevisionAt: nextDate ??
                 DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
             currentRevisionIndex: 0,
@@ -5286,7 +5288,7 @@ class AppProvider extends ChangeNotifier {
       itemType: 'sketchy',
       action: watched ? 'watched' : 'unwatched',
       title: logVideo != null
-          ? 'Sketchy Micro — ${logVideo.title}'
+          ? 'Sketchy Micro â€” ${logVideo.title}'
           : 'Sketchy Micro #$id',
     );
   }
@@ -5316,9 +5318,9 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // SKETCHY PHARM VIDEOS (G6)
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> toggleSketchyPharmWatched(int id, bool watched) async {
     await _db.toggleSketchyPharm(id, watched);
@@ -5345,7 +5347,7 @@ class AppProvider extends ChangeNotifier {
             source: 'SKETCHY_PHARM',
             pageNumber: '',
             title: video.title,
-            parentTitle: '${video.category} › ${video.subcategory}',
+            parentTitle: '${video.category} â€º ${video.subcategory}',
             nextRevisionAt: nextDate ??
                 DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
             currentRevisionIndex: 0,
@@ -5366,7 +5368,7 @@ class AppProvider extends ChangeNotifier {
       itemType: 'sketchy',
       action: watched ? 'watched' : 'unwatched',
       title: logVideo != null
-          ? 'Sketchy Pharm — ${logVideo.title}'
+          ? 'Sketchy Pharm â€” ${logVideo.title}'
           : 'Sketchy Pharm #$id',
     );
   }
@@ -5443,9 +5445,9 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // PATHOMA CHAPTERS (G6)
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> togglePathomaChapterWatched(int id, bool watched) async {
     await _db.togglePathoma(id, watched);
@@ -5492,7 +5494,7 @@ class AppProvider extends ChangeNotifier {
       itemType: 'pathoma',
       action: watched ? 'watched' : 'unwatched',
       title: logChapter != null
-          ? 'Pathoma Ch${logChapter.chapter} — ${logChapter.title}'
+          ? 'Pathoma Ch${logChapter.chapter} â€” ${logChapter.title}'
           : 'Pathoma #$id',
     );
   }
@@ -5521,7 +5523,7 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  // ── Sketchy / Pathoma revision advance (mirrors FA page cycle) ─
+  // ═══════════════════════════════════════════════════════════════”€â”€ Sketchy / Pathoma revision advance (mirrors FA page cycle) â”€
   Future<void> advanceSketchyMicroRevision(int id) async {
     final idx = sketchyMicroVideos.indexWhere((v) => v.id == id);
     if (idx < 0) return;
@@ -5530,7 +5532,7 @@ class AppProvider extends ChangeNotifier {
       await toggleSketchyMicroWatched(id, true);
       return;
     }
-    // Already watched → advance revision
+    // Already watched â†’ advance revision
     final revId = 'sketchy-micro-$id';
     final revIdx = revisionItems.indexWhere((r) => r.id == revId);
     if (revIdx >= 0) {
@@ -5620,9 +5622,9 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // VIDEO LECTURES (V11)
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   String _videoLectureRevisionId(int id) => 'video-lecture-$id';
 
@@ -5721,7 +5723,7 @@ class AppProvider extends ChangeNotifier {
       itemId: 'video-lecture:$id',
       itemType: 'video_lecture',
       action: watched ? 'watched' : 'unwatched',
-      title: '${updatedLecture.subject} — ${updatedLecture.title}',
+      title: '${updatedLecture.subject} â€” ${updatedLecture.title}',
     );
   }
 
@@ -5772,9 +5774,9 @@ class AppProvider extends ChangeNotifier {
     await _removeVideoLectureRevisionItem(id);
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // UWORLD SESSIONS (G5)
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> addUWorldSession(UWorldSession session) async {
     await _db.insertUWorldSession(session.toJson());
@@ -5798,7 +5800,7 @@ class AppProvider extends ChangeNotifier {
           type: 'UWORLD_Q',
           source: 'UWORLD',
           pageNumber: '',
-          title: '$wrong wrong Q${wrong > 1 ? 's' : ''} — ${session.subject}',
+          title: '$wrong wrong Q${wrong > 1 ? 's' : ''} â€” ${session.subject}',
           parentTitle: 'UWorld ${session.date}',
           nextRevisionAt: nextDate ??
               DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
@@ -5820,9 +5822,9 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // UWORLD PROGRESS (G6/V4)
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> loadUWorldTopics() async {
     uworldTopics = await _db.getUWorldTopics();
@@ -5859,7 +5861,7 @@ class AppProvider extends ChangeNotifier {
         itemType: 'uworld',
         action: 'question_done',
         title:
-            topic != null ? 'UWorld — ${topic.subtopic}' : 'UWorld Topic #$id',
+            topic != null ? 'UWorld â€” ${topic.subtopic}' : 'UWorld Topic #$id',
         details:
             '{"done":$deltaDone,"correct":$deltaCorrect,"totalDone":$done,"totalCorrect":$correct}',
       );
@@ -5880,9 +5882,9 @@ class AppProvider extends ChangeNotifier {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // NOTIFICATIONS
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   /// Mark a single notification as read by id.
   void markNotificationRead(String id) {
@@ -5911,9 +5913,9 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // HABITS
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   /// Add a new habit (in-memory only for now).
   void addHabit(Habit habit) {
@@ -5951,9 +5953,9 @@ class AppProvider extends ChangeNotifier {
     }).toList();
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // COMBINED QUERIES / GETTERS
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   /// Returns combined activities for a specific date from
   /// dayPlans (blocks), timeLogs, and studyPlan.
@@ -5968,7 +5970,7 @@ class AppProvider extends ChangeNotifier {
         result.add(DateActivity(
           type: 'block',
           title: block.title,
-          subtitle: '${block.plannedStartTime} – ${block.plannedEndTime}',
+          subtitle: '${block.plannedStartTime} â€“ ${block.plannedEndTime}',
           durationMinutes: block.plannedDurationMinutes,
         ));
       }
@@ -6000,7 +6002,7 @@ class AppProvider extends ChangeNotifier {
     return result;
   }
 
-  /// Returns map of subject → total hours from timeLogs.
+  /// Returns map of subject â†’ total hours from timeLogs.
   /// Includes only study-related categories.
   Map<String, double> getSubjectBreakdown() {
     const studyCats = {
@@ -6031,9 +6033,9 @@ class AppProvider extends ChangeNotifier {
     });
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // BACKUP
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   /// Fire-and-forget backup after every write.
   Future<void> _triggerBackup() async {
@@ -6077,9 +6079,9 @@ class AppProvider extends ChangeNotifier {
     await ns.scheduleDailyRevisionReminder(revisionCount: revisionCount);
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // FULL DATA CLEAR (for backup restore)
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> clearAllAndReload() async {
     await _db.clearAllData();
@@ -6119,9 +6121,9 @@ class AppProvider extends ChangeNotifier {
     _loaded = false;
     notifyListeners();
   }
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // STREAK SYSTEM
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   /// Count FA pages whose firstReadAt falls on the given effective date.
   int getPagesReadOnDate(String dateKey, int dayStartHour) {
@@ -6190,7 +6192,7 @@ class AppProvider extends ChangeNotifier {
       return 'earned';
     }
 
-    // Not yet met — check if within 30h window
+    // Not yet met â€” check if within 30h window
     final deadline = getStreakDeadline(dayStartHour);
     if (deadline != null && now.isBefore(deadline)) {
       // Still within window
@@ -6204,7 +6206,7 @@ class AppProvider extends ChangeNotifier {
       return 'grace'; // In 6h grace period
     }
 
-    // Past 30h window — streak is broken unless credits cover it
+    // Past 30h window â€” streak is broken unless credits cover it
     return 'broken';
   }
 
@@ -6243,9 +6245,9 @@ class AppProvider extends ChangeNotifier {
     unawaited(_triggerBackup());
   }
 
-  // ═════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // LIBRARY NOTES
-  // ═════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<List<LibraryNote>> getLibraryNotes(String itemId) async {
     final docs = await DatabaseService.instance.getLibraryNotes(itemId);
@@ -6301,9 +6303,9 @@ class AppProvider extends ChangeNotifier {
     unawaited(_triggerBackup());
   }
 
-  // ═════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // LIBRARY ITEM METADATA
-  // ═════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<void> updateFAPageMetadata(FAPage updatedPage) async {
     final i = faPages.indexWhere((p) => p.pageNum == updatedPage.pageNum);
@@ -6348,9 +6350,9 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ═════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // ACTIVITY LOGS
-  // ═════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   /// Internal helper to log an activity.
   Future<void> _logActivity({
@@ -6391,9 +6393,9 @@ class AppProvider extends ChangeNotifier {
     return _db.getActivityLogsSince(since.toIso8601String());
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // DAY SESSIONS
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   final Map<String, DaySession> _daySessions = {};
 
@@ -6446,9 +6448,9 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // TIMELINE SCHEDULING
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   /// Reschedule all tasks from now.
   Future<void> rescheduleFromNow(String dateKey) async {
@@ -6617,3 +6619,5 @@ class AppProvider extends ChangeNotifier {
     return firstOverlap;
   }
 }
+
+
