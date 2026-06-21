@@ -273,6 +273,7 @@ class _MainShellState extends State<MainShell> {
           }
 
           shellChild = Scaffold(
+            resizeToAvoidBottomInset: false,
             backgroundColor: DashboardColors.background(isDark),
             body: Stack(
               children: [
