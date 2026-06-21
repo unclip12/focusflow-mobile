@@ -1555,7 +1555,7 @@ class _TimelineViewState extends State<TimelineView> {
     }
 
     final actualBottomPadding = widget.shrinkWrap
-        ? 32.0 + MediaQuery.of(context).padding.bottom
+        ? 16.0
         : bottomPadding;
 
     return ReorderableListView.builder(

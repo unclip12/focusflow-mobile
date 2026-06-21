@@ -1027,6 +1027,10 @@ class _TodayTimelineTab extends StatelessWidget {
                     ),
                   ),
           ),
+          // ── Bottom spacing to scroll past floating nav bar ───
+          SizedBox(
+            height: MediaQuery.of(context).padding.bottom + 72.0 + 24.0,
+          ),
         ],
       ),
     );
