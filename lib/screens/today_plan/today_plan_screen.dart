@@ -1364,9 +1364,10 @@ class _CompactHeader extends StatelessWidget {
         : DateFormat('EEE, d MMM').format(date);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
       child: LiquidGlassCard(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1414,23 +1415,29 @@ class _CompactHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            Text(
-              '$completedBlocks / $totalBlocks done',
-              style: TextStyle(
-                color: onSurface,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 6),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: progress.clamp(0.0, 1.0),
-                minHeight: 5,
-                backgroundColor: onSurface.withValues(alpha: 0.08),
-                valueColor: AlwaysStoppedAnimation<Color>(accent),
-              ),
+            Row(
+              children: [
+                Text(
+                  '$completedBlocks / $totalBlocks done',
+                  style: TextStyle(
+                    color: onSurface,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: progress.clamp(0.0, 1.0),
+                      minHeight: 4,
+                      backgroundColor: onSurface.withValues(alpha: 0.08),
+                      valueColor: AlwaysStoppedAnimation<Color>(accent),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 6),
             Row(
@@ -1547,7 +1554,7 @@ class _WeekDayColumn extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Container(
               width: 30,
               height: 30,
@@ -1569,7 +1576,7 @@ class _WeekDayColumn extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             SizedBox(
               height: 6,
               child: Row(
@@ -1705,25 +1712,27 @@ class _QuickActionCard extends StatelessWidget {
 
     return LiquidGlassCard(
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      borderRadius: BorderRadius.circular(16),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      borderRadius: BorderRadius.circular(12),
       child: SizedBox(
-        height: 46,
-        child: Column(
+        height: 24,
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               emoji,
-              style: const TextStyle(fontSize: 20),
+              style: const TextStyle(fontSize: 16),
             ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: onSurface,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: onSurface,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
