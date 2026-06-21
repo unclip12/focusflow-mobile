@@ -139,15 +139,12 @@ double _timelinePillHeight(int minutes) {
   return scaledHeight < 56.0 ? 56.0 : scaledHeight;
 }
 
-const double _kTimelineHandleWidth = 14;
-const double _kTimelineHandleGap = 4;
-const double _kTimelineLeadingWidth =
-    _kTimelineHandleWidth + _kTimelineHandleGap;
-const double _kTimelineTimeWidth = 36;
-const double _kTimelineTimeToPillGap = 4;
-const double _kTimelinePillWidth = 46;
-const double _kTimelineContentGap = 8;
-const double _kTimelineStatusSize = 20;
+const double _kTimelineLeadingWidth = 8.0;
+const double _kTimelineTimeWidth = 68.0;
+const double _kTimelineTimeToPillGap = 8.0;
+const double _kTimelinePillWidth = 40.0;
+const double _kTimelineContentGap = 12.0;
+const double _kTimelineStatusSize = 24.0;
 const Color _kTimelineAccent = Color(0xFFE8837A);
 const Color _kTimelineGapAccent = _kTimelineAccent;
 const double _kNowOverlayHeight = 24;
@@ -1644,8 +1641,8 @@ class _TimelineViewState extends State<TimelineView> {
         return KeyedSubtree(
           key: ValueKey('block_${block.id}_${slice.relation.name}'),
           child: _BlockCard(
+            index: index,
             slice: slice,
-            leading: const SizedBox(width: 22),
             onTap: () => _onBlockTap(block),
             onLongPress: () => _onBlockLongPress(block),
             onStatusTap: _isLockedBlock(block) ||
@@ -1702,6 +1699,44 @@ class _ReminderTimelineRow extends StatelessWidget {
     final accent = occurrence.isOverdue
         ? const Color(0xFFD97706)
         : const Color(0xFF6366F1);
+    final isCompleted = occurrence.completed;
+    final ringColor = isCompleted
+        ? accent.withValues(alpha: 0.3)
+        : onSurface.withValues(alpha: 0.2);
+    final doneColor = accent.withValues(alpha: 0.16);
+
+    Widget buildStatusIndicator() {
+      final indicator = Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isCompleted ? doneColor : Colors.transparent,
+            border: Border.all(
+              color: isCompleted ? doneColor : ringColor,
+              width: isCompleted ? 1.5 : 1.8,
+            ),
+          ),
+          child: isCompleted
+              ? Icon(
+                  Icons.check_rounded,
+                  size: 14,
+                  color: accent,
+                )
+              : null,
+        ),
+      );
+
+      if (onToggle == null) return indicator;
+
+      return GestureDetector(
+        onTap: () => unawaited(onToggle!(!isCompleted)),
+        behavior: HitTestBehavior.opaque,
+        child: indicator,
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -1711,46 +1746,76 @@ class _ReminderTimelineRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(width: _kTimelineLeadingWidth),
+            // Column 1: Time Column
             SizedBox(
               width: _kTimelineTimeWidth,
-              child: Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Text(
-                    _to12hShort(_minutesToHHMM(reminderMinutes)),
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: accent,
+              height: 72,
+              child: Stack(
+                children: [
+                  Positioned(
+                    top: 12,
+                    right: 0,
+                    child: Text(
+                      _to12hShort(_minutesToHHMM(reminderMinutes)),
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: accent,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
             const SizedBox(width: _kTimelineTimeToPillGap),
+
+            // Column 2: Center Column
             SizedBox(
               width: _kTimelinePillWidth,
-              child: Center(
-                child: Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    color: accent,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: accent.withValues(alpha: 0.24),
-                        blurRadius: 10,
-                        spreadRadius: 1,
-                      ),
-                    ],
+              height: 72,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // Continuous vertical line
+                  Positioned(
+                    top: 0,
+                    bottom: 0,
+                    left: (_kTimelinePillWidth - 3.0) / 2, // Centered
+                    width: 3.0,
+                    child: Container(
+                      color: isCompleted
+                          ? accent
+                          : theme.dividerColor.withValues(alpha: 0.4),
+                    ),
                   ),
-                ),
+                  // Center dot circle
+                  Positioned(
+                    top: 16,
+                    left: (_kTimelinePillWidth - 10.0) / 2, // Centered
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: accent,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: accent.withValues(alpha: 0.24),
+                            blurRadius: 10,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(width: _kTimelineContentGap),
+
+            // Column 3: Expanded Card Container
             Expanded(
               child: Material(
                 color: Colors.transparent,
@@ -1763,96 +1828,75 @@ class _ReminderTimelineRow extends StatelessWidget {
                       vertical: 12,
                     ),
                     decoration: BoxDecoration(
-                      color: occurrence.completed
+                      color: isCompleted
                           ? accent.withValues(alpha: 0.08)
                           : theme.colorScheme.surfaceContainerHighest
                               .withValues(alpha: 0.42),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: accent.withValues(
-                          alpha: occurrence.completed ? 0.16 : 0.28,
+                          alpha: isCompleted ? 0.16 : 0.28,
                         ),
                       ),
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                occurrence.title,
+                        Text(
+                          occurrence.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: onSurface.withValues(
+                              alpha: isCompleted ? 0.45 : 1,
+                            ),
+                            decoration: isCompleted
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                occurrence.isOverdue
+                                    ? 'Reminder carried from ${DateFormat('d MMM').format(DateTime.parse(occurrence.occurrenceKey))}'
+                                    : 'Reminder',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: onSurface.withValues(
-                                    alpha: occurrence.completed ? 0.45 : 1,
-                                  ),
-                                  decoration: occurrence.completed
-                                      ? TextDecoration.lineThrough
-                                      : null,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: onSurface.withValues(alpha: 0.56),
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      occurrence.isOverdue
-                                          ? 'Reminder carried from ${DateFormat('d MMM').format(DateTime.parse(occurrence.occurrenceKey))}'
-                                          : 'Reminder',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color:
-                                            onSurface.withValues(alpha: 0.56),
-                                      ),
-                                    ),
+                            ),
+                            if (occurrence.isOverdue) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: accent.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  'Overdue',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: accent,
                                   ),
-                                  if (occurrence.isOverdue) ...[
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 3,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: accent.withValues(alpha: 0.12),
-                                        borderRadius:
-                                            BorderRadius.circular(999),
-                                      ),
-                                      child: Text(
-                                        'Overdue',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w800,
-                                          color: accent,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
+                                ),
                               ),
                             ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Checkbox(
-                          value: occurrence.completed,
-                          activeColor: accent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          onChanged: onToggle == null
-                              ? null
-                              : (value) => unawaited(
-                                    onToggle!(value ?? !occurrence.completed),
-                                  ),
+                          ],
                         ),
                       ],
                     ),
@@ -1860,6 +1904,10 @@ class _ReminderTimelineRow extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(width: 10),
+
+            // Column 4: Status Checkbox indicator
+            buildStatusIndicator(),
           ],
         ),
       ),
@@ -2389,8 +2437,8 @@ class _BlockCard extends StatelessWidget {
 */
 
 class _BlockCard extends StatelessWidget {
+  final int index;
   final _TimelineBlockSlice slice;
-  final Widget? leading;
   final VoidCallback? onLongPress;
   final VoidCallback? onTap;
   final VoidCallback? onStatusTap;
@@ -2401,8 +2449,8 @@ class _BlockCard extends StatelessWidget {
   final Color nowLineBackgroundColor;
 
   const _BlockCard({
+    required this.index,
     required this.slice,
-    this.leading,
     this.onTap,
     this.onLongPress,
     this.onStatusTap,
@@ -2451,168 +2499,50 @@ class _BlockCard extends StatelessWidget {
     }
   }
 
-  Widget _buildSinglePill({
-    required double height,
-    required Color backgroundColor,
-    required Color borderColor,
-    required Color accentColor,
-    required Color iconColor,
-  }) {
-    return Container(
-      width: _kTimelinePillWidth,
-      height: height,
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: borderColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            left: 6,
-            top: 8,
-            bottom: 8,
-            child: Container(
-              width: 3,
-              decoration: BoxDecoration(
-                color: accentColor.withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-          ),
-          Center(
-            child: Tooltip(
-              message: _categoryLabel(block),
-              child: Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: accentColor.withValues(alpha: 0.14),
-                ),
-                child: Icon(
-                  _iconForBlock(),
-                  size: 18,
-                  color: iconColor,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildCategoryIconCircle(BuildContext context, bool isDone, Color accent) {
+    final theme = Theme.of(context);
+    final isLocked = block.isEvent || block.id.startsWith('prayer_');
+    final isMovable = slice.relation == _TimelineBlockRelation.sameDay && !isLocked;
 
-  Widget _buildDualTrackPills({
-    required double cardHeight,
-    required Color plannedColor,
-    required Color actualColor,
-    required Color labelColor,
-    required Color actualLabelColor,
-    required Color checkIconColor,
-    required String plannedLabel,
-    required String actualLabel,
-    required double plannedHeight,
-    required double actualHeight,
-    required Color accentColor,
-  }) {
-    return SizedBox(
-      width: 60,
-      height: cardHeight,
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  plannedLabel,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: labelColor,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  actualLabel,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: actualLabelColor,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Container(
-                      width: 28,
-                      height: plannedHeight,
-                      decoration: BoxDecoration(
-                        color: plannedColor,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: accentColor.withValues(alpha: 0.12),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Container(
-                      width: 28,
-                      height: actualHeight,
-                      decoration: BoxDecoration(
-                        color: actualColor,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: accentColor.withValues(alpha: 0.18),
-                        ),
-                      ),
-                      child: Center(
-                        child: Icon(
-                          Icons.check_rounded,
-                          size: 14,
-                          color: checkIconColor,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+    final circle = Tooltip(
+      message: _categoryLabel(block),
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isDone
+              ? accent
+              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
+          border: Border.all(
+            color: accent.withValues(
+              alpha: isDone ? 0.4 : 0.2,
             ),
+            width: 1.5,
           ),
-        ],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 6,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Icon(
+          _iconForBlock(),
+          size: 18,
+          color: isDone ? Colors.white : accent,
+        ),
       ),
     );
+
+    if (isMovable) {
+      return ReorderableDragStartListener(
+        index: index,
+        child: circle,
+      );
+    }
+    return circle;
   }
 
   Widget _buildStatusIndicator({
@@ -2772,7 +2702,6 @@ class _BlockCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
-    final onSurfaceVariant = theme.colorScheme.onSurfaceVariant;
     final timeLabelColor =
         theme.textTheme.bodySmall?.color ?? theme.colorScheme.onSurfaceVariant;
     final accent = _baseBlockColor(block);
@@ -2780,13 +2709,12 @@ class _BlockCard extends StatelessWidget {
     final plannedDuration = _resolvedBlockDurationMinutes(block);
     final isDone = block.status == BlockStatus.done;
     final isSplit = block.splitTotalParts != null && block.splitTotalParts! > 1;
-    final neutralPillColor = theme.colorScheme.surface.withValues(alpha: 0.78);
-    final pillBorderColor = onSurface.withValues(alpha: isDone ? 0.1 : 0.08);
     final completedPillColor = accent.withValues(alpha: 0.16);
     final statusRingColor = isDone
         ? accent.withValues(alpha: 0.3)
         : onSurface.withValues(alpha: 0.2);
     final startLabel = slice.startLabel;
+    final endLabel = _to12hShort(_minutesToHHMM(slice.visibleEndMinutes));
     final rangeLabel = slice.rangeLabel;
     final isAdHocBlock = block.isAdHocTrack == true;
     final actualStartTime =
@@ -2847,61 +2775,98 @@ class _BlockCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (leading != null) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: SizedBox(
-                        width: _kTimelineHandleWidth,
-                        child: leading,
-                      ),
-                    ),
-                    const SizedBox(width: _kTimelineHandleGap),
-                  ],
+                  // Column 1: Time Column (start label top, end label bottom)
                   SizedBox(
                     width: _kTimelineTimeWidth,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        startLabel,
-                        textAlign: TextAlign.right,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: timeLabelColor,
-                          fontFeatures: [FontFeature.tabularFigures()],
+                    height: cardHeight,
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          top: 4,
+                          right: 0,
+                          child: Text(
+                            startLabel,
+                            textAlign: TextAlign.right,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: timeLabelColor,
+                              fontFeatures: const [FontFeature.tabularFigures()],
+                            ),
+                          ),
                         ),
-                      ),
+                        if (occupiedDuration >= 15)
+                          Positioned(
+                            bottom: 4,
+                            right: 0,
+                            child: Text(
+                              endLabel,
+                              textAlign: TextAlign.right,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: timeLabelColor.withValues(alpha: 0.55),
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: _kTimelineTimeToPillGap),
-                  showDualTrack
-                      ? _buildDualTrackPills(
-                          cardHeight: cardHeight,
-                          plannedColor:
-                              theme.colorScheme.surface.withValues(alpha: 0.66),
-                          actualColor: completedPillColor,
-                          labelColor: onSurface.withValues(alpha: 0.52),
-                          actualLabelColor: onSurfaceVariant,
-                          checkIconColor: onSurface,
-                          plannedLabel: _to12hShort(block.plannedEndTime),
-                          actualLabel: _to12hShort(actualEndTime),
-                          plannedHeight: plannedTrackHeight,
-                          actualHeight: actualTrackHeight,
-                          accentColor: accent,
-                        )
-                      : _buildSinglePill(
-                          height: cardHeight,
-                          backgroundColor: neutralPillColor,
-                          borderColor: pillBorderColor,
-                          accentColor: accent,
-                          iconColor: accent,
+
+                  // Column 2: Center Column (Continuous vertical line + circular icon container)
+                  SizedBox(
+                    width: _kTimelinePillWidth,
+                    height: cardHeight,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        // Continuous vertical line segment
+                        Positioned(
+                          top: 0,
+                          bottom: 0,
+                          left: (_kTimelinePillWidth - 3.0) / 2, // Centered
+                          width: 3.0,
+                          child: Container(
+                            color: isDone
+                                ? accent
+                                : theme.dividerColor.withValues(alpha: 0.4),
+                          ),
                         ),
+                        // Category Icon Circle
+                        Positioned(
+                          top: 4,
+                          left: (_kTimelinePillWidth - 36.0) / 2, // Centered
+                          child: _buildCategoryIconCircle(context, isDone, accent),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(width: _kTimelineContentGap),
+
+                  // Column 3: Expanded Card Container
                   Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(top: isCompactCard ? 0 : 4),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isDone
+                            ? accent.withValues(alpha: 0.08)
+                            : theme.colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.42),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: accent.withValues(
+                            alpha: isDone ? 0.16 : 0.28,
+                          ),
+                        ),
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
                             block.title,
@@ -3072,6 +3037,8 @@ class _BlockCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 10),
+
+                  // Column 4: Status Indicator checkbox circle outline ring
                   _buildStatusIndicator(
                     isDone: isDone,
                     ringColor: statusRingColor,
@@ -3504,75 +3471,95 @@ class _GapSlot extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(width: _kTimelineLeadingWidth),
+                    // Column 1: Time Column (start label top, hour ticks relative to gap height)
                     SizedBox(
                       width: _kTimelineTimeWidth,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: _kGapRowVerticalPadding,
-                        ),
-                        child: Stack(
-                          children: [
-                            Positioned(
-                              top: 0,
-                              right: 0,
-                              child: Text(
-                                startLabel,
-                                textAlign: TextAlign.right,
-                                style: TextStyle(
+                      height: gapHeight,
+                      child: Stack(
+                        children: [
+                          Positioned(
+                            top: 4,
+                            right: 0,
+                            child: Text(
+                              startLabel,
+                              textAlign: TextAlign.right,
+                              style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                   color: timeLabelColor,
-                                  fontFeatures: [FontFeature.tabularFigures()],
+                                  fontFeatures: const [FontFeature.tabularFigures()]),
+                            ),
+                          ),
+                          ...hourTicks.map((tick) {
+                            final fraction = (tick - startMinutes) / gapMinutes;
+                            final topPos = fraction * gapHeight;
+                            return Positioned(
+                              top: topPos - 6,
+                              right: 0,
+                              child: Text(
+                                _to12hShort(_minutesToHHMM(tick)),
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                  color: timeLabelColor.withValues(alpha: 0.7),
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures()
+                                  ],
                                 ),
                               ),
-                            ),
-                            ...hourTicks.map((tick) {
-                              final fraction =
-                                  (tick - startMinutes) / gapMinutes;
-                              final topPos = fraction *
-                                  (gapHeight - (_kGapRowVerticalPadding * 2));
-                              return Positioned(
-                                top: topPos - 6,
-                                right: 0,
-                                child: Text(
-                                  _to12hShort(_minutesToHHMM(tick)),
-                                  textAlign: TextAlign.right,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w500,
-                                    color: timeLabelColor,
-                                    fontFeatures: [
-                                      FontFeature.tabularFigures()
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }),
-                          ],
-                        ),
+                            );
+                          }),
+                        ],
                       ),
                     ),
                     const SizedBox(width: _kTimelineTimeToPillGap),
+
+                    // Column 2: Center Column (dashed line + hourly tick circles)
                     SizedBox(
                       width: _kTimelinePillWidth,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: _kGapRowVerticalPadding,
-                        ),
-                        child: Center(
-                          child: CustomPaint(
-                            size: Size(
-                              2,
-                              gapHeight - (_kGapRowVerticalPadding * 2),
-                            ),
-                            painter: _DashedLinePainter(
-                              color: theme.dividerColor.withValues(alpha: 0.7),
+                      height: gapHeight,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          // Continuous dashed vertical line
+                          Positioned(
+                            top: 0,
+                            bottom: 0,
+                            left: (_kTimelinePillWidth - 2.0) / 2, // Centered
+                            child: CustomPaint(
+                              size: const Size(2, double.infinity),
+                              painter: _DashedLinePainter(
+                                color: theme.dividerColor.withValues(alpha: 0.7),
+                              ),
                             ),
                           ),
-                        ),
+                          ...hourTicks.map((tick) {
+                            final fraction = (tick - startMinutes) / gapMinutes;
+                            final topPos = fraction * gapHeight;
+                            return Positioned(
+                              top: topPos - 4,
+                              left: (_kTimelinePillWidth - 8.0) / 2, // Centered
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: theme.colorScheme.surface,
+                                  border: Border.all(
+                                    color: theme.dividerColor.withValues(alpha: 0.5),
+                                    width: 1.5,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                        ],
                       ),
                     ),
                     const SizedBox(width: _kTimelineContentGap),
+
+                    // Column 3: Expanded Card Container
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
