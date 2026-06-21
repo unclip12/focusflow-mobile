@@ -29,11 +29,15 @@ Future<void> showReminderEditorSheet(
 class ReminderTab extends StatelessWidget {
   final String dateKey;
   final String? highlightedReminderId;
+  final ScrollPhysics? physics;
+  final bool shrinkWrap;
 
   const ReminderTab({
     super.key,
     required this.dateKey,
     this.highlightedReminderId,
+    this.physics,
+    this.shrinkWrap = false,
   });
 
   @override
@@ -43,7 +47,88 @@ class ReminderTab extends StatelessWidget {
     final reminders = app.getReminderOccurrencesForDate(dateKey);
     final completedCount = reminders.where((item) => item.completed).length;
 
+    final listWidget = reminders.isEmpty
+        ? Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.notifications_none_rounded,
+                  size: 48,
+                  color: cs.primary.withValues(alpha: 0.25),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'No reminders yet',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: cs.onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Tap + to add a reminder',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.onSurface.withValues(alpha: 0.35),
+                  ),
+                ),
+              ],
+            ),
+          )
+        : ListView.builder(
+            shrinkWrap: shrinkWrap,
+            physics: physics,
+            padding: EdgeInsets.fromLTRB(
+              16,
+              8,
+              16,
+              shrinkWrap ? 16 : MediaQuery.of(context).padding.bottom + 24,
+            ),
+            itemCount: reminders.length,
+            itemBuilder: (context, index) {
+              final occurrence = reminders[index];
+              return Dismissible(
+                key: Key(
+                  'reminder_${occurrence.reminderId}_${occurrence.occurrenceKey}',
+                ),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 16),
+                  decoration: BoxDecoration(
+                    color: cs.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.delete_rounded, color: cs.error),
+                ),
+                onDismissed: (_) =>
+                    context.read<AppProvider>().deleteReminder(
+                          occurrence.reminderId,
+                        ),
+                child: _ReminderOccurrenceTile(
+                  occurrence: occurrence,
+                  highlighted:
+                      highlightedReminderId == occurrence.reminderId,
+                  onTap: () => showReminderEditorSheet(
+                    context,
+                    dateKey: dateKey,
+                    existing: occurrence.reminder,
+                  ),
+                  onToggle: () => context
+                      .read<AppProvider>()
+                      .setReminderOccurrenceCompleted(
+                        reminderId: occurrence.reminderId,
+                        occurrenceKey: occurrence.occurrenceKey,
+                        completed: !occurrence.completed,
+                      ),
+                ),
+              );
+            },
+          );
+
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -69,85 +154,7 @@ class ReminderTab extends StatelessWidget {
             ],
           ),
         ),
-        Expanded(
-          child: reminders.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.notifications_none_rounded,
-                        size: 48,
-                        color: cs.primary.withValues(alpha: 0.25),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'No reminders yet',
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: cs.onSurface.withValues(alpha: 0.5),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Tap + to add a reminder',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: cs.onSurface.withValues(alpha: 0.35),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : ListView.builder(
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    8,
-                    16,
-                    MediaQuery.of(context).padding.bottom + 24,
-                  ),
-                  itemCount: reminders.length,
-                  itemBuilder: (context, index) {
-                    final occurrence = reminders[index];
-                    return Dismissible(
-                      key: Key(
-                        'reminder_${occurrence.reminderId}_${occurrence.occurrenceKey}',
-                      ),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 16),
-                        decoration: BoxDecoration(
-                          color: cs.error.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(Icons.delete_rounded, color: cs.error),
-                      ),
-                      onDismissed: (_) =>
-                          context.read<AppProvider>().deleteReminder(
-                                occurrence.reminderId,
-                              ),
-                      child: _ReminderOccurrenceTile(
-                        occurrence: occurrence,
-                        highlighted:
-                            highlightedReminderId == occurrence.reminderId,
-                        onTap: () => showReminderEditorSheet(
-                          context,
-                          dateKey: dateKey,
-                          existing: occurrence.reminder,
-                        ),
-                        onToggle: () => context
-                            .read<AppProvider>()
-                            .setReminderOccurrenceCompleted(
-                              reminderId: occurrence.reminderId,
-                              occurrenceKey: occurrence.occurrenceKey,
-                              completed: !occurrence.completed,
-                            ),
-                      ),
-                    );
-                  },
-                ),
-        ),
+        shrinkWrap ? listWidget : Expanded(child: listWidget),
       ],
     );
   }

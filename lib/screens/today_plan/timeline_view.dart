@@ -343,6 +343,8 @@ class TimelineView extends StatefulWidget {
   final Future<void> Function(ReminderOccurrence occurrence)? onReminderTap;
   final Future<void> Function(ReminderOccurrence occurrence, bool completed)?
       onReminderToggle;
+  final ScrollPhysics? physics;
+  final bool shrinkWrap;
 
   const TimelineView({
     super.key,
@@ -353,6 +355,8 @@ class TimelineView extends StatefulWidget {
     this.onOpenDate,
     this.onReminderTap,
     this.onReminderToggle,
+    this.physics,
+    this.shrinkWrap = false,
   });
 
   @override
@@ -1550,11 +1554,17 @@ class _TimelineViewState extends State<TimelineView> {
       );
     }
 
+    final actualBottomPadding = widget.shrinkWrap
+        ? 32.0 + MediaQuery.of(context).padding.bottom
+        : bottomPadding;
+
     return ReorderableListView.builder(
       buildDefaultDragHandles: false,
-      padding: EdgeInsets.fromLTRB(0, 8, 0, bottomPadding),
+      padding: EdgeInsets.fromLTRB(0, 8, 0, actualBottomPadding),
       itemCount: items.length,
       onReorder: (oldIndex, newIndex) => _onReorder(oldIndex, newIndex, items),
+      physics: widget.physics,
+      shrinkWrap: widget.shrinkWrap,
       itemBuilder: (context, index) {
         final item = items[index];
         if (item.isGap) {

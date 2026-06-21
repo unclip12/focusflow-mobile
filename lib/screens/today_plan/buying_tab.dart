@@ -11,7 +11,15 @@ import 'shopping_flow_overlay.dart';
 
 class BuyingTab extends StatelessWidget {
   final String dateKey;
-  const BuyingTab({super.key, required this.dateKey});
+  final ScrollPhysics? physics;
+  final bool shrinkWrap;
+
+  const BuyingTab({
+    super.key,
+    required this.dateKey,
+    this.physics,
+    this.shrinkWrap = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +28,117 @@ class BuyingTab extends StatelessWidget {
     final items = app.getBuyingItemsForDate(dateKey);
     final checkedCount = items.where((i) => i.checked).length;
 
+    final listWidget = items.isEmpty
+        ? Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('🛒', style: TextStyle(fontSize: 48)),
+                const SizedBox(height: 12),
+                Text(
+                  'No buying items yet',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: cs.onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Tap + to add an item',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.onSurface.withValues(alpha: 0.35),
+                  ),
+                ),
+              ],
+            ),
+          )
+        : ListView.builder(
+            shrinkWrap: shrinkWrap,
+            physics: physics,
+            padding: EdgeInsets.fromLTRB(
+              16,
+              4,
+              16,
+              shrinkWrap ? 16 : MediaQuery.of(context).padding.bottom + 24,
+            ),
+            itemCount: items.length,
+            itemBuilder: (context, i) {
+              final item = items[i];
+              return Dismissible(
+                key: Key(item.id),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 16),
+                  decoration: BoxDecoration(
+                    color: cs.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.delete_rounded, color: cs.error),
+                ),
+                onDismissed: (_) => app.deleteBuyingItem(item.id),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 4),
+                  decoration: BoxDecoration(
+                    color: item.checked
+                        ? const Color(0xFF10B981).withValues(alpha: 0.05)
+                        : cs.surfaceContainerHighest
+                            .withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: CheckboxListTile(
+                    value: item.checked,
+                    onChanged: (_) {
+                      app.upsertBuyingItem(
+                          item.copyWith(checked: !item.checked));
+                    },
+                    activeColor: const Color(0xFF10B981),
+                    checkboxShape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    title: Text(
+                      item.name,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        decoration: item.checked
+                            ? TextDecoration.lineThrough
+                            : null,
+                        color: item.checked
+                            ? cs.onSurface.withValues(alpha: 0.4)
+                            : cs.onSurface,
+                      ),
+                    ),
+                    subtitle: _buildSubtitle(item, cs),
+                    secondary: item.quantity != null
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF59E0B)
+                                  .withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '${item.quantity}${item.unit != null ? ' ${item.unit}' : ''}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFF59E0B),
+                              ),
+                            ),
+                          )
+                        : null,
+                    dense: true,
+                  ),
+                ),
+              );
+            },
+          );
+
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         // ── Header ────────────────────────────────────────────
         Padding(
@@ -68,114 +186,7 @@ class BuyingTab extends StatelessWidget {
           ),
 
         // ── Items ─────────────────────────────────────────────
-        Expanded(
-          child: items.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('🛒', style: TextStyle(fontSize: 48)),
-                      const SizedBox(height: 12),
-                      Text(
-                        'No buying items yet',
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: cs.onSurface.withValues(alpha: 0.5),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Tap + to add an item',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: cs.onSurface.withValues(alpha: 0.35),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : ListView.builder(
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    4,
-                    16,
-                    MediaQuery.of(context).padding.bottom + 24,
-                  ),
-                  itemCount: items.length,
-                  itemBuilder: (context, i) {
-                    final item = items[i];
-                    return Dismissible(
-                      key: Key(item.id),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 16),
-                        decoration: BoxDecoration(
-                          color: cs.error.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(Icons.delete_rounded, color: cs.error),
-                      ),
-                      onDismissed: (_) => app.deleteBuyingItem(item.id),
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 4),
-                        decoration: BoxDecoration(
-                          color: item.checked
-                              ? const Color(0xFF10B981).withValues(alpha: 0.05)
-                              : cs.surfaceContainerHighest
-                                  .withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: CheckboxListTile(
-                          value: item.checked,
-                          onChanged: (_) {
-                            app.upsertBuyingItem(
-                                item.copyWith(checked: !item.checked));
-                          },
-                          activeColor: const Color(0xFF10B981),
-                          checkboxShape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          title: Text(
-                            item.name,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              decoration: item.checked
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                              color: item.checked
-                                  ? cs.onSurface.withValues(alpha: 0.4)
-                                  : cs.onSurface,
-                            ),
-                          ),
-                          subtitle: _buildSubtitle(item, cs),
-                          secondary: item.quantity != null
-                              ? Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF59E0B)
-                                        .withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    '${item.quantity}${item.unit != null ? ' ${item.unit}' : ''}',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFFF59E0B),
-                                    ),
-                                  ),
-                                )
-                              : null,
-                          dense: true,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-        ),
+        shrinkWrap ? listWidget : Expanded(child: listWidget),
       ],
     );
   }

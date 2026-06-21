@@ -11,7 +11,15 @@ import 'package:focusflow_mobile/models/todo_item.dart';
 
 class TodoTab extends StatelessWidget {
   final String dateKey;
-  const TodoTab({super.key, required this.dateKey});
+  final ScrollPhysics? physics;
+  final bool shrinkWrap;
+
+  const TodoTab({
+    super.key,
+    required this.dateKey,
+    this.physics,
+    this.shrinkWrap = false,
+  });
 
   static const _categories = ['Studies', 'Daily Life', 'Other'];
   static const _categoryIcons = {
@@ -31,7 +39,96 @@ class TodoTab extends StatelessWidget {
     final app = context.watch<AppProvider>();
     final todos = app.getTodoItemsForDate(dateKey);
 
+    final listWidget = todos.isEmpty
+        ? Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.checklist_rounded,
+                    size: 48, color: cs.primary.withValues(alpha: 0.25)),
+                const SizedBox(height: 12),
+                Text(
+                  'No to-do items yet',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: cs.onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Tap + to add a task',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.onSurface.withValues(alpha: 0.35),
+                  ),
+                ),
+              ],
+            ),
+          )
+        : ListView(
+            shrinkWrap: shrinkWrap,
+            physics: physics,
+            padding: EdgeInsets.fromLTRB(
+              16,
+              8,
+              16,
+              shrinkWrap ? 16 : MediaQuery.of(context).padding.bottom + 24,
+            ),
+            children: _categories.map((cat) {
+              final catItems =
+                  todos.where((t) => t.category == cat).toList();
+              if (catItems.isEmpty) return const SizedBox.shrink();
+              final color = _categoryColors[cat]!;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8, bottom: 6),
+                    child: Row(
+                      children: [
+                        Icon(_categoryIcons[cat], size: 16, color: color),
+                        const SizedBox(width: 6),
+                        Text(
+                          cat,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: color,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${catItems.where((t) => t.completed).length}/${catItems.length}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: cs.onSurface.withValues(alpha: 0.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ...catItems.map((item) => _TodoItemTile(
+                        item: item,
+                        color: color,
+                        onToggle: () {
+                          final updated = item.copyWith(
+                            completed: !item.completed,
+                            completedAt: !item.completed
+                                ? DateTime.now().toIso8601String()
+                                : null,
+                          );
+                          app.upsertTodoItem(updated);
+                        },
+                        onDelete: () => app.deleteTodoItem(item.id),
+                      )),
+                  const SizedBox(height: 4),
+                ],
+              );
+            }).toList(),
+          );
+
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         // ── Add button ────────────────────────────────────────
         Padding(
@@ -57,93 +154,7 @@ class TodoTab extends StatelessWidget {
         ),
 
         // ── Category groups ───────────────────────────────────
-        Expanded(
-          child: todos.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.checklist_rounded,
-                          size: 48, color: cs.primary.withValues(alpha: 0.25)),
-                      const SizedBox(height: 12),
-                      Text(
-                        'No to-do items yet',
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: cs.onSurface.withValues(alpha: 0.5),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Tap + to add a task',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: cs.onSurface.withValues(alpha: 0.35),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : ListView(
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    8,
-                    16,
-                    MediaQuery.of(context).padding.bottom + 24,
-                  ),
-                  children: _categories.map((cat) {
-                    final catItems =
-                        todos.where((t) => t.category == cat).toList();
-                    if (catItems.isEmpty) return const SizedBox.shrink();
-                    final color = _categoryColors[cat]!;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8, bottom: 6),
-                          child: Row(
-                            children: [
-                              Icon(_categoryIcons[cat], size: 16, color: color),
-                              const SizedBox(width: 6),
-                              Text(
-                                cat,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: color,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '${catItems.where((t) => t.completed).length}/${catItems.length}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: cs.onSurface.withValues(alpha: 0.4),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        ...catItems.map((item) => _TodoItemTile(
-                              item: item,
-                              color: color,
-                              onToggle: () {
-                                final updated = item.copyWith(
-                                  completed: !item.completed,
-                                  completedAt: !item.completed
-                                      ? DateTime.now().toIso8601String()
-                                      : null,
-                                );
-                                app.upsertTodoItem(updated);
-                              },
-                              onDelete: () => app.deleteTodoItem(item.id),
-                            )),
-                        const SizedBox(height: 4),
-                      ],
-                    );
-                  }).toList(),
-                ),
-        ),
+        shrinkWrap ? listWidget : Expanded(child: listWidget),
       ],
     );
   }

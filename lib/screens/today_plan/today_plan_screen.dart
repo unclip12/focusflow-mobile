@@ -979,32 +979,32 @@ class _TodayTimelineTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final isSubTabActive = selectedSubTab != _subTabTimeline;
 
-    return Column(
-      children: [
-        // ── Header (always visible) ──────────────────────────
-        _CompactHeader(
-          date: date,
-          isToday: isToday,
-          totalBlocks: totalBlocks,
-          completedBlocks: completedBlocks,
-          onPrev: onPrev,
-          onNext: onNext,
-          onDateTap: onDateTap,
-          onStartDay: onStartDay,
-          onStudySession: onStudySession,
-          onTrackNow: onTrackNow,
-          onQuickAdd: () => onQuickAdd(),
-          quickAddLabel: quickAddLabel,
-          onSelectDate: onSelectDate,
-        ),
-        // ── Sub-tab pills: Reminder | To-Do | Buying ─────────
-        _SubTabPillRow(
-          selectedIndex: selectedSubTab,
-          onChanged: onSubTabChanged,
-        ),
-        // ── Content: timeline or sub-tab content ─────────────
-        Expanded(
-          child: AnimatedSwitcher(
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // ── Header (always visible) ──────────────────────────
+          _CompactHeader(
+            date: date,
+            isToday: isToday,
+            totalBlocks: totalBlocks,
+            completedBlocks: completedBlocks,
+            onPrev: onPrev,
+            onNext: onNext,
+            onDateTap: onDateTap,
+            onStartDay: onStartDay,
+            onStudySession: onStudySession,
+            onTrackNow: onTrackNow,
+            onQuickAdd: () => onQuickAdd(),
+            quickAddLabel: quickAddLabel,
+            onSelectDate: onSelectDate,
+          ),
+          // ── Sub-tab pills: Reminder | To-Do | Buying ─────────
+          _SubTabPillRow(
+            selectedIndex: selectedSubTab,
+            onChanged: onSubTabChanged,
+          ),
+          // ── Content: timeline or sub-tab content ─────────────
+          AnimatedSwitcher(
             duration: const Duration(milliseconds: 220),
             child: isSubTabActive
                 ? KeyedSubtree(
@@ -1022,11 +1022,13 @@ class _TodayTimelineTab extends StatelessWidget {
                       onOpenDate: onSelectDate,
                       onReminderTap: onReminderTap,
                       onReminderToggle: onReminderToggle,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
                     ),
                   ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1036,11 +1038,21 @@ class _TodayTimelineTab extends StatelessWidget {
         return ReminderTab(
           dateKey: dateKey,
           highlightedReminderId: highlightedReminderId,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
         );
       case _subTabTodo:
-        return TodoTab(dateKey: dateKey);
+        return TodoTab(
+          dateKey: dateKey,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+        );
       case _subTabBuying:
-        return BuyingTab(dateKey: dateKey);
+        return BuyingTab(
+          dateKey: dateKey,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+        );
       default:
         return const SizedBox.shrink();
     }
