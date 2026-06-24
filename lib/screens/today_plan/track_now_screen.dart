@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:math';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
@@ -62,6 +63,7 @@ class _TrackNowScreenState extends State<TrackNowScreen>
   // Recently tracked tasks
   List<MapEntry<String, Map<String, dynamic>>> _recentTasks = [];
   bool _showAllRecent = false;
+  String? _notesHint;
 
   // "Started X minutes ago" backfill (0 = right now)
   int _backfillMinutes = 0;
@@ -87,6 +89,7 @@ class _TrackNowScreenState extends State<TrackNowScreen>
         _selectedTaskTitle = linkedTaskTitle;
         _nameCtrl.text = linkedTaskTitle ?? activity.label;
         _notesCtrl.text = activity.notes ?? '';
+        _notesHint = _generateNotesHint(linkedTaskTitle ?? activity.label);
         _trackingActivityId = activity.id;
         _isTracking = true;
         if (activity.startedAt != null) {
@@ -436,6 +439,58 @@ class _TrackNowScreenState extends State<TrackNowScreen>
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
+  String _generateNotesHint(String taskName) {
+    final lower = taskName.toLowerCase();
+    
+    // Group 1: Coding, Development, Tech
+    final techKeywords = ['code', 'develop', 'program', 'app', 'bug', 'fix', 'ui', 'feature', 'api', 'git', 'refactor', 'test', 'run'];
+    // Group 2: Medical Study, Bio, Anatomy, Medicine
+    final medKeywords = ['anatomy', 'pathology', 'physiology', 'medicine', 'clinical', 'disease', 'drug', 'pharm', 'cardio', 'neuro', 'renal', 'patient', 'study', 'learn', 'lecture', 'read'];
+    // Group 3: Writing, Planning, Creation
+    final writeKeywords = ['write', 'plan', 'draft', 'essay', 'report', 'outline', 'review', 'slide', 'presentation'];
+
+    final random = Random();
+
+    if (techKeywords.any((k) => lower.contains(k))) {
+      final techSuggestions = [
+        'How is the build/run going so far?',
+        'Any bugs, code patterns, or lessons learned?',
+        'Any points to remember for implementation?',
+        'Key technical steps completed or roadblocks?',
+        'What design pattern or logic did you use?',
+      ];
+      return techSuggestions[random.nextInt(techSuggestions.length)];
+    } else if (medKeywords.any((k) => lower.contains(k))) {
+      final medSuggestions = [
+        'How is it going so far? Any key mnemonics?',
+        'Any high-yield points, symptoms, or drugs to remember?',
+        'Key pathophysiological mechanisms or signs?',
+        'Summary of the clinical case or pathology studied?',
+        'Important terms, values, or diagnostic criteria?',
+      ];
+      return medSuggestions[random.nextInt(medSuggestions.length)];
+    } else if (writeKeywords.any((k) => lower.contains(k))) {
+      final writeSuggestions = [
+        'How is the outline or draft going so far?',
+        'Any key points to remember or arguments to include?',
+        'Main themes, headers, or citations to add?',
+        'Summary of what you wrote in this section?',
+        'Next key paragraph or transition thoughts?',
+      ];
+      return writeSuggestions[random.nextInt(writeSuggestions.length)];
+    } else {
+      // General fallbacks
+      final generalSuggestions = [
+        'How is it going so far? Any points to remember?',
+        'Any thoughts, takeaways, or blockers encountered?',
+        'What key things did you accomplish so far?',
+        'Any ideas, follow-ups, or notes for later?',
+        'How is your focus going so far? Any reminders?',
+      ];
+      return generalSuggestions[random.nextInt(generalSuggestions.length)];
+    }
+  }
+
   String get _trackingDisplayName {
     final selectedTitle = _selectedTaskTitle?.trim();
     if (selectedTitle != null && selectedTitle.isNotEmpty) return selectedTitle;
@@ -628,6 +683,7 @@ class _TrackNowScreenState extends State<TrackNowScreen>
       _trackingActivityId = activity.id;
       _startedAt = actualStart;
       _elapsed = backfillDuration.inSeconds;
+      _notesHint = _generateNotesHint(name);
     });
     _startTimer();
   }
@@ -1630,6 +1686,7 @@ class _TrackNowScreenState extends State<TrackNowScreen>
 
           // Large timer
           Container(
+            width: double.infinity,
             padding:
                 const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
             decoration: BoxDecoration(
@@ -1638,13 +1695,17 @@ class _TrackNowScreenState extends State<TrackNowScreen>
             ),
             child: Column(
               children: [
-                Text(
-                  _fmtTime(_elapsed),
-                  style: theme.textTheme.displayLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 56,
-                    color: const Color(0xFFEF4444),
-                    fontFeatures: const [FontFeature.tabularFigures()],
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    _fmtTime(_elapsed),
+                    maxLines: 1,
+                    style: theme.textTheme.displayLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 56,
+                      color: const Color(0xFFEF4444),
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
                   ),
                 ),
                 if (_startedAt != null) ...[
@@ -1674,7 +1735,7 @@ class _TrackNowScreenState extends State<TrackNowScreen>
               maxLines: 3,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
-                hintText: 'Notes... (what did you cook?)',
+                hintText: _notesHint ?? 'Notes... (how is it going so far?)',
                 hintStyle: TextStyle(
                   color: cs.onSurface.withValues(alpha: 0.3),
                   fontSize: 14,

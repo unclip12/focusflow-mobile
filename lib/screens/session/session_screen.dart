@@ -1,4 +1,4 @@
-﻿// =============================================================
+// =============================================================
 // SessionScreen â€” Full-screen focus timer with motivational quotes
 // Receives a Block (and its index/date) via GoRouter extra.
 // =============================================================
@@ -242,19 +242,26 @@ class _SessionScreenState extends State<SessionScreen> {
 
             // â”€â”€ Large timer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Container(
+              width: double.infinity,
               padding: const EdgeInsets.symmetric(
                   horizontal: 40, vertical: 24),
               decoration: BoxDecoration(
                 color: cs.primary.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(24),
               ),
-              child: Text(
-                _formatElapsed(_elapsedSeconds),
-                style: theme.textTheme.displayLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 64,
-                  color: cs.primary,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    _formatElapsed(_elapsedSeconds),
+                    maxLines: 1,
+                    style: theme.textTheme.displayLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 64,
+                      color: cs.primary,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
                 ),
               ),
             ),

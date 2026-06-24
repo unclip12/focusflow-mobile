@@ -17,6 +17,7 @@ import 'package:focusflow_mobile/services/background_timer_service.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:focusflow_mobile/utils/emoji_helper.dart';
 
 import 'package:focusflow_mobile/models/app_settings.dart';
 import 'package:focusflow_mobile/models/knowledge_base.dart';
@@ -1765,7 +1766,7 @@ class AppProvider extends ChangeNotifier {
       plannedEndTime:
           _fromMinutes((completedAt.hour * 60) + completedAt.minute),
       type: BlockType.other,
-      title: title,
+      title: EmojiHelper.cleanAndPrependEmoji(title, '✨'),
       colorHex: colorHex,
       plannedDurationMinutes: durationMinutes,
       remainingDurationMinutes: durationMinutes,

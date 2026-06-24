@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:focusflow_mobile/utils/emoji_helper.dart';
 
 /// Shared task registry — records every task name entered from:
 ///   • Track Now (live tracking)
@@ -171,13 +172,51 @@ class ActivityHistoryService {
   }) async {
     final trimmed = prefix.trim().toLowerCase();
     if (trimmed.isEmpty) return [];
+
+    // 1. History matches
     final all = await getAllFull();
-    final matches = all.entries
-        .where((e) => e.key.toLowerCase().startsWith(trimmed))
+    final historyMatches = all.entries
+        .where((e) => e.key.toLowerCase().contains(trimmed))
         .map((e) => MapEntry(e.key, ((e.value['count'] as num?) ?? 0).toInt()))
-        .toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    return matches.take(limit).toList();
+        .toList();
+
+    // 2. Dictionary matches
+    final dictionaryMatches = EmojiHelper.suggestCommonTasks(trimmed, limit: limit)
+        .map((task) => MapEntry(task, 0))
+        .toList();
+
+    // 3. Merge and deduplicate
+    final merged = <String, int>{};
+    for (final e in historyMatches) {
+      merged[e.key] = e.value;
+    }
+    for (final e in dictionaryMatches) {
+      final matchingKey = merged.keys.firstWhere(
+        (k) => k.toLowerCase() == e.key.toLowerCase(),
+        orElse: () => '',
+      );
+      if (matchingKey.isEmpty) {
+        merged[e.key] = 0;
+      }
+    }
+
+    // 4. Sort: startsWith first, then higher count, then shorter length
+    final sorted = merged.entries.toList()
+      ..sort((a, b) {
+        final aLower = a.key.toLowerCase();
+        final bLower = b.key.toLowerCase();
+        final aStarts = aLower.startsWith(trimmed);
+        final bStarts = bLower.startsWith(trimmed);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+
+        if (b.value != a.value) {
+          return b.value.compareTo(a.value);
+        }
+        return a.key.length.compareTo(b.key.length);
+      });
+
+    return sorted.take(limit).toList();
   }
 
   /// Legacy compat — returns a simple { label -> count } map.

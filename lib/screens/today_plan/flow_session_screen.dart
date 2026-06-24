@@ -732,6 +732,7 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
                 else ...[
                   // ── Large timer ────────────────────────────────────
                   Container(
+                    width: double.infinity,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 40, vertical: 24),
                     decoration: BoxDecoration(
@@ -740,13 +741,17 @@ class _FlowSessionScreenState extends State<FlowSessionScreen>
                     ),
                     child: Column(
                       children: [
-                        Text(
-                          _fmtTime(_activityElapsed),
-                          style: theme.textTheme.displayLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 56,
-                            color: cs.primary,
-                            fontFeatures: const [FontFeature.tabularFigures()],
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            _fmtTime(_activityElapsed),
+                            maxLines: 1,
+                            style: theme.textTheme.displayLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 56,
+                              color: cs.primary,
+                              fontFeatures: const [FontFeature.tabularFigures()],
+                            ),
                           ),
                         ),
                         const SizedBox(height: 4),

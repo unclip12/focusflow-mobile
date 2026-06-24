@@ -19,6 +19,7 @@ import 'package:focusflow_mobile/services/activity_history_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/focus_batch_calculator.dart';
 import 'planned_insert_conflict_sheet.dart';
+import 'package:focusflow_mobile/utils/emoji_helper.dart';
 
 // ── General task categories ──────────────────────────────────────
 // ── Study task type enums (unchanged) ───────────────────────────
@@ -474,9 +475,15 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         : _generalTaskCategories
             .expand((category) => category.suggestions)
             .toList(growable: false);
+
+    final dictionarySuggestions = query.isNotEmpty
+        ? EmojiHelper.suggestCommonTasks(query, limit: 10)
+        : <String>[];
+
     final options = <String>[
       ...baseSuggestions,
       ...app.savedGeneralTaskNames,
+      ...dictionarySuggestions,
     ];
 
     final seen = <String>{};
@@ -546,7 +553,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
           _startTime != null ? _fmtHHMM(_startTime!) : '00:00',
       plannedEndTime: _endTime != null ? _fmtHHMM(_endTime!) : '00:00',
       type: BlockType.other,
-      title: '${category.emoji} $title',
+      title: EmojiHelper.cleanAndPrependEmoji(title, category.emoji),
       description:
           _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
       plannedDurationMinutes: durationMinutes,
