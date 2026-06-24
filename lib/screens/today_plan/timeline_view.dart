@@ -1614,12 +1614,12 @@ class _TimelineViewState extends State<TimelineView> {
           );
           final double gapHeight;
           if (isExpanded) {
-            gapHeight = math.max(120.0, _scaledTimelineHeight(gapMinutes));
+            gapHeight = math.max(140.0, _scaledTimelineHeight(gapMinutes));
           } else {
             if (gapState.canAddLog && gapState.canAddTask) {
-              gapHeight = 132.0;
+              gapHeight = 192.0;
             } else {
-              gapHeight = math.min(110.0, 76.0 + (gapMinutes / 60.0) * 6.0);
+              gapHeight = 112.0;
             }
           }
           return KeyedSubtree(
@@ -4160,57 +4160,61 @@ class _GapSlot extends StatelessWidget {
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           mainAxisAlignment: MainAxisAlignment.center,
                                           children: [
-                                            // Past section row
+                                            // Past section
                                             Row(
+                                              crossAxisAlignment: CrossAxisAlignment.center,
                                               children: [
+                                                Icon(
+                                                  Icons.edit_note_rounded,
+                                                  size: 14,
+                                                  color: onSurface.withValues(alpha: 0.56),
+                                                ),
+                                                const SizedBox(width: 6),
                                                 Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    children: [
-                                                      Text(
-                                                        '${_to12h(_minutesToHHMM(startMinutes))} - ${_to12h(_minutesToHHMM(visiblePastEndMinutes))} • ${_formatGapDurationCompact(visiblePastDurationMinutes)}',
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight: FontWeight.w600,
-                                                          color: onSurface,
-                                                          fontFeatures: const [FontFeature.tabularFigures()],
-                                                        ),
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                      Text(
-                                                        'What did you do here?',
-                                                        style: TextStyle(
-                                                          fontSize: 10,
-                                                          color: onSurface.withValues(alpha: 0.55),
-                                                        ),
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                    ],
+                                                  child: Text(
+                                                    'What did you do here?',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: onSurface.withValues(alpha: 0.72),
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
                                                   ),
                                                 ),
-                                                if (onAddLog != null)
-                                                  _GapActionButton(
-                                                    onPressed: onAddLog,
-                                                    icon: Icon(
-                                                      Icons.add_rounded,
-                                                      size: 14,
-                                                      color: onSurface.withValues(alpha: 0.56),
-                                                    ),
-                                                    label: 'Log',
-                                                    labelStyle: TextStyle(
-                                                      color: onSurface.withValues(alpha: 0.72),
-                                                      fontWeight: FontWeight.w700,
-                                                      fontSize: 10,
-                                                    ),
-                                                    side: BorderSide(
-                                                      color: onSurface.withValues(alpha: 0.14),
-                                                    ),
-                                                    backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.54),
-                                                  ),
                                               ],
                                             ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              '${_to12h(_minutesToHHMM(startMinutes))} - ${_to12h(_minutesToHHMM(visiblePastEndMinutes))} • ${_formatGapDurationCompact(visiblePastDurationMinutes)}',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: onSurface.withValues(alpha: 0.55),
+                                                fontFeatures: const [FontFeature.tabularFigures()],
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 4),
+                                            if (onAddLog != null)
+                                              _GapActionButton(
+                                                onPressed: onAddLog,
+                                                icon: Icon(
+                                                  Icons.add_rounded,
+                                                  size: 14,
+                                                  color: onSurface.withValues(alpha: 0.56),
+                                                ),
+                                                label: 'Add Log',
+                                                labelStyle: TextStyle(
+                                                  color: onSurface.withValues(alpha: 0.72),
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 10,
+                                                ),
+                                                side: BorderSide(
+                                                  color: onSurface.withValues(alpha: 0.14),
+                                                ),
+                                                backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.54),
+                                              ),
                                             const SizedBox(height: 6),
                                             Divider(
                                               height: 1,
@@ -4218,96 +4222,143 @@ class _GapSlot extends StatelessWidget {
                                               color: onSurface.withValues(alpha: 0.08),
                                             ),
                                             const SizedBox(height: 6),
-                                            // Future section row
+                                            // Future section
                                             Row(
+                                              crossAxisAlignment: CrossAxisAlignment.center,
                                               children: [
+                                                const Icon(
+                                                  Icons.access_time_rounded,
+                                                  size: 14,
+                                                  color: _kTimelineGapAccent,
+                                                ),
+                                                const SizedBox(width: 6),
                                                 Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    children: [
-                                                      Text(
-                                                        '${_to12h(_minutesToHHMM(visibleFutureStartMinutes))} - ${_to12h(_minutesToHHMM(endMinutes))} • $futureLabel',
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight: FontWeight.w600,
-                                                          color: onSurface,
-                                                          fontFeatures: const [FontFeature.tabularFigures()],
-                                                        ),
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
+                                                  child: RichText(
+                                                    text: TextSpan(
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.w500,
+                                                        color: onSurface.withValues(alpha: 0.72),
                                                       ),
-                                                      Text(
-                                                        'Empty slot',
-                                                        style: TextStyle(
-                                                          fontSize: 10,
-                                                          color: onSurface.withValues(alpha: 0.55),
+                                                      children: [
+                                                        const TextSpan(text: 'Use '),
+                                                        TextSpan(
+                                                          text: futureLabel,
+                                                          style: const TextStyle(
+                                                            color: _kTimelineGapAccent,
+                                                            fontWeight: FontWeight.w700,
+                                                          ),
                                                         ),
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                    ],
+                                                        const TextSpan(text: ' from here onward'),
+                                                      ],
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
                                                   ),
                                                 ),
-                                                if (onAddTask != null)
-                                                  _GapActionButton(
-                                                    onPressed: onAddTask,
-                                                    icon: const Icon(
-                                                      Icons.add_rounded,
-                                                      size: 14,
-                                                      color: _kTimelineGapAccent,
-                                                    ),
-                                                    label: 'Task',
-                                                    labelStyle: const TextStyle(
-                                                      color: _kTimelineGapAccent,
-                                                      fontWeight: FontWeight.w700,
-                                                      fontSize: 10,
-                                                    ),
-                                                    side: BorderSide(
-                                                      color: onSurface.withValues(alpha: 0.14),
-                                                    ),
-                                                    backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.54),
-                                                  ),
                                               ],
                                             ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              '${_to12h(_minutesToHHMM(visibleFutureStartMinutes))} - ${_to12h(_minutesToHHMM(endMinutes))} • $futureLabel',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: onSurface.withValues(alpha: 0.55),
+                                                fontFeatures: const [FontFeature.tabularFigures()],
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 4),
+                                            if (onAddTask != null)
+                                              _GapActionButton(
+                                                onPressed: onAddTask,
+                                                icon: const Icon(
+                                                  Icons.add_rounded,
+                                                  size: 14,
+                                                  color: _kTimelineGapAccent,
+                                                ),
+                                                label: 'Add Task',
+                                                labelStyle: const TextStyle(
+                                                  color: _kTimelineGapAccent,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 10,
+                                                ),
+                                                side: BorderSide(
+                                                  color: onSurface.withValues(alpha: 0.14),
+                                                ),
+                                                backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.54),
+                                              ),
                                           ],
                                         )
-                                      : Row(
+                                      : Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisAlignment: MainAxisAlignment.center,
                                           children: [
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                mainAxisAlignment: MainAxisAlignment.center,
-                                                children: [
-                                                  Text(
-                                                    hasPastSection
-                                                        ? '${_to12h(_minutesToHHMM(startMinutes))} - ${_to12h(_minutesToHHMM(visiblePastEndMinutes))} • ${_formatGapDurationCompact(visiblePastDurationMinutes)}'
-                                                        : '${_to12h(_minutesToHHMM(visibleFutureStartMinutes))} - ${_to12h(_minutesToHHMM(endMinutes))} • $futureLabel',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight: FontWeight.w700,
-                                                      color: onSurface,
-                                                      fontFeatures: const [FontFeature.tabularFigures()],
-                                                    ),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                  const SizedBox(height: 2),
-                                                  Text(
-                                                    hasPastSection
-                                                        ? 'What did you do here?'
-                                                        : 'Empty slot',
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight: FontWeight.w500,
-                                                      color: onSurface.withValues(alpha: 0.55),
-                                                    ),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                ],
-                                              ),
+                                            Row(
+                                              crossAxisAlignment: CrossAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  hasPastSection
+                                                      ? Icons.edit_note_rounded
+                                                      : Icons.access_time_rounded,
+                                                  size: 14,
+                                                  color: hasPastSection
+                                                      ? onSurface.withValues(alpha: 0.56)
+                                                      : _kTimelineGapAccent,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Expanded(
+                                                  child: hasPastSection
+                                                      ? Text(
+                                                          'What did you do here?',
+                                                          style: TextStyle(
+                                                            fontSize: 11,
+                                                            fontWeight: FontWeight.w600,
+                                                            color: onSurface.withValues(alpha: 0.72),
+                                                          ),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
+                                                        )
+                                                      : RichText(
+                                                          text: TextSpan(
+                                                            style: TextStyle(
+                                                              fontSize: 11,
+                                                              fontWeight: FontWeight.w500,
+                                                              color: onSurface.withValues(alpha: 0.72),
+                                                            ),
+                                                            children: [
+                                                              const TextSpan(text: 'Use '),
+                                                              TextSpan(
+                                                                text: futureLabel,
+                                                                style: const TextStyle(
+                                                                  color: _kTimelineGapAccent,
+                                                                  fontWeight: FontWeight.w700,
+                                                                ),
+                                                              ),
+                                                              const TextSpan(text: ' wisely...'),
+                                                            ],
+                                                          ),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
+                                                        ),
+                                                ),
+                                              ],
                                             ),
-                                            const SizedBox(width: 8),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              hasPastSection
+                                                  ? '${_to12h(_minutesToHHMM(startMinutes))} - ${_to12h(_minutesToHHMM(visiblePastEndMinutes))} • ${_formatGapDurationCompact(visiblePastDurationMinutes)}'
+                                                  : '${_to12h(_minutesToHHMM(visibleFutureStartMinutes))} - ${_to12h(_minutesToHHMM(endMinutes))} • $futureLabel',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: onSurface.withValues(alpha: 0.55),
+                                                fontFeatures: const [FontFeature.tabularFigures()],
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 6),
                                             if (hasPastSection && onAddLog != null)
                                               _GapActionButton(
                                                 onPressed: onAddLog,
@@ -4320,7 +4371,7 @@ class _GapSlot extends StatelessWidget {
                                                 labelStyle: TextStyle(
                                                   color: onSurface.withValues(alpha: 0.72),
                                                   fontWeight: FontWeight.w700,
-                                                  fontSize: 11,
+                                                  fontSize: 10,
                                                 ),
                                                 side: BorderSide(
                                                   color: onSurface.withValues(alpha: 0.14),
@@ -4339,7 +4390,7 @@ class _GapSlot extends StatelessWidget {
                                                 labelStyle: const TextStyle(
                                                   color: _kTimelineGapAccent,
                                                   fontWeight: FontWeight.w700,
-                                                  fontSize: 11,
+                                                  fontSize: 10,
                                                 ),
                                                 side: BorderSide(
                                                   color: onSurface.withValues(alpha: 0.14),
@@ -4347,7 +4398,7 @@ class _GapSlot extends StatelessWidget {
                                                 backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.54),
                                               ),
                                           ],
-                                        ),
+                                        )
                                 ),
                                 const SizedBox(width: 4),
                                 // Expand/collapse toggle button
