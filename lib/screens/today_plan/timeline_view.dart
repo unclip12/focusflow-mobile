@@ -28,6 +28,8 @@ import 'free_gap_panel.dart';
 import 'routine_runner_screen.dart';
 import 'study_flow_screen.dart';
 import 'study_session_picker.dart';
+import 'package:focusflow_mobile/models/daily_flow.dart';
+import 'track_now_screen.dart';
 
 // -- Helpers --------------------------------------------------
 typedef TimelineAddTaskCallback = Future<void> Function(
@@ -139,11 +141,11 @@ double _timelinePillHeight(int minutes) {
   return scaledHeight < 56.0 ? 56.0 : scaledHeight;
 }
 
-const double _kTimelineLeadingWidth = 8.0;
+const double _kTimelineLeadingWidth = 4.0;
 const double _kTimelineTimeWidth = 68.0;
 const double _kTimelineTimeToPillGap = 8.0;
 const double _kTimelinePillWidth = 40.0;
-const double _kTimelineContentGap = 12.0;
+const double _kTimelineContentGap = 8.0;
 const double _kTimelineStatusSize = 24.0;
 const double _kTimelineNodeSize = 60.0;
 const Color _kTimelineAccent = Color(0xFFE8837A);
@@ -168,6 +170,10 @@ double _gapSlotHeight(
   required bool hasPastSection,
   required bool hasFutureSection,
 }) {
+  // Collapse large empty future-only gaps (no past log, no future task added)
+  if (minutes > 120 && !hasPastSection && !hasFutureSection) {
+    return 72.0;
+  }
   final scaledHeight = _scaledTimelineHeight(minutes);
   final contentMinHeight = hasPastSection && hasFutureSection
       ? 210.0
@@ -369,7 +375,7 @@ class _TimelineViewState extends State<TimelineView> {
   void initState() {
     super.initState();
     _currentTime = DateTime.now();
-    _nowTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+    _nowTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       setState(() => _currentTime = DateTime.now());
     });
@@ -1517,6 +1523,33 @@ class _TimelineViewState extends State<TimelineView> {
     final surfaceColor = theme.colorScheme.surface;
     final bounds = _resolveTimelineBounds();
     final items = _buildTimelineItems(bounds);
+
+    // Check for live TRACK_NOW activity
+    final app = context.watch<AppProvider>();
+    final liveActivity = _isViewingToday ? app.getActiveTrackNow(widget.dateKey) : null;
+    if (liveActivity != null) {
+      final startedAt = liveActivity.startedAt != null
+          ? DateTime.tryParse(liveActivity.startedAt!)
+          : null;
+      final liveStartMinutes = startedAt != null
+          ? startedAt.hour * 60 + startedAt.minute
+          : _currentMinutesOfDay;
+
+      int insertIndex = 0;
+      for (int i = 0; i < items.length; i++) {
+        final item = items[i];
+        final itemStart = item.slice != null
+            ? item.slice!.visibleStartMinutes
+            : (item.isGap
+                ? item.gapStartMinutes!
+                : (item.isReminder ? item.reminderMinutes! : 0));
+        if (itemStart <= liveStartMinutes) {
+          insertIndex = i + 1;
+        }
+      }
+      items.insert(insertIndex, _TimelineItem.liveActivity(liveActivity));
+    }
+
     final bottomPadding = MediaQuery.of(context).padding.bottom + 96;
     final nowLabel = _formatCurrentTimeLabel();
 
@@ -1563,6 +1596,23 @@ class _TimelineViewState extends State<TimelineView> {
       shrinkWrap: widget.shrinkWrap,
       itemBuilder: (context, index) {
         final item = items[index];
+        if (item.liveActivity != null) {
+          return KeyedSubtree(
+            key: ValueKey('live_track_now_${item.liveActivity!.id}'),
+            child: _LiveTrackingTimelineBlock(
+              activity: item.liveActivity!,
+              dateKey: widget.dateKey,
+              onOpenTrackNow: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => TrackNowScreen(
+                    dateKey: widget.dateKey,
+                    existingActivityId: item.liveActivity!.id,
+                  ),
+                ));
+              },
+            ),
+          );
+        }
         if (item.isGap) {
           final gapState = _buildGapActionState(
             gapStartMinutes: item.gapStartMinutes!,
@@ -1674,6 +1724,496 @@ class _TimelineViewState extends State<TimelineView> {
           ),
         );
       },
+    );
+  }
+}
+
+// ── Live Tracking Block in Timeline ─────────────────────────────────────────
+class _LiveTrackingTimelineBlock extends StatefulWidget {
+  final FlowActivity activity;
+  final String dateKey;
+  final VoidCallback onOpenTrackNow;
+
+  const _LiveTrackingTimelineBlock({
+    required this.activity,
+    required this.dateKey,
+    required this.onOpenTrackNow,
+  });
+
+  @override
+  State<_LiveTrackingTimelineBlock> createState() =>
+      _LiveTrackingTimelineBlockState();
+}
+
+class _LiveTrackingTimelineBlockState
+    extends State<_LiveTrackingTimelineBlock>
+    with SingleTickerProviderStateMixin {
+  late Timer _ticker;
+  late AnimationController _pulseCtrl;
+  int _elapsedSeconds = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+    _recalcElapsed();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {
+        _recalcElapsed();
+      });
+    });
+  }
+
+  void _recalcElapsed() {
+    final startedAt = widget.activity.startedAt != null
+        ? DateTime.tryParse(widget.activity.startedAt!)
+        : null;
+    if (startedAt != null) {
+      _elapsedSeconds =
+          DateTime.now().difference(startedAt).inSeconds.clamp(0, 999999);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ticker.cancel();
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
+
+  String _fmtElapsed(int s) {
+    final h = s ~/ 3600;
+    final m = (s % 3600) ~/ 60;
+    final sec = s % 60;
+    if (h > 0) return '${h}h ${m.toString().padLeft(2, '0')}m';
+    if (m > 0) return '${m}m ${sec.toString().padLeft(2, '0')}s';
+    return '${sec}s';
+  }
+
+  String _startedLabel() {
+    final dt = widget.activity.startedAt != null
+        ? DateTime.tryParse(widget.activity.startedAt!)
+        : null;
+    if (dt == null) return 'Just started';
+    return 'Since ${_to12h(_minutesToHHMM(dt.hour * 60 + dt.minute))}';
+  }
+
+  Color _accent() {
+    final cat = (widget.activity.category ?? '').toLowerCase();
+    if (cat.contains('cook') || cat.contains('eat') || cat.contains('food')) {
+      return const Color(0xFFEF4444);
+    }
+    if (cat.contains('clean') || cat.contains('wash') || cat.contains('bath')) {
+      return const Color(0xFF10B981);
+    }
+    if (cat.contains('exercise') || cat.contains('workout') ||
+        cat.contains('gym')) {
+      return const Color(0xFF3B82F6);
+    }
+    if (cat.contains('study') || cat.contains('work') ||
+        cat.contains('develop') || cat.contains('code')) {
+      return const Color(0xFF8B5CF6);
+    }
+    if (cat.contains('prayer') || cat.contains('meditat')) {
+      return const Color(0xFF059669);
+    }
+    if (cat.contains('rest') || cat.contains('sleep') || cat.contains('nap')) {
+      return const Color(0xFF6366F1);
+    }
+    if (cat.contains('travel') || cat.contains('commut')) {
+      return const Color(0xFF14B8A6);
+    }
+    return const Color(0xFF0EA5E9);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final onSurface = cs.onSurface;
+    final accent = _accent();
+    final app = context.read<AppProvider>();
+    final elapsedMin = _elapsedSeconds ~/ 60;
+    final secInMin = _elapsedSeconds % 60;
+    final fillFraction = secInMin / 60.0;
+
+    // Minimum 160px; grows 2px per minute of tracking
+    final double cardHeight = (160.0 + elapsedMin * 2.0).clamp(160.0, 9999.0);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      child: GestureDetector(
+        onTap: widget.onOpenTrackNow,
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          height: cardHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(width: _kTimelineLeadingWidth),
+
+              // Time column
+              SizedBox(
+                width: _kTimelineTimeWidth,
+                height: cardHeight,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned(
+                      top: 4,
+                      right: 0,
+                      child: Text(
+                        _startedLabel().replaceFirst('Since ', ''),
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: accent,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 20,
+                      right: 0,
+                      child: Text(
+                        'NOW',
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6,
+                          color: accent.withValues(alpha: 0.65),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 4,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          _fmtElapsed(_elapsedSeconds),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: accent,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: _kTimelineTimeToPillGap),
+
+              // Spine column
+              SizedBox(
+                width: _kTimelinePillWidth,
+                height: cardHeight,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // Gradient spine line
+                    Positioned(
+                      top: 14,
+                      bottom: 0,
+                      left: (_kTimelinePillWidth - 3.0) / 2,
+                      width: 3,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              accent.withValues(alpha: 0.85),
+                              accent.withValues(alpha: 0.25),
+                              accent.withValues(alpha: 0.05),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Pulsing dot at top
+                    Positioned(
+                      top: 2,
+                      left: (_kTimelinePillWidth - 16.0) / 2,
+                      child: AnimatedBuilder(
+                        animation: _pulseCtrl,
+                        builder: (_, __) {
+                          final p = _pulseCtrl.value;
+                          return Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: accent.withValues(alpha: 0.5 + p * 0.5),
+                              boxShadow: [
+                                BoxShadow(
+                                  color:
+                                      accent.withValues(alpha: 0.3 + p * 0.35),
+                                  blurRadius: 8 + p * 6,
+                                  spreadRadius: p * 3,
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Container(
+                                width: 7,
+                                height: 7,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white
+                                      .withValues(alpha: 0.7 + p * 0.3),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: _kTimelineContentGap),
+
+              // Card
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: Stack(
+                    children: [
+                      // Liquid fill background (fills per second within minute)
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        height: cardHeight * fillFraction,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                              colors: [
+                                accent.withValues(alpha: 0.20),
+                                accent.withValues(alpha: 0.06),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Card body
+                      Container(
+                        height: cardHeight,
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.055),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: accent.withValues(alpha: 0.32),
+                            width: 1.5,
+                          ),
+                        ),
+                        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // LIVE badge + task name
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 7, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: accent,
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      AnimatedBuilder(
+                                        animation: _pulseCtrl,
+                                        builder: (_, __) {
+                                          final p = _pulseCtrl.value;
+                                          return Container(
+                                            width: 6,
+                                            height: 6,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: Colors.white.withValues(
+                                                  alpha: 0.5 + p * 0.5),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Text(
+                                        'LIVE',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.white,
+                                          letterSpacing: 0.8,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    widget.activity.label,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: onSurface,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            // Started at + elapsed
+                            Text(
+                              _startedLabel(),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: accent,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Running: ${_fmtElapsed(_elapsedSeconds)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: onSurface.withValues(alpha: 0.6),
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures()
+                                ],
+                              ),
+                            ),
+                            if (widget.activity.category != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                widget.activity.category!,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: accent.withValues(alpha: 0.75),
+                                ),
+                              ),
+                            ],
+                            const Spacer(),
+                            // Action buttons: Stop & Save / Cancel
+                            Row(
+                              children: [
+                                _trackingActionBtn(
+                                  context,
+                                  icon: Icons.stop_circle_rounded,
+                                  label: 'Stop & Save',
+                                  accent: accent,
+                                  filled: true,
+                                  onTap: () async {
+                                    HapticsService.medium();
+                                    final actId = widget.activity.id;
+                                    await app.stopTrackNow(
+                                        widget.dateKey, actId);
+                                  },
+                                ),
+                                const SizedBox(width: 8),
+                                _trackingActionBtn(
+                                  context,
+                                  icon: Icons.cancel_outlined,
+                                  label: 'Cancel',
+                                  accent: onSurface.withValues(alpha: 0.5),
+                                  filled: false,
+                                  onTap: () async {
+                                    HapticsService.light();
+                                    await app.discardTrackNow(
+                                        widget.dateKey, widget.activity.id);
+                                  },
+                                ),
+                                const Spacer(),
+                                // Arrow to go to full TrackNow screen
+                                GestureDetector(
+                                  onTap: widget.onOpenTrackNow,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: accent.withValues(alpha: 0.1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.open_in_full_rounded,
+                                      size: 14,
+                                      color: accent,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _trackingActionBtn(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required Color accent,
+    required bool filled,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: filled ? accent.withValues(alpha: 0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+          border:
+              Border.all(color: accent.withValues(alpha: filled ? 0.3 : 0.2)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: accent),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: accent,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1924,6 +2464,7 @@ class _TimelineItem {
   final bool isGap;
   final bool isWarning;
   final String? warningText;
+  final FlowActivity? liveActivity;
 
   const _TimelineItem._(
       {this.block,
@@ -1934,6 +2475,7 @@ class _TimelineItem {
       this.gapEndMinutes,
       this.warningText,
       this.isWarning = false,
+      this.liveActivity,
       required this.isGap});
   factory _TimelineItem.block(_TimelineBlockSlice slice) =>
       _TimelineItem._(block: slice.block, slice: slice, isGap: false);
@@ -1958,8 +2500,11 @@ class _TimelineItem {
           isWarning: true,
           warningText: message,
         );
+  factory _TimelineItem.liveActivity(FlowActivity activity) =>
+      _TimelineItem._(liveActivity: activity, isGap: false);
 
   bool get isReminder => reminderOccurrence != null;
+  bool get isBlock => slice != null;
 }
 
 class _TimelineBounds {
@@ -3434,13 +3979,14 @@ class _GapSlot extends StatelessWidget {
       hasFutureSection: hasFutureSection,
     );
 
-    final hourTicks = <int>[];
-    final firstHourInGap = (startMinutes ~/ 60) * 60 + 60;
-    for (int tick = firstHourInGap; tick < endMinutes; tick += 60) {
-      hourTicks.add(tick);
+    final halfHourTicks = <int>[];
+    final firstTick = ((startMinutes ~/ 30) * 30) + 30;
+    for (int tick = firstTick; tick < endMinutes; tick += 30) {
+      halfHourTicks.add(tick);
     }
+    final hourTicks = halfHourTicks.where((t) => t % 60 == 0).toList();
 
-    final startLabel = _to12hShort(_minutesToHHMM(startMinutes));
+    final startLabel = _to12h(_minutesToHHMM(startMinutes));
     final durationLabel = _formatGapDurationCompact(gapMinutes);
     final gapRangeLabel =
         '${_to12h(_minutesToHHMM(startMinutes))} - ${_to12h(_minutesToHHMM(visiblePastEndMinutes))} • ${_formatGapDurationCompact(visiblePastDurationMinutes)}';
@@ -3491,19 +4037,24 @@ class _GapSlot extends StatelessWidget {
                                   ]),
                             ),
                           ),
-                          ...hourTicks.map((tick) {
-                            final fraction = (tick - startMinutes) / gapMinutes;
+                          ...halfHourTicks.map((tick) {
+                            final fraction = (tick - startMinutes) / (gapMinutes > 0 ? gapMinutes : 1);
                             final topPos = fraction * gapHeight;
+                            final isHour = tick % 60 == 0;
                             return Positioned(
                               top: topPos - 6,
                               right: 0,
                               child: Text(
-                                _to12hShort(_minutesToHHMM(tick)),
+                                isHour
+                                    ? _to12h(_minutesToHHMM(tick))
+                                    : _to12hShort(_minutesToHHMM(tick)),
                                 textAlign: TextAlign.right,
                                 style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
-                                  color: timeLabelColor.withValues(alpha: 0.7),
+                                  fontSize: isHour ? 10 : 9,
+                                  fontWeight:
+                                      isHour ? FontWeight.w600 : FontWeight.w400,
+                                  color: timeLabelColor
+                                      .withValues(alpha: isHour ? 0.7 : 0.40),
                                   fontFeatures: const [
                                     FontFeature.tabularFigures()
                                   ],
@@ -3537,7 +4088,7 @@ class _GapSlot extends StatelessWidget {
                             ),
                           ),
                           ...hourTicks.map((tick) {
-                            final fraction = (tick - startMinutes) / gapMinutes;
+                            final fraction = (tick - startMinutes) / (gapMinutes > 0 ? gapMinutes : 1);
                             final topPos = fraction * gapHeight;
                             return Positioned(
                               top: topPos - 4,

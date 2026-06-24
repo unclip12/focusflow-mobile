@@ -1013,7 +1013,7 @@ class _TodayTimelineTab extends StatelessWidget {
                   )
                 : Padding(
                     key: const ValueKey<int>(0),
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
                     child: TimelineView(
                       dateKey: dateKey,
                       blocks: blocks,
