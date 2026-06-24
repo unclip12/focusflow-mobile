@@ -3025,6 +3025,18 @@ class _BlockCard extends StatelessWidget {
 
   Block get block => slice.block;
 
+  String? _leadingEmoji(String title) {
+    final token = RegExp(r'^(\S+)\s+').firstMatch(title.trim())?.group(1);
+    if (token == null || RegExp(r'^[A-Za-z0-9]+$').hasMatch(token)) return null;
+    return token;
+  }
+
+  String _stripLeadingEmoji(String title) {
+    final emoji = _leadingEmoji(title);
+    if (emoji == null) return title.trim();
+    return title.trim().replaceFirst('$emoji ', '').trim();
+  }
+
   IconData _iconForBlock() {
     final lowerTitle = block.title.toLowerCase();
 
@@ -3068,6 +3080,8 @@ class _BlockCard extends StatelessWidget {
     final isMovable =
         slice.relation == _TimelineBlockRelation.sameDay && !isLocked;
 
+    final emoji = _leadingEmoji(block.title);
+
     final circle = Tooltip(
       message: _categoryLabel(block),
       child: Container(
@@ -3093,11 +3107,18 @@ class _BlockCard extends StatelessWidget {
             ),
           ],
         ),
-        child: Icon(
-          _iconForBlock(),
-          size: 28,
-          color: isDone ? Colors.white : accent,
-        ),
+        child: emoji != null
+            ? Center(
+                child: Text(
+                  emoji,
+                  style: const TextStyle(fontSize: 28),
+                ),
+              )
+            : Icon(
+                _iconForBlock(),
+                size: 28,
+                color: isDone ? Colors.white : accent,
+              ),
       ),
     );
 
@@ -3130,10 +3151,11 @@ class _BlockCard extends StatelessWidget {
           ),
         ),
         child: isDone
-            ? const Center(
-                child: Text(
-                  '📋',
-                  style: TextStyle(fontSize: 12),
+            ? Center(
+                child: Icon(
+                  Icons.check_rounded,
+                  size: 14,
+                  color: checkColor,
                 ),
               )
             : null,
@@ -3339,98 +3361,98 @@ class _BlockCard extends StatelessWidget {
         onTap: onTap,
         onLongPress: onLongPress,
         behavior: HitTestBehavior.opaque,
-        child: SizedBox(
-          height: cardHeight,
-          child: Stack(
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Column 1: Time Column (start label top, end label bottom)
-                  SizedBox(
-                    width: _kTimelineTimeWidth,
-                    height: cardHeight,
-                    child: Stack(
-                      children: [
-                        Positioned(
-                          top: 4,
-                          right: 0,
-                          child: Text(
-                            startLabel,
-                            textAlign: TextAlign.right,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: timeLabelColor,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures()
-                              ],
-                            ),
-                          ),
-                        ),
-                        if (occupiedDuration >= 15)
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: cardHeight),
+          child: IntrinsicHeight(
+            child: Stack(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Column 1: Time Column (start label top, end label bottom)
+                    SizedBox(
+                      width: _kTimelineTimeWidth,
+                      child: Stack(
+                        children: [
                           Positioned(
-                            bottom: 4,
+                            top: 4,
                             right: 0,
                             child: Text(
-                              endLabel,
+                              startLabel,
                               textAlign: TextAlign.right,
                               style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: timeLabelColor.withValues(alpha: 0.55),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: timeLabelColor,
                                 fontFeatures: const [
                                   FontFeature.tabularFigures()
                                 ],
                               ),
                             ),
                           ),
-                      ],
+                          if (occupiedDuration >= 15)
+                            Positioned(
+                              bottom: 4,
+                              right: 0,
+                              child: Text(
+                                endLabel,
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: timeLabelColor.withValues(alpha: 0.55),
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures()
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: _kTimelineTimeToPillGap),
+                    const SizedBox(width: _kTimelineTimeToPillGap),
 
-                  // Column 2: Center Column (Continuous vertical line + circular icon container)
-                  SizedBox(
-                    width: _kTimelinePillWidth,
-                    height: cardHeight,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        // Continuous vertical line segment
-                        Positioned(
-                          top: 0,
-                          bottom: 0,
-                          left: (_kTimelinePillWidth - 3.0) / 2, // Centered
-                          width: 3.0,
-                          child: Container(
-                            color: isDone
-                                ? accent
-                                : theme.dividerColor.withValues(alpha: 0.4),
-                          ),
-                        ),
-                        // Category Icon Circle
-                        Positioned(
-                          top: 4,
-                          left: (_kTimelinePillWidth - _kTimelineNodeSize) / 2,
-                          child:
-                              _buildCategoryIconCircle(context, isDone, accent),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: _kTimelineContentGap),
-
-                  // Column 3: Expanded Card Container
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.fromLTRB(4, 10, 4, 10),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
+                    // Column 2: Center Column (Continuous vertical line + circular icon container)
+                    SizedBox(
+                      width: _kTimelinePillWidth,
+                      child: Stack(
+                        clipBehavior: Clip.none,
                         children: [
-                          Text(
-                            block.title,
+                          // Continuous vertical line segment
+                          Positioned(
+                            top: 0,
+                            bottom: 0,
+                            left: (_kTimelinePillWidth - 3.0) / 2, // Centered
+                            width: 3.0,
+                            child: Container(
+                              color: isDone
+                                  ? accent
+                                  : theme.dividerColor.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          // Category Icon Circle
+                          Positioned(
+                            top: 4,
+                            left: (_kTimelinePillWidth - _kTimelineNodeSize) / 2,
+                            child:
+                                _buildCategoryIconCircle(context, isDone, accent),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: _kTimelineContentGap),
+
+                    // Column 3: Expanded Card Container
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.fromLTRB(4, 10, 4, 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _stripLeadingEmoji(block.title),
                             style: TextStyle(
                               fontSize: 17,
                               height: 1.16,
@@ -3634,7 +3656,8 @@ class _BlockCard extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }
 
@@ -4029,8 +4052,7 @@ class _GapSlot extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         child: ConstrainedBox(
           constraints: BoxConstraints(minHeight: gapHeight),
-          child: SizedBox(
-            height: gapHeight,
+          child: IntrinsicHeight(
             child: Stack(
               children: [
                 Row(
@@ -4040,7 +4062,6 @@ class _GapSlot extends StatelessWidget {
                     // Column 1: Time Column (start label top, hour ticks relative to gap height if expanded)
                     SizedBox(
                       width: _kTimelineTimeWidth,
-                      height: gapHeight,
                       child: Stack(
                         children: [
                           Positioned(
@@ -4056,6 +4077,22 @@ class _GapSlot extends StatelessWidget {
                                   fontFeatures: const [
                                     FontFeature.tabularFigures()
                                   ]),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 4,
+                            right: 0,
+                            child: Text(
+                              _to12h(_minutesToHHMM(endMinutes)),
+                              textAlign: TextAlign.right,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: timeLabelColor.withValues(alpha: 0.55),
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures()
+                                ],
+                              ),
                             ),
                           ),
                           if (isExpanded)
@@ -4092,7 +4129,6 @@ class _GapSlot extends StatelessWidget {
                     // Column 2: Center Column (dashed line + hourly tick circles if expanded)
                     SizedBox(
                       width: _kTimelinePillWidth,
-                      height: gapHeight,
                       child: Stack(
                         clipBehavior: Clip.none,
                         children: [
@@ -4160,6 +4196,7 @@ class _GapSlot extends StatelessWidget {
                                       ? Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           mainAxisAlignment: MainAxisAlignment.center,
+                                          mainAxisSize: MainAxisSize.min,
                                           children: [
                                             // Past section
                                             Row(
@@ -4287,6 +4324,7 @@ class _GapSlot extends StatelessWidget {
                                       : Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           mainAxisAlignment: MainAxisAlignment.center,
+                                          mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Row(
                                               crossAxisAlignment: CrossAxisAlignment.center,
