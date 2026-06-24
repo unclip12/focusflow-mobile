@@ -3057,7 +3057,7 @@ class _BlockCard extends StatelessWidget {
       case BlockType.mixed:
         return Icons.dashboard_rounded;
       case BlockType.other:
-        return block.isEvent ? Icons.event_rounded : Icons.task_alt_rounded;
+        return block.isEvent ? Icons.event_rounded : Icons.task_rounded;
     }
   }
 
@@ -3130,10 +3130,11 @@ class _BlockCard extends StatelessWidget {
           ),
         ),
         child: isDone
-            ? Icon(
-                Icons.check_rounded,
-                size: 12,
-                color: checkColor,
+            ? const Center(
+                child: Text(
+                  '📋',
+                  style: TextStyle(fontSize: 12),
+                ),
               )
             : null,
       ),
@@ -4178,8 +4179,6 @@ class _GapSlot extends StatelessWidget {
                                                       fontWeight: FontWeight.w600,
                                                       color: onSurface.withValues(alpha: 0.72),
                                                     ),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
                                                   ),
                                                 ),
                                               ],
@@ -4192,8 +4191,6 @@ class _GapSlot extends StatelessWidget {
                                                 color: onSurface.withValues(alpha: 0.55),
                                                 fontFeatures: const [FontFeature.tabularFigures()],
                                               ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
                                             ),
                                             const SizedBox(height: 4),
                                             if (onAddLog != null)
@@ -4252,8 +4249,6 @@ class _GapSlot extends StatelessWidget {
                                                         const TextSpan(text: ' from here onward'),
                                                       ],
                                                     ),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
                                                   ),
                                                 ),
                                               ],
@@ -4266,8 +4261,6 @@ class _GapSlot extends StatelessWidget {
                                                 color: onSurface.withValues(alpha: 0.55),
                                                 fontFeatures: const [FontFeature.tabularFigures()],
                                               ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
                                             ),
                                             const SizedBox(height: 4),
                                             if (onAddTask != null)
@@ -4317,8 +4310,6 @@ class _GapSlot extends StatelessWidget {
                                                             fontWeight: FontWeight.w600,
                                                             color: onSurface.withValues(alpha: 0.72),
                                                           ),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow.ellipsis,
                                                         )
                                                       : RichText(
                                                           text: TextSpan(
@@ -4339,8 +4330,6 @@ class _GapSlot extends StatelessWidget {
                                                               const TextSpan(text: ' wisely...'),
                                                             ],
                                                           ),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow.ellipsis,
                                                         ),
                                                 ),
                                               ],
@@ -4355,8 +4344,6 @@ class _GapSlot extends StatelessWidget {
                                                 color: onSurface.withValues(alpha: 0.55),
                                                 fontFeatures: const [FontFeature.tabularFigures()],
                                               ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
                                             ),
                                             const SizedBox(height: 6),
                                             if (hasPastSection && onAddLog != null)
