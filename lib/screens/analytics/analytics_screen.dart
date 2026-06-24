@@ -15,9 +15,17 @@ import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/providers/settings_provider.dart';
 import 'package:focusflow_mobile/utils/app_colors.dart';
 import 'package:focusflow_mobile/widgets/app_scaffold.dart';
+import 'package:focusflow_mobile/services/activity_history_service.dart';
 
-class AnalyticsScreen extends StatelessWidget {
+class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
+
+  @override
+  State<AnalyticsScreen> createState() => _AnalyticsScreenState();
+}
+
+class _AnalyticsScreenState extends State<AnalyticsScreen> {
+  int _activeTab = 0; // 0 = Studies, 1 = Tasks
 
   @override
   Widget build(BuildContext context) {
@@ -36,24 +44,94 @@ class AnalyticsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── SECTION 1: FA Progress Overview ────────────
-            _FAProgressCard(app: app, settings: settings),
-            const SizedBox(height: 16),
+            // ── Tab switcher ────────────────────────────────
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : Colors.black.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _activeTab = 0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _activeTab == 0
+                              ? Theme.of(context).colorScheme.primary
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'Studies',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: _activeTab == 0
+                                ? Theme.of(context).colorScheme.onPrimary
+                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _activeTab = 1),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _activeTab == 1
+                              ? Theme.of(context).colorScheme.primary
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'Tasks',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: _activeTab == 1
+                                ? Theme.of(context).colorScheme.onPrimary
+                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
-            // ── SECTION 2: Study Time ─────────────────────
-            _StudyTimeCard(app: app),
-            const SizedBox(height: 16),
+            if (_activeTab == 0) ...[
+              // ── SECTION 1: FA Progress Overview ────────────
+              _FAProgressCard(app: app, settings: settings),
+              const SizedBox(height: 16),
 
-            // ── SECTION 3: Subject Breakdown ──────────────
-            _SubjectBreakdownCard(app: app),
-            const SizedBox(height: 16),
+              // ── SECTION 2: Study Time ─────────────────────
+              _StudyTimeCard(app: app),
+              const SizedBox(height: 16),
 
-            // ── SECTION 4: UWorld Performance ─────────────
-            _UWorldCard(app: app),
-            const SizedBox(height: 16),
+              // ── SECTION 3: Subject Breakdown ──────────────
+              _SubjectBreakdownCard(app: app),
+              const SizedBox(height: 16),
 
-            // ── SECTION 5: Resource Completion ────────────
-            _ResourceTrackerCard(app: app),
+              // ── SECTION 4: UWorld Performance ─────────────
+              _UWorldCard(app: app),
+              const SizedBox(height: 16),
+
+              // ── SECTION 5: Resource Completion ────────────
+              _ResourceTrackerCard(app: app),
+            ] else ...[
+              const _TasksAnalyticsView(),
+            ],
           ],
         ),
       ),
@@ -873,5 +951,222 @@ class _ResourceRow extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION 6: TASKS ANALYTICS VIEW
+// ══════════════════════════════════════════════════════════════════
+
+class _TasksAnalyticsView extends StatelessWidget {
+  const _TasksAnalyticsView();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return FutureBuilder<List<MapEntry<String, Map<String, dynamic>>>>(
+      future: ActivityHistoryService.getRecent(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return _SectionCard(
+            title: 'Task Leaderboard',
+            children: [
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: Text(
+                    'No tasks tracked yet',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: cs.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
+        final data = snapshot.data!;
+        
+        // 1. Most Time Spent sorting
+        final topByTime = List<MapEntry<String, Map<String, dynamic>>>.from(data)
+          ..sort((a, b) {
+            final aVal = (a.value['totalSeconds'] as num?)?.toInt() ?? 0;
+            final bVal = (b.value['totalSeconds'] as num?)?.toInt() ?? 0;
+            return bVal.compareTo(aVal);
+          });
+        
+        // 2. Most Done sorting (count)
+        final topByCount = List<MapEntry<String, Map<String, dynamic>>>.from(data)
+          ..sort((a, b) {
+            final aVal = (a.value['count'] as num?)?.toInt() ?? 0;
+            final bVal = (b.value['count'] as num?)?.toInt() ?? 0;
+            return bVal.compareTo(aVal);
+          });
+
+        return Column(
+          children: [
+            _LeaderboardCard(
+              title: 'Most Time Spent',
+              items: topByTime,
+              isTime: true,
+            ),
+            const SizedBox(height: 16),
+            _LeaderboardCard(
+              title: 'Most Done',
+              items: topByCount,
+              isTime: false,
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _LeaderboardCard extends StatefulWidget {
+  final String title;
+  final List<MapEntry<String, Map<String, dynamic>>> items;
+  final bool isTime;
+
+  const _LeaderboardCard({
+    required this.title,
+    required this.items,
+    required this.isTime,
+  });
+
+  @override
+  State<_LeaderboardCard> createState() => _LeaderboardCardState();
+}
+
+class _LeaderboardCardState extends State<_LeaderboardCard> {
+  bool _showAll = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    
+    final filteredItems = widget.isTime
+        ? widget.items.where((e) => ((e.value['totalSeconds'] as num?) ?? 0) > 0).toList()
+        : widget.items.where((e) => ((e.value['count'] as num?) ?? 0) > 0).toList();
+
+    if (filteredItems.isEmpty) {
+      return _SectionCard(
+        title: widget.title,
+        children: [
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Text(
+                'No data available',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: cs.onSurface.withValues(alpha: 0.4),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final displayItems = _showAll ? filteredItems : filteredItems.take(10).toList();
+    final maxVal = widget.isTime
+        ? ((filteredItems.first.value['totalSeconds'] as num?) ?? 1).toDouble()
+        : ((filteredItems.first.value['count'] as num?) ?? 1).toDouble();
+
+    return _SectionCard(
+      title: widget.title,
+      children: [
+        ...List.generate(displayItems.length, (i) {
+          final entry = displayItems[i];
+          final val = widget.isTime
+              ? ((entry.value['totalSeconds'] as num?) ?? 0).toDouble()
+              : ((entry.value['count'] as num?) ?? 0).toDouble();
+          final frac = maxVal > 0 ? val / maxVal : 0.0;
+          
+          final label = entry.key;
+          final valueStr = widget.isTime
+              ? _formatSeconds(val.toInt())
+              : '${val.toInt()} times';
+
+          final colors = [
+            const Color(0xFF6366F1),
+            const Color(0xFF8B5CF6),
+            const Color(0xFFEC4899),
+            const Color(0xFF10B981),
+            const Color(0xFFF59E0B),
+          ];
+          final color = colors[i % colors.length];
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 100,
+                  child: Text(
+                    label,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: frac.clamp(0.0, 1.0),
+                      minHeight: 8,
+                      backgroundColor: cs.onSurface.withValues(alpha: 0.07),
+                      valueColor: AlwaysStoppedAnimation(color),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  valueStr,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+        if (filteredItems.length > 10) ...[
+          const SizedBox(height: 8),
+          Center(
+            child: TextButton(
+              onPressed: () {
+                setState(() => _showAll = !_showAll);
+              },
+              child: Text(_showAll ? 'Show Less' : 'More'),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  String _formatSeconds(int totalSecs) {
+    final h = totalSecs ~/ 3600;
+    final m = (totalSecs % 3600) ~/ 60;
+    if (h == 0) return '${m}m';
+    if (m == 0) return '${h}h';
+    return '${h}h ${m}m';
   }
 }

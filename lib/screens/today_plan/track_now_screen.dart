@@ -13,27 +13,6 @@ import 'package:focusflow_mobile/services/activity_history_service.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:focusflow_mobile/screens/today_plan/add_task_sheet.dart';
 
-// ── Category data ──────────────────────────────────────────────
-class _Category {
-  final String name;
-  final String emoji;
-  final Color color;
-  const _Category(this.name, this.emoji, this.color);
-}
-
-const _categories = [
-  _Category('Cooking',  '🍳', Color(0xFFEF4444)),
-  _Category('Cleaning', '🧹', Color(0xFF10B981)),
-  _Category('Exercise', '💪', Color(0xFF3B82F6)),
-  _Category('Study',    '📚', Color(0xFF8B5CF6)),
-  _Category('Prayer',   '🕌', Color(0xFF059669)),
-  _Category('Shopping', '🛒', Color(0xFFF59E0B)),
-  _Category('Eating',   '🍽️', Color(0xFFEC4899)),
-  _Category('Rest',     '😴', Color(0xFF6366F1)),
-  _Category('Travel',   '🚗', Color(0xFF14B8A6)),
-  _Category('Work',     '💼', Color(0xFF0EA5E9)),
-  _Category('Other',    '⏱️', Color(0xFF64748B)),
-];
 
 // Preset backfill durations shown as quick chips
 const _kBackfillPresets = [0, 2, 5, 10, 15, 20, 25, 30];
@@ -63,7 +42,6 @@ class _TrackNowScreenState extends State<TrackNowScreen>
     with WidgetsBindingObserver {
   final _nameCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
-  String? _selectedCategory;
   bool _isTracking = false;
   String? _trackingActivityId;
   DateTime? _startedAt;
@@ -81,23 +59,18 @@ class _TrackNowScreenState extends State<TrackNowScreen>
   // Activity history autocomplete
   List<MapEntry<String, int>> _suggestions = [];
 
+  // Recently tracked tasks
+  List<MapEntry<String, Map<String, dynamic>>> _recentTasks = [];
+  bool _showAllRecent = false;
+
   // "Started X minutes ago" backfill (0 = right now)
   int _backfillMinutes = 0;
-
-  String? _categoryColorHex(String? category) {
-    if (category == null) return null;
-    try {
-      final item = _categories.firstWhere((entry) => entry.name == category);
-      return '#${item.color.toARGB32().toRadixString(16).substring(2).toUpperCase()}';
-    } catch (_) {
-      return null;
-    }
-  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _loadRecentTasks();
     // If resuming an existing activity
     if (widget.existingActivityId != null) {
       final app = context.read<AppProvider>();
@@ -113,7 +86,6 @@ class _TrackNowScreenState extends State<TrackNowScreen>
         _selectedTaskId = linkedTaskId;
         _selectedTaskTitle = linkedTaskTitle;
         _nameCtrl.text = linkedTaskTitle ?? activity.label;
-        _selectedCategory = activity.category;
         _notesCtrl.text = activity.notes ?? '';
         _trackingActivityId = activity.id;
         _isTracking = true;
@@ -126,6 +98,15 @@ class _TrackNowScreenState extends State<TrackNowScreen>
         WakelockPlus.enable();
         _resumeTimerState();
       }
+    }
+  }
+
+  Future<void> _loadRecentTasks() async {
+    final recent = await ActivityHistoryService.getRecent();
+    if (mounted) {
+      setState(() {
+        _recentTasks = recent;
+      });
     }
   }
 
@@ -551,7 +532,6 @@ class _TrackNowScreenState extends State<TrackNowScreen>
       _selectedTaskId = itemId;
       _selectedTaskTitle = itemTitle;
       _nameCtrl.text = itemTitle;
-      _selectedCategory = null;
       _suggestions = [];
     });
     HapticsService.light();
@@ -616,7 +596,7 @@ class _TrackNowScreenState extends State<TrackNowScreen>
     final activity = await app.startTrackNow(
       widget.dateKey,
       label: name,
-      category: _selectedCategory,
+      category: null,
     );
 
     // Link to the selected task immediately upon start if applicable
@@ -691,7 +671,7 @@ class _TrackNowScreenState extends State<TrackNowScreen>
       linkedTaskIds: _selectedTaskId != null ? [_selectedTaskId!] : null,
       resolution: resolution,
       cascadePush: cascadePush,
-      trackedColorHex: _categoryColorHex(_selectedCategory),
+      trackedColorHex: null,
     );
 
     _tickTimer?.cancel();
@@ -699,7 +679,7 @@ class _TrackNowScreenState extends State<TrackNowScreen>
 
     // Record label to history for future autocomplete
     if (name.isNotEmpty) {
-      unawaited(ActivityHistoryService.record(name));
+      unawaited(ActivityHistoryService.record(name, durationSecs: _elapsed));
     }
 
     // Fire notification: session complete
@@ -1246,62 +1226,97 @@ class _TrackNowScreenState extends State<TrackNowScreen>
 
             const SizedBox(height: 16),
 
-            // ── Category selector ─────────────────────────────
-            Text('Category',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: cs.onSurface.withValues(alpha: 0.7),
-                )),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _categories.map((c) {
-                final selected = _selectedCategory == c.name;
-                return GestureDetector(
-                  onTap: () => setState(() => _selectedCategory =
-                      _selectedCategory == c.name ? null : c.name),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? c.color.withValues(alpha: 0.15)
-                          : cs.surfaceContainerHighest.withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: selected
-                            ? c.color.withValues(alpha: 0.5)
-                            : Colors.transparent,
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(c.emoji, style: const TextStyle(fontSize: 16)),
-                        const SizedBox(width: 6),
-                        Text(
-                          c.name,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight:
-                                selected ? FontWeight.w700 : FontWeight.w500,
-                            color: selected
-                                ? c.color
-                                : cs.onSurface.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ],
+            // ── Recently Tracked section ─────────────────────────────
+            if (_recentTasks.isNotEmpty) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Recently Tracked',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
-                );
-              }).toList(),
-            ),
-
-            const SizedBox(height: 24),
+                  if (_recentTasks.length > 10)
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _showAllRecent = !_showAllRecent;
+                        });
+                        HapticsService.light();
+                      },
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(50, 30),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(
+                        _showAllRecent ? 'Show Less' : 'More',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: cs.primary,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: (_showAllRecent ? _recentTasks : _recentTasks.take(10))
+                    .map((entry) {
+                  final count = entry.value['count'] ?? 0;
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _nameCtrl.text = entry.key;
+                        _suggestions = [];
+                      });
+                      HapticsService.light();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: cs.outlineVariant.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            entry.key,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: cs.onSurface.withValues(alpha: 0.8),
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            '$count×',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: cs.onSurface.withValues(alpha: 0.4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 24),
+            ],
 
             // ── "When did you start?" backfill section ────────
             Text(
@@ -1580,11 +1595,6 @@ class _TrackNowScreenState extends State<TrackNowScreen>
   // ── Tracking view (timer running) ────────────────────────────
 
   Widget _buildTrackingView(ThemeData theme, ColorScheme cs) {
-    final categoryData = _categories.firstWhere(
-      (c) => c.name == _selectedCategory,
-      orElse: () => _categories.last,
-    );
-
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
@@ -1600,9 +1610,9 @@ class _TrackNowScreenState extends State<TrackNowScreen>
             ),
           ),
           const SizedBox(height: 10),
-          Text(
-            categoryData.emoji,
-            style: const TextStyle(fontSize: 48),
+          const Text(
+            '⏱️',
+            style: TextStyle(fontSize: 48),
           ),
           const SizedBox(height: 12),
           Text(
@@ -1615,25 +1625,6 @@ class _TrackNowScreenState extends State<TrackNowScreen>
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          if (_selectedCategory != null) ...[
-            const SizedBox(height: 6),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: categoryData.color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                _selectedCategory!,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: categoryData.color,
-                ),
-              ),
-            ),
-          ],
 
           const SizedBox(height: 32),
 

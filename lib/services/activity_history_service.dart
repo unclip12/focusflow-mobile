@@ -63,18 +63,58 @@ class ActivityHistoryService {
 
   // ── Write ─────────────────────────────────────────────────────
 
+  /// Cleans task labels by removing leading emojis and symbols.
+  static String cleanLabel(String label) {
+    var clean = label.trim();
+    if (clean.isEmpty) return clean;
+    final regex = RegExp(r'^[^\p{L}\p{N}\(\)]+\s*', unicode: true);
+    clean = clean.replaceFirst(regex, '');
+    return clean.trim();
+  }
+
+  /// Determines if a label or block type represents study tasks.
+  static bool isStudyLabel(String label, {String? blockTypeValue}) {
+    final lower = label.toLowerCase();
+    if (lower.startsWith('studies') ||
+        lower.startsWith('study') ||
+        lower.contains('fa page') ||
+        lower.contains('first aid') ||
+        lower.contains('qbank') ||
+        lower.contains('anki') ||
+        lower.contains('cerebellum') ||
+        lower.contains('subject reading') ||
+        lower.contains('usmle') ||
+        lower.contains('fmge')) {
+      return true;
+    }
+    if (blockTypeValue != null) {
+      final val = blockTypeValue.toUpperCase();
+      return val == 'VIDEO' ||
+          val == 'REVISION_FA' ||
+          val == 'ANKI' ||
+          val == 'QBANK' ||
+          val == 'STUDY_SESSION' ||
+          val == 'FMGE_REVISION';
+    }
+    return false;
+  }
+
   /// Record a task usage. Call this whenever a task name is saved/confirmed
   /// from any input area (Track Now, Add Log, New Task, Study Session).
   ///
   /// [label]        — task name (e.g. "Cooking", "Bathe", "Studies")
   /// [durationSecs] — seconds spent on this task (0 if unknown / scheduling)
-  static Future<void> record(String label, {int durationSecs = 0}) async {
-    final trimmed = label.trim();
-    if (trimmed.isEmpty) return;
+  static Future<void> record(String label, {int durationSecs = 0, String? blockTypeValue}) async {
+    final cleaned = cleanLabel(label);
+    if (cleaned.isEmpty) return;
+
+    final isStudy = isStudyLabel(cleaned, blockTypeValue: blockTypeValue);
+    final targetLabel = isStudy ? 'Studies' : cleaned;
+
     final prefs = await SharedPreferences.getInstance();
     final all = await getAllFull();
-    final existing = all[trimmed] ?? {'count': 0, 'totalSeconds': 0};
-    all[trimmed] = {
+    final existing = all[targetLabel] ?? {'count': 0, 'totalSeconds': 0};
+    all[targetLabel] = {
       'count': ((existing['count'] as num?) ?? 0).toInt() + 1,
       'totalSeconds':
           ((existing['totalSeconds'] as num?) ?? 0).toInt() + durationSecs,

@@ -5,6 +5,7 @@
 // Study path: unchanged exam-aware multi-step flow.
 // =============================================================
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
@@ -14,6 +15,7 @@ import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/models/knowledge_base.dart';
 import 'package:focusflow_mobile/services/srs_service.dart';
+import 'package:focusflow_mobile/services/activity_history_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/focus_batch_calculator.dart';
 import 'planned_insert_conflict_sheet.dart';
@@ -246,6 +248,10 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   final _generalNotesCtrl = TextEditingController();
   bool _isEvent = false;
 
+  // Recently tracked tasks
+  List<MapEntry<String, Map<String, dynamic>>> _recentTasks = [];
+  bool _showAllRecent = false;
+
   // ── Shared ───────────────────────────────────────────
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
@@ -261,6 +267,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       _usmleType = UsmleTaskType.revision;
       _step = 3;
     }
+    ActivityHistoryService.getRecent().then((recent) {
+      if (mounted) setState(() => _recentTasks = recent);
+    });
   }
 
   @override
@@ -526,6 +535,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
 
     final app = context.read<AppProvider>();
     app.saveGeneralTaskName(title);
+    unawaited(ActivityHistoryService.record(title, durationSecs: 0));
 
     final durationMinutes = _generalDurationMinutes ?? 0;
     final block = Block(
@@ -616,6 +626,8 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       requestedBlocks: newBlocks,
     );
     if (!inserted) return;
+
+    unawaited(ActivityHistoryService.record('Studies', durationSecs: 0));
 
     if (mounted) {
       Navigator.of(context).pop();
@@ -871,6 +883,96 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
             ),
             style: const TextStyle(fontSize: 14),
           ),
+          if (_recentTasks.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Recently Tracked',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+                if (_recentTasks.length > 10)
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _showAllRecent = !_showAllRecent;
+                      });
+                    },
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(50, 20),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      _showAllRecent ? 'Show Less' : 'More',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: cs.primary,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: (_showAllRecent ? _recentTasks : _recentTasks.take(10))
+                  .map((entry) {
+                final count = entry.value['count'] ?? 0;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _titleCtrl.text = entry.key;
+                      _titleCtrl.selection = TextSelection.fromPosition(
+                        TextPosition(offset: _titleCtrl.text.length),
+                      );
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: cs.outline.withValues(alpha: 0.15),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          entry.key,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: cs.onSurface.withValues(alpha: 0.8),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$count×',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: cs.onSurface.withValues(alpha: 0.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
           if (suggestions.isNotEmpty) ...[
             const SizedBox(height: 8),
             Container(

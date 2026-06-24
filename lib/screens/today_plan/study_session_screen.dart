@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/providers/app_provider.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
+import 'package:focusflow_mobile/services/activity_history_service.dart';
 
 const Color _kStudyScreenBackground = Color(0xFF0D0D0D);
 const Color _kStudyScreenAccent = Color(0xFFE8837A);
@@ -67,6 +68,7 @@ class _StudySessionScreenState extends State<StudySessionScreen> {
     _ticker?.cancel();
     _ticker = null;
     final elapsed = _formatElapsed(_stopwatch.elapsed);
+    unawaited(ActivityHistoryService.record('Studies', durationSecs: _stopwatch.elapsed.inSeconds));
 
     setState(() {});
     ScaffoldMessenger.of(context)

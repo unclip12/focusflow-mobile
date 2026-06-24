@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:focusflow_mobile/models/day_plan.dart';
 import 'package:focusflow_mobile/services/task_suggestions_service.dart';
+import 'package:focusflow_mobile/services/activity_history_service.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 
 import 'alert_repeat_sheet.dart';
@@ -122,6 +124,9 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
   bool _userChangedColor = false;
   Color _headerColor = _defaultHeaderColor;
 
+  List<MapEntry<String, Map<String, dynamic>>> _recentTasks = [];
+  bool _showAllRecent = false;
+
   bool get _isLogMode => widget.mode == BlockEditorMode.log;
   bool get _isExistingBlock =>
       !widget.block.id.startsWith('draft_') && widget.block.id.isNotEmpty;
@@ -146,6 +151,16 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
         TextEditingController(text: _stripLeadingEmoji(widget.block.title));
     _notesController =
         TextEditingController(text: widget.block.description ?? '');
+    _loadRecentTasks();
+  }
+
+  Future<void> _loadRecentTasks() async {
+    final recent = await ActivityHistoryService.getRecent();
+    if (mounted) {
+      setState(() {
+        _recentTasks = recent;
+      });
+    }
   }
 
   @override
@@ -586,6 +601,9 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
           saveAsLog: _isLogMode,
         ),
       );
+      if (!_isLogMode) {
+        unawaited(ActivityHistoryService.record(_composeTitle(), durationSecs: 0, blockTypeValue: _selectedType.value));
+      }
       if (mounted) Navigator.of(context).pop();
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -772,6 +790,96 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          if (_recentTasks.isNotEmpty) ...[
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Recently Tracked',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: titleColor.withValues(alpha: 0.6),
+                                  ),
+                                ),
+                                if (_recentTasks.length > 10)
+                                  TextButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        _showAllRecent = !_showAllRecent;
+                                      });
+                                    },
+                                    style: TextButton.styleFrom(
+                                      padding: EdgeInsets.zero,
+                                      minimumSize: const Size(50, 20),
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    child: Text(
+                                      _showAllRecent ? 'Show Less' : 'More',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: _accentColor,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: (_showAllRecent ? _recentTasks : _recentTasks.take(10))
+                                  .map((entry) {
+                                final count = entry.value['count'] ?? 0;
+                                return GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _titleController.text = entry.key;
+                                      _titleController.selection = TextSelection.fromPosition(
+                                        TextPosition(offset: _titleController.text.length),
+                                      );
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: cardColor,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: dividerColor,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          entry.key,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: titleColor.withValues(alpha: 0.8),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '$count×',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                            color: titleColor.withValues(alpha: 0.4),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
                           _Card(
                             children: [
                               _ActionRow(

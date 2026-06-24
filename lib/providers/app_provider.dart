@@ -54,6 +54,7 @@ import 'package:focusflow_mobile/models/reminder.dart';
 import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/utils/date_utils.dart' as du;
 import 'package:focusflow_mobile/services/timeline_scheduler.dart';
+import 'package:focusflow_mobile/services/activity_history_service.dart';
 
 // â”€â”€ AppNotification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 enum AppNotificationType { reminder, achievement, revisionDue, streak }
@@ -965,7 +966,47 @@ class AppProvider extends ChangeNotifier {
     await syncFlowActivitiesFromDayPlan(date);
   }
 
+  bool _isStudyBlock(Block block) {
+    return block.type == BlockType.video ||
+        block.type == BlockType.revisionFa ||
+        block.type == BlockType.anki ||
+        block.type == BlockType.qbank ||
+        block.type == BlockType.studySession ||
+        block.type == BlockType.fmgeRevision;
+  }
+
   Future<void> _saveDayPlan(DayPlan plan, {bool notify = true}) async {
+    final oldPlanIdx = dayPlans.indexWhere((p) => p.date == plan.date);
+    if (oldPlanIdx >= 0) {
+      final oldPlan = dayPlans[oldPlanIdx];
+      final oldBlocksMap = {for (var b in oldPlan.blocks ?? const <Block>[]) b.id: b};
+      for (final newBlock in plan.blocks ?? const <Block>[]) {
+        final oldBlock = oldBlocksMap[newBlock.id];
+        if (newBlock.status == BlockStatus.done &&
+            (oldBlock == null || oldBlock.status != BlockStatus.done)) {
+          final durationSecs = (newBlock.actualDurationMinutes ?? newBlock.plannedDurationMinutes) * 60;
+          final label = _isStudyBlock(newBlock) ? 'Studies' : newBlock.title;
+          unawaited(ActivityHistoryService.record(
+            label,
+            durationSecs: durationSecs,
+            blockTypeValue: newBlock.type.value,
+          ));
+        }
+      }
+    } else {
+      for (final newBlock in plan.blocks ?? const <Block>[]) {
+        if (newBlock.status == BlockStatus.done) {
+          final durationSecs = (newBlock.actualDurationMinutes ?? newBlock.plannedDurationMinutes) * 60;
+          final label = _isStudyBlock(newBlock) ? 'Studies' : newBlock.title;
+          unawaited(ActivityHistoryService.record(
+            label,
+            durationSecs: durationSecs,
+            blockTypeValue: newBlock.type.value,
+          ));
+        }
+      }
+    }
+
     await _db.upsertDayPlan(plan.toJson());
     final idx = dayPlans.indexWhere((p) => p.date == plan.date);
     if (idx >= 0) {
