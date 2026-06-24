@@ -154,22 +154,10 @@ const double _kNowOverlayHeight = 24;
 const double _kNowLineThickness = 1.5;
 const double _kNowDotSize = 10;
 const double _kGapRowHorizontalPadding = 8;
-const double _kGapRowVerticalPadding = 8;
 const double _kGapButtonHeight = 36;
 const double _kGapButtonHorizontalPadding = 16;
 const double _kCompactFutureTimelineHeight = 220;
 
-double _gapSlotHeight(
-  int minutes, {
-  required bool hasPastSection,
-  required bool hasFutureSection,
-}) {
-  // Gaps are always compact. They do not scale with time duration.
-  if (hasPastSection && hasFutureSection) {
-    return 124.0;
-  }
-  return 68.0;
-}
 
 Color _colorFromHex(String? value, {Color fallback = _kTimelineAccent}) {
   if (value == null || value.trim().isEmpty) return fallback;
@@ -357,6 +345,7 @@ class TimelineView extends StatefulWidget {
 class _TimelineViewState extends State<TimelineView> {
   late DateTime _currentTime;
   Timer? _nowTimer;
+  final Set<String> _expandedGaps = {};
 
   @override
   void initState() {
@@ -1615,20 +1604,26 @@ class _TimelineViewState extends State<TimelineView> {
           );
         }
         if (item.isGap) {
+          final gapKey = 'gap_${item.gapStartMinutes}_${item.gapEndMinutes}';
+          final isExpanded = _expandedGaps.contains(gapKey);
+          final gapMinutes = item.gapEndMinutes! - item.gapStartMinutes!;
           final gapState = _buildGapActionState(
             gapStartMinutes: item.gapStartMinutes!,
             gapEndMinutes: item.gapEndMinutes!,
             dayStartMinutes: bounds.startMinutes,
           );
-          final gapHeight = _gapSlotHeight(
-            item.gapEndMinutes! - item.gapStartMinutes!,
-            hasPastSection: gapState.canAddLog,
-            hasFutureSection: gapState.canAddTask,
-          );
+          final double gapHeight;
+          if (isExpanded) {
+            gapHeight = math.max(120.0, _scaledTimelineHeight(gapMinutes));
+          } else {
+            if (gapState.canAddLog && gapState.canAddTask) {
+              gapHeight = 132.0;
+            } else {
+              gapHeight = math.min(110.0, 76.0 + (gapMinutes / 60.0) * 6.0);
+            }
+          }
           return KeyedSubtree(
-            key: ValueKey(
-              'gap_${item.gapStartMinutes}_${item.gapEndMinutes}',
-            ),
+            key: ValueKey(gapKey),
             child: _GapSlot(
               startMinutes: item.gapStartMinutes!,
               endMinutes: item.gapEndMinutes!,
@@ -1655,6 +1650,17 @@ class _TimelineViewState extends State<TimelineView> {
                 height: gapHeight,
               ),
               nowLabel: nowLabel,
+              isExpanded: isExpanded,
+              onToggleExpand: () {
+                setState(() {
+                  if (_expandedGaps.contains(gapKey)) {
+                    _expandedGaps.remove(gapKey);
+                  } else {
+                    _expandedGaps.add(gapKey);
+                  }
+                });
+              },
+              gapHeight: gapHeight,
             ),
           );
         }
@@ -3955,6 +3961,9 @@ class _GapSlot extends StatelessWidget {
   final bool showPastPrompt;
   final double? nowLineOffset;
   final String nowLabel;
+  final bool isExpanded;
+  final VoidCallback onToggleExpand;
+  final double gapHeight;
 
   const _GapSlot({
     required this.startMinutes,
@@ -3968,6 +3977,9 @@ class _GapSlot extends StatelessWidget {
     this.showPastPrompt = false,
     this.nowLineOffset,
     required this.nowLabel,
+    required this.isExpanded,
+    required this.onToggleExpand,
+    required this.gapHeight,
   });
 
   @override
@@ -3986,11 +3998,9 @@ class _GapSlot extends StatelessWidget {
         futureStartMinutes.clamp(startMinutes, endMinutes);
     final visiblePastDurationMinutes =
         math.max(0, visiblePastEndMinutes - startMinutes);
-    final gapHeight = _gapSlotHeight(
-      gapMinutes,
-      hasPastSection: hasPastSection,
-      hasFutureSection: hasFutureSection,
-    );
+
+    final double outerVerticalPadding = isExpanded ? 8.0 : 4.0;
+    final double innerVerticalPadding = isExpanded ? 10.0 : 6.0;
 
     final halfHourTicks = <int>[];
     final firstTick = ((startMinutes ~/ 30) * 30) + 30;
@@ -4026,7 +4036,7 @@ class _GapSlot extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(width: _kTimelineLeadingWidth),
-                    // Column 1: Time Column (start label top, hour ticks relative to gap height)
+                    // Column 1: Time Column (start label top, hour ticks relative to gap height if expanded)
                     SizedBox(
                       width: _kTimelineTimeWidth,
                       height: gapHeight,
@@ -4047,37 +4057,38 @@ class _GapSlot extends StatelessWidget {
                                   ]),
                             ),
                           ),
-                          ...halfHourTicks.map((tick) {
-                            final fraction = (tick - startMinutes) / (gapMinutes > 0 ? gapMinutes : 1);
-                            final topPos = fraction * gapHeight;
-                            final isHour = tick % 60 == 0;
-                            return Positioned(
-                              top: topPos - 6,
-                              right: 0,
-                              child: Text(
-                                isHour
-                                    ? _to12h(_minutesToHHMM(tick))
-                                    : _to12hShort(_minutesToHHMM(tick)),
-                                textAlign: TextAlign.right,
-                                style: TextStyle(
-                                  fontSize: isHour ? 10 : 9,
-                                  fontWeight:
-                                      isHour ? FontWeight.w600 : FontWeight.w400,
-                                  color: timeLabelColor
-                                      .withValues(alpha: isHour ? 0.7 : 0.40),
-                                  fontFeatures: const [
-                                    FontFeature.tabularFigures()
-                                  ],
+                          if (isExpanded)
+                            ...halfHourTicks.map((tick) {
+                              final fraction = (tick - startMinutes) / (gapMinutes > 0 ? gapMinutes : 1);
+                              final topPos = fraction * gapHeight;
+                              final isHour = tick % 60 == 0;
+                              return Positioned(
+                                top: topPos - 6,
+                                right: 0,
+                                child: Text(
+                                  isHour
+                                      ? _to12h(_minutesToHHMM(tick))
+                                      : _to12hShort(_minutesToHHMM(tick)),
+                                  textAlign: TextAlign.right,
+                                  style: TextStyle(
+                                    fontSize: isHour ? 10 : 9,
+                                    fontWeight:
+                                        isHour ? FontWeight.w600 : FontWeight.w400,
+                                    color: timeLabelColor
+                                        .withValues(alpha: isHour ? 0.7 : 0.40),
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures()
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            );
-                          }),
+                              );
+                            }),
                         ],
                       ),
                     ),
                     const SizedBox(width: _kTimelineTimeToPillGap),
 
-                    // Column 2: Center Column (dashed line + hourly tick circles)
+                    // Column 2: Center Column (dashed line + hourly tick circles if expanded)
                     SizedBox(
                       width: _kTimelinePillWidth,
                       height: gapHeight,
@@ -4097,27 +4108,28 @@ class _GapSlot extends StatelessWidget {
                               ),
                             ),
                           ),
-                          ...hourTicks.map((tick) {
-                            final fraction = (tick - startMinutes) / (gapMinutes > 0 ? gapMinutes : 1);
-                            final topPos = fraction * gapHeight;
-                            return Positioned(
-                              top: topPos - 4,
-                              left: (_kTimelinePillWidth - 8.0) / 2, // Centered
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: theme.colorScheme.surface,
-                                  border: Border.all(
-                                    color: theme.dividerColor
-                                        .withValues(alpha: 0.5),
-                                    width: 1.5,
+                          if (isExpanded)
+                            ...hourTicks.map((tick) {
+                              final fraction = (tick - startMinutes) / (gapMinutes > 0 ? gapMinutes : 1);
+                              final topPos = fraction * gapHeight;
+                              return Positioned(
+                                top: topPos - 4,
+                                left: (_kTimelinePillWidth - 8.0) / 2, // Centered
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: theme.colorScheme.surface,
+                                    border: Border.all(
+                                      color: theme.dividerColor
+                                          .withValues(alpha: 0.5),
+                                      width: 1.5,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            );
-                          }),
+                              );
+                            }),
                         ],
                       ),
                     ),
@@ -4126,9 +4138,9 @@ class _GapSlot extends StatelessWidget {
                     // Column 3: Expanded Card Container
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(
+                        padding: EdgeInsets.symmetric(
                           horizontal: _kGapRowHorizontalPadding,
-                          vertical: _kGapRowVerticalPadding,
+                          vertical: outerVerticalPadding,
                         ),
                         child: DecoratedBox(
                           decoration: BoxDecoration(
@@ -4139,188 +4151,226 @@ class _GapSlot extends StatelessWidget {
                             ),
                           ),
                           child: Padding(
-                            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-                            child: hasPastSection && hasFutureSection
-                                ? Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      // Past section row
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  '${_to12h(_minutesToHHMM(startMinutes))} - ${_to12h(_minutesToHHMM(visiblePastEndMinutes))} • ${_formatGapDurationCompact(visiblePastDurationMinutes)}',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: onSurface,
-                                                    fontFeatures: const [FontFeature.tabularFigures()],
-                                                  ),
-                                                ),
-                                                Text(
-                                                  'What did you do here?',
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    color: onSurface.withValues(alpha: 0.55),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          if (onAddLog != null)
-                                            _GapActionButton(
-                                              onPressed: onAddLog,
-                                              icon: Icon(
-                                                Icons.add_rounded,
-                                                size: 14,
-                                                color: onSurface.withValues(alpha: 0.56),
-                                              ),
-                                              label: 'Log',
-                                              labelStyle: TextStyle(
-                                                color: onSurface.withValues(alpha: 0.72),
-                                                fontWeight: FontWeight.w700,
-                                                fontSize: 10,
-                                              ),
-                                              side: BorderSide(
-                                                color: onSurface.withValues(alpha: 0.14),
-                                              ),
-                                              backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.54),
-                                            ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Divider(
-                                        height: 1,
-                                        thickness: 1,
-                                        color: onSurface.withValues(alpha: 0.08),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      // Future section row
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  '${_to12h(_minutesToHHMM(visibleFutureStartMinutes))} - ${_to12h(_minutesToHHMM(endMinutes))} • $futureLabel',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: onSurface,
-                                                    fontFeatures: const [FontFeature.tabularFigures()],
-                                                  ),
-                                                ),
-                                                Text(
-                                                  'Empty slot',
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    color: onSurface.withValues(alpha: 0.55),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          if (onAddTask != null)
-                                            _GapActionButton(
-                                              onPressed: onAddTask,
-                                              icon: const Icon(
-                                                Icons.add_rounded,
-                                                size: 14,
-                                                color: _kTimelineGapAccent,
-                                              ),
-                                              label: 'Task',
-                                              labelStyle: const TextStyle(
-                                                color: _kTimelineGapAccent,
-                                                fontWeight: FontWeight.w700,
-                                                fontSize: 10,
-                                              ),
-                                              side: BorderSide(
-                                                color: onSurface.withValues(alpha: 0.14),
-                                              ),
-                                              backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.54),
-                                            ),
-                                        ],
-                                      ),
-                                    ],
-                                  )
-                                : Row(
-                                    children: [
-                                      Expanded(
-                                        child: Column(
+                            padding: EdgeInsets.fromLTRB(14, innerVerticalPadding, 14, innerVerticalPadding),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: hasPastSection && hasFutureSection
+                                      ? Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           mainAxisAlignment: MainAxisAlignment.center,
                                           children: [
-                                            Text(
-                                              hasPastSection
-                                                  ? '${_to12h(_minutesToHHMM(startMinutes))} - ${_to12h(_minutesToHHMM(visiblePastEndMinutes))} • ${_formatGapDurationCompact(visiblePastDurationMinutes)}'
-                                                  : '${_to12h(_minutesToHHMM(visibleFutureStartMinutes))} - ${_to12h(_minutesToHHMM(endMinutes))} • $futureLabel',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w700,
-                                                color: onSurface,
-                                                fontFeatures: const [FontFeature.tabularFigures()],
-                                              ),
+                                            // Past section row
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        '${_to12h(_minutesToHHMM(startMinutes))} - ${_to12h(_minutesToHHMM(visiblePastEndMinutes))} • ${_formatGapDurationCompact(visiblePastDurationMinutes)}',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          fontWeight: FontWeight.w600,
+                                                          color: onSurface,
+                                                          fontFeatures: const [FontFeature.tabularFigures()],
+                                                        ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                      Text(
+                                                        'What did you do here?',
+                                                        style: TextStyle(
+                                                          fontSize: 10,
+                                                          color: onSurface.withValues(alpha: 0.55),
+                                                        ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                if (onAddLog != null)
+                                                  _GapActionButton(
+                                                    onPressed: onAddLog,
+                                                    icon: Icon(
+                                                      Icons.add_rounded,
+                                                      size: 14,
+                                                      color: onSurface.withValues(alpha: 0.56),
+                                                    ),
+                                                    label: 'Log',
+                                                    labelStyle: TextStyle(
+                                                      color: onSurface.withValues(alpha: 0.72),
+                                                      fontWeight: FontWeight.w700,
+                                                      fontSize: 10,
+                                                    ),
+                                                    side: BorderSide(
+                                                      color: onSurface.withValues(alpha: 0.14),
+                                                    ),
+                                                    backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.54),
+                                                  ),
+                                              ],
                                             ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              hasPastSection
-                                                  ? 'What did you do here?'
-                                                  : 'Empty slot',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w500,
-                                                color: onSurface.withValues(alpha: 0.55),
-                                              ),
+                                            const SizedBox(height: 6),
+                                            Divider(
+                                              height: 1,
+                                              thickness: 1,
+                                              color: onSurface.withValues(alpha: 0.08),
+                                            ),
+                                            const SizedBox(height: 6),
+                                            // Future section row
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        '${_to12h(_minutesToHHMM(visibleFutureStartMinutes))} - ${_to12h(_minutesToHHMM(endMinutes))} • $futureLabel',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          fontWeight: FontWeight.w600,
+                                                          color: onSurface,
+                                                          fontFeatures: const [FontFeature.tabularFigures()],
+                                                        ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                      Text(
+                                                        'Empty slot',
+                                                        style: TextStyle(
+                                                          fontSize: 10,
+                                                          color: onSurface.withValues(alpha: 0.55),
+                                                        ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                if (onAddTask != null)
+                                                  _GapActionButton(
+                                                    onPressed: onAddTask,
+                                                    icon: const Icon(
+                                                      Icons.add_rounded,
+                                                      size: 14,
+                                                      color: _kTimelineGapAccent,
+                                                    ),
+                                                    label: 'Task',
+                                                    labelStyle: const TextStyle(
+                                                      color: _kTimelineGapAccent,
+                                                      fontWeight: FontWeight.w700,
+                                                      fontSize: 10,
+                                                    ),
+                                                    side: BorderSide(
+                                                      color: onSurface.withValues(alpha: 0.14),
+                                                    ),
+                                                    backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.54),
+                                                  ),
+                                              ],
                                             ),
                                           ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      if (hasPastSection && onAddLog != null)
-                                        _GapActionButton(
-                                          onPressed: onAddLog,
-                                          icon: Icon(
-                                            Icons.add_rounded,
-                                            size: 14,
-                                            color: onSurface.withValues(alpha: 0.56),
-                                          ),
-                                          label: 'Add Log',
-                                          labelStyle: TextStyle(
-                                            color: onSurface.withValues(alpha: 0.72),
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 11,
-                                          ),
-                                          side: BorderSide(
-                                            color: onSurface.withValues(alpha: 0.14),
-                                          ),
-                                          backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.54),
                                         )
-                                      else if (hasFutureSection && onAddTask != null)
-                                        _GapActionButton(
-                                          onPressed: onAddTask,
-                                          icon: const Icon(
-                                            Icons.add_rounded,
-                                            size: 14,
-                                            color: _kTimelineGapAccent,
-                                          ),
-                                          label: 'Add Task',
-                                          labelStyle: const TextStyle(
-                                            color: _kTimelineGapAccent,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 11,
-                                          ),
-                                          side: BorderSide(
-                                            color: onSurface.withValues(alpha: 0.14),
-                                          ),
-                                          backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.54),
+                                      : Row(
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  Text(
+                                                    hasPastSection
+                                                        ? '${_to12h(_minutesToHHMM(startMinutes))} - ${_to12h(_minutesToHHMM(visiblePastEndMinutes))} • ${_formatGapDurationCompact(visiblePastDurationMinutes)}'
+                                                        : '${_to12h(_minutesToHHMM(visibleFutureStartMinutes))} - ${_to12h(_minutesToHHMM(endMinutes))} • $futureLabel',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: onSurface,
+                                                      fontFeatures: const [FontFeature.tabularFigures()],
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    hasPastSection
+                                                        ? 'What did you do here?'
+                                                        : 'Empty slot',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w500,
+                                                      color: onSurface.withValues(alpha: 0.55),
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            if (hasPastSection && onAddLog != null)
+                                              _GapActionButton(
+                                                onPressed: onAddLog,
+                                                icon: Icon(
+                                                  Icons.add_rounded,
+                                                  size: 14,
+                                                  color: onSurface.withValues(alpha: 0.56),
+                                                ),
+                                                label: 'Add Log',
+                                                labelStyle: TextStyle(
+                                                  color: onSurface.withValues(alpha: 0.72),
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 11,
+                                                ),
+                                                side: BorderSide(
+                                                  color: onSurface.withValues(alpha: 0.14),
+                                                ),
+                                                backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.54),
+                                              )
+                                            else if (hasFutureSection && onAddTask != null)
+                                              _GapActionButton(
+                                                onPressed: onAddTask,
+                                                icon: const Icon(
+                                                  Icons.add_rounded,
+                                                  size: 14,
+                                                  color: _kTimelineGapAccent,
+                                                ),
+                                                label: 'Add Task',
+                                                labelStyle: const TextStyle(
+                                                  color: _kTimelineGapAccent,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 11,
+                                                ),
+                                                side: BorderSide(
+                                                  color: onSurface.withValues(alpha: 0.14),
+                                                ),
+                                                backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.54),
+                                              ),
+                                          ],
                                         ),
-                                    ],
+                                ),
+                                const SizedBox(width: 4),
+                                // Expand/collapse toggle button
+                                Material(
+                                  color: Colors.transparent,
+                                  child: IconButton(
+                                    icon: Icon(
+                                      isExpanded
+                                          ? Icons.expand_less_rounded
+                                          : Icons.expand_more_rounded,
+                                      color: onSurface.withValues(alpha: 0.54),
+                                    ),
+                                    onPressed: onToggleExpand,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(
+                                      minWidth: 32,
+                                      minHeight: 32,
+                                    ),
+                                    splashRadius: 18,
                                   ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
