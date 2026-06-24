@@ -105,7 +105,12 @@ class ActivityHistoryService {
   ///
   /// [label]        — task name (e.g. "Cooking", "Bathe", "Studies")
   /// [durationSecs] — seconds spent on this task (0 if unknown / scheduling)
-  static Future<void> record(String label, {int durationSecs = 0, String? blockTypeValue}) async {
+  static Future<void> record(
+    String label, {
+    int durationSecs = 0,
+    String? blockTypeValue,
+    bool incrementCount = true,
+  }) async {
     final cleaned = cleanLabel(label);
     if (cleaned.isEmpty) return;
 
@@ -116,7 +121,7 @@ class ActivityHistoryService {
     final all = await getAllFull();
     final existing = all[targetLabel] ?? {'count': 0, 'totalSeconds': 0};
     all[targetLabel] = {
-      'count': ((existing['count'] as num?) ?? 0).toInt() + 1,
+      'count': ((existing['count'] as num?) ?? 0).toInt() + (incrementCount ? 1 : 0),
       'totalSeconds':
           ((existing['totalSeconds'] as num?) ?? 0).toInt() + durationSecs,
       'lastUsedAt': DateTime.now().toIso8601String(),
@@ -124,12 +129,45 @@ class ActivityHistoryService {
     await _saveAll(prefs, all);
   }
 
+  /// Decrement completed count and duration for a task when deleted or status changed.
+  static Future<void> decrementRecord(
+    String label, {
+    int durationSecs = 0,
+    String? blockTypeValue,
+  }) async {
+    final cleaned = cleanLabel(label);
+    if (cleaned.isEmpty) return;
+
+    final isStudy = isStudyLabel(cleaned, blockTypeValue: blockTypeValue);
+    final targetLabel = isStudy ? 'Studies' : cleaned;
+
+    final prefs = await SharedPreferences.getInstance();
+    final all = await getAllFull();
+    if (!all.containsKey(targetLabel)) return;
+
+    final existing = all[targetLabel]!;
+    final currentCount = ((existing['count'] as num?) ?? 0).toInt();
+    final currentSeconds = ((existing['totalSeconds'] as num?) ?? 0).toInt();
+
+    final newCount = currentCount - 1;
+    final newSeconds = currentSeconds - durationSecs;
+
+    all[targetLabel] = {
+      'count': newCount < 0 ? 0 : newCount,
+      'totalSeconds': newSeconds < 0 ? 0 : newSeconds,
+      'lastUsedAt': existing['lastUsedAt'] ?? DateTime.now().toIso8601String(),
+    };
+    await _saveAll(prefs, all);
+  }
+
   // ── Read helpers ──────────────────────────────────────────────
 
   /// Returns all entries sorted by lastUsedAt descending (recently tracked first).
+  /// Excludes entries with count <= 0.
   static Future<List<MapEntry<String, Map<String, dynamic>>>> getRecent() async {
     final all = await getAllFull();
-    final sorted = all.entries.toList()
+    final filtered = all.entries.where((e) => ((e.value['count'] as num?) ?? 0) > 0).toList();
+    final sorted = filtered
       ..sort((a, b) {
         final aT = a.value['lastUsedAt'] as String? ?? '';
         final bT = b.value['lastUsedAt'] as String? ?? '';
@@ -139,10 +177,12 @@ class ActivityHistoryService {
   }
 
   /// Returns all entries sorted by totalSeconds descending (top by time spent).
+  /// Excludes entries with count <= 0.
   static Future<List<MapEntry<String, Map<String, dynamic>>>> getTopByTime()
       async {
     final all = await getAllFull();
-    final sorted = all.entries.toList()
+    final filtered = all.entries.where((e) => ((e.value['count'] as num?) ?? 0) > 0).toList();
+    final sorted = filtered
       ..sort((a, b) {
         final aS = (a.value['totalSeconds'] as num?)?.toInt() ?? 0;
         final bS = (b.value['totalSeconds'] as num?)?.toInt() ?? 0;
@@ -152,10 +192,12 @@ class ActivityHistoryService {
   }
 
   /// Returns all entries sorted by count descending (top by times done).
+  /// Excludes entries with count <= 0.
   static Future<List<MapEntry<String, Map<String, dynamic>>>> getTopByCount()
       async {
     final all = await getAllFull();
-    final sorted = all.entries.toList()
+    final filtered = all.entries.where((e) => ((e.value['count'] as num?) ?? 0) > 0).toList();
+    final sorted = filtered
       ..sort((a, b) {
         final aC = (a.value['count'] as num?)?.toInt() ?? 0;
         final bC = (b.value['count'] as num?)?.toInt() ?? 0;

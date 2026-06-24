@@ -13,6 +13,8 @@ import 'package:focusflow_mobile/services/background_timer_service.dart';
 import 'package:focusflow_mobile/services/activity_history_service.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:focusflow_mobile/screens/today_plan/add_task_sheet.dart';
+import 'package:focusflow_mobile/services/offline_suggestion_catalog.dart';
+import 'package:focusflow_mobile/utils/emoji_helper.dart';
 
 
 // Preset backfill durations shown as quick chips
@@ -504,6 +506,28 @@ class _TrackNowScreenState extends State<TrackNowScreen>
     return '';
   }
 
+  String _getTrackingEmoji() {
+    final title = _trackingDisplayName.trim();
+    if (title.isEmpty) return '⏱️';
+
+    // If it has a leading emoji, extract it
+    if (EmojiHelper.hasLeadingEmoji(title)) {
+      final parts = title.split(' ');
+      if (parts.isNotEmpty && EmojiHelper.hasLeadingEmoji(parts.first)) {
+        return parts.first;
+      }
+    }
+
+    final emoji = EmojiHelper.getEmojiForTask(title);
+    if (emoji != null) return emoji;
+
+    if (OfflineSuggestionCatalog.isInitialized) {
+      return OfflineSuggestionCatalog.suggest(title).emoji;
+    }
+
+    return '⏱️';
+  }
+
   String? _resolveLinkedTaskTitle(AppProvider app, String taskId) {
     final flow = app.getDailyFlow(widget.dateKey);
     if (flow != null) {
@@ -732,11 +756,6 @@ class _TrackNowScreenState extends State<TrackNowScreen>
 
     _tickTimer?.cancel();
     BackgroundTimerService.stop();
-
-    // Record label to history for future autocomplete
-    if (name.isNotEmpty) {
-      unawaited(ActivityHistoryService.record(name, durationSecs: _elapsed));
-    }
 
     // Fire notification: session complete
     unawaited(NotificationService.instance.showFocusTimerDone(
@@ -1666,9 +1685,9 @@ class _TrackNowScreenState extends State<TrackNowScreen>
             ),
           ),
           const SizedBox(height: 10),
-          const Text(
-            '⏱️',
-            style: TextStyle(fontSize: 48),
+          Text(
+            _getTrackingEmoji(),
+            style: const TextStyle(fontSize: 48),
           ),
           const SizedBox(height: 12),
           Text(

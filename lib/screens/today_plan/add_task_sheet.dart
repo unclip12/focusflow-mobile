@@ -542,7 +542,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
 
     final app = context.read<AppProvider>();
     app.saveGeneralTaskName(title);
-    unawaited(ActivityHistoryService.record(title, durationSecs: 0));
+    unawaited(ActivityHistoryService.record(title, durationSecs: 0, incrementCount: false));
 
     final durationMinutes = _generalDurationMinutes ?? 0;
     final block = Block(
@@ -634,7 +634,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     );
     if (!inserted) return;
 
-    unawaited(ActivityHistoryService.record('Studies', durationSecs: 0));
+    unawaited(ActivityHistoryService.record('Studies', durationSecs: 0, incrementCount: false));
 
     if (mounted) {
       Navigator.of(context).pop();

@@ -937,12 +937,27 @@ class AppProvider extends ChangeNotifier {
     if (plan == null || blocks == null) return;
 
     final remaining = <Block>[];
+    final removedBlocks = <Block>[];
     for (final block in blocks) {
       if (!ids.contains(block.id)) {
         remaining.add(block.copyWith(index: remaining.length));
+      } else {
+        removedBlocks.add(block);
       }
     }
     if (remaining.length == blocks.length) return;
+
+    for (final block in removedBlocks) {
+      if (block.status == BlockStatus.done) {
+        final durationSecs = (block.actualDurationMinutes ?? block.plannedDurationMinutes) * 60;
+        final label = _isStudyBlock(block) ? 'Studies' : block.title;
+        unawaited(ActivityHistoryService.decrementRecord(
+          label,
+          durationSecs: durationSecs,
+          blockTypeValue: block.type.value,
+        ));
+      }
+    }
 
     await upsertDayPlan(plan.copyWith(blocks: remaining));
     await syncFlowActivitiesFromDayPlan(todayDateKey);
@@ -956,12 +971,25 @@ class AppProvider extends ChangeNotifier {
     if (plan == null || blocks == null) return;
 
     final remaining = <Block>[];
+    Block? removedBlock;
     for (final block in blocks) {
       if (block.id != blockId) {
         remaining.add(block.copyWith(index: remaining.length));
+      } else {
+        removedBlock = block;
       }
     }
     if (remaining.length == blocks.length) return;
+
+    if (removedBlock != null && removedBlock.status == BlockStatus.done) {
+      final durationSecs = (removedBlock.actualDurationMinutes ?? removedBlock.plannedDurationMinutes) * 60;
+      final label = _isStudyBlock(removedBlock) ? 'Studies' : removedBlock.title;
+      unawaited(ActivityHistoryService.decrementRecord(
+        label,
+        durationSecs: durationSecs,
+        blockTypeValue: removedBlock.type.value,
+      ));
+    }
 
     await upsertDayPlan(plan.copyWith(blocks: remaining));
     await syncFlowActivitiesFromDayPlan(date);
@@ -991,6 +1019,16 @@ class AppProvider extends ChangeNotifier {
             label,
             durationSecs: durationSecs,
             blockTypeValue: newBlock.type.value,
+          ));
+        } else if (oldBlock != null &&
+            oldBlock.status == BlockStatus.done &&
+            newBlock.status != BlockStatus.done) {
+          final durationSecs = (oldBlock.actualDurationMinutes ?? oldBlock.plannedDurationMinutes) * 60;
+          final label = _isStudyBlock(oldBlock) ? 'Studies' : oldBlock.title;
+          unawaited(ActivityHistoryService.decrementRecord(
+            label,
+            durationSecs: durationSecs,
+            blockTypeValue: oldBlock.type.value,
           ));
         }
       }

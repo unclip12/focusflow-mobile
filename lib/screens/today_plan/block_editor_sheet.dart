@@ -602,7 +602,7 @@ class _BlockEditorSheetState extends State<BlockEditorSheet> {
         ),
       );
       if (!_isLogMode) {
-        unawaited(ActivityHistoryService.record(_composeTitle(), durationSecs: 0, blockTypeValue: _selectedType.value));
+        unawaited(ActivityHistoryService.record(_composeTitle(), durationSecs: 0, blockTypeValue: _selectedType.value, incrementCount: false));
       }
       if (mounted) Navigator.of(context).pop();
     } finally {
