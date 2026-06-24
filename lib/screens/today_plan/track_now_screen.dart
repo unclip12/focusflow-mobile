@@ -9,6 +9,7 @@ import 'package:focusflow_mobile/utils/constants.dart';
 import 'package:focusflow_mobile/services/haptics_service.dart';
 import 'package:focusflow_mobile/services/notification_service.dart';
 import 'package:focusflow_mobile/services/background_timer_service.dart';
+import 'package:focusflow_mobile/services/activity_history_service.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:focusflow_mobile/screens/today_plan/add_task_sheet.dart';
 
@@ -33,6 +34,9 @@ const _categories = [
   _Category('Work',     '💼', Color(0xFF0EA5E9)),
   _Category('Other',    '⏱️', Color(0xFF64748B)),
 ];
+
+// Preset backfill durations shown as quick chips
+const _kBackfillPresets = [0, 2, 5, 10, 15, 20, 25, 30];
 
 enum _TrackNowInterruptChoice { pauseAndTrack, linkToCurrent }
 
@@ -73,6 +77,12 @@ class _TrackNowScreenState extends State<TrackNowScreen>
   // Timer state
   int _elapsed = 0;
   Timer? _tickTimer;
+
+  // Activity history autocomplete
+  List<MapEntry<String, int>> _suggestions = [];
+
+  // "Started X minutes ago" backfill (0 = right now)
+  int _backfillMinutes = 0;
 
   String? _categoryColorHex(String? category) {
     if (category == null) return null;
@@ -401,8 +411,7 @@ class _TrackNowScreenState extends State<TrackNowScreen>
     _tickTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _elapsed++);
     });
-    
-    // Start background timer
+
     final name = _trackingDisplayName;
     if (name.isNotEmpty) {
       BackgroundTimerService.start(
@@ -415,11 +424,9 @@ class _TrackNowScreenState extends State<TrackNowScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _isTracking && _startedAt != null) {
-      // Recompute elapsed from startedAt when app resumes from background
       setState(() {
         _elapsed = DateTime.now().difference(_startedAt!).inSeconds;
       });
-      // Re-sync background service time in case it drifted
       final name = _trackingDisplayName;
       BackgroundTimerService.start(
         activityName: name.isNotEmpty ? name : 'Session',
@@ -545,6 +552,7 @@ class _TrackNowScreenState extends State<TrackNowScreen>
       _selectedTaskTitle = itemTitle;
       _nameCtrl.text = itemTitle;
       _selectedCategory = null;
+      _suggestions = [];
     });
     HapticsService.light();
 
@@ -610,11 +618,11 @@ class _TrackNowScreenState extends State<TrackNowScreen>
       label: name,
       category: _selectedCategory,
     );
-    
+
     // Link to the selected task immediately upon start if applicable
     if (_selectedTaskId != null) {
       await app.updateFlowActivity(
-        widget.dateKey, 
+        widget.dateKey,
         activity.copyWith(
           label: name,
           linkedTaskIds: [_selectedTaskId!],
@@ -622,11 +630,24 @@ class _TrackNowScreenState extends State<TrackNowScreen>
       );
     }
 
+    // Apply backfill: shift start time back by _backfillMinutes
+    final backfillDuration = Duration(minutes: _backfillMinutes);
+    final actualStart = DateTime.now().subtract(backfillDuration);
+
+    if (_backfillMinutes > 0) {
+      await app.updateFlowActivity(
+        widget.dateKey,
+        activity.copyWith(
+          startedAt: actualStart.toIso8601String(),
+        ),
+      );
+    }
+
     setState(() {
       _isTracking = true;
       _trackingActivityId = activity.id;
-      _startedAt = DateTime.now();
-      _elapsed = 0;
+      _startedAt = actualStart;
+      _elapsed = backfillDuration.inSeconds;
     });
     _startTimer();
   }
@@ -675,6 +696,11 @@ class _TrackNowScreenState extends State<TrackNowScreen>
 
     _tickTimer?.cancel();
     BackgroundTimerService.stop();
+
+    // Record label to history for future autocomplete
+    if (name.isNotEmpty) {
+      unawaited(ActivityHistoryService.record(name));
+    }
 
     // Fire notification: session complete
     unawaited(NotificationService.instance.showFocusTimerDone(
@@ -886,6 +912,81 @@ class _TrackNowScreenState extends State<TrackNowScreen>
     );
   }
 
+  // ── Backfill chip helper ──────────────────────────────────────
+
+  Widget _backfillChip(int minutes, String label, ColorScheme cs) {
+    final selected = _backfillMinutes == minutes;
+    return GestureDetector(
+      onTap: () {
+        setState(() => _backfillMinutes = minutes);
+        HapticsService.light();
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? cs.primary.withValues(alpha: 0.15)
+              : cs.surfaceContainerHighest.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected
+                ? cs.primary.withValues(alpha: 0.5)
+                : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            color: selected
+                ? cs.primary
+                : cs.onSurface.withValues(alpha: 0.6),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickCustomBackfill() async {
+    final controller = TextEditingController();
+    final result = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Started how many minutes ago?'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Minutes',
+            hintText: 'e.g. 8',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final m = int.tryParse(controller.text.trim());
+              Navigator.of(ctx).pop(m);
+            },
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result != null && result > 0) {
+      setState(() => _backfillMinutes = result);
+      HapticsService.light();
+    }
+  }
+
   // ── Build ────────────────────────────────────────────────────
 
   @override
@@ -1020,7 +1121,6 @@ class _TrackNowScreenState extends State<TrackNowScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 24),
-          // Title
           Text(
             '⏱️ Track Now',
             style: theme.textTheme.headlineSmall?.copyWith(
@@ -1038,13 +1138,11 @@ class _TrackNowScreenState extends State<TrackNowScreen>
           ),
           const SizedBox(height: 32),
 
-          // Activity Query / Inline Selection
           _buildExistingTasksList(theme, cs),
 
           const SizedBox(height: 24),
-          
+
           if (_selectedTaskId == null) ...[
-            // Activity name (Custom Input)
             Text('Or enter custom activity:',
                 style: TextStyle(
                   fontSize: 13,
@@ -1052,9 +1150,11 @@ class _TrackNowScreenState extends State<TrackNowScreen>
                   color: cs.onSurface.withValues(alpha: 0.7),
                 )),
             const SizedBox(height: 8),
+
+            // ── Activity text field with autocomplete ────────
             TextField(
               controller: _nameCtrl,
-              autofocus: _selectedTaskId == null,
+              autofocus: true,
               textCapitalization: TextCapitalization.sentences,
               onChanged: (val) {
                 if (val.isNotEmpty && _selectedTaskId != null) {
@@ -1063,6 +1163,13 @@ class _TrackNowScreenState extends State<TrackNowScreen>
                     _selectedTaskTitle = null;
                   });
                 }
+                if (val.trim().isEmpty) {
+                  setState(() => _suggestions = []);
+                  return;
+                }
+                ActivityHistoryService.suggest(val).then((results) {
+                  if (mounted) setState(() => _suggestions = results);
+                });
               },
               decoration: InputDecoration(
                 hintText: 'e.g. Making Biryani',
@@ -1077,9 +1184,69 @@ class _TrackNowScreenState extends State<TrackNowScreen>
               ),
               style: const TextStyle(fontSize: 15),
             ),
-            const SizedBox(height: 24),
 
-            // Category selector (only for manual)
+            // ── Autocomplete suggestion chips ─────────────────
+            if (_suggestions.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: _suggestions.map((entry) {
+                  return GestureDetector(
+                    onTap: () {
+                      _nameCtrl.text = entry.key;
+                      setState(() => _suggestions = []);
+                      HapticsService.light();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: cs.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: cs.primary.withValues(alpha: 0.25)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            entry.key,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: cs.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: cs.primary.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${entry.value}×',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: cs.primary.withValues(alpha: 0.8),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 8),
+            ],
+
+            const SizedBox(height: 16),
+
+            // ── Category selector ─────────────────────────────
             Text('Category',
                 style: TextStyle(
                   fontSize: 13,
@@ -1133,40 +1300,207 @@ class _TrackNowScreenState extends State<TrackNowScreen>
                 );
               }).toList(),
             ),
-          ] else ...[
-             // Notice when existing task is selected
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: cs.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: cs.primary.withValues(alpha: 0.3)),
-                ),
-                child: Column(
-                  children: [
-                    Icon(Icons.check_circle_rounded, color: cs.primary, size: 28),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Ready to track:',
+
+            const SizedBox(height: 24),
+
+            // ── "When did you start?" backfill section ────────
+            Text(
+              'When did you start?',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _backfillChip(0, 'Right now', cs),
+                _backfillChip(2, '2 min ago', cs),
+                _backfillChip(5, '5 min ago', cs),
+                _backfillChip(10, '10 min ago', cs),
+                _backfillChip(15, '15 min ago', cs),
+                _backfillChip(20, '20 min ago', cs),
+                _backfillChip(25, '25 min ago', cs),
+                _backfillChip(30, '30 min ago', cs),
+                // Custom input chip
+                GestureDetector(
+                  onTap: _pickCustomBackfill,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: (_backfillMinutes > 0 &&
+                              !_kBackfillPresets
+                                  .skip(1)
+                                  .contains(_backfillMinutes))
+                          ? cs.tertiary.withValues(alpha: 0.15)
+                          : cs.surfaceContainerHighest.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: (_backfillMinutes > 0 &&
+                                !_kBackfillPresets
+                                    .skip(1)
+                                    .contains(_backfillMinutes))
+                            ? cs.tertiary.withValues(alpha: 0.5)
+                            : Colors.transparent,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Text(
+                      (_backfillMinutes > 0 &&
+                              !_kBackfillPresets
+                                  .skip(1)
+                                  .contains(_backfillMinutes))
+                          ? '$_backfillMinutes min ago'
+                          : '⌨️ Custom',
                       style: TextStyle(
                         fontSize: 12,
-                        color: cs.onSurface.withValues(alpha: 0.6),
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _selectedTaskTitle ?? '',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
+              ],
+            ),
+            if (_backfillMinutes > 0) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(Icons.info_outline_rounded,
+                      size: 13,
+                      color: cs.onSurface.withValues(alpha: 0.4)),
+                  const SizedBox(width: 5),
+                  Text(
+                    'Tracking will start from $_backfillMinutes min ago',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ],
               ),
+            ],
+          ] else ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cs.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: cs.primary.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.check_circle_rounded, color: cs.primary, size: 28),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Ready to track:',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _selectedTaskTitle ?? '',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Backfill section shown for existing task selection too
+            Text(
+              'When did you start?',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _backfillChip(0, 'Right now', cs),
+                _backfillChip(2, '2 min ago', cs),
+                _backfillChip(5, '5 min ago', cs),
+                _backfillChip(10, '10 min ago', cs),
+                _backfillChip(15, '15 min ago', cs),
+                _backfillChip(20, '20 min ago', cs),
+                _backfillChip(25, '25 min ago', cs),
+                _backfillChip(30, '30 min ago', cs),
+                GestureDetector(
+                  onTap: _pickCustomBackfill,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: (_backfillMinutes > 0 &&
+                              !_kBackfillPresets
+                                  .skip(1)
+                                  .contains(_backfillMinutes))
+                          ? cs.tertiary.withValues(alpha: 0.15)
+                          : cs.surfaceContainerHighest.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: (_backfillMinutes > 0 &&
+                                !_kBackfillPresets
+                                    .skip(1)
+                                    .contains(_backfillMinutes))
+                            ? cs.tertiary.withValues(alpha: 0.5)
+                            : Colors.transparent,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Text(
+                      (_backfillMinutes > 0 &&
+                              !_kBackfillPresets
+                                  .skip(1)
+                                  .contains(_backfillMinutes))
+                          ? '$_backfillMinutes min ago'
+                          : '⌨️ Custom',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurface.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (_backfillMinutes > 0) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(Icons.info_outline_rounded,
+                      size: 13,
+                      color: cs.onSurface.withValues(alpha: 0.4)),
+                  const SizedBox(width: 5),
+                  Text(
+                    'Tracking will start from $_backfillMinutes min ago',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
+          const SizedBox(height: 32),
         ],
       ),
     );
