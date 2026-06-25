@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import '../../models/ai/document_vector.dart';
 import '../../objectbox.g.dart';
@@ -15,7 +16,7 @@ class RagDatabaseService {
     try {
       _interpreter = await Interpreter.fromAsset('assets/models/all-MiniLM-L6-v2.tflite');
     } catch (e) {
-      print('Failed to load embedding model: $e');
+      debugPrint('Failed to load embedding model: $e');
     }
   }
 

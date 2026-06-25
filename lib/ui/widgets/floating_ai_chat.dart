@@ -3,7 +3,7 @@ import '../../services/ai/local_llm_service.dart';
 
 class FloatingAiChat {
   static OverlayEntry? _overlayEntry;
-  static List<Map<String, String>> _messages = [];
+  static final List<Map<String, String>> _messages = [];
   static final LocalLlmService _llmService = LocalLlmService();
 
   static void show(BuildContext context) {
@@ -35,11 +35,11 @@ class _FloatingChatWidget extends StatefulWidget {
   final VoidCallback onClose;
 
   const _FloatingChatWidget({
-    Key? key,
+    super.key,
     required this.messages,
     required this.llmService,
     required this.onClose,
-  }) : super(key: key);
+  });
 
   @override
   State<_FloatingChatWidget> createState() => _FloatingChatWidgetState();
