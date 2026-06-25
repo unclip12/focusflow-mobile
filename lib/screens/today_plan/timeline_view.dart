@@ -1538,7 +1538,8 @@ class _TimelineViewState extends State<TimelineView> {
     final items = _buildTimelineItems(bounds);
 
     // Check for live TRACK_NOW activity (rebuild on app provider changes)
-    context.watch<AppProvider>();
+    final app = context.watch<AppProvider>();
+    final lastActivity = app.getLastCompletedTrackedActivity(widget.dateKey);
 
     final bottomPadding = MediaQuery.of(context).padding.bottom + 96;
     final nowLabel = _formatCurrentTimeLabel();
@@ -1642,6 +1643,18 @@ class _TimelineViewState extends State<TimelineView> {
                         gapEndMinutes: gapState.logEndMinutes,
                         dayStartMinutes: bounds.startMinutes,
                       ),
+              continueTaskLabel: (gapState.canAddLog && lastActivity != null) ? lastActivity.label : null,
+              onContinueTask: (gapState.canAddLog && lastActivity != null) ? () async {
+                final resumed = await app.resumeTrackNow(widget.dateKey, lastActivity.id);
+                if (resumed != null && context.mounted) {
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => TrackNowScreen(
+                      dateKey: widget.dateKey,
+                      existingActivityId: resumed.id,
+                    ),
+                  ));
+                }
+              } : null,
               futureDurationMinutes: gapState.futureMinutes,
               showPastPrompt: gapState.canAddLog,
               nowLineOffset: _lineOffsetForRange(
@@ -3981,6 +3994,8 @@ class _GapSlot extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onAddTask;
   final VoidCallback? onAddLog;
+  final String? continueTaskLabel;
+  final VoidCallback? onContinueTask;
   final int futureDurationMinutes;
   final bool showPastPrompt;
   final double? nowLineOffset;
@@ -3997,6 +4012,8 @@ class _GapSlot extends StatelessWidget {
     required this.onTap,
     this.onAddTask,
     this.onAddLog,
+    this.continueTaskLabel,
+    this.onContinueTask,
     this.futureDurationMinutes = 0,
     this.showPastPrompt = false,
     this.nowLineOffset,

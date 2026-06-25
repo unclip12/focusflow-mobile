@@ -272,6 +272,37 @@ class _TrackNowScreenState extends State<TrackNowScreen>
     );
   }
 
+  Future<bool?> _showContinueLastTaskDialog(FlowActivity activity) {
+    final formatTime = DateFormat('h:mm a');
+    final startTime = activity.startedAt != null ? formatTime.format(DateTime.parse(activity.startedAt!).toLocal()) : 'earlier';
+    final endTime = activity.completedAt != null ? formatTime.format(DateTime.parse(activity.completedAt!).toLocal()) : 'recently';
+    
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Continue previous session?'),
+        content: Text(
+          'You recently tracked "${activity.label}" from $startTime to $endTime.\n\n'
+          'Do you want to continue that session (merging the gap since it ended) or start a new timer?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(null),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Start New'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<bool> _confirmCascadePush() async {
     final result = await showDialog<bool>(
       context: context,
@@ -670,6 +701,37 @@ class _TrackNowScreenState extends State<TrackNowScreen>
       }
       await app.pausePlannedBlock(widget.dateKey, activeBlock.id);
       _pausedPlannedBlockId = activeBlock.id;
+    }
+
+    final lastActivity = app.getLastCompletedTrackedActivity(widget.dateKey);
+    if (lastActivity != null && lastActivity.label.trim() == name.trim()) {
+      final continueSession = await _showContinueLastTaskDialog(lastActivity);
+      if (continueSession == null) return; // user dismissed/cancelled
+
+      if (continueSession == true) {
+        final resumed = await app.resumeTrackNow(widget.dateKey, lastActivity.id);
+        if (resumed != null) {
+          final originalStart = DateTime.parse(resumed.startedAt!);
+          final actualStart = originalStart.subtract(Duration(minutes: _backfillMinutes));
+          
+          if (_backfillMinutes > 0) {
+            await app.updateFlowActivity(
+              widget.dateKey,
+              resumed.copyWith(startedAt: actualStart.toIso8601String()),
+            );
+          }
+
+          setState(() {
+            _isTracking = true;
+            _trackingActivityId = resumed.id;
+            _startedAt = actualStart;
+            _elapsed = DateTime.now().difference(actualStart).inSeconds;
+            _notesHint = _generateNotesHint(name);
+          });
+          _startTimer();
+          return;
+        }
+      }
     }
 
     final activity = await app.startTrackNow(

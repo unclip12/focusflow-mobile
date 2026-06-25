@@ -54,19 +54,9 @@ class BackupService {
   static const _kLastActiveTab = 'lastActiveTab';
   static const _manifestFileName = 'manifest.json';
   static const _attachmentsRoot = 'attachments';
-  static const Set<String> _durablePreferenceKeys = {
-    _kFaViewMode,
-    _kGeneralTaskNames,
-    _kFaSeededKey,
-    _kBackupAuto,
-    _kBackupFrequency,
-  };
-  static const Set<String> _appOwnedPreferenceKeys = {
-    ..._durablePreferenceKeys,
+  static const Set<String> _ephemeralPreferenceKeys = {
     _kActiveRoutineRun,
     _kActiveStudySession,
-    _kLastActiveTab,
-    _kBackupHistory,
     _kLastBackupPath,
     _kLastBackupTime,
   };
@@ -117,7 +107,8 @@ class BackupService {
   static Future<Map<String, dynamic>> _collectSharedPreferences() async {
     final prefs = await SharedPreferences.getInstance();
     final values = <String, dynamic>{};
-    for (final key in _durablePreferenceKeys) {
+    for (final key in prefs.getKeys()) {
+      if (_ephemeralPreferenceKeys.contains(key)) continue;
       final value = _readPreferenceValue(prefs, key);
       if (value == null) continue;
       if (value is List<String>) {
@@ -459,14 +450,18 @@ class BackupService {
   ) async {
     final spMap = data['shared_preferences'] as Map<String, dynamic>?;
     final prefs = await SharedPreferences.getInstance();
-    for (final key in _appOwnedPreferenceKeys) {
-      await prefs.remove(key);
+    
+    // Clear all existing keys except ephemeral ones before restoring
+    for (final key in prefs.getKeys()) {
+      if (!_ephemeralPreferenceKeys.contains(key)) {
+        await prefs.remove(key);
+      }
     }
     if (spMap == null) return;
 
     for (final entry in spMap.entries) {
       final key = entry.key;
-      if (!_durablePreferenceKeys.contains(key)) continue;
+      if (_ephemeralPreferenceKeys.contains(key)) continue;
       final value = entry.value;
       try {
         if (value is bool) {

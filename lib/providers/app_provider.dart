@@ -4012,6 +4012,51 @@ class AppProvider extends ChangeNotifier {
     BackgroundTimerService.stop();
   }
 
+  /// Retrieves the very last completed TRACK_NOW activity for a given date.
+  FlowActivity? getLastCompletedTrackedActivity(String date) {
+    final flow = getDailyFlow(date);
+    if (flow == null) return null;
+    
+    final completedTracks = flow.activities.where((a) => a.activityType == 'TRACK_NOW' && a.status == 'DONE' && a.completedAt != null).toList();
+    if (completedTracks.isEmpty) return null;
+    
+    completedTracks.sort((a, b) => b.completedAt!.compareTo(a.completedAt!));
+    return completedTracks.first;
+  }
+
+  /// Resumes a previously completed TRACK_NOW activity.
+  /// Clears completedAt, durationSeconds and sets status to IN_PROGRESS.
+  Future<FlowActivity?> resumeTrackNow(String date, String activityId) async {
+    final flow = getDailyFlow(date);
+    if (flow == null) return null;
+
+    final activities = List<FlowActivity>.from(flow.activities);
+    final idx = activities.indexWhere((a) => a.id == activityId);
+    if (idx < 0) return null;
+
+    final old = activities[idx];
+    final activity = FlowActivity(
+      id: old.id,
+      label: old.label,
+      icon: old.icon,
+      activityType: old.activityType,
+      routineId: old.routineId,
+      linkedTaskIds: old.linkedTaskIds,
+      sortOrder: old.sortOrder,
+      status: 'IN_PROGRESS', // Resumed
+      startedAt: old.startedAt,
+      completedAt: null, // Cleared
+      durationSeconds: null, // Cleared
+      pausedUntil: old.pausedUntil,
+      notes: old.notes,
+      category: old.category,
+    );
+
+    activities[idx] = activity;
+    await upsertDailyFlow(flow.copyWith(activities: activities));
+    return activity;
+  }
+
   /// Stop the Track Now timer and mark activity as DONE.
   Future<void> stopTrackNow(
     String date,
