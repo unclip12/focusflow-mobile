@@ -7,6 +7,7 @@ import 'app_router.dart';
 import 'providers/settings_provider.dart';
 import 'services/notification_service.dart';
 import 'utils/app_theme.dart';
+import 'ui/widgets/floating_ai_chat.dart';
 
 /// Root widget — wires theme + router together.
 /// Theme is driven by SettingsProvider (12 themes, dark mode, accent colour).
@@ -105,6 +106,12 @@ class _FocusFlowAppState extends State<FocusFlowApp> {
       themeMode: themeMode,
       routerConfig: appRouter,
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          FloatingAiChat.show(context);
+        });
+        return child!;
+      },
     );
   }
 }

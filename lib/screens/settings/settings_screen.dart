@@ -24,7 +24,8 @@ import 'package:focusflow_mobile/utils/show_app_bottom_sheet.dart';
 import 'package:focusflow_mobile/widgets/app_scaffold.dart';
 import 'package:focusflow_mobile/widgets/liquid_glass_card.dart';
 import 'package:focusflow_mobile/screens/settings/theme_picker_card.dart';
-
+import '../../services/ai/model_manager_service.dart';
+import '../../services/ai/assembly_ai_service.dart';
 const String _kInterFontFamily = 'Inter';
 
 TextStyle _interTextStyle({
@@ -689,6 +690,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _GlassSectionHeader(title: 'Menu'),
           const SizedBox(height: 8),
           _MenuReorderSection(sp: sp),
+          const SizedBox(height: 20),
+          // ═════════════════════════════════════════════════════════════════════
+          // AI ASSISTANT
+          // ═════════════════════════════════════════════════════════════════════
+          _GlassSectionHeader(title: 'AI Assistant'),
+          const SizedBox(height: 8),
+          LiquidGlassCard(
+            child: Column(
+              children: [
+                _GlassListTile(
+                  icon: Icons.smart_toy_rounded,
+                  iconColor: DashboardColors.primary,
+                  title: 'Gemma 2B Model',
+                  subtitle: 'Download offline AI model',
+                  trailing: Icon(Icons.download_rounded,
+                      color: DashboardColors.textSecondary, size: 20),
+                  onTap: () {
+                    _showModelManagerDialog(context);
+                  },
+                ),
+                Divider(
+                    height: 1,
+                    color: DashboardColors.glassBorder(
+                        Theme.of(context).brightness == Brightness.dark)),
+                _GlassListTile(
+                  icon: Icons.mic_rounded,
+                  iconColor: Colors.purple,
+                  title: 'AssemblyAI Key',
+                  subtitle: 'For voice transcription',
+                  trailing: Icon(Icons.edit_rounded,
+                      color: DashboardColors.textSecondary, size: 20),
+                  onTap: () {
+                    _showAssemblyAiKeyDialog(context);
+                  },
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 20),
 
           // ═════════════════════════════════════════════════════════════════════
@@ -2329,4 +2368,75 @@ class _ChangelogItem extends StatelessWidget {
       ),
     );
   }
+}
+void _showModelManagerDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Download Gemma Model'),
+      content: const Text('This will download the 2GB offline Gemma model to your device storage.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Download started in background...')),
+            );
+            ModelManagerService().downloadModel(
+              onReceiveProgress: (received, total) {
+                // To be implemented: update UI with progress
+              },
+              onSuccess: (path) {
+                // To be implemented: notify success
+              },
+              onError: (error) {
+                // To be implemented: show error toast
+              },
+            );
+          },
+          child: const Text('Download'),
+        ),
+      ],
+    ),
+  );
+}
+
+void _showAssemblyAiKeyDialog(BuildContext context) async {
+  final TextEditingController controller = TextEditingController();
+  final service = AssemblyAiService();
+  final currentKey = await service.getApiKey();
+  controller.text = currentKey ?? '';
+
+  if (!context.mounted) return;
+
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('AssemblyAI API Key'),
+      content: TextField(
+        controller: controller,
+        decoration: const InputDecoration(
+          labelText: 'API Key',
+          border: OutlineInputBorder(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () async {
+            await service.saveApiKey(controller.text.trim());
+            if (context.mounted) Navigator.pop(context);
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    ),
+  );
 }
