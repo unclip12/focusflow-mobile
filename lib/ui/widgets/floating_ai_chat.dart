@@ -35,7 +35,6 @@ class _FloatingChatWidget extends StatefulWidget {
   final VoidCallback onClose;
 
   const _FloatingChatWidget({
-    super.key,
     required this.messages,
     required this.llmService,
     required this.onClose,
