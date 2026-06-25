@@ -699,15 +699,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
           LiquidGlassCard(
             child: Column(
               children: [
-                _GlassListTile(
-                  icon: Icons.smart_toy_rounded,
-                  iconColor: DashboardColors.primary,
-                  title: 'Gemma 2B Model',
-                  subtitle: 'Download offline AI model',
-                  trailing: Icon(Icons.download_rounded,
-                      color: DashboardColors.textSecondary, size: 20),
-                  onTap: () {
-                    _showModelManagerDialog(context);
+                ValueListenableBuilder<double?>(
+                  valueListenable: ModelManagerService().downloadProgressNotifier,
+                  builder: (context, progress, child) {
+                    final bool isDownloading = progress != null;
+                    return _GlassListTile(
+                      icon: Icons.smart_toy_rounded,
+                      iconColor: DashboardColors.primary,
+                      title: 'Gemma 4 Model (2B)',
+                      subtitle: isDownloading 
+                          ? '${(progress * 100).toStringAsFixed(1)}% downloaded'
+                          : 'Download offline AI model',
+                      trailing: isDownloading
+                          ? SizedBox(
+                              width: 100,
+                              child: LinearProgressIndicator(
+                                value: progress,
+                                backgroundColor: DashboardColors.primary.withValues(alpha: 0.2),
+                                valueColor: AlwaysStoppedAnimation<Color>(DashboardColors.primary),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            )
+                          : Icon(Icons.download_rounded, color: DashboardColors.textSecondary, size: 20),
+                      onTap: isDownloading ? null : () {
+                        _showModelManagerDialog(context);
+                      },
+                    );
                   },
                 ),
                 Divider(
@@ -2373,8 +2390,8 @@ void _showModelManagerDialog(BuildContext context) {
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Download Gemma Model'),
-      content: const Text('This will download the 2GB offline Gemma model to your device storage.'),
+      title: const Text('Download Gemma 4 Model'),
+      content: const Text('This will download the 2GB offline Gemma 4 model to your device storage.'),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
@@ -2388,13 +2405,21 @@ void _showModelManagerDialog(BuildContext context) {
             );
             ModelManagerService().downloadModel(
               onReceiveProgress: (received, total) {
-                // To be implemented: update UI with progress
+                // Handled globally by Notifier
               },
               onSuccess: (path) {
-                // To be implemented: notify success
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Model downloaded successfully!')),
+                  );
+                }
               },
               onError: (error) {
-                // To be implemented: show error toast
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Download failed: $error')),
+                  );
+                }
               },
             );
           },

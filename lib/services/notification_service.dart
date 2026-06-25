@@ -1087,4 +1087,32 @@ class NotificationService {
         return block.title;
     }
   }
+
+  Future<void> showDownloadProgress(int progress, int max) async {
+    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'model_download',
+      'Model Downloads',
+      channelDescription: 'Progress of offline AI model downloads',
+      channelShowBadge: false,
+      importance: Importance.low,
+      priority: Priority.low,
+      onlyAlertOnce: true,
+      showProgress: true,
+      maxProgress: max,
+      progress: progress,
+      icon: '@mipmap/ic_launcher',
+    );
+    final NotificationDetails details = NotificationDetails(android: androidDetails);
+    
+    await _plugin.show(
+      5001, // Download Notification ID
+      'Downloading Gemma 4 Model',
+      '${(progress / 1024 / 1024).toStringAsFixed(1)} MB / ${(max / 1024 / 1024).toStringAsFixed(1)} MB',
+      details,
+    );
+  }
+
+  Future<void> clearDownloadProgress() async {
+    await _plugin.cancel(5001);
+  }
 }

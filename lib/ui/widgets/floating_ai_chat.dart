@@ -1,31 +1,31 @@
 import 'package:flutter/material.dart';
 import '../../services/ai/local_llm_service.dart';
 
-class FloatingAiChat {
-  static OverlayEntry? _overlayEntry;
+class PersistentAiChatWidget extends StatefulWidget {
+  const PersistentAiChatWidget({super.key});
+
+  @override
+  State<PersistentAiChatWidget> createState() => _PersistentAiChatWidgetState();
+}
+
+class _PersistentAiChatWidgetState extends State<PersistentAiChatWidget> {
   static final List<Map<String, String>> _messages = [];
   static final LocalLlmService _llmService = LocalLlmService();
+  bool _isVisible = true;
 
-  static void show(BuildContext context) {
-    if (_overlayEntry != null) return;
+  @override
+  Widget build(BuildContext context) {
+    if (!_isVisible) return const SizedBox.shrink();
 
-    _overlayEntry = OverlayEntry(
-      builder: (context) => _FloatingChatWidget(
-        messages: _messages,
-        llmService: _llmService,
-        onClose: () {
-          _overlayEntry?.remove();
-          _overlayEntry = null;
-        },
-      ),
+    return _FloatingChatWidget(
+      messages: _messages,
+      llmService: _llmService,
+      onClose: () {
+        setState(() {
+          _isVisible = false;
+        });
+      },
     );
-
-    Overlay.of(context).insert(_overlayEntry!);
-  }
-
-  static void hide() {
-    _overlayEntry?.remove();
-    _overlayEntry = null;
   }
 }
 

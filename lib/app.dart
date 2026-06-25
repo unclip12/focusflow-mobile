@@ -107,10 +107,15 @@ class _FocusFlowAppState extends State<FocusFlowApp> {
       routerConfig: appRouter,
       debugShowCheckedModeBanner: false,
       builder: (context, child) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          FloatingAiChat.show(context);
-        });
-        return child!;
+        return Directionality(
+          textDirection: TextDirection.ltr,
+          child: Stack(
+            children: [
+              if (child != null) child,
+              const PersistentAiChatWidget(),
+            ],
+          ),
+        );
       },
     );
   }
