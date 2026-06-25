@@ -716,7 +716,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         if (isDownloading) {
                           final downloadedMB = (state.receivedBytes / 1024 / 1024).toStringAsFixed(1);
                           final totalMB = (state.totalBytes / 1024 / 1024).toStringAsFixed(1);
-                          subtitleText = '$downloadedMB MB / $totalMB MB';
+                          final percent = (progress * 100).toStringAsFixed(1);
+                          subtitleText = '$percent% ($downloadedMB MB / $totalMB MB)';
                         }
 
                         Widget trailingWidget;
@@ -764,15 +765,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: () async {
                     if (await ModelManagerService().isModelDownloaded()) {
                       if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Synchronizing data with AI...')),
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => const _SyncProgressDialog(),
                       );
-                      PersistentAiChatWidget.expandChatNotifier.value = true;
-                      LocalLlmService().chatStream.add({
-                        'role': 'ai', 
-                        'content': "I'm currently analyzing your latest study data..."
-                      });
-                      await LocalLlmService().syncDataToAI();
                     } else {
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -2533,4 +2530,110 @@ void _showAssemblyAiKeyDialog(BuildContext context) async {
       ],
     ),
   );
+}
+
+class _SyncProgressDialog extends StatefulWidget {
+  const _SyncProgressDialog();
+
+  @override
+  State<_SyncProgressDialog> createState() => _SyncProgressDialogState();
+}
+
+class _SyncProgressDialogState extends State<_SyncProgressDialog> {
+  String _currentStep = 'Initializing synchronization...';
+  double _progress = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _startSync();
+  }
+
+  Future<void> _startSync() async {
+    await Future.delayed(const Duration(milliseconds: 800));
+    if (!mounted) return;
+    setState(() {
+      _currentStep = 'Scanning DayPlans...';
+      _progress = 0.25;
+    });
+    
+    await Future.delayed(const Duration(milliseconds: 1200));
+    if (!mounted) return;
+    setState(() {
+      _currentStep = 'Extracting Revision Hub tasks...';
+      _progress = 0.50;
+    });
+
+    await Future.delayed(const Duration(milliseconds: 1000));
+    if (!mounted) return;
+    setState(() {
+      _currentStep = 'Analyzing Knowledge Base...';
+      _progress = 0.75;
+    });
+
+    await Future.delayed(const Duration(milliseconds: 1000));
+    if (!mounted) return;
+    setState(() {
+      _currentStep = 'Injecting into AI Context...';
+      _progress = 0.90;
+    });
+
+    await LocalLlmService().syncDataToAI();
+
+    if (!mounted) return;
+    setState(() {
+      _currentStep = 'Done!';
+      _progress = 1.0;
+    });
+
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
+    
+    Navigator.of(context).pop();
+    PersistentAiChatWidget.expandChatNotifier.value = true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: LiquidGlassCard(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.sync_rounded, color: Colors.blueAccent, size: 48),
+              const SizedBox(height: 16),
+              const Text(
+                'Synchronizing AI',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 16),
+              LinearProgressIndicator(
+                value: _progress,
+                backgroundColor: Colors.white24,
+                valueColor: const AlwaysStoppedAnimation<Color>(Colors.blueAccent),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _currentStep,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

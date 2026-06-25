@@ -8,6 +8,7 @@ import 'providers/settings_provider.dart';
 import 'services/notification_service.dart';
 import 'services/background_timer_service.dart';
 import 'services/offline_suggestion_catalog.dart';
+import 'services/ai/local_llm_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,6 +39,9 @@ void main() async {
 
   // Schedule persistent daily notifications after data is ready
   _scheduleStartupNotifications(appProvider, settingsProvider);
+
+  // Initialize the Local LLM if the model has already been downloaded
+  await LocalLlmService().initializeIfDownloaded();
 
   // ── UI is up immediately ──────────────────────────────────────
   // All heavy work (DB init, seeding FA/Sketchy/Pathoma/UWorld)

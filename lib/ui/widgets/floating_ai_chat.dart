@@ -302,10 +302,6 @@ class _FloatingChatWidgetState extends State<_FloatingChatWidget> {
                     });
                   },
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
-                  onPressed: widget.onClose,
-                ),
               ],
             )
           ],

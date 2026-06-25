@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:llama_cpp_dart/llama_cpp_dart.dart';
+import 'model_manager_service.dart';
 
 class LocalLlmService {
   static final LocalLlmService _instance = LocalLlmService._internal();
@@ -13,6 +14,13 @@ class LocalLlmService {
   final StreamController<Map<String, String>> chatStream = StreamController<Map<String, String>>.broadcast();
 
   bool get isReady => _isReady;
+
+  Future<void> initializeIfDownloaded() async {
+    if (await ModelManagerService().isModelDownloaded()) {
+      final path = await ModelManagerService().getModelPath();
+      await init(path);
+    }
+  }
 
   Future<void> init(String modelPath) async {
     if (_isReady) return;
