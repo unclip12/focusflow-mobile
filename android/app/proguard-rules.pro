@@ -16,3 +16,9 @@
 
 ## Suppress missing Play Core classes (used by Flutter deferred components but not needed)
 -dontwarn com.google.android.play.core.**
+
+## ML Kit Text Recognition (ignore optional script models)
+-dontwarn com.google.mlkit.vision.text.chinese.**
+-dontwarn com.google.mlkit.vision.text.devanagari.**
+-dontwarn com.google.mlkit.vision.text.japanese.**
+-dontwarn com.google.mlkit.vision.text.korean.**
