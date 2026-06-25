@@ -93,7 +93,7 @@ class _TimePickerSheetState extends State<TimePickerSheet> {
   @override
   void initState() {
     super.initState();
-    _pickerMode = _TimePickerMode.standard;
+    _pickerMode = _TimePickerMode.detailed;
 
     final initialStartMinutes = _snapMinutesToMode(
       _minutesFromHhmm(widget.initialStartTime),
