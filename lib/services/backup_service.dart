@@ -43,15 +43,8 @@ class _BackupAttachmentAsset {
 class BackupService {
   static const _kActiveRoutineRun = 'active_routine_run';
   static const _kActiveStudySession = 'active_study_session';
-  static const _kBackupAuto = 'backup_auto';
-  static const _kBackupFrequency = 'backup_frequency';
-  static const _kBackupHistory = 'backup_history';
-  static const _kFaSeededKey = 'fa_2025_seeded_v3';
-  static const _kFaViewMode = 'faViewMode';
-  static const _kGeneralTaskNames = 'general_task_names';
   static const _kLastBackupPath = 'last_backup_path';
   static const _kLastBackupTime = 'last_backup_time';
-  static const _kLastActiveTab = 'lastActiveTab';
   static const _manifestFileName = 'manifest.json';
   static const _attachmentsRoot = 'attachments';
   static const Set<String> _ephemeralPreferenceKeys = {
