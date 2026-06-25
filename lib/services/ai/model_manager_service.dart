@@ -45,7 +45,7 @@ class ModelManagerService {
       final task = DownloadTask(
         url: _modelDownloadUrl,
         filename: _modelFileName,
-        directory: dir.path,
+        baseDirectory: BaseDirectory.applicationDocuments,
         updates: Updates.statusAndProgress,
         retries: 3,
         allowPause: true,

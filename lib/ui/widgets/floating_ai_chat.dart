@@ -9,6 +9,8 @@ import '../../widgets/liquid_glass_card.dart';
 class PersistentAiChatWidget extends StatefulWidget {
   const PersistentAiChatWidget({super.key});
 
+  static final ValueNotifier<bool> expandChatNotifier = ValueNotifier(false);
+
   @override
   State<PersistentAiChatWidget> createState() => _PersistentAiChatWidgetState();
 }
@@ -17,6 +19,18 @@ class _PersistentAiChatWidgetState extends State<PersistentAiChatWidget> {
   static final List<Map<String, String>> _messages = [];
   static final LocalLlmService _llmService = LocalLlmService();
   bool _isVisible = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _llmService.chatStream.stream.listen((msg) {
+      if (mounted) {
+        setState(() {
+          _messages.add(msg);
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +68,28 @@ class _FloatingChatWidgetState extends State<_FloatingChatWidget> {
   bool isExpanded = false;
   final TextEditingController _controller = TextEditingController();
   bool isTyping = false;
+
+  @override
+  void initState() {
+    super.initState();
+    PersistentAiChatWidget.expandChatNotifier.addListener(_onExpandRequested);
+  }
+
+  @override
+  void dispose() {
+    PersistentAiChatWidget.expandChatNotifier.removeListener(_onExpandRequested);
+    super.dispose();
+  }
+
+  void _onExpandRequested() {
+    if (PersistentAiChatWidget.expandChatNotifier.value && !isExpanded && mounted) {
+      setState(() {
+        isExpanded = true;
+      });
+      // Optionally reset the notifier if it's meant to be a one-time trigger
+      PersistentAiChatWidget.expandChatNotifier.value = false;
+    }
+  }
 
   void _sendMessage() async {
     if (_controller.text.trim().isEmpty) return;

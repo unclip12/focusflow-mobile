@@ -8,9 +8,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../ui/widgets/floating_ai_chat.dart';
+import '../../services/ai/local_llm_service.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:focusflow_mobile/providers/app_provider.dart';
@@ -699,39 +701,84 @@ class _SettingsScreenState extends State<SettingsScreen> {
           LiquidGlassCard(
             child: Column(
               children: [
-                ValueListenableBuilder<DownloadState?>(
-                  valueListenable: ModelManagerService().downloadProgressNotifier,
-                  builder: (context, state, child) {
-                    final bool isDownloading = state != null;
-                    final progress = state?.progress ?? 0.0;
+                FutureBuilder<bool>(
+                  future: ModelManagerService().isModelDownloaded(),
+                  builder: (context, snapshot) {
+                    final isDownloaded = snapshot.data ?? false;
                     
-                    String subtitleText = 'Download offline AI model';
-                    if (isDownloading) {
-                      final downloadedMB = (state.receivedBytes / 1024 / 1024).toStringAsFixed(1);
-                      final totalMB = (state.totalBytes / 1024 / 1024).toStringAsFixed(1);
-                      subtitleText = '$downloadedMB MB / $totalMB MB';
-                    }
+                    return ValueListenableBuilder<DownloadState?>(
+                      valueListenable: ModelManagerService().downloadProgressNotifier,
+                      builder: (context, state, child) {
+                        final bool isDownloading = state != null;
+                        final progress = state?.progress ?? 0.0;
+                        
+                        String subtitleText = isDownloaded ? 'Downloaded' : 'Download offline AI model';
+                        if (isDownloading) {
+                          final downloadedMB = (state.receivedBytes / 1024 / 1024).toStringAsFixed(1);
+                          final totalMB = (state.totalBytes / 1024 / 1024).toStringAsFixed(1);
+                          subtitleText = '$downloadedMB MB / $totalMB MB';
+                        }
 
-                    return _GlassListTile(
-                      icon: Icons.smart_toy_rounded,
-                      iconColor: DashboardColors.primary,
-                      title: 'Gemma 4 Model (2B)',
-                      subtitle: subtitleText,
-                      trailing: isDownloading
-                          ? SizedBox(
-                              width: 100,
-                              child: LinearProgressIndicator(
-                                value: progress,
-                                backgroundColor: DashboardColors.primary.withValues(alpha: 0.2),
-                                valueColor: AlwaysStoppedAnimation<Color>(DashboardColors.primary),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            )
-                          : Icon(Icons.download_rounded, color: DashboardColors.textSecondary, size: 20),
-                      onTap: isDownloading ? null : () {
-                        _showModelManagerDialog(context);
+                        Widget trailingWidget;
+                        if (isDownloading) {
+                          trailingWidget = SizedBox(
+                            width: 100,
+                            child: LinearProgressIndicator(
+                              value: progress,
+                              backgroundColor: DashboardColors.primary.withValues(alpha: 0.2),
+                              valueColor: AlwaysStoppedAnimation<Color>(DashboardColors.primary),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          );
+                        } else if (isDownloaded) {
+                          trailingWidget = const Icon(Icons.check_circle_rounded, color: Colors.green, size: 20);
+                        } else {
+                          trailingWidget = Icon(Icons.download_rounded, color: DashboardColors.textSecondary, size: 20);
+                        }
+
+                        return _GlassListTile(
+                          icon: Icons.smart_toy_rounded,
+                          iconColor: DashboardColors.primary,
+                          title: 'Gemma 4 Model (2B)',
+                          subtitle: subtitleText,
+                          trailing: trailingWidget,
+                          onTap: (isDownloading || isDownloaded) ? null : () {
+                            _showModelManagerDialog(context);
+                          },
+                        );
                       },
                     );
+                  },
+                ),
+                Divider(
+                    height: 1,
+                    color: DashboardColors.glassBorder(
+                        Theme.of(context).brightness == Brightness.dark)),
+                _GlassListTile(
+                  icon: Icons.sync_rounded,
+                  iconColor: Colors.blueAccent,
+                  title: 'Synchronize Data',
+                  subtitle: 'Update AI with latest study plans',
+                  trailing: Icon(Icons.chevron_right_rounded,
+                      color: DashboardColors.textSecondary, size: 20),
+                  onTap: () async {
+                    if (await ModelManagerService().isModelDownloaded()) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Synchronizing data with AI...')),
+                      );
+                      PersistentAiChatWidget.expandChatNotifier.value = true;
+                      LocalLlmService().chatStream.add({
+                        'role': 'ai', 
+                        'content': "I'm currently analyzing your latest study data..."
+                      });
+                      await LocalLlmService().syncDataToAI();
+                    } else {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please download the AI model first.')),
+                      );
+                    }
                   },
                 ),
                 Divider(
@@ -2414,12 +2461,27 @@ void _showModelManagerDialog(BuildContext context) {
               onReceiveProgress: (received, total) {
                 // Handled globally by Notifier
               },
-              onSuccess: (path) {
+              onSuccess: (path) async {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Model downloaded successfully!')),
                   );
                 }
+                
+                // Initialize LLM, expand chat, and start syncing data!
+                await LocalLlmService().init(path);
+                
+                // Programmatically expand the chat bubble
+                PersistentAiChatWidget.expandChatNotifier.value = true;
+                
+                // Send automated greeting
+                LocalLlmService().chatStream.add({
+                  'role': 'ai', 
+                  'content': "Hello! I've successfully downloaded. I'm currently analyzing your study data..."
+                });
+                
+                // Trigger background sync
+                await LocalLlmService().syncDataToAI();
               },
               onError: (error) {
                 if (context.mounted) {
