@@ -699,17 +699,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
           LiquidGlassCard(
             child: Column(
               children: [
-                ValueListenableBuilder<double?>(
+                ValueListenableBuilder<DownloadState?>(
                   valueListenable: ModelManagerService().downloadProgressNotifier,
-                  builder: (context, progress, child) {
-                    final bool isDownloading = progress != null;
+                  builder: (context, state, child) {
+                    final bool isDownloading = state != null;
+                    final progress = state?.progress ?? 0.0;
+                    
+                    String subtitleText = 'Download offline AI model';
+                    if (isDownloading) {
+                      final downloadedMB = (state.receivedBytes / 1024 / 1024).toStringAsFixed(1);
+                      final totalMB = (state.totalBytes / 1024 / 1024).toStringAsFixed(1);
+                      subtitleText = '$downloadedMB MB / $totalMB MB';
+                    }
+
                     return _GlassListTile(
                       icon: Icons.smart_toy_rounded,
                       iconColor: DashboardColors.primary,
                       title: 'Gemma 4 Model (2B)',
-                      subtitle: isDownloading 
-                          ? '${(progress * 100).toStringAsFixed(1)}% downloaded'
-                          : 'Download offline AI model',
+                      subtitle: subtitleText,
                       trailing: isDownloading
                           ? SizedBox(
                               width: 100,

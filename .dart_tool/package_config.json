@@ -74,6 +74,12 @@
       "languageVersion": "3.6"
     },
     {
+      "name": "background_downloader",
+      "rootUri": "file:///C:/Users/arsha/AppData/Local/Pub/Cache/hosted/pub.dev/background_downloader-9.5.5",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    },
+    {
       "name": "boolean_selector",
       "rootUri": "file:///C:/Users/arsha/AppData/Local/Pub/Cache/hosted/pub.dev/boolean_selector-2.1.2",
       "packageUri": "lib/",

@@ -1,5 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:syncfusion_flutter_pdf/pdf.dart';
 import '../../services/ai/local_llm_service.dart';
+import '../../widgets/liquid_glass_card.dart';
 
 class PersistentAiChatWidget extends StatefulWidget {
   const PersistentAiChatWidget({super.key});
@@ -63,34 +68,109 @@ class _FloatingChatWidgetState extends State<_FloatingChatWidget> {
 
     try {
       final response = await widget.llmService.generateResponse(text);
-      setState(() {
-        widget.messages.add({'role': 'ai', 'content': response});
-        isTyping = false;
-      });
+      if (mounted) {
+        setState(() {
+          widget.messages.add({'role': 'ai', 'content': response});
+          isTyping = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        widget.messages.add({'role': 'ai', 'content': 'Error: ${e.toString()}'});
-        isTyping = false;
-      });
+      if (mounted) {
+        setState(() {
+          widget.messages.add({'role': 'ai', 'content': 'Error: ${e.toString()}'});
+          isTyping = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickAndProcessAttachment() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg'],
+    );
+
+    if (result == null || result.files.single.path == null) return;
+    final file = File(result.files.single.path!);
+    final ext = result.files.single.extension?.toLowerCase();
+
+    setState(() => isTyping = true);
+
+    try {
+      String extractedText = '';
+      if (ext == 'pdf') {
+        final PdfDocument document = PdfDocument(inputBytes: await file.readAsBytes());
+        final PdfTextExtractor extractor = PdfTextExtractor(document);
+        extractedText = extractor.extractText();
+        document.dispose();
+      } else {
+        final inputImage = InputImage.fromFile(file);
+        final textRecognizer = TextRecognizer();
+        final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+        extractedText = recognizedText.text;
+        textRecognizer.close();
+      }
+
+      if (extractedText.isNotEmpty) {
+        final prompt = 'I am attaching a document/image. Here is the text extracted from it:\n"""$extractedText"""\n\nPlease acknowledge receipt and ask me what I want to do with it.';
+        setState(() {
+          widget.messages.add({'role': 'user', 'content': '[Attachment: ${result.files.single.name}]'});
+        });
+        
+        final response = await widget.llmService.generateResponse(prompt);
+        if (mounted) {
+          setState(() {
+            widget.messages.add({'role': 'ai', 'content': response});
+            isTyping = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            widget.messages.add({'role': 'ai', 'content': 'I could not extract any text from that file.'});
+            isTyping = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          widget.messages.add({'role': 'ai', 'content': 'Error reading attachment: $e'});
+          isTyping = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final maxDx = size.width - (isExpanded ? 320 : 60);
+    final maxDy = size.height - (isExpanded ? 450 : 60);
+    
+    // Constrain position within bounds
+    final clampedPosition = Offset(
+      position.dx.clamp(0.0, maxDx),
+      position.dy.clamp(0.0, maxDy),
+    );
+    
     return Positioned(
-      left: position.dx,
-      top: position.dy,
+      left: clampedPosition.dx,
+      top: clampedPosition.dy,
       child: isExpanded
-          ? _buildExpandedChat()
-          : _buildChatHead(),
+          ? _buildExpandedChat(clampedPosition, maxDx, maxDy)
+          : _buildChatHead(clampedPosition, maxDx, maxDy),
     );
   }
 
-  Widget _buildChatHead() {
+  Widget _buildChatHead(Offset currentPos, double maxDx, double maxDy) {
     return GestureDetector(
       onPanUpdate: (details) {
         setState(() {
-          position += details.delta;
+          position = Offset(
+            (currentPos.dx + details.delta.dx).clamp(0.0, maxDx),
+            (currentPos.dy + details.delta.dy).clamp(0.0, maxDy),
+          );
         });
       },
       onTap: () {
@@ -106,18 +186,16 @@ class _FloatingChatWidgetState extends State<_FloatingChatWidget> {
     );
   }
 
-  Widget _buildExpandedChat() {
+  Widget _buildExpandedChat(Offset currentPos, double maxDx, double maxDy) {
     return Material(
+      color: Colors.transparent,
       elevation: 8,
       borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: 320,
-        height: 450,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
+      child: LiquidGlassCard(
+        child: SizedBox(
+          width: 320,
+          height: 450,
+          child: Column(
           children: [
             _buildChatHeader(),
             Expanded(
@@ -155,6 +233,7 @@ class _FloatingChatWidgetState extends State<_FloatingChatWidget> {
               ),
             _buildChatInput(),
           ],
+        ),
         ),
       ),
     );
@@ -204,6 +283,10 @@ class _FloatingChatWidgetState extends State<_FloatingChatWidget> {
       padding: const EdgeInsets.all(8.0),
       child: Row(
         children: [
+          IconButton(
+            icon: const Icon(Icons.attach_file, color: Colors.blueAccent),
+            onPressed: isTyping ? null : _pickAndProcessAttachment,
+          ),
           Expanded(
             child: TextField(
               controller: _controller,
@@ -216,14 +299,8 @@ class _FloatingChatWidgetState extends State<_FloatingChatWidget> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.mic, color: Colors.blueAccent),
-            onPressed: () {
-              // TODO: Wire AssemblyAiService here
-            },
-          ),
-          IconButton(
             icon: const Icon(Icons.send, color: Colors.blueAccent),
-            onPressed: _sendMessage,
+            onPressed: isTyping ? null : _sendMessage,
           ),
         ],
       ),

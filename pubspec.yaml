@@ -47,6 +47,8 @@ dependencies:
   google_mlkit_text_recognition: ^0.15.0
   record: ^6.2.1
   dio: ^5.9.2
+  background_downloader: ^9.5.5
+  syncfusion_flutter_pdf: ^28.2.12
 
 dev_dependencies:
   flutter_test:

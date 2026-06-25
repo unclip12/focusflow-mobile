@@ -9,6 +9,7 @@
       "dependencies": [
         "archive",
         "audioplayers",
+        "background_downloader",
         "collection",
         "dio",
         "file_picker",
@@ -40,6 +41,7 @@
         "share_plus",
         "shared_preferences",
         "sqflite",
+        "syncfusion_flutter_pdf",
         "syncfusion_flutter_pdfviewer",
         "tflite_flutter",
         "timezone",
@@ -143,6 +145,33 @@
         "stream_channel",
         "test_api",
         "vector_math"
+      ]
+    },
+    {
+      "name": "syncfusion_flutter_pdf",
+      "version": "28.2.12",
+      "dependencies": [
+        "convert",
+        "crypto",
+        "flutter",
+        "http",
+        "intl",
+        "syncfusion_flutter_core",
+        "xml"
+      ]
+    },
+    {
+      "name": "background_downloader",
+      "version": "9.5.5",
+      "dependencies": [
+        "async",
+        "collection",
+        "flutter",
+        "http",
+        "logging",
+        "mime",
+        "path",
+        "path_provider"
       ]
     },
     {
@@ -974,6 +1003,23 @@
       ]
     },
     {
+      "name": "syncfusion_flutter_core",
+      "version": "28.2.12",
+      "dependencies": [
+        "flutter",
+        "vector_math"
+      ]
+    },
+    {
+      "name": "xml",
+      "version": "6.6.1",
+      "dependencies": [
+        "collection",
+        "meta",
+        "petitparser"
+      ]
+    },
+    {
       "name": "dio_web_adapter",
       "version": "2.1.2",
       "dependencies": [
@@ -1358,27 +1404,6 @@
       "dependencies": [
         "flutter",
         "syncfusion_flutter_core"
-      ]
-    },
-    {
-      "name": "syncfusion_flutter_pdf",
-      "version": "28.2.12",
-      "dependencies": [
-        "convert",
-        "crypto",
-        "flutter",
-        "http",
-        "intl",
-        "syncfusion_flutter_core",
-        "xml"
-      ]
-    },
-    {
-      "name": "syncfusion_flutter_core",
-      "version": "28.2.12",
-      "dependencies": [
-        "flutter",
-        "vector_math"
       ]
     },
     {
@@ -1957,12 +1982,11 @@
       ]
     },
     {
-      "name": "xml",
-      "version": "6.6.1",
+      "name": "petitparser",
+      "version": "7.0.2",
       "dependencies": [
         "collection",
-        "meta",
-        "petitparser"
+        "meta"
       ]
     },
     {
@@ -2099,14 +2123,6 @@
       "name": "vm_service",
       "version": "15.0.2",
       "dependencies": []
-    },
-    {
-      "name": "petitparser",
-      "version": "7.0.2",
-      "dependencies": [
-        "collection",
-        "meta"
-      ]
     }
   ],
   "configVersion": 1
