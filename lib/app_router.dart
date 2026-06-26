@@ -131,11 +131,6 @@ final GoRouter appRouter = GoRouter(
           name: Routes.backup,
           builder: (_, __) => const BackupScreen(),
         ),
-        GoRoute(
-          path: '/ai-chat',
-          name: Routes.aiChat,
-          builder: (_, __) => const AiChatListScreen(),
-        ),
       ],
     ),
 
@@ -150,6 +145,13 @@ final GoRouter appRouter = GoRouter(
           plan: extra['plan'],
         );
       },
+    ),
+
+    // ── AI Chat: outside shell — full screen, no nav bar ───────
+    GoRoute(
+      path: '/ai-chat',
+      name: Routes.aiChat,
+      builder: (_, __) => const AiChatListScreen(),
     ),
   ],
 );

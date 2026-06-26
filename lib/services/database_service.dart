@@ -19,7 +19,7 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._();
 
   static const _dbName = 'focusflow.db';
-  static const _dbVersion = 13;
+  static const _dbVersion = 14;
 
   Database? _database;
 
@@ -265,6 +265,7 @@ class DatabaseService {
     // ── V11 tables (Video Lectures) ───────────────────────────
     await _createV11Tables(db);
     await _createV12Tables(db);
+    await _createV13Tables(db);
   }
 
   /// Create G5 tracker tables — called from both _onCreate and _onUpgrade.
@@ -413,6 +414,9 @@ class DatabaseService {
       await _createV12Tables(db);
     }
     if (oldVersion < 13) {
+      await _createV13Tables(db);
+    }
+    if (oldVersion < 14) {
       await _createV13Tables(db);
     }
     // Streak data table — always ensure it exists

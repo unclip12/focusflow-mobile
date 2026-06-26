@@ -6,7 +6,9 @@
 // =============================================================
 
 import 'dart:async';
+import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../ui/widgets/floating_ai_chat.dart';
@@ -2456,12 +2458,55 @@ void _showModelManagerDialog(BuildContext context) {
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Download Gemma 4 Model'),
-      content: const Text('This will download the 2GB offline Gemma 4 model to your device storage.'),
+      title: const Text('Gemma 4 Model (2B)'),
+      content: const Text('You can download the 2GB offline model, or select a .gguf file already saved on your phone.'),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),
+        ),
+        OutlinedButton(
+          onPressed: () async {
+            Navigator.pop(context);
+            final result = await FilePicker.platform.pickFiles(
+              type: FileType.any,
+            );
+            if (result != null && result.files.single.path != null) {
+              final pickedFile = File(result.files.single.path!);
+              final targetPath = await ModelManagerService().getModelPath();
+              
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Importing model... this may take a moment.')),
+                );
+              }
+              
+              try {
+                await pickedFile.copy(targetPath);
+                
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Model imported successfully!')),
+                  );
+                }
+                
+                await LocalLlmService().init(targetPath);
+                PersistentAiChatWidget.expandChatNotifier.value = true;
+                LocalLlmService().chatStream.add({
+                  'role': 'ai', 
+                  'content': "Hello! I've been successfully connected. I'm currently analyzing your study data..."
+                });
+                await LocalLlmService().syncDataToAI();
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to import model: \$e')),
+                  );
+                }
+              }
+            }
+          },
+          child: const Text('Select File'),
         ),
         FilledButton(
           onPressed: () {
@@ -2498,7 +2543,7 @@ void _showModelManagerDialog(BuildContext context) {
               onError: (error) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Download failed: $error')),
+                    SnackBar(content: Text('Download failed: \$error')),
                   );
                 }
               },
