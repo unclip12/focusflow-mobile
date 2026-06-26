@@ -90,6 +90,11 @@ class _AiChatListScreenState extends State<AiChatListScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_rounded,
+              color: isDark ? Colors.white : Colors.black87),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: Text(
           'AI Chats',
           style: GoogleFonts.inter(

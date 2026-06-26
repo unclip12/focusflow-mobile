@@ -4,11 +4,8 @@
 // =============================================================
 
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
 
-import 'package:focusflow_mobile/models/ai_chat.dart';
-import 'package:focusflow_mobile/services/database_service.dart';
-import 'package:focusflow_mobile/screens/ai_chat/ai_chat_screen.dart';
+import 'package:focusflow_mobile/app_router.dart';
 
 class PersistentAiChatWidget extends StatefulWidget {
   const PersistentAiChatWidget({super.key});
@@ -55,50 +52,14 @@ class _PersistentAiChatWidgetState extends State<PersistentAiChatWidget>
 
     setState(() => _isChatOpen = true);
 
-    // Find the most recent conversation, or create a new one
-    final db = DatabaseService.instance;
-    final conversations = await db.getConversations();
-    String conversationId;
-
-    if (conversations.isNotEmpty) {
-      conversationId = conversations.first['id'] as String;
-    } else {
-      conversationId = const Uuid().v4();
-      final now = DateTime.now().toIso8601String();
-      await db.insertConversation(AiConversation(
-        id: conversationId,
-        title: 'New Chat',
-        createdAt: now,
-        updatedAt: now,
-      ).toJson());
-    }
-
     if (!mounted) return;
 
-    // Open the chat screen as a full-screen overlay
-    await Navigator.of(context).push(
-      PageRouteBuilder(
-        opaque: true,
-        barrierDismissible: false,
-        pageBuilder: (context, animation, secondaryAnimation) {
-          return AiChatScreen(conversationId: conversationId);
-        },
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 1),
-              end: Offset.zero,
-            ).animate(CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutCubic,
-            )),
-            child: child,
-          );
-        },
-        transitionDuration: const Duration(milliseconds: 350),
-        reverseTransitionDuration: const Duration(milliseconds: 250),
-      ),
-    );
+    // Open the chat list screen using the global appRouter
+    try {
+      await appRouter.pushNamed(Routes.aiChat);
+    } catch (e) {
+      debugPrint('Error pushing aiChat: $e');
+    }
 
     // When the user presses back / closes the chat, update state
     if (mounted) {
@@ -131,7 +92,7 @@ class _PersistentAiChatWidgetState extends State<PersistentAiChatWidget>
         },
         onTap: () {
           if (_isChatOpen) {
-            Navigator.of(context).maybePop();
+            appRouter.pop();
           } else {
             _openChat();
           }
