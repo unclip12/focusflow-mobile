@@ -3,6 +3,7 @@
 // =============================================================
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -11,16 +12,9 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:uuid/uuid.dart';
 
-import 'dart:convert';
-import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
-
 import 'package:focusflow_mobile/models/ai_chat.dart';
 import 'package:focusflow_mobile/services/database_service.dart';
 import 'package:focusflow_mobile/services/ai/local_llm_service.dart';
-import 'package:focusflow_mobile/services/ai/gemini_service.dart';
-import 'package:focusflow_mobile/providers/settings_provider.dart';
-import 'package:focusflow_mobile/screens/today_plan/track_now_screen.dart';
 
 class AiChatScreen extends StatefulWidget {
   final String conversationId;
@@ -53,31 +47,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     super.dispose();
   }
 
-  void _handleAiAction(String action, dynamic payload) {
-    if (action == 'SHOW_UWORLD_TOPICS') {
-      final topics = List<String>.from(payload['topics'] ?? []);
-      final msg = AiChatMessage(
-        id: const Uuid().v4(),
-        conversationId: widget.conversationId,
-        role: 'ai',
-        content: jsonEncode(topics),
-        type: 'uworld_topics',
-        timestamp: DateTime.now().toIso8601String(),
-      );
-      if (mounted) {
-        setState(() => _messages.add(msg));
-        _scrollToBottom();
-      }
-      _db.insertChatMessage(msg.toJson());
-    } else if (action == 'NAVIGATE_TRACKER') {
-      if (mounted) {
-        final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => TrackNowScreen(dateKey: today),
-        ));
-      }
-    }
-  }
+
 
   Future<void> _loadMessages() async {
     final rows = await _db.getChatMessages(widget.conversationId);
@@ -113,7 +83,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
     
     // Read SettingsProvider before async gap
     if (!mounted) return;
-    final sp = context.read<SettingsProvider>();
     
     _controller.clear();
 
@@ -151,16 +120,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
     // Generate AI response
     try {
-      final geminiApiKey = sp.geminiApiKey;
-      
-      String response;
-      if (geminiApiKey != null && geminiApiKey.isNotEmpty) {
-        final gemini = GeminiService();
-        gemini.initialize(geminiApiKey);
-        response = await gemini.generateResponse(text.trim(), onAction: _handleAiAction);
-      } else {
-        response = await _llm.generateResponse(text.trim());
-      }
+      // Route to Local LLM
+      String response = await _llm.generateResponse(text.trim());
       
       final aiMsg = AiChatMessage(
         id: const Uuid().v4(),

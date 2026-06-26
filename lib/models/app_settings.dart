@@ -313,9 +313,6 @@ class AppSettings {
   // Study plan start date — auto-set on first FA page read, editable in settings
   final String? studyPlanStartDate; // ISO8601 date (yyyy-MM-dd)
 
-  // Gemini API Key for AI Integration
-  final String? geminiApiKey;
-
   const AppSettings({
     required this.darkMode,
     this.themeId,
@@ -338,7 +335,6 @@ class AppSettings {
     this.dayStartHour,
     this.streakAutoCredit,
     this.studyPlanStartDate,
-    this.geminiApiKey,
   });
 
   factory AppSettings.defaults() => AppSettings(
@@ -364,7 +360,6 @@ class AppSettings {
         dayStartHour: 5,
         streakAutoCredit: false,
         studyPlanStartDate: null,
-        geminiApiKey: null,
       );
 
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
@@ -399,7 +394,6 @@ class AppSettings {
         dayStartHour: j['dayStartHour'] as int?,
         streakAutoCredit: j['streakAutoCredit'] as bool?,
         studyPlanStartDate: j['studyPlanStartDate'] as String?,
-        geminiApiKey: j['geminiApiKey'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -427,7 +421,6 @@ class AppSettings {
         if (streakAutoCredit != null) 'streakAutoCredit': streakAutoCredit,
         if (studyPlanStartDate != null)
           'studyPlanStartDate': studyPlanStartDate,
-        if (geminiApiKey != null) 'geminiApiKey': geminiApiKey,
       };
 
   AppSettings copyWith({
@@ -452,7 +445,6 @@ class AppSettings {
     int? dayStartHour,
     bool? streakAutoCredit,
     String? studyPlanStartDate,
-    String? geminiApiKey,
   }) =>
       AppSettings(
         darkMode: darkMode ?? this.darkMode,
@@ -476,6 +468,5 @@ class AppSettings {
         dayStartHour: dayStartHour ?? this.dayStartHour,
         streakAutoCredit: streakAutoCredit ?? this.streakAutoCredit,
         studyPlanStartDate: studyPlanStartDate ?? this.studyPlanStartDate,
-        geminiApiKey: geminiApiKey ?? this.geminiApiKey,
       );
 }

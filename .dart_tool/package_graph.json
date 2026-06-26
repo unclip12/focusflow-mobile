@@ -22,11 +22,11 @@
         "flutter_tts",
         "go_router",
         "google_fonts",
-        "google_generative_ai",
         "google_mlkit_text_recognition",
         "http",
         "image_picker",
         "intl",
+        "llama_cpp_dart",
         "media_kit",
         "media_kit_libs_video",
         "media_kit_video",
@@ -148,10 +148,14 @@
       ]
     },
     {
-      "name": "google_generative_ai",
-      "version": "0.4.7",
+      "name": "llama_cpp_dart",
+      "version": "0.1.2+1",
       "dependencies": [
-        "http"
+        "ffi",
+        "flutter",
+        "image",
+        "typed_isolate",
+        "uuid"
       ]
     },
     {
@@ -999,6 +1003,27 @@
       ]
     },
     {
+      "name": "image",
+      "version": "4.8.0",
+      "dependencies": [
+        "archive",
+        "meta",
+        "xml"
+      ]
+    },
+    {
+      "name": "typed_isolate",
+      "version": "6.0.0",
+      "dependencies": [
+        "meta"
+      ]
+    },
+    {
+      "name": "ffi",
+      "version": "2.2.0",
+      "dependencies": []
+    },
+    {
       "name": "syncfusion_flutter_core",
       "version": "28.2.12",
       "dependencies": [
@@ -1099,11 +1124,6 @@
       "dependencies": [
         "flutter"
       ]
-    },
-    {
-      "name": "ffi",
-      "version": "2.2.0",
-      "dependencies": []
     },
     {
       "name": "quiver",
@@ -1332,15 +1352,6 @@
       "dependencies": [
         "path",
         "safe_local_storage"
-      ]
-    },
-    {
-      "name": "image",
-      "version": "4.8.0",
-      "dependencies": [
-        "archive",
-        "meta",
-        "xml"
       ]
     },
     {

@@ -13,6 +13,9 @@ import 'package:focusflow_mobile/models/pathoma_chapter.dart';
 import 'package:focusflow_mobile/models/fa_subtopic.dart';
 import 'package:focusflow_mobile/models/activity_log.dart';
 import 'package:focusflow_mobile/models/video_lecture.dart';
+import 'package:focusflow_mobile/models/day_plan.dart';
+import 'package:focusflow_mobile/services/ai/ai_memory_sync_service.dart';
+import 'package:flutter/foundation.dart';
 
 class DatabaseService {
   DatabaseService._();
@@ -641,7 +644,13 @@ class DatabaseService {
 
   Future<int> insertActivityLog(ActivityLogEntry entry) async {
     final db = await database;
-    return db.insert(tActivityLogs, entry.toMap()..remove('id'));
+    final result = await db.insert(tActivityLogs, entry.toMap()..remove('id'));
+    try {
+      AiMemorySyncService().syncActivityLog(entry);
+    } catch (e) {
+      debugPrint('Error syncing activity log to AI: $e');
+    }
+    return result;
   }
 
   Future<List<ActivityLogEntry>> getActivityLogsByItem(String itemId) async {
@@ -722,8 +731,21 @@ class DatabaseService {
   // DAY PLANS — date is primary key
   // ═══════════════════════════════════════════════════════════════
 
-  Future<void> upsertDayPlan(Map<String, dynamic> json) =>
-      upsert(tDayPlans, 'date', json['date'] ?? '', json);
+  Future<void> upsertDayPlan(Map<String, dynamic> json) async {
+    await upsert(tDayPlans, 'date', json['date'] ?? '', json);
+    if (json['date'] != null && json['data'] != null) {
+      try {
+        final blocks = (jsonDecode(json['data']) as List)
+            .map((e) => Block.fromJson(e as Map<String, dynamic>))
+            .toList();
+        for (final block in blocks) {
+          AiMemorySyncService().syncTimelineBlock(json['date'], block);
+        }
+      } catch (e) {
+        debugPrint('Error syncing day plan to AI: $e');
+      }
+    }
+  }
 
   Future<Map<String, dynamic>?> getDayPlan(String date) =>
       getById(tDayPlans, 'date', date);

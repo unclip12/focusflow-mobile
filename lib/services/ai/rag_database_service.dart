@@ -48,6 +48,27 @@ class RagDatabaseService {
     _box.put(doc);
   }
 
+  Future<void> batchIndexDocuments(List<Map<String, String>> items) async {
+    final docs = <DocumentVector>[];
+    for (final item in items) {
+      final text = item['text']!;
+      final sourceId = item['sourceId']!;
+      final sourceType = item['sourceType']!;
+      final embedding = await _getEmbedding(text);
+      if (embedding.isNotEmpty) {
+        docs.add(DocumentVector(
+          text: text,
+          sourceId: sourceId,
+          sourceType: sourceType,
+          embedding: embedding,
+        ));
+      }
+    }
+    if (docs.isNotEmpty) {
+      _box.putMany(docs);
+    }
+  }
+
   Future<List<DocumentVector>> searchRelevantContext(String query, {int limit = 5}) async {
     final queryEmbedding = await _getEmbedding(query);
     if (queryEmbedding.isEmpty) return [];

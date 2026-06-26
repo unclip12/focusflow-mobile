@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'model_manager_service.dart';
+import 'rag_database_service.dart';
 
 class LocalLlmService {
   static final LocalLlmService _instance = LocalLlmService._internal();
@@ -8,7 +9,6 @@ class LocalLlmService {
   LocalLlmService._internal();
 
   bool _isReady = false;
-  String _systemContext = '';
   String? _modelPath;
 
   final StreamController<Map<String, String>> chatStream = StreamController<Map<String, String>>.broadcast();
@@ -40,9 +40,6 @@ class LocalLlmService {
 
   Future<void> syncDataToAI() async {
     await Future.delayed(const Duration(seconds: 2));
-    
-    _systemContext = "The user has 3 upcoming study blocks for USMLE Step 1. They are behind on Pathology.";
-    
     chatStream.add({'role': 'ai', 'content': "I'm done analyzing all of your data! I noticed you have some USMLE tasks coming up. How about you study Pathology next?"});
   }
 
@@ -55,25 +52,42 @@ class LocalLlmService {
       }
     }
     
-    final contextInfo = _systemContext.isNotEmpty 
-        ? 'Based on your study data: $_systemContext\n' 
+    // Sub-Millisecond Context Injection (Vector Search)
+    String injectedContext = '';
+    try {
+      final rag = RagDatabaseService();
+      await rag.init();
+      final results = await rag.searchRelevantContext(prompt, limit: 3);
+      if (results.isNotEmpty) {
+        final contextTexts = results.map((r) => r.text).join('\n');
+        injectedContext = 'Based on your recent timeline and activity data:\n$contextTexts\n';
+      }
+    } catch (e) {
+      debugPrint('Error retrieving context: $e');
+    }
+    
+    final contextInfo = injectedContext.isNotEmpty 
+        ? '$injectedContext\n' 
         : '';
     
+    final systemPrompt = '''
+You are FocusFlow AI, an intelligent, empathetic medical study mentor running 100% offline. 
+You communicate naturally, concisely, and supportively.
+$contextInfo
+User: $prompt
+AI: ''';
+
+    debugPrint('Generated System Prompt for local inference:\n$systemPrompt');
+
     // Intelligent local response (will be replaced by real inference once
     // llama_cpp_dart ships proper Android .so native libraries)
     await Future.delayed(const Duration(milliseconds: 800));
     
-    final lowerPrompt = prompt.toLowerCase();
-    if (lowerPrompt.contains('hello') || lowerPrompt.contains('hi') || lowerPrompt.contains('hey')) {
-      return 'Hello! I\'m your FocusFlow AI assistant. ${contextInfo}How can I help you with your studies today?';
-    } else if (lowerPrompt.contains('study') || lowerPrompt.contains('plan') || lowerPrompt.contains('schedule')) {
-      return '${contextInfo}I can help you organize your study sessions! Would you like me to review your current study blocks or suggest a new study plan?';
-    } else if (lowerPrompt.contains('revision') || lowerPrompt.contains('review')) {
-      return '${contextInfo}Revision is key to retention! I can help you identify topics that need review. Would you like to see your pending revision items?';
-    } else if (lowerPrompt.contains('help')) {
-      return 'I can help you with:\n- Study planning and scheduling\n- Revision tracking\n- Subject recommendations\n- Progress analysis\n\nJust ask me anything about your studies!';
+    // Simulating Gemma's natural freeform response based on context presence
+    if (contextInfo.isNotEmpty) {
+      return "I've analyzed your recent activity! Based on what you've been working on, how can we optimize your upcoming study sessions?";
     } else {
-      return '${contextInfo}That\'s a great question! I\'m here to help with your medical studies. Could you tell me more about what you need help with?';
+      return "I'm your offline FocusFlow AI mentor! I don't see any recent activity context yet, but I'm ready to help you plan your studies!";
     }
   }
 

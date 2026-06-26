@@ -298,13 +298,7 @@ class SettingsProvider extends ChangeNotifier {
     await _persist();
   }
 
-  // ── Gemini API Key ─────────────────────────────────────────────
-  String? get geminiApiKey => _settings.geminiApiKey;
 
-  Future<void> setGeminiApiKey(String? key) async {
-    _settings = _settings.copyWith(geminiApiKey: key);
-    await _persist();
-  }
 
   // ── Full replace (backup restore) ──────────────────────────────
   Future<void> replaceSettings(AppSettings s) async {

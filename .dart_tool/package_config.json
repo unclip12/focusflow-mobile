@@ -416,12 +416,6 @@
       "languageVersion": "3.9"
     },
     {
-      "name": "google_generative_ai",
-      "rootUri": "file:///C:/Users/arsha/AppData/Local/Pub/Cache/hosted/pub.dev/google_generative_ai-0.4.7",
-      "packageUri": "lib/",
-      "languageVersion": "3.1"
-    },
-    {
       "name": "google_mlkit_commons",
       "rootUri": "file:///C:/Users/arsha/AppData/Local/Pub/Cache/hosted/pub.dev/google_mlkit_commons-0.11.1",
       "packageUri": "lib/",
@@ -564,6 +558,12 @@
       "rootUri": "file:///C:/Users/arsha/AppData/Local/Pub/Cache/hosted/pub.dev/lints-4.0.0",
       "packageUri": "lib/",
       "languageVersion": "3.1"
+    },
+    {
+      "name": "llama_cpp_dart",
+      "rootUri": "file:///C:/Users/arsha/AppData/Local/Pub/Cache/hosted/pub.dev/llama_cpp_dart-0.1.2+1",
+      "packageUri": "lib/",
+      "languageVersion": "3.2"
     },
     {
       "name": "logging",
@@ -1164,6 +1164,12 @@
       "rootUri": "file:///C:/Users/arsha/AppData/Local/Pub/Cache/hosted/pub.dev/typed_data-1.4.0",
       "packageUri": "lib/",
       "languageVersion": "3.5"
+    },
+    {
+      "name": "typed_isolate",
+      "rootUri": "file:///C:/Users/arsha/AppData/Local/Pub/Cache/hosted/pub.dev/typed_isolate-6.0.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.3"
     },
     {
       "name": "universal_platform",
