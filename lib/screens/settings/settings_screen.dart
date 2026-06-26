@@ -2578,6 +2578,7 @@ class _SyncProgressDialogState extends State<_SyncProgressDialog> {
       _progress = 0.90;
     });
 
+    await LocalLlmService().initializeIfDownloaded();
     await LocalLlmService().syncDataToAI();
 
     if (!mounted) return;
