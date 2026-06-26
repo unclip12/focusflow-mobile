@@ -22,6 +22,7 @@
         "flutter_tts",
         "go_router",
         "google_fonts",
+        "google_generative_ai",
         "google_mlkit_text_recognition",
         "http",
         "image_picker",
@@ -144,6 +145,13 @@
         "stream_channel",
         "test_api",
         "vector_math"
+      ]
+    },
+    {
+      "name": "google_generative_ai",
+      "version": "0.4.7",
+      "dependencies": [
+        "http"
       ]
     },
     {

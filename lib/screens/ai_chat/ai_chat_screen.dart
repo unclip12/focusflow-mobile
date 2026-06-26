@@ -11,9 +11,16 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:uuid/uuid.dart';
 
+import 'dart:convert';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+
 import 'package:focusflow_mobile/models/ai_chat.dart';
 import 'package:focusflow_mobile/services/database_service.dart';
 import 'package:focusflow_mobile/services/ai/local_llm_service.dart';
+import 'package:focusflow_mobile/services/ai/gemini_service.dart';
+import 'package:focusflow_mobile/providers/settings_provider.dart';
+import 'package:focusflow_mobile/screens/today_plan/track_now_screen.dart';
 
 class AiChatScreen extends StatefulWidget {
   final String conversationId;
@@ -44,6 +51,32 @@ class _AiChatScreenState extends State<AiChatScreen> {
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _handleAiAction(String action, dynamic payload) {
+    if (action == 'SHOW_UWORLD_TOPICS') {
+      final topics = List<String>.from(payload['topics'] ?? []);
+      final msg = AiChatMessage(
+        id: const Uuid().v4(),
+        conversationId: widget.conversationId,
+        role: 'ai',
+        content: jsonEncode(topics),
+        type: 'uworld_topics',
+        timestamp: DateTime.now().toIso8601String(),
+      );
+      if (mounted) {
+        setState(() => _messages.add(msg));
+        _scrollToBottom();
+      }
+      _db.insertChatMessage(msg.toJson());
+    } else if (action == 'NAVIGATE_TRACKER') {
+      if (mounted) {
+        final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => TrackNowScreen(dateKey: today),
+        ));
+      }
+    }
   }
 
   Future<void> _loadMessages() async {
@@ -77,6 +110,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   Future<void> _sendMessage(String text, {String type = 'text'}) async {
     if (text.trim().isEmpty) return;
+    
+    // Read SettingsProvider before async gap
+    if (!mounted) return;
+    final sp = context.read<SettingsProvider>();
+    
     _controller.clear();
 
     final userMsg = AiChatMessage(
@@ -113,7 +151,17 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
     // Generate AI response
     try {
-      final response = await _llm.generateResponse(text.trim());
+      final geminiApiKey = sp.geminiApiKey;
+      
+      String response;
+      if (geminiApiKey != null && geminiApiKey.isNotEmpty) {
+        final gemini = GeminiService();
+        gemini.initialize(geminiApiKey);
+        response = await gemini.generateResponse(text.trim(), onAction: _handleAiAction);
+      } else {
+        response = await _llm.generateResponse(text.trim());
+      }
+      
       final aiMsg = AiChatMessage(
         id: const Uuid().v4(),
         conversationId: widget.conversationId,
@@ -315,7 +363,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.78,
+          maxWidth: MediaQuery.of(context).size.width * 0.85,
         ),
         decoration: BoxDecoration(
           color: isUser
@@ -372,18 +420,50 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   ],
                 ),
               ),
-            SelectableText(
-              message.content,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                height: 1.5,
-                color: isUser ? Colors.white : (isDark ? Colors.white.withValues(alpha: 0.85) : Colors.black87),
+            if (message.type == 'uworld_topics')
+              _buildUWorldTopicsList(message.content, isDark)
+            else
+              SelectableText(
+                message.content,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  height: 1.5,
+                  color: isUser ? Colors.white : (isDark ? Colors.white.withValues(alpha: 0.85) : Colors.black87),
+                ),
               ),
-            ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildUWorldTopicsList(String content, bool isDark) {
+    try {
+      final topics = List<String>.from(jsonDecode(content));
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Select a UWorld Topic to start tracking:',
+              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: topics.map((topic) {
+              return ActionChip(
+                label: Text(topic, style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : Colors.black87)),
+                backgroundColor: isDark ? Colors.white12 : Colors.black12,
+                onPressed: () {
+                  _sendMessage("Start tracking UWorld topic: $topic");
+                },
+              );
+            }).toList(),
+          ),
+        ],
+      );
+    } catch (e) {
+      return Text('Error displaying topics.', style: TextStyle(color: Colors.red));
+    }
   }
 
   Widget _buildTypingIndicator(bool isDark) {

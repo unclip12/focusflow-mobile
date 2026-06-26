@@ -793,6 +793,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _showAssemblyAiKeyDialog(context);
                   },
                 ),
+                Divider(
+                    height: 1,
+                    color: DashboardColors.glassBorder(
+                        Theme.of(context).brightness == Brightness.dark)),
+                _GlassListTile(
+                  icon: Icons.key_rounded,
+                  iconColor: Colors.orange,
+                  title: 'Gemini API Key',
+                  subtitle: 'Required for advanced AI functionality',
+                  trailing: Icon(Icons.edit_rounded,
+                      color: DashboardColors.textSecondary, size: 20),
+                  onTap: () {
+                    _showGeminiApiKeyDialog(context);
+                  },
+                ),
               ],
             ),
           ),
@@ -2531,6 +2546,59 @@ void _showAssemblyAiKeyDialog(BuildContext context) async {
     ),
   );
 }
+
+  void _showGeminiApiKeyDialog(BuildContext context) {
+    final sp = context.read<SettingsProvider>();
+    final ctrl = TextEditingController(text: sp.geminiApiKey ?? '');
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Gemini API Key', style: _interTextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Enter your Gemini API key to enable intelligent task tracking, logging, and smart interactive study plans.',
+                style: _interTextStyle(fontSize: 14, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: ctrl,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'API Key',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  filled: true,
+                  fillColor: Colors.grey.shade100,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: DashboardColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () {
+                sp.setGeminiApiKey(ctrl.text.trim());
+                Navigator.pop(context);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
 class _SyncProgressDialog extends StatefulWidget {
   const _SyncProgressDialog();
