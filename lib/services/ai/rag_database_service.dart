@@ -4,13 +4,23 @@ import '../../models/ai/document_vector.dart';
 import '../../objectbox.g.dart';
 
 class RagDatabaseService {
-  late final Store _store;
-  late final Box<DocumentVector> _box;
+  // Singleton pattern to prevent "multiple Store instances" error
+  static final RagDatabaseService _instance = RagDatabaseService._internal();
+  factory RagDatabaseService() => _instance;
+  RagDatabaseService._internal();
+
+  Store? _store;
+  Box<DocumentVector>? _box;
   Interpreter? _interpreter;
+  bool _initialized = false;
 
   Future<void> init() async {
-    _store = await openStore();
-    _box = _store.box<DocumentVector>();
+    if (_initialized) return;
+    
+    // Only open if not already attached
+    _store ??= await openStore();
+    _box = _store!.box<DocumentVector>();
+    _initialized = true;
     
     // Load tiny embedding model (must be placed in assets/models/all-MiniLM-L6-v2.tflite)
     try {
@@ -45,7 +55,7 @@ class RagDatabaseService {
       embedding: embedding,
     );
 
-    _box.put(doc);
+    _box!.put(doc);
   }
 
   Future<void> batchIndexDocuments(List<Map<String, String>> items) async {
@@ -65,7 +75,7 @@ class RagDatabaseService {
       }
     }
     if (docs.isNotEmpty) {
-      _box.putMany(docs);
+      _box!.putMany(docs);
     }
   }
 
@@ -73,7 +83,7 @@ class RagDatabaseService {
     final queryEmbedding = await _getEmbedding(query);
     if (queryEmbedding.isEmpty) return [];
 
-    final builder = _box.query(DocumentVector_.embedding.nearestNeighborsF32(queryEmbedding, limit));
+    final builder = _box!.query(DocumentVector_.embedding.nearestNeighborsF32(queryEmbedding, limit));
     final queryObj = builder.build();
     final results = queryObj.find();
     queryObj.close();
