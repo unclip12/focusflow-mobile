@@ -1,7 +1,5 @@
 // =============================================================
 // AppRouter — GoRouter with ShellRoute for bottom nav (G4)
-// /session stays outside shell (full-screen focus timer)
-// /splash is the true initial route — handles all heavy seeding
 // =============================================================
 
 import 'package:flutter/material.dart';
@@ -23,6 +21,7 @@ import 'package:focusflow_mobile/screens/session/session_screen.dart';
 import 'package:focusflow_mobile/screens/tracker/tracker_screen.dart';
 import 'package:focusflow_mobile/screens/import/import_screen.dart';
 import 'package:focusflow_mobile/screens/backup/backup_screen.dart';
+import 'package:focusflow_mobile/screens/ai_chat/ai_chat_list_screen.dart';
 
 // ── Route names ─────────────────────────────────────────────────
 class Routes {
@@ -40,6 +39,8 @@ class Routes {
   static const session       = 'session';
   static const tracker       = 'tracker';
   static const backup        = 'backup';
+  static const aiChat        = 'ai-chat';
+  static const aiChatDetail  = 'ai-chat-detail';
 }
 
 // ── Router ──────────────────────────────────────────────────────
@@ -129,6 +130,11 @@ final GoRouter appRouter = GoRouter(
           path: '/backup',
           name: Routes.backup,
           builder: (_, __) => const BackupScreen(),
+        ),
+        GoRoute(
+          path: '/ai-chat',
+          name: Routes.aiChat,
+          builder: (_, __) => const AiChatListScreen(),
         ),
       ],
     ),

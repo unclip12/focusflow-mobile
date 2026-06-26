@@ -19,7 +19,7 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._();
 
   static const _dbName = 'focusflow.db';
-  static const _dbVersion = 12;
+  static const _dbVersion = 13;
 
   Database? _database;
 
@@ -78,6 +78,8 @@ class DatabaseService {
   static const tVideoLectures = 'video_lectures';
   static const tReminders = 'reminders';
   static const tReminderOccurrences = 'reminder_occurrences';
+  static const tAiConversations = 'ai_conversations';
+  static const tAiChatMessages = 'ai_chat_messages';
 
   Future<void> _onCreate(Database db, int version) async {
     // Knowledge Base — pageNumber is the primary key
@@ -409,6 +411,9 @@ class DatabaseService {
     }
     if (oldVersion < 12) {
       await _createV12Tables(db);
+    }
+    if (oldVersion < 13) {
+      await _createV13Tables(db);
     }
     // Streak data table — always ensure it exists
     await db.execute('''
@@ -1609,5 +1614,75 @@ class DatabaseService {
     final db = await database;
     await db.close();
     _database = null;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // V13: AI CHAT TABLES
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> _createV13Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tAiConversations (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL DEFAULT 'New Chat',
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        lastMessage TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tAiChatMessages (
+        id TEXT PRIMARY KEY,
+        conversationId TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        type TEXT NOT NULL DEFAULT 'text',
+        timestamp TEXT NOT NULL,
+        FOREIGN KEY (conversationId) REFERENCES $tAiConversations(id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_chat_messages_conv ON $tAiChatMessages(conversationId)',
+    );
+  }
+
+  // ── AI Conversations CRUD ─────────────────────────────────────
+
+  Future<void> insertConversation(Map<String, dynamic> data) async {
+    final db = await database;
+    await db.insert(tAiConversations, data, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<Map<String, dynamic>>> getConversations() async {
+    final db = await database;
+    return db.query(tAiConversations, orderBy: 'updatedAt DESC');
+  }
+
+  Future<void> updateConversation(String id, Map<String, dynamic> data) async {
+    final db = await database;
+    await db.update(tAiConversations, data, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> deleteConversation(String id) async {
+    final db = await database;
+    await db.delete(tAiChatMessages, where: 'conversationId = ?', whereArgs: [id]);
+    await db.delete(tAiConversations, where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ── AI Chat Messages CRUD ─────────────────────────────────────
+
+  Future<void> insertChatMessage(Map<String, dynamic> data) async {
+    final db = await database;
+    await db.insert(tAiChatMessages, data, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<Map<String, dynamic>>> getChatMessages(String conversationId) async {
+    final db = await database;
+    return db.query(
+      tAiChatMessages,
+      where: 'conversationId = ?',
+      whereArgs: [conversationId],
+      orderBy: 'timestamp ASC',
+    );
   }
 }

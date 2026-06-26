@@ -33,6 +33,7 @@ class MainShell extends StatefulWidget {
     'analytics': Icons.bar_chart_rounded,
     'settings': Icons.settings_rounded,
     'tracker': Icons.local_library_rounded,
+    'ai-chat': Icons.smart_toy_rounded,
   };
 
   @override

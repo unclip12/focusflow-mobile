@@ -13,6 +13,7 @@ class MenuItemId {
   static const String timeLogger    = 'time-logger';
   static const String analytics     = 'analytics';
   static const String settings      = 'settings';
+  static const String aiChat        = 'ai-chat';
 }
 
 const List<String> kDefaultMenuOrder = [
@@ -41,6 +42,7 @@ const Map<String, String> kPinnableScreenLabels = {
   MenuItemId.revision:      'Revision',
   MenuItemId.analytics:     'Analytics',
   'import':                 'Import',
+  MenuItemId.aiChat:        'AI Chat',
 };
 
 // Default 4 pinned tabs shown in bottom nav
